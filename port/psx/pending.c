@@ -214,24 +214,6 @@ s32 MemCardWriteFile(s32 port, const char *name, const void *buffer, s32 offset,
     hm_unimplemented("MemCardWriteFile");
 }
 
-MATRIX *RotMatrixX(s32 angle, MATRIX *matrix) {
-    (void)angle;
-    (void)matrix;
-    hm_unimplemented("RotMatrixX");
-}
-
-MATRIX *RotMatrixY(s32 angle, MATRIX *matrix) {
-    (void)angle;
-    (void)matrix;
-    hm_unimplemented("RotMatrixY");
-}
-
-MATRIX *RotMatrixZ(s32 angle, MATRIX *matrix) {
-    (void)angle;
-    (void)matrix;
-    hm_unimplemented("RotMatrixZ");
-}
-
 void SetDumpFnt(s32 stream) {
     (void)stream;
     hm_unimplemented("SetDumpFnt");

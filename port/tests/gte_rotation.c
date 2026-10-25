@@ -14,7 +14,15 @@ int main(void) {
     CHECK(RotMatrix(&angle, &out) == &out);
     CHECK(!memcmp(out.m, GsIDMATRIX.m, sizeof(out.m)));
     CHECK(out.t[0] == 1 && out.t[1] == 2 && out.t[2] == 3);
-    angle.vx = 1024;
+    MATRIX composed = GsIDMATRIX;
+    CHECK(RotMatrixY(1024, &composed) == &composed);
+    CHECK(RotMatrixX(1024, &composed) == &composed);
+    CHECK(RotMatrixZ(1024, &composed) == &composed);
+    angle = (SVECTOR){1024, 1024, 1024, 0};
+    RotMatrixZXY(&angle, &out);
+    CHECK(!memcmp(out.m, composed.m, sizeof(out.m)));
+    CHECK(out.t[0] == 1 && out.t[1] == 2 && out.t[2] == 3);
+    angle = (SVECTOR){1024, 0, 0, 0};
     RotMatrix(&angle, &out);
     VECTOR input = {0, 1, 0, 0}, result;
     ApplyMatrixLV(&out, &input, &result);

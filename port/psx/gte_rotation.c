@@ -36,3 +36,21 @@ MATRIX *RotMatrix(const SVECTOR *angle, MATRIX *matrix) {
 MATRIX *RotMatrixZXY(const SVECTOR *angle, MATRIX *matrix) {
     return hm_rotation_angles(angle, matrix, 1);
 }
+
+static MATRIX *hm_rotate_axis(s32 angle, MATRIX *matrix, u32 axis) {
+    SVECTOR angles = {0};
+    s16 value = hm_gte_half(angle);
+    if (axis == 0)
+        angles.vx = value;
+    else if (axis == 1)
+        angles.vy = value;
+    else
+        angles.vz = value;
+    MATRIX rotation;
+    hm_rotation_angles(&angles, &rotation, 0);
+    hm_rotation_product(&rotation, matrix, matrix);
+    return matrix;
+}
+MATRIX *RotMatrixX(s32 angle, MATRIX *matrix) { return hm_rotate_axis(angle, matrix, 0); }
+MATRIX *RotMatrixY(s32 angle, MATRIX *matrix) { return hm_rotate_axis(angle, matrix, 1); }
+MATRIX *RotMatrixZ(s32 angle, MATRIX *matrix) { return hm_rotate_axis(angle, matrix, 2); }

@@ -11,16 +11,6 @@ void debug_hook_run(s32 value) {
     (void)value;
     hm_runtime_error("game.projection fixture", "unexpected model draw");
 }
-#define HM_ROTATION_TRAP(name)                                                                     \
-    MATRIX *name(s32 angle, MATRIX *matrix) {                                                      \
-        (void)angle;                                                                               \
-        (void)matrix;                                                                              \
-        hm_runtime_error("game.projection fixture", "unexpected " #name);                          \
-    }
-HM_ROTATION_TRAP(RotMatrixX)
-HM_ROTATION_TRAP(RotMatrixY)
-HM_ROTATION_TRAP(RotMatrixZ)
-#undef HM_ROTATION_TRAP
 
 int main(void) {
     InitGeom();

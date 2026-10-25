@@ -816,3 +816,21 @@ actual game path requires overlapping transfers.
 
 Reference: https://psx-spx.consoledev.net/graphicsprocessingunitgpu/,
 GPU memory transfer commands and mask-bit settings. No SDK code is used.
+
+<a id="adr-037"></a>
+
+## ADR-037: Apply axis rotations to the existing matrix
+
+Date: 2026-10-26. Status: deterministic reference; SDK quantization pending.
+
+The real-disc path reaches RotMatrixY in camera_frustum_setup. Supply X/Y/Z
+helpers by left-multiplying the existing rotation matrix by the requested axis
+rotation. Preserve translation and use an alias-safe intermediate. Reuse the
+integer Euler path rather than adding a separate sine or rounding policy.
+The test composes Y then X then Z and compares the resulting noncommuting
+quarter turns with the documented ZXY Euler order. SDK product quantization
+remains unverified. Remove the corresponding test-only projection traps now
+that real implementations exist.
+
+Reference: public Run-Time Library Reference 4.7, RotMatrixX page 8-120,
+https://psx.arthus.net/sdk/Psy-Q/DOCS/LibRef47.pdf (axis matrix * m).
