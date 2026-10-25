@@ -26,10 +26,12 @@ static void hm_boot_tick(void *context, u64 tick) {
     if (hm_boot_trace_state && tick % 600 == 0) {
         const FarmPlayer *player = &game_state.player;
         fprintf(stderr,
-                "Game tick %llu: area=%d place=%d,%d entry=%d player=%d,%d,%d mode=%u flags=%08x\n",
+                "Game tick %llu: area=%d place=%d,%d entry=%d player=%d,%d,%d mode=%u flags=%08x "
+                "global=%08x status=%08x\n",
                 (unsigned long long)tick, farm_area.mode.area, farm_area.mode.place.value,
                 farm_area.mode.place.location, game_state.progress.entryStep, player->position.vx,
-                player->position.vy, player->position.vz, player->mode, player->stateFlags);
+                player->position.vy, player->position.vz, player->mode, player->stateFlags,
+                game_state.globalFlags, game_state.statusFlags);
     }
     if (hm_boot_tick_limit && tick > hm_boot_tick_limit) {
         if (hm_boot_capture && !hm_frame_capture(hm_boot_capture)) {
