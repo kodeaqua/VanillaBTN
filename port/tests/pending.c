@@ -3,6 +3,6 @@
 #include <stddef.h>
 
 int main(void) {
-    MoveImage(NULL, 0, 0);
+    FntFlush(0);
     return 1;
 }

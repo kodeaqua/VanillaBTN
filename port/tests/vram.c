@@ -11,7 +11,13 @@
         }                                                                                          \
     } while (0)
 
-int main(void) {
+int main(int argc, char **argv) {
+    (void)argv;
+    if (argc == 2) {
+        RECT overlap = {0, 0, 4, 1};
+        MoveImage(&overlap, 1, 0);
+        return 1;
+    }
     hm_vram_reset();
     for (u32 row = 0; row < 32; ++row) {
         CHECK(hm_vram_dirty_row(row) == UINT64_MAX);
@@ -52,6 +58,20 @@ int main(void) {
     u16 tight = 0;
     StoreImage(&rect, (u32 *)&tight);
     CHECK(tight == single);
+    hm_vram_reset();
+    rect = (RECT){1023, 511, 2, 2};
+    LoadImage(&rect, source);
+    CHECK(MoveImage(&rect, 15, 15) == 0);
+    RECT target = {15, 15, 2, 2};
+    StoreImage(&target, copy);
+    CHECK(!memcmp(copy, source, sizeof(copy)));
+    hm_vram_mask(1, 1);
+    CHECK(MoveImage2(&rect, 15, 15) == 0);
+    CHECK(hm_vram_pixel(15, 15) == (0x1234 | 0x8000));
+    CHECK(hm_vram_pixel(15, 16) == 0x9ABC);
+    /* Identical coordinates are valid and still apply mask settings. */
+    CHECK(MoveImage(&target, 15, 15) == 0);
+    CHECK(hm_vram_pixel(16, 15) == (0x5678 | 0x8000));
     CHECK(DrawSync(0) == 0);
     return 0;
 }

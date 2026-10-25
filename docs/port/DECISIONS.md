@@ -794,3 +794,25 @@ checks. Invalid facing/base values fail explicitly. Regression checks all
 three bases and four facings against the actual source arrays. The original
 matching expression remains unchanged. HOPS has a separate cross-table alias
 which remains tracked and has not yet been reached by this replay.
+
+<a id="adr-036"></a>
+
+## ADR-036: Implement bounded nonoverlapping VRAM moves
+
+Date: 2026-10-26. Status: nonoverlapping/identical copies implemented.
+
+The New Game scene animation calls MoveImage. Execute nonoverlapping transfers
+directly on the game thread in the existing VRAM model, including 10/9-bit
+coordinate wrapping, zero-as-maximum extents, mask checks/sets and dirty tiles.
+MoveImage2 uses the same synchronous transfer path. Identical coordinates are
+valid and still apply mask rules. No copy allocation is required.
+
+Nonidentical overlapping source/destination rectangles fail explicitly, with
+wrap-aware intersection detection. The public hardware transfer description
+does not establish their internal copy order, so do not invent snapshot or
+memmove behavior. Tests cover wrapped sources, mask preservation, identity
+copies and the overlap diagnostic. This restriction must be resolved if an
+actual game path requires overlapping transfers.
+
+Reference: https://psx-spx.consoledev.net/graphicsprocessingunitgpu/,
+GPU memory transfer commands and mask-bit settings. No SDK code is used.

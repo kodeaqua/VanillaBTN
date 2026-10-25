@@ -193,8 +193,8 @@ if(BUILD_TESTING)
     endforeach()
     add_executable(hmbtn_pending_test tests/pending.c)
     target_link_libraries(hmbtn_pending_test PRIVATE hmbtn_psx_pending)
-    add_test(NAME psx.pending.MoveImage
-        COMMAND "${CMAKE_COMMAND}" "-DPROGRAM=$<TARGET_FILE:hmbtn_pending_test>" "-DAPI=MoveImage"
+    add_test(NAME psx.pending.FntFlush
+        COMMAND "${CMAKE_COMMAND}" "-DPROGRAM=$<TARGET_FILE:hmbtn_pending_test>" "-DAPI=FntFlush"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_unimplemented.cmake")
     add_executable(hmbtn_timing_test tests/timing.c)
     target_link_libraries(hmbtn_timing_test PRIVATE hmbtn_psx_initial)
@@ -227,6 +227,11 @@ if(BUILD_TESTING)
     add_executable(hmbtn_vram_test tests/vram.c)
     target_link_libraries(hmbtn_vram_test PRIVATE hmbtn_psx_initial)
     add_test(NAME gpu.vram COMMAND hmbtn_vram_test)
+    add_test(NAME gpu.vram_overlap_pending
+        COMMAND "${CMAKE_COMMAND}" "-DPROGRAM=$<TARGET_FILE:hmbtn_vram_test>"
+            "-DCASE=overlap" "-DCONTEXT=MoveImage"
+            "-DDETAIL=overlapping transfers require hardware copy-order validation"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_runtime_error.cmake")
     add_executable(hmbtn_texture_test tests/texture_pack.c)
     target_link_libraries(hmbtn_texture_test PRIVATE hmbtn_game_initial hmbtn_psx_initial)
     add_test(NAME game.texture_upload COMMAND hmbtn_texture_test)

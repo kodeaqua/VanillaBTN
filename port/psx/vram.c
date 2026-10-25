@@ -101,7 +101,26 @@ s32 ClearImage(const RECT *area, u8 r, u8 g, u8 b) {
 s32 DrawSync(s32 mode) {
     if (mode != 0 && mode != 1)
         hm_runtime_error("DrawSync", "unsupported synchronization mode");
-    /* Implemented transfers execute immediately on the game thread. There is
-     * no command queue yet; DrawOTag is deliberately not implemented here. */
+    /* API transfers and ordering-table submission execute on the game thread. */
     return 0;
 }
+
+s32 MoveImage(const RECT *area, s32 x, s32 y) {
+    if (!area)
+        hm_runtime_error("MoveImage", "null source rectangle");
+    u32 sx = (u32)area->x & 1023, sy = (u32)area->y & 511;
+    u32 dx = (u32)x & 1023, dy = (u32)y & 511;
+    u32 width = (((u32)area->w - 1) & 1023) + 1;
+    u32 height = (((u32)area->h - 1) & 511) + 1;
+    int overlap_x = ((dx - sx) & 1023) < width || ((sx - dx) & 1023) < width;
+    int overlap_y = ((dy - sy) & 511) < height || ((sy - dy) & 511) < height;
+    if (overlap_x && overlap_y && (sx != dx || sy != dy))
+        hm_runtime_error("MoveImage",
+                         "overlapping transfers require hardware copy-order validation");
+    for (u32 row = 0; row < height; ++row)
+        for (u32 column = 0; column < width; ++column)
+            hm_vram_put(dx + column, dy + row, hm_vram_pixel(sx + column, sy + row), 1);
+    return 0;
+}
+
+s32 MoveImage2(const RECT *area, s32 x, s32 y) { return MoveImage(area, x, y); }

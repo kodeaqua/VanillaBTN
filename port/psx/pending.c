@@ -214,20 +214,6 @@ s32 MemCardWriteFile(s32 port, const char *name, const void *buffer, s32 offset,
     hm_unimplemented("MemCardWriteFile");
 }
 
-s32 MoveImage(const RECT *area, s32 x, s32 y) {
-    (void)area;
-    (void)x;
-    (void)y;
-    hm_unimplemented("MoveImage");
-}
-
-s32 MoveImage2(const RECT *area, s32 x, s32 y) {
-    (void)area;
-    (void)x;
-    (void)y;
-    hm_unimplemented("MoveImage2");
-}
-
 MATRIX *RotMatrixX(s32 angle, MATRIX *matrix) {
     (void)angle;
     (void)matrix;
