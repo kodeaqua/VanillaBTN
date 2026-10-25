@@ -6285,7 +6285,12 @@ s32 player_init_toys(FarmPlayer *player)
     file_offset = ANIM_PACK_START(entry, 0);
     do
     {
+#ifdef HMBTN_PORT
+        /* PORT: preserve the native asset base - see docs/port/DECISIONS.md#adr-028. */
+        anim_bind_file(&player->toys[i].sprite, (void *)(file_base + file_offset));
+#else
         anim_bind_file(&player->toys[i].sprite, (void *)(file_offset + (s32)file_base));
+#endif
         i++;
     } while (i < PLAYER_TOYS);
 
