@@ -1,4 +1,5 @@
 #include "psx/sound_voice.h"
+#include "psx/cd_runtime.h"
 #include "psx/error.h"
 #include "psx/sequence.h"
 #include "psx/sound_bank.h"
@@ -178,10 +179,18 @@ void hm_sound_mix(s16 *stereo, u32 frames) {
     const hm_sound_control *control = hm_sound_configuration();
     for (u32 i = 0; i < frames; ++i) {
         s32 left = stereo[i * 2], right = stereo[i * 2 + 1];
+        s16 cd[2];
+        hm_cd_audio_sample(cd);
+        if (control->common.cd.mix) {
+            left += cd[0] * control->serial_left / 127;
+            right += cd[1] * control->serial_right / 127;
+        }
         if (control->mono)
             left = right = (left + right) / 2;
-        stereo[i * 2] = (s16)(left * control->master_left / 127);
-        stereo[i * 2 + 1] = (s16)(right * control->master_right / 127);
+        left = left * control->master_left / 127;
+        right = right * control->master_right / 127;
+        stereo[i * 2] = (s16)(left < -32768 ? -32768 : left > 32767 ? 32767 : left);
+        stereo[i * 2 + 1] = (s16)(right < -32768 ? -32768 : right > 32767 ? 32767 : right);
     }
 }
 void hm_sound_set_sink(void (*sink)(void *, const s16 *, u32), void *context) {

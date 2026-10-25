@@ -900,3 +900,39 @@ and checks returned slot identity, zeroed arguments, duplicate rejection, all
 five queue entries, full-queue failure and reuse after reset. Do not suppress
 the warning or force a guessed success pointer. Other return-type warnings
 remain tracked for their own call paths.
+
+<a id="adr-041"></a>
+
+## ADR-041: Decode the source disc's XA streams on the game thread
+
+Date: 2026-10-26. Status: deterministic reference; hardware audio parity pending.
+
+The extended opening reaches cd_audio_play_track and requests Setfilter/ReadS.
+A local header-only scan of all four XA files confirms file number 1, channels
+0..7, and coding byte 1 (37.8 kHz stereo, 4-bit ADPCM) for every audio sector.
+Unused sectors and per-channel EOF records are present. No audio/game data is
+added to git. Other XA coding modes remain explicit failures.
+
+Reuse the port's own tested SPU predictor decoder by rearranging each XA sound
+unit's nibbles into a bounded temporary block. Keep independent channel history.
+Resample each six decoded stereo frames to seven output frames using the public
+29-tap/seven-phase zigzag coefficient facts. Reset decoder history at ReadS.
+The public reference itself notes uncertain hardware rounding and startup phase;
+this is a reproducible reference, not proof of bit-exact CD audio output.
+
+Advance physical sectors at the existing 75/150-sector deterministic tick rate,
+apply file/channel filtering, queue selected PCM in a fixed 8192-frame game-thread
+ring, and drain queued audio after selected-channel EOF. Standby/cancel/data reads
+clear the stream. GetlocP returns an eight-byte position response without a
+four-byte write into its final three-byte position field. No audio worker or
+per-frame heap allocation is introduced.
+
+Mix decoded PCM through the source-used serial volume/mix controls before mono
+and master gain, with saturation. Exact SDK volume law and CD reverb parity are
+unverified. Synthetic tests cover literal resampler impulse values, predictor
+history, coding rejection, filter/EOF selection, position response bounds, PCM
+mixing, muting and cancellation. Real-disc continuation remains under test.
+
+References: https://psx-spx.consoledev.net/cdromformat/ (XA headers, predictors,
+interpolation coefficients) and public CD command descriptions. No SDK or other
+PSX implementation code is copied.
