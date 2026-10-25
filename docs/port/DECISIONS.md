@@ -155,3 +155,37 @@ and disc IO. Free-space budgets and demo overlap retain their vanilla meaning.
 OT pointer encoding, overlay loading, asset bounds validation and the rest of
 boot remain separate work. Matching check still requires an unavailable Linux
 toolchain; textual branch preservation is additional evidence, not a substitute.
+
+<a id="adr-009"></a>
+
+## ADR-009: Encode GPU links as stable handles to native tag pointers
+
+Date: 2026-10-25. Status: accepted, following the fixed-width handle default.
+
+Context: PS1 packet tags have an eight-bit command length and a 24-bit next
+address. Truncating a native pointer can alias unrelated objects and cannot
+represent 64-bit host addresses. The source links packets through SDK addPrim,
+the LINK_PRIM macro, and ot_insert_prim; all three paths must agree.
+
+Decision: Preserve packet layouts and replace only the address part with a
+nonzero 24-bit handle. Keep 0xFFFFFF as the end marker. Assign handles in first-use
+order, storing full native pointers in a bounded registry. Hash buckets are an
+internal lookup detail; ASLR does not affect handle assignment. The initial
+registry supports 65536 live tag addresses with a fixed 1 MiB allocation (pointer
+array plus buckets) and no per-frame allocation. Exhaustion and malformed handles
+abort with diagnostics rather than truncating, wrapping or silently succeeding.
+
+ClearOTagR creates reverse tag chains. addPrim/AddPrim preserve both packet and
+head lengths; the source-specific helpers retain LINK_PRIM/ot_insert_prim's
+behavior of clearing the OT head length. setlen writes only the length byte,
+without reading uninitialized address bytes. DrawOTag/rendering remain separate.
+
+Consequences: Callers must keep registered tag objects alive and discard every
+chain before resetting the registry. Do not reset it per frame; copied/cached
+packet links must remain valid. Handles are process-local, not save-file data.
+The registry validates identity/alignment, not allocation extents or payload
+lengths; it is not an untrusted-memory sandbox or a cycle detector. Capacity and
+runtime cost still need full-game/device profiling; no performance claim is made.
+Matching source integrations must retain the exact original else branches.
+
+Public packet/OT reference: https://psx-spx.consoledev.net/graphicsprocessingunitgpu/.

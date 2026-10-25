@@ -197,6 +197,9 @@ DISPENV *SetDefDispEnv(DISPENV *environment, s32 x, s32 y, s32 width, s32 height
 DRAWENV *PutDrawEnv(DRAWENV *environment);
 DISPENV *PutDispEnv(DISPENV *environment);
 u32 *ClearOTagR(u32 *table, s32 entries);
+void setlen(void *packet, u8 words);
+void addPrim(u32 *head, void *packet);
+void AddPrim(u32 *head, void *packet);
 void DrawOTag(u32 *table);
 
 #endif

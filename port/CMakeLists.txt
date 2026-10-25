@@ -51,6 +51,7 @@ add_library(hmbtn_game_initial STATIC
     ../src/main/main.c
     ../src/main/cd/afile.c
     ../src/main/graphics/frame_buffers.c
+    ../src/main/graphics/prim.c
     ../src/main/geometry/math_util.c
     ../src/main/game/farm_data_size.c
     ../src/main/game/farm_state.c
@@ -64,7 +65,8 @@ target_link_libraries(hmbtn_game_initial PUBLIC hmbtn_game_options hmbtn_work_me
 set_source_files_properties(../src/main/main.c PROPERTIES COMPILE_DEFINITIONS main=hm_game_main)
 
 add_library(hmbtn_psx_initial STATIC
-    psx/unimplemented.c psx/gte_stubs.c psx/cd_position.c psx/cd_stubs.c)
+    psx/unimplemented.c psx/gte_stubs.c psx/cd_position.c psx/cd_stubs.c
+    psx/gpu_links.c psx/gpu_ot.c)
 target_link_libraries(hmbtn_psx_initial PUBLIC hmbtn_port_options)
 target_include_directories(hmbtn_psx_initial PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/compat/psyq")
 
@@ -87,6 +89,29 @@ if(BUILD_TESTING)
         "$<$<PLATFORM_ID:Windows,Linux,Android>:-Wl,--gc-sections>"
         "$<$<PLATFORM_ID:Darwin>:-Wl,-dead_strip>")
     add_test(NAME game.work_memory COMMAND hmbtn_work_memory_test)
+    add_executable(hmbtn_gpu_links_test tests/gpu_links.c)
+    target_link_libraries(hmbtn_gpu_links_test PRIVATE hmbtn_game_initial hmbtn_psx_initial)
+    add_test(NAME gpu.links COMMAND hmbtn_gpu_links_test)
+    foreach(rejection IN ITEMS null unaligned capacity unknown zero empty)
+        if(rejection MATCHES "^(null|unaligned|capacity)$")
+            set(context hm_gpu_link_encode)
+            if(rejection STREQUAL "capacity")
+                set(detail "handle capacity exceeded")
+            else()
+                set(detail "${rejection} tag")
+            endif()
+        elseif(rejection STREQUAL "empty")
+            set(context ClearOTagR)
+            set(detail "non-positive length")
+        else()
+            set(context hm_gpu_link_decode)
+            set(detail "invalid handle")
+        endif()
+        add_test(NAME gpu.links.reject.${rejection}
+            COMMAND "${CMAKE_COMMAND}" "-DPROGRAM=$<TARGET_FILE:hmbtn_gpu_links_test>"
+                "-DCASE=${rejection}" "-DCONTEXT=${context}" "-DDETAIL=${detail}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_runtime_error.cmake")
+    endforeach()
     add_executable(hmbtn_layouts_test tests/layouts.c)
     target_link_libraries(hmbtn_layouts_test PRIVATE hmbtn_game_options)
     add_test(NAME compat.layouts COMMAND hmbtn_layouts_test)
