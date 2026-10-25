@@ -12,6 +12,49 @@ static s16 hm_gs_buffers[2][2];
 
 const hm_gpu_environment *hm_gpu_environment_state(void) { return &hm_environment; }
 
+static s16 hm_gpu_signed11(u32 value) {
+    value &= 2047;
+    return (s16)(value < 1024 ? (s32)value : (s32)value - 2048);
+}
+
+void hm_gpu_environment_command(u32 word) {
+    DRAWENV *draw = &hm_environment.draw;
+    switch (word >> 24) {
+    case 0xE1:
+        draw->tpage = (u16)(word & 0x1FF);
+        draw->dtd = (u8)((word >> 9) & 1);
+        draw->dfe = (u8)((word >> 10) & 1);
+        break;
+    case 0xE2:
+        draw->tw.x = (s16)(((word >> 10) & 31) * 8);
+        draw->tw.y = (s16)(((word >> 15) & 31) * 8);
+        draw->tw.w = (s16)(256 - (word & 31) * 8);
+        draw->tw.h = (s16)(256 - ((word >> 5) & 31) * 8);
+        break;
+    case 0xE3: {
+        s32 right = draw->clip.x + draw->clip.w - 1, bottom = draw->clip.y + draw->clip.h - 1;
+        draw->clip.x = (s16)(word & 1023);
+        draw->clip.y = (s16)((word >> 10) & 511);
+        draw->clip.w = (s16)(right - draw->clip.x + 1);
+        draw->clip.h = (s16)(bottom - draw->clip.y + 1);
+        break;
+    }
+    case 0xE4:
+        draw->clip.w = (s16)((s32)(word & 1023) - draw->clip.x + 1);
+        draw->clip.h = (s16)((s32)((word >> 10) & 511) - draw->clip.y + 1);
+        break;
+    case 0xE5:
+        draw->ofs[0] = hm_gpu_signed11(word);
+        draw->ofs[1] = hm_gpu_signed11(word >> 11);
+        break;
+    case 0xE6:
+        hm_vram_mask(word & 1, word & 2);
+        break;
+    default:
+        hm_runtime_error("hm_gpu_environment_command", "unknown environment opcode");
+    }
+}
+
 s32 ResetGraph(s32 mode) {
     if (mode != 0)
         hm_runtime_error("ResetGraph", "unsupported graph reset mode");

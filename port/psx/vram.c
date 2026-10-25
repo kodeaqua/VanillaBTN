@@ -46,6 +46,8 @@ static void hm_vram_put(u32 x, u32 y, u16 value, int masked) {
     }
 }
 
+void hm_vram_draw_pixel(u32 x, u32 y, u16 value) { hm_vram_put(x, y, value, 1); }
+
 static void hm_vram_area(const RECT *area, const void *pixels, const char *api) {
     if (!area || !pixels)
         hm_runtime_error(api, "null image argument");
