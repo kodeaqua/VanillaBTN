@@ -224,6 +224,15 @@ s32 MoveImage2(const RECT *area, s32 x, s32 y);
 s32 ClearImage(const RECT *area, u8 r, u8 g, u8 b);
 s32 SetDispMask(s32 enabled);
 s32 FntPrint(const char *format, ...);
+void FntLoad(s32 x, s32 y);
+s32 FntOpen(s32 x, s32 y, s32 width, s32 height, s32 background, s32 characters);
+void FntFlush(s32 stream);
+void SetDumpFnt(s32 stream);
+void KanjiFntClose(void);
+void KanjiFntOpen(s32 x, s32 y, s32 width, s32 height, s32 texture_x, s32 texture_y,
+                  s32 clut_x, s32 red, s32 green, s32 blue);
+s32 KanjiFntPrint(const char *format, ...);
+void KanjiFntFlush(s32 stream);
 
 /* Source call sites pass several primitive types; field macros retain their
  * concrete types and evaluate only the requested primitive attributes. */

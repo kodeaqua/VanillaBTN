@@ -311,11 +311,11 @@ SDK's binary layout. CD command constants cover only commands observed in source
 `port/analysis/compile_probe.py` invokes Clang on all original C files with the
 port force-include and the basename include directories. It writes per-file
 diagnostics to ignored `build/port/compile-probe.json`. No file is changed and no
-game code is linked or run. The result with Clang 20.1.8 is 87 syntax passes and
-26 failures out of 113 files, with 1738 warnings emitted before the error cap.
+game code is linked or run. The result with Clang 20.1.8 is 96 syntax passes and
+17 failures out of 113 files, with 2072 warnings emitted before the error cap.
 
-Common blockers include missing libsnd and other SDK headers, undeclared GTE/font API
-calls, inline GTE commands, SDK helper constants, GCC nested functions and
+Common blockers include missing pad/card headers and SDK declarations,
+inline GTE commands, GCC nested functions, pointer-width assignments and
 macro-generated declarations not accepted by modern C. The probe's five-error
 limit means this is not a complete error count. Syntax passes can still fail
 during code generation, linking, runtime layout checks or sanitizer execution.
@@ -324,6 +324,15 @@ Warnings include pointer-to-integer/integer-to-pointer truncation, excess and
 missing initializers, incompatible callback types, and a transposed memset
 argument warning. They remain visible; broad warning suppression or automatic
 source cleanup would hide real fidelity and 64-bit hazards.
+
+The routine native archive now compiles 21 original units, including the sound
+loader/request/XA-control code, farm event commands, player/scene-view code,
+debug overlay and minigames 3/5. Clean-room source-facing declarations for
+libsnd/libspu and matrix/font/lighting calls supply native call contracts only;
+their missing implementations still produce linker errors. This is not audio
+playback, controller polling, rendered output or a full overlay link. SpuCommonAttr
+is native configuration metadata with only source-used fields, not a proprietary
+SDK or asset ABI. SPU voice constants are the 24 bits consumed by key-status queries.
 
 ## Port guards and validation
 

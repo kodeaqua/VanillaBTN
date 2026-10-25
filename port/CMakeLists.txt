@@ -54,6 +54,15 @@ add_library(hmbtn_game_initial STATIC
     ../src/main/graphics/prim.c
     ../src/main/graphics/texture_pack.c
     ../src/main/geometry/math_util.c
+    ../src/main/sound/cd_audio.c
+    ../src/main/sound/sound.c
+    ../src/main/sound/sound_request.c
+    ../src/overlay/08_DEBUG/debug.c
+    ../src/overlay/11_GF_FARM/event/event_commands.c
+    ../src/overlay/11_GF_FARM/people/player.c
+    ../src/overlay/11_GF_FARM/world/scene_view.c
+    ../src/overlay/21_GF_MG3/mg3.c
+    ../src/overlay/25_GF_MG5/mg5.c
     ../src/main/game/farm_data_size.c
     ../src/main/game/farm_state.c
     ../src/main/game/horse_names.c

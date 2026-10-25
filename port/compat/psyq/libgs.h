@@ -25,5 +25,9 @@ void GsSetDrawBuffOffset(void);
 void GsInit3D(void);
 void *GsGetWorkBase(void);
 void GsSetWorkBase(void *base);
+void GsSetFlatLight(s32 index, const GsF_LIGHT *light);
+void GsSetAmbient(s32 red, s32 green, s32 blue);
+void GsSetLightMode(s32 mode);
+void GsSetProjection(s32 distance);
 
 #endif

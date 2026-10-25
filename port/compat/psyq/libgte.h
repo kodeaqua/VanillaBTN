@@ -42,5 +42,20 @@ void SetGeomOffset(s32 x, s32 y);
 void SetGeomScreen(s32 distance);
 s32 ratan2(s32 y, s32 x);
 void OuterProduct0(VECTOR *first, VECTOR *second, VECTOR *result);
+extern const MATRIX GsIDMATRIX;
+void PushMatrix(void);
+void PopMatrix(void);
+MATRIX *RotMatrix(const SVECTOR *angle, MATRIX *matrix);
+MATRIX *RotMatrixZXY(const SVECTOR *angle, MATRIX *matrix);
+MATRIX *RotMatrixX(s32 angle, MATRIX *matrix);
+MATRIX *RotMatrixY(s32 angle, MATRIX *matrix);
+MATRIX *RotMatrixZ(s32 angle, MATRIX *matrix);
+MATRIX *TransMatrix(MATRIX *matrix, const VECTOR *translation);
+void SetRotMatrix(const MATRIX *matrix);
+void SetTransMatrix(const MATRIX *matrix);
+VECTOR *ApplyMatrixLV(const MATRIX *matrix, const VECTOR *input, VECTOR *output);
+void VectorNormalS(const VECTOR *input, SVECTOR *output);
+void VectorNormalSS(const SVECTOR *input, SVECTOR *output);
+void RotTrans(const SVECTOR *input, VECTOR *output, s32 *flags);
 
 #endif
