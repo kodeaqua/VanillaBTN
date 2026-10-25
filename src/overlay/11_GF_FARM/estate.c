@@ -200,6 +200,17 @@ s32 estate_pending_op_start(void) {
 
 /* Clear the message queues and forget the notices seen. */
 void estate_queues_clear(void) {
+#ifdef HMBTN_PORT
+    /* PORT: native state fields move when pointers widen; preserve the exact
+     * queue-byte writes - see docs/port/DECISIONS.md#adr-029. */
+    s32 queue;
+    s32 slot;
+    for (queue = 0; queue < MESSAGE_QUEUES; queue++) {
+        for (slot = 0; slot < MESSAGE_QUEUE_LEN; slot++) {
+            game_state.progress.estate.queues[queue][slot].kind = -1;
+        }
+    }
+#else
     s32 empty = -1;
     u8 *p = (u8 *)&game_state;
     s32 i;
@@ -208,6 +219,7 @@ void estate_queues_clear(void) {
         p[0x4A36] = empty;
         p += 4;
     }
+#endif
     game_state.progress.estate.noticesSeen = 0;
 }
 
