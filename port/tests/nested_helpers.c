@@ -1,4 +1,5 @@
 #include "actor.h"
+#include "harvest_sprites.h"
 #include "scene.h"
 #include <libgte.h>
 #include <stdio.h>
@@ -22,6 +23,18 @@ static s32 scene_flag_stage;
 #include "compat/nested/ground.inc"
 #include "compat/nested/scene.inc"
 #include "compat/nested/shop.inc"
+
+static FarmHelper *hm_waited_object;
+static s32 hm_waited_proximity;
+static s32 harvest_obj_wait_walk(FarmHelper *helper, s32 proximity) {
+    hm_waited_object = helper;
+    hm_waited_proximity = proximity;
+    return 0;
+}
+#define HARVEST_NEAR_PROXIMITY 230
+#define SLOT_NONE (-1)
+#include "compat/nested/harvest.inc"
+#undef harvest_helper_arrive_or_wait
 
 int main(void) {
     SVECTOR vertices[4] = {{0, 0, 0, 0}, {10, 0, 0, 0}, {0, 0, 10, 0}, {10, 0, 10, 0}};
@@ -76,6 +89,19 @@ int main(void) {
     CHECK(scene_slot_handoff_step(&owner, &other, 5) == 1);
     CHECK(first.step == 0 && second.step == 0 && scene_flag_stage == 5);
     CHECK((owner.flags & SCENE_ENTRY_HIDDEN) && !(other.flags & SCENE_ENTRY_HIDDEN));
+    FarmHelper captured = {0}, carried = {0};
+    carried.actor.place.location = 4;
+    carried.actor.flags = 0;
+    hm_harvest_helper_arrive_or_wait(&captured, &carried, 5, ACTOR_FLAG_BIT26);
+    CHECK(hm_waited_object == &captured && hm_waited_proximity == 230);
+    CHECK(carried.actor.flags & ACTOR_FLAG_BIT26);
+    carried.targetAnimal = 8;
+    carried.actor.taskId = 9;
+    hm_waited_object = NULL;
+    hm_harvest_helper_arrive_or_wait(&captured, &carried, 4, ACTOR_FLAG_BIT26);
+    CHECK(carried.targetAnimal == -1 && carried.actor.taskId == 0);
+    CHECK(!(carried.actor.flags & ACTOR_FLAG_BIT26) && (carried.flags & HELPER_BIT9));
+    CHECK(hm_waited_object == NULL);
     flags[9] = 3;
     flags[0] = 2;
     CHECK(has_medal_price(flags) == 1);

@@ -4,6 +4,7 @@
 #include "compat/types.h"
 
 s32 ResetCallback(void);
+s32 ChangeClearPAD(s32 mode);
 void SetMem(s32 megabytes);
 void SystemError(s32 code, s32 detail);
 

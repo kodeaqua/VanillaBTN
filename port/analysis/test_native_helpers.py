@@ -33,6 +33,15 @@ def function_body(source: str, name: str) -> list[str]:
 
 
 class NativeHelperTests(unittest.TestCase):
+    def test_captured_helper_body_is_preserved(self):
+        root = Path(__file__).resolve().parents[2]
+        original = (root / "src/overlay/11_GF_FARM/people/harvest_sprites.c").read_text(encoding="utf-8")
+        native = (root / "port/compat/nested/harvest.inc").read_text(encoding="utf-8")
+        original_words = function_body(original, "harvest_helper_arrive_or_wait")
+        native_words = function_body(native, "hm_harvest_helper_arrive_or_wait")
+        self.assertEqual(original_words[original_words.index("{"):],
+                         native_words[native_words.index("{"):])
+
     def test_matching_helper_tokens_are_preserved(self):
         root = Path(__file__).resolve().parents[2]
         cases = [

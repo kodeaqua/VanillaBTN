@@ -3,12 +3,13 @@
 
 /* Load host declarations before mapping SDK spellings in game translation units.
  * Do not force-include this header in the platform/runtime implementation. */
-#include <sys/types.h>
 #include <string.h>
+#include <sys/types.h>
 
+#include "compat/asset.h"
+#include "compat/fixed_math.h"
 #include "compat/types.h"
 #include "compat/work_memory.h"
-#include "compat/fixed_math.h"
 
 typedef u8 hm_psx_u_char;
 typedef u16 hm_psx_u_short;
