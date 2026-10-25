@@ -1,5 +1,8 @@
 # Local Windows disc validation
 
+The image/boot tools below are diagnostics. They do not yet provide a playable
+title screen, audio playback, native saves or host input.
+
 The data-free tests run with the normal Windows presets. A separate diagnostic
 reads the owner's original USA SLUS_011.15 raw BIN track without extracting or
 writing any game files:
@@ -33,3 +36,20 @@ process before running so its ASan DLL is on PATH:
 & ./port/packaging/windows/setup-toolchain.ps1
 & ./build/port/windows-asan-ubsan/hmbtn_disc_probe.exe 'D:/my-disc/Harvest Moon - Back to Nature (USA).bin'
 ```
+
+The separate boot probe links the reachable original game/overlay C graph and
+enters hm_game_main after validation. Build its excluded target explicitly:
+
+```powershell
+# After setup-toolchain.ps1 in the same PowerShell process:
+cmake --build build/port/windows-release --target hmbtn_boot_probe
+& ./build/port/windows-release/hmbtn_boot_probe.exe 'D:/my-disc/Harvest Moon - Back to Nature (USA).bin'
+```
+
+Current observed stop: `Unimplemented PSX API: MemCardInit`, with a nonzero abort
+exit. Before that point, the original code performs callback/VSync setup, real
+A_FILE reads, silent sound configuration, and GTE/GPU environment setup. This
+is an expected bring-up failure, not a completed boot. Unsupported SDK calls
+must retain their named failures while implementations are added. The console
+probe uses virtual time and has no SDL window; hardware presentation is tested
+separately in GPU_TESTING.md. Native overlay reentry also remains unsupported.

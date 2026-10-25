@@ -3,6 +3,7 @@ project(hmbtn_port LANGUAGES C)
 
 include(CTest)
 option(HMBTN_SANITIZERS "Enable address and undefined-behavior sanitizers" OFF)
+option(HMBTN_BUILD_GPU_SPIKE "Build the local SDL_GPU presentation validation" OFF)
 
 if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(FATAL_ERROR "Only 64-bit native targets are supported")
@@ -26,6 +27,9 @@ endif()
 add_library(hmbtn_work_memory STATIC compat/work_memory.c compat/cpu.c)
 target_link_libraries(hmbtn_work_memory PUBLIC hmbtn_port_options)
 
+add_library(hmbtn_overlay STATIC overlay/registry.c)
+target_link_libraries(hmbtn_overlay PUBLIC hmbtn_port_options)
+
 # Compile original translation units with port-only compatibility hooks.
 add_library(hmbtn_game_options INTERFACE)
 target_link_libraries(hmbtn_game_options INTERFACE hmbtn_port_options)
@@ -47,44 +51,16 @@ target_compile_options(hmbtn_game_options INTERFACE
     -include "${CMAKE_CURRENT_SOURCE_DIR}/compat/game.h")
 target_compile_definitions(hmbtn_game_options INTERFACE HMBTN_PORT=1)
 
-add_library(hmbtn_game_initial STATIC
-    ../src/main/main.c
-    ../src/main/cd/afile.c
-    ../src/main/graphics/frame_buffers.c
-    ../src/main/graphics/prim.c
-    ../src/main/graphics/texture_pack.c
-    ../src/main/geometry/math_util.c
-    ../src/main/geometry/ground.c
-    ../src/overlay/11_GF_FARM/animals/animals.c
-    ../src/overlay/11_GF_FARM/estate.c
-    ../src/overlay/11_GF_FARM/menu/shop_dialogues.c
-    ../src/overlay/11_GF_FARM/event/event_rules.c
-    ../src/overlay/11_GF_FARM/world/scene.c
-    ../src/overlay/19_GF_MG2/mg2.c
-    ../src/overlay/30_GF_swind/swind.c
-    ../src/main/sound/cd_audio.c
-    ../src/main/sound/sound.c
-    ../src/main/sound/sound_request.c
-    ../src/overlay/08_DEBUG/debug.c
-    ../src/overlay/11_GF_FARM/event/event_commands.c
-    ../src/overlay/11_GF_FARM/people/player.c
-    ../src/overlay/11_GF_FARM/world/scene_view.c
-    ../src/overlay/21_GF_MG3/mg3.c
-    ../src/overlay/25_GF_MG5/mg5.c
-    ../src/main/game/farm_data_size.c
-    ../src/main/game/farm_state.c
-    ../src/main/game/horse_names.c
-    ../src/main/game/event_flags.c
-    ../src/main/game/farm_tables.c
-    ../src/main/game/picture_codes.c)
-target_link_libraries(hmbtn_game_initial PUBLIC hmbtn_game_options hmbtn_work_memory)
+file(GLOB_RECURSE hm_game_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../src/*.c")
+add_library(hmbtn_game_initial STATIC ${hm_game_sources})
+target_link_libraries(hmbtn_game_initial PUBLIC hmbtn_game_options hmbtn_work_memory hmbtn_overlay)
 # Keep the game's entry point separate from the host test runners. This source
 # is compiled into the archive only; no native game executable is linked yet.
 set_source_files_properties(../src/main/main.c PROPERTIES COMPILE_DEFINITIONS main=hm_game_main)
 
 add_library(hmbtn_psx_initial STATIC
-    psx/unimplemented.c psx/gte_stubs.c psx/cd_position.c psx/cd_runtime.c
-    psx/gpu_links.c psx/gpu_ot.c psx/gpu_packets.c psx/vram.c)
+    psx/unimplemented.c psx/gte_stubs.c psx/gte_runtime.c psx/timing.c psx/sound_control.c psx/cd_position.c psx/cd_runtime.c
+    psx/gpu_links.c psx/gpu_ot.c psx/gpu_packets.c psx/gpu_environment.c psx/vram.c)
 target_link_libraries(hmbtn_psx_initial PUBLIC hmbtn_port_options)
 target_include_directories(hmbtn_psx_initial PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/compat/psyq")
 
@@ -94,10 +70,75 @@ target_link_libraries(hmbtn_psx_initial PUBLIC hmbtn_disc)
 add_executable(hmbtn_disc_probe platform/disc_probe.c)
 target_link_libraries(hmbtn_disc_probe PRIVATE hmbtn_psx_initial)
 
+add_executable(hmbtn_boot_probe EXCLUDE_FROM_ALL platform/boot_probe.c)
+add_library(hmbtn_psx_pending STATIC psx/pending.c)
+target_link_libraries(hmbtn_psx_pending PUBLIC hmbtn_psx_initial)
+target_link_libraries(hmbtn_boot_probe PRIVATE hmbtn_game_initial hmbtn_psx_pending)
+
+if(HMBTN_BUILD_GPU_SPIKE)
+    include(FetchContent)
+    set(SDL_SHARED OFF CACHE BOOL "" FORCE)
+    set(SDL_STATIC ON CACHE BOOL "" FORCE)
+    set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
+    set(SDL_TESTS OFF CACHE BOOL "" FORCE)
+    set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(SDL3
+        URL https://github.com/libsdl-org/SDL/releases/download/release-3.2.28/SDL3-3.2.28.tar.gz
+        URL_HASH SHA256=1330671214d146f8aeb1ed399fc3e081873cdb38b5189d1f8bb6ab15bbc04211
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+    FetchContent_MakeAvailable(SDL3)
+    add_executable(hmbtn_gpu_spike platform/gpu_spike.c)
+    target_compile_definitions(hmbtn_gpu_spike PRIVATE SDL_MAIN_HANDLED)
+    target_link_libraries(hmbtn_gpu_spike PRIVATE hmbtn_port_options SDL3::SDL3)
+endif()
+
 add_executable(hmbtn_ot_bench EXCLUDE_FROM_ALL analysis/ot_bench.c)
 target_link_libraries(hmbtn_ot_bench PRIVATE hmbtn_psx_initial)
 
 if(BUILD_TESTING)
+    add_executable(hmbtn_asset_test tests/asset.c)
+    target_link_libraries(hmbtn_asset_test PRIVATE hmbtn_port_options)
+    add_test(NAME compat.asset_words COMMAND hmbtn_asset_test)
+    add_executable(hmbtn_gpu_environment_test tests/gpu_environment.c)
+    target_link_libraries(hmbtn_gpu_environment_test PRIVATE hmbtn_psx_initial)
+    add_test(NAME gpu.environment COMMAND hmbtn_gpu_environment_test)
+    add_executable(hmbtn_sound_control_test tests/sound_control.c)
+    target_link_libraries(hmbtn_sound_control_test PRIVATE hmbtn_psx_initial)
+    add_test(NAME spu.control COMMAND hmbtn_sound_control_test)
+    add_executable(hmbtn_overlay_test tests/overlay.c)
+    target_link_libraries(hmbtn_overlay_test PRIVATE hmbtn_overlay hmbtn_psx_initial)
+    add_test(NAME overlay.registry COMMAND hmbtn_overlay_test)
+    foreach(rejection IN ITEMS unknown region reload)
+        if(rejection STREQUAL "unknown")
+            set(detail "unknown overlay member")
+        elseif(rejection STREQUAL "region")
+            set(detail "overlay region mismatch")
+        else()
+            set(detail "native overlay reentry is not implemented")
+        endif()
+        add_test(NAME overlay.reject.${rejection}
+            COMMAND "${CMAKE_COMMAND}" "-DPROGRAM=$<TARGET_FILE:hmbtn_overlay_test>"
+                "-DCASE=${rejection}" "-DCONTEXT=hm_overlay_select" "-DDETAIL=${detail}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_runtime_error.cmake")
+    endforeach()
+    add_executable(hmbtn_pending_test tests/pending.c)
+    target_link_libraries(hmbtn_pending_test PRIVATE hmbtn_psx_pending)
+    add_test(NAME psx.pending.SsVabOpenHead
+        COMMAND "${CMAKE_COMMAND}" "-DPROGRAM=$<TARGET_FILE:hmbtn_pending_test>" "-DAPI=SsVabOpenHead"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_unimplemented.cmake")
+    add_executable(hmbtn_timing_test tests/timing.c)
+    target_link_libraries(hmbtn_timing_test PRIVATE hmbtn_psx_initial)
+    add_test(NAME psx.timing COMMAND hmbtn_timing_test)
+    add_executable(hmbtn_game_projection_test tests/game_projection.c)
+    target_link_libraries(hmbtn_game_projection_test PRIVATE hmbtn_game_options hmbtn_psx_initial)
+    target_compile_options(hmbtn_game_projection_test PRIVATE -ffunction-sections -fdata-sections)
+    target_link_options(hmbtn_game_projection_test PRIVATE
+        "$<$<PLATFORM_ID:Windows,Linux,Android>:-Wl,--gc-sections>"
+        "$<$<PLATFORM_ID:Darwin>:-Wl,-dead_strip>")
+    add_test(NAME game.projection COMMAND hmbtn_game_projection_test)
+    add_executable(hmbtn_gte_projection_test tests/gte_projection.c)
+    target_link_libraries(hmbtn_gte_projection_test PRIVATE hmbtn_psx_initial)
+    add_test(NAME gte.projection COMMAND hmbtn_gte_projection_test)
     add_executable(hmbtn_nested_helpers_test tests/nested_helpers.c)
     target_link_libraries(hmbtn_nested_helpers_test PRIVATE hmbtn_game_options)
     add_test(NAME compat.nested_helpers COMMAND hmbtn_nested_helpers_test)
