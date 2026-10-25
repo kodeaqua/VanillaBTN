@@ -258,7 +258,8 @@ source cleanup would hide real fidelity and 64-bit hazards.
 
 ## Port guards and validation
 
-Nine `HMBTN_PORT` guard blocks have been introduced, all under ADR-008:
+Eleven `HMBTN_PORT` guard blocks have been introduced under ADR-008 (workspace)
+and ADR-009 (GPU links):
 
 | File | Guarded change |
 | --- | --- |
@@ -271,8 +272,10 @@ Nine `HMBTN_PORT` guard blocks have been introduced, all under ADR-008:
 | src/main/main.h | Native region accessor has a pointer return type |
 | src/main/game/farm_state.c | Overlay-address temporaries are matching-only |
 | src/main/game/farm_state.c | Farm load window binds to native storage |
+| src/main/graphics/prim.h | LINK_PRIM stores a native pointer handle instead of address bits |
+| src/main/graphics/frame_buffers.c | ot_insert_prim uses the same native link codec |
 
-For each of these three files, selecting every matching `#else` branch and
+For each of these five files, selecting every matching `#else` branch and
 removing the new guard directives reconstructs the previous source text exactly,
 including its whitespace (line endings normalized for comparison). This check
 passed against the preceding git revision. It does not establish byte-matching

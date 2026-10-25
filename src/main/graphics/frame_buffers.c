@@ -26,8 +26,13 @@ void *ot_insert_prim(s32 index, s32 advance) {
     }
     entry = &state->ot[index];
     current = state->primCursor.tag;
+#ifdef HMBTN_PORT
+    /* PORT: retain pointer identity in the 24-bit link — see docs/port/DECISIONS.md#adr-009 */
+    hm_gpu_ot_insert(entry, current);
+#else
     *current = (*current & OT_TAG_MASK) | (*entry & OT_ADDRESS_MASK);
     *entry = (u_long)current & OT_ADDRESS_MASK;
+#endif
     state->primCursor.bytes += advance;
     return current;
 }
