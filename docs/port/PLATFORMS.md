@@ -6,8 +6,8 @@ render. A replay reaches farm initialization; farm gameplay is not validated.
 | Target | Foundation preset | Validation |
 | --- | --- | --- |
 | Linux x86-64 | linux-release, linux-asan-ubsan | Deferred; requires a separate Linux host, no WSL |
-| Windows x86-64 | windows-release | All 113 original source units compile; local tests passed (58/58) |
-| Windows x86-64 sanitizers | windows-asan-ubsan | All source units compile; Clang 20.1.8 ASan/UBSan tests passed (58/58); execution coverage remains limited |
+| Windows x86-64 | windows-release | All 113 original source units compile; local tests passed (59/59) |
+| Windows x86-64 sanitizers | windows-asan-ubsan | All source units compile; Clang 20.1.8 ASan/UBSan tests passed (59/59); execution coverage remains limited |
 | macOS universal | macos-universal-release | Pending; no macOS host tested |
 | Android arm64 | Pending NDK and minSdk selection | No device/build validation |
 
