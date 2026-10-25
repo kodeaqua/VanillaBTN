@@ -228,12 +228,6 @@ s32 MoveImage2(const RECT *area, s32 x, s32 y) {
     hm_unimplemented("MoveImage2");
 }
 
-MATRIX *RotMatrix(const SVECTOR *angle, MATRIX *matrix) {
-    (void)angle;
-    (void)matrix;
-    hm_unimplemented("RotMatrix");
-}
-
 MATRIX *RotMatrixX(s32 angle, MATRIX *matrix) {
     (void)angle;
     (void)matrix;
@@ -250,12 +244,6 @@ MATRIX *RotMatrixZ(s32 angle, MATRIX *matrix) {
     (void)angle;
     (void)matrix;
     hm_unimplemented("RotMatrixZ");
-}
-
-MATRIX *RotMatrixZXY(const SVECTOR *angle, MATRIX *matrix) {
-    (void)angle;
-    (void)matrix;
-    hm_unimplemented("RotMatrixZXY");
 }
 
 void SetDumpFnt(s32 stream) {

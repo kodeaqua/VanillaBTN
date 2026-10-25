@@ -755,3 +755,21 @@ of matrix/vector helpers and zero-vector hardware parity are unverified.
 Reference: public Run-Time Library Reference 4.7, ApplyMatrixLV, VectorNormal
 and OuterProduct descriptions; Inline Programming Reference OP preservation
 distinction. Only API facts and the existing scalar hardware core are used.
+
+<a id="adr-034"></a>
+
+## ADR-034: Compose source-used Euler rotation matrices
+
+Date: 2026-10-26. Status: deterministic reference; SDK quantization pending.
+
+After terrain cross products, the real-disc path reaches RotMatrix from the
+farm view setup. Implement the documented Q12 matrix products Rx * Ry * Rz for
+RotMatrix and Rz * Rx * Ry for RotMatrixZXY. Reuse the port's analytic integer
+sine table, use signed floor shifts and keep translation words untouched.
+Quarter-turn tests check axis signs, noncommuting rotation order, return
+pointers and translation preservation. Other rotation entry points remain
+explicit failures until implemented. SDK sine-table and product-rounding
+parity remain open; no SDK implementation or table is copied.
+
+Reference: public Run-Time Library Reference 4.7, RotMatrix table 8-2,
+https://psx.arthus.net/sdk/Psy-Q/DOCS/LibRef47.pdf (page 8-116).
