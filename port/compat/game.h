@@ -4,6 +4,7 @@
 /* Load host declarations before mapping SDK spellings in game translation units.
  * Do not force-include this header in the platform/runtime implementation. */
 #include <sys/types.h>
+#include <string.h>
 
 #include "compat/types.h"
 

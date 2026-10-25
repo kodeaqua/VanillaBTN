@@ -37,5 +37,8 @@ s32 rsin(s32 angle);
 s32 rcos(s32 angle);
 s32 SquareRoot0(s32 value);
 s32 VectorNormal(VECTOR *input, VECTOR *output);
+void InitGeom(void);
+void SetGeomOffset(s32 x, s32 y);
+void SetGeomScreen(s32 distance);
 
 #endif

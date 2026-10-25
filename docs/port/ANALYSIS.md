@@ -127,10 +127,11 @@ reports stay in ignored `build/`.
 
 ## Initial native source compilation
 
-`hmbtn_game_initial` compiles six original, unmodified units:
+`hmbtn_game_initial` compiles eight original, unmodified units:
 `main/geometry/math_util.c`, `main/game/farm_data_size.c`,
 `main/game/horse_names.c`, `main/game/picture_codes.c`,
-`main/game/event_flags.c`, and `main/game/farm_tables.c`.
+`main/game/event_flags.c`, `main/game/farm_tables.c`, `main/main.c`,
+and `main/cd/afile.c`.
 The port force-includes `compat/game.h`: fixed-width primitive types and scoped
 SDK integer aliases. Minimal VECTOR/SVECTOR/CVECTOR/MATRIX and GPU packet
 declarations follow source field usage and public GP0 formats (ADR-006).
@@ -141,7 +142,7 @@ and must not be used as a native runtime until that issue is resolved.
 
 The four GTE calls (`rsin`, `rcos`, `SquareRoot0`, `VectorNormal`) abort with their
 names in all builds until faithfully implemented; they are not numerical
-approximations. Eight tests cover type/endian and layout assumptions, original integer power,
+approximations. The initial tests cover type/endian and layout assumptions, original integer power,
 32-bit wrapping, interpolation/truncation/clamping, vector operations and each
 stub's failure diagnostic. Static helper paths are not exercised by game.math.
 `game.state` exercises all 1184 valid event flags, word/sign-bit boundaries,
@@ -155,12 +156,22 @@ and pointer-bearing state layout parity have not been tested.
 `compat.layouts` checks A_FILE records, ANI headers/images/parts/ranges/frames,
 image bank headers, input replay records and estate rows. ANI frames are 10 bytes
 in the original declaration, with control at offset 7. No source edit was needed.
-No main loop, title screen, or renderer is linked yet.
+No main loop, title screen, or renderer is linked into an executable yet.
 
 An earlier `llvm-nm --defined-only --extern-only` pass confirmed six math functions
-and four data symbols in the initial four-unit subset. The current syntax-only
-probe of `main/main.c` passes the new libetc declarations, then stops at missing
-`libcd.h`; further SDK headers and the main-loop dependencies remain unavailable.
+and four data symbols in the initial four-unit subset. A new pass confirms
+`hm_game_main` and `afile_init` in the archive. main.c is renamed only through
+its port build definition; the original source remains unchanged. These objects
+are not selected by the current test executables. The game's hardcoded
+WORK_REGION, frame table addresses, native pointer truncation and region-gap
+arithmetic remain unsafe for execution. Main-loop runtime dependencies and
+overlay dispatch have not been solved (ADR-007).
+
+The new source-facing libcd/libapi/libmcrd/libmcx declarations and the narrow
+GPU/GS/GTE startup declarations permit native entry-point code generation.
+Declarations alone do not implement callbacks, rendering, cards or GS work memory.
+The game force-include now supplies string.h as well: the host's memory.h alone
+does not declare memmove, unlike the original compilation environment.
 
 Warnings retained in `math_util.c`: unused static functions `vec3_add`,
 `vec3_differs`, `vec3_move_toward`, `math_cross2_sign`, and
@@ -169,16 +180,40 @@ Warnings retained in `math_util.c`: unused static functions `vec3_add`,
 two incompatible function-pointer casts at lines 733 and 735. The latter adapt
 `item_use_coin` and `farm_adjust_stamina_fatigue` to ItemUseFn; calling these through
 that type needs a deliberate port solution before item actions are enabled.
+main.c adds four pointer-to-s32 warnings and four unused-function warnings.
+afile.c adds 33 missing-pos initializer warnings for the existing A_FILE member
+table, two unused functions and two unused parameters. No warnings were suppressed.
+
+## CD bring-up surface
+
+`psx/cd_position.c` implements CdIntToPos/CdPosToInt from public BCD MSF addressing
+rules, without a disc or SDK code. Known vectors cover lead-in, frame/second/minute
+boundaries, a multi-minute location and the upper two-digit-minute location.
+An exhaustive round trip covers 450000 positions (LBA -150 through 449849).
+The reserved fourth byte is preserved. A separate eight-byte GetlocP response
+fixture passes its final three bytes to CdPosToInt under ASan; the helper must
+not read a fourth byte. Malformed BCD and out-of-domain input behavior is not
+claimed as validated PSY-Q parity.
+
+CdInit, CdSearchFile, CdControl, CdRead, CdReadSync, CdSync, CdReadBreak and
+CdFlush are explicit named abort stubs. Eight failure tests check these APIs
+cannot silently claim successful initialization, metadata or reads. There are
+17 CTests in total: five behavior/layout tests and twelve unimplemented-API
+failure tests (four GTE, eight CD). This is not a disc IO, XA or title boot test.
+
+CdlFILE is host-side result metadata with only the fields used by the source,
+pos and size. It is never read from disc bytes and does not claim the proprietary
+SDK's binary layout. CD command constants cover only commands observed in source.
 
 ## Full-tree native syntax inventory
 
 `port/analysis/compile_probe.py` invokes Clang on all original C files with the
 port force-include and the basename include directories. It writes per-file
 diagnostics to ignored `build/port/compile-probe.json`. No file is changed and no
-game code is linked or run. The result with Clang 20.1.8 is 55 syntax passes and
-58 failures out of 113 files, with 1228 warnings emitted before the error cap.
+game code is linked or run. The result with Clang 20.1.8 is 65 syntax passes and
+48 failures out of 113 files, with 1647 warnings emitted before the error cap.
 
-Common blockers include missing libcd/libapi/abs headers, undeclared GPU API
+Common blockers include missing abs/libsnd and other SDK headers, undeclared GPU API
 calls, MIPS register clobbers, SDK helper constants, GCC nested functions and
 macro-generated declarations not accepted by modern C. The probe's five-error
 limit means this is not a complete error count. Syntax passes can still fail
@@ -192,7 +227,7 @@ source cleanup would hide real fidelity and 64-bit hazards.
 ## Port guards and validation
 
 No `HMBTN_PORT` guards or original source edits have been introduced.
-The port now builds the six game units above, not a game executable.
+The port now builds the eight game units above, not a game executable.
 Matching `check` is unverified: Ubuntu WSL failed to start with
 `HCS_E_HYPERV_NOT_INSTALLED`. Project-local Windows tools were subsequently
 provisioned: CMake 3.31.6 and Ninja 1.12.1. LLVM-mingw was upgraded from

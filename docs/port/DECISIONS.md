@@ -98,3 +98,28 @@ Consequences: This establishes declarations and layout checks, not a GPU runtime
 or a solution to truncated links in original LINK_PRIM. Original data loaders,
 overlay dispatch and save serialization still need a separate 64-bit audit.
 Public packet format reference: https://psx-spx.consoledev.net/graphicsprocessingunitgpu/.
+
+## ADR-007: Compile the original entry point before linking or executing it
+
+Date: 2026-10-25. Status: accepted, following the separate native-build default.
+
+Context: SDK declarations blocked main.c before native code generation. Even
+after declaration fixes, its hardcoded work addresses and 32-bit pointer casts
+make it unsafe to run on a native 64-bit host.
+
+Decision: Compile unmodified main.c into the native game archive with a scoped
+`main=hm_game_main` definition. Add its source-required SDK declarations and
+compile afile.c in the same archive. Do not link or execute a game entry point
+until native work memory, overlay dispatch and required runtime calls are ready.
+Implement only the pure CD position helpers now; disc IO calls used by afile.c
+abort explicitly. Other declared-but-unimplemented APIs remain link errors.
+
+Consequences: Native code generation is verifiable without falsely claiming
+boot. CdlFILE is source-facing search metadata containing only pos and size,
+not a copied SDK ABI or an on-disc record. CdPosToInt reads exactly three bytes
+because cd_audio.c passes the last three bytes of a GetlocP response. CdIntToPos
+preserves the reserved fourth byte. Tested inputs cover normal two-digit BCD
+positions, not malformed locations or arbitrary out-of-range LBAs.
+
+Hardware reference for BCD MSF, 75 frames/second and the lead-in offset:
+https://psx-spx.consoledev.net/cdromdrive/.

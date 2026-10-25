@@ -18,4 +18,12 @@ typedef struct {
     u8 r, g, b, pad;
 } GsF_LIGHT;
 
+void GsInitGraph(s32 width, s32 height, s32 mode, s32 interlace, s32 dither);
+void GsDefDispBuff(s32 x0, s32 y0, s32 x1, s32 y1);
+void GsSetOffset(s32 x, s32 y);
+void GsSetDrawBuffOffset(void);
+void GsInit3D(void);
+void *GsGetWorkBase(void);
+void GsSetWorkBase(void *base);
+
 #endif

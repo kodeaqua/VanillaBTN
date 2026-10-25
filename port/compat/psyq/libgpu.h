@@ -189,4 +189,14 @@ HM_GPU_OFFSET(DISPENV, screen, 8);
 HM_GPU_OFFSET(DISPENV, isinter, 16);
 #undef HM_GPU_OFFSET
 
+s32 DrawSync(s32 mode);
+s32 ResetGraph(s32 mode);
+s32 SetGraphDebug(s32 mode);
+DRAWENV *SetDefDrawEnv(DRAWENV *environment, s32 x, s32 y, s32 width, s32 height);
+DISPENV *SetDefDispEnv(DISPENV *environment, s32 x, s32 y, s32 width, s32 height);
+DRAWENV *PutDrawEnv(DRAWENV *environment);
+DISPENV *PutDispEnv(DISPENV *environment);
+u32 *ClearOTagR(u32 *table, s32 entries);
+void DrawOTag(u32 *table);
+
 #endif
