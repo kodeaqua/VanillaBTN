@@ -490,3 +490,25 @@ remains unfinished. The real-disc sanitizer probe now stops at SsSeqOpen.
 
 Reference: https://psx-spx.consoledev.net/cdromfileformats/#cdrom-file-audio-sample-sets-vab-and-vhvb-sony
 and https://psx-spx.consoledev.net/graphicsprocessingunitgpu/.
+
+<a id="adr-022"></a>
+
+## ADR-022: Retain sequence asset bounds at the native loader boundary
+
+Date: 2026-10-25. Status: accepted for safe SEQ parsing; playback pending.
+
+SsSeqOpen receives only a pointer and bank ID. The original loader knows the
+exact copied sequence size; attempting to discover an end marker through an
+unbounded pointer would hide malformed-asset reads. A narrow native guard
+registers the copied pointer/length with the sequence runtime. Matching code
+does not call the registration function and reconstructs the baseline exactly.
+
+The parser checks SEQ v1 headers, big-endian timing, bounded variable integers,
+channel event widths, running status and metadata/SysEx payload bounds. Open
+validates termination and requires a loaded bank. Handles and volume settings
+are retained; stopping an idle opened sequence is valid. SsSeqPlay still aborts
+until the sequencer and voice mixer can actually perform the requested playback.
+No silent playing/completion status is fabricated. The real-disc sanitizer
+probe now reaches SsSeqPlay after opening the sequence successfully.
+
+Reference: https://psx-spx.consoledev.net/cdromfileformats/#cdrom-file-audio-sequences-seqsep-sony.

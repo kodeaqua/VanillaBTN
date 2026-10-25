@@ -46,10 +46,10 @@ cmake --build build/port/windows-release --target hmbtn_boot_probe
 & ./build/port/windows-release/hmbtn_boot_probe.exe 'D:/my-disc/Harvest Moon - Back to Nature (USA).bin'
 ```
 
-Current observed stop: `Unimplemented PSX API: SsSeqOpen`, with a nonzero abort
+Current sanitizer stop: `Unimplemented PSX API: SsSeqPlay`, with a nonzero abort
 exit. Before that point, the original code performs callback/VSync setup, real
 A_FILE reads, silent sound configuration, GTE/GPU setup, title initialization
-and streamed VAB sample-bank loading. Release and sanitizer boot reach this stop.
+and streamed VAB sample-bank loading. Bounded SEQ parsing/opening succeeds.
 The native title-picture copy is bounded after an ASan-reported overread. This
 is an expected bring-up failure, not a completed boot. Unsupported SDK calls
 must retain their named failures while implementations are added. The console

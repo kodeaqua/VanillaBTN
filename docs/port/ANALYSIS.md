@@ -285,7 +285,7 @@ All 33 A_FILE offsets (32 member ranges) are monotonic and inside the
 133935104-byte archive. The probe is a diagnostic, not a game executable.
 No assets were extracted or added to git. The source's afile_init has not run.
 
-There are 47 CTests, all passing in Windows release and ASan/UBSan. New coverage
+There are 48 CTests, all passing in Windows release and ASan/UBSan. New coverage
 includes SHA-1 published vectors, malformed synthetic sectors/directories,
 cross-sector file reads, deterministic CD transfer/cancel/error behavior,
 VRAM transfers/masks/wrapping and the original texture-pack decoder. Tests need
@@ -342,7 +342,8 @@ SEQ/XA audio playback remains unfinished. DrawOTag supports sprites, tiles and
 axis-aligned flat quads, not general polygons. The pending SDK layer contains named
 abort paths for remaining calls, preventing unsupported work from returning
 fabricated success. The real-disc console and SDL_GPU window probes reach
-SsSeqOpen after real A_FILE reads and streamed VAB loading. ASan boot found a
+sequence loading after real A_FILE reads and streamed VAB loading. The current
+sanitizer stop is SsSeqPlay: opening the bounded sequence succeeds. ASan boot found a
 title-picture overread; ADR-020 bounds the copy to its source array. After that
 fix the sanitizer probe reaches the same named stop without a prior finding.
 The SDL window ran through Vulkan; its last captured frame is black, so no
@@ -362,9 +363,9 @@ and distinct-object C test check that capture semantics are retained.
 
 ## Port guards and validation
 
-Fifty `HMBTN_PORT` guard blocks have been introduced under ADR-008 through
-ADR-020 (workspace, GPU links, CPU/GTE adapters, nested helpers, event pointers,
-private text declarations, static overlay dispatch and bounded title copies):
+Fifty-one `HMBTN_PORT` guard blocks have been introduced under ADR-008 through
+ADR-022 (workspace, GPU links, CPU/GTE adapters, nested helpers, event pointers,
+private text declarations, overlays, bounded title copies and SEQ asset spans):
 
 | File | Guarded change |
 | --- | --- |
@@ -397,8 +398,9 @@ private text declarations, static overlay dispatch and bounded title copies):
 | src/main/overlay_regions.c | Bind asset regions to native workspace (1 guard) |
 | src/main/main.c | Select statically linked overlays without loading PS1 code (1 additional guard) |
 | src/overlay/27_GF_TITLE/title.c | Bound title-picture copy to the selected source array (1 guard) |
+| src/main/sound/sound.c | Register the copied native sequence asset bounds (1 guard) |
 
-For each of these twenty-two files, selecting every matching `#else` branch and
+For each of these twenty-three files, selecting every matching `#else` branch and
 removing the new guard directives reconstructs the previous source text exactly,
 including its whitespace (line endings normalized for comparison). This check
 passed against baseline revision 9ace470. It does not establish byte-matching

@@ -6,8 +6,8 @@ screen or gameplay has been validated.
 | Target | Foundation preset | Validation |
 | --- | --- | --- |
 | Linux x86-64 | linux-release, linux-asan-ubsan | Deferred; requires a separate Linux host, no WSL |
-| Windows x86-64 | windows-release | All 113 original source units compile; local tests passed (47/47) |
-| Windows x86-64 sanitizers | windows-asan-ubsan | All source units compile; Clang 20.1.8 ASan/UBSan tests passed (47/47); execution coverage remains limited |
+| Windows x86-64 | windows-release | All 113 original source units compile; local tests passed (48/48) |
+| Windows x86-64 sanitizers | windows-asan-ubsan | All source units compile; Clang 20.1.8 ASan/UBSan tests passed (48/48); execution coverage remains limited |
 | macOS universal | macos-universal-release | Pending; no macOS host tested |
 | Android arm64 | Pending NDK and minSdk selection | No device/build validation |
 
@@ -19,7 +19,8 @@ collisions, excluding compiler COFF reference entries. The console probe ran the
 original C entry point with the verified USA disc: callbacks, virtual VSync,
 silent audio setup, A_FILE initialization, draw/display setup and GTE/GS setup
 execute, followed by no-card initialization, title init and streamed VAB loading.
-SsSeqOpen now aborts by name. A title-picture overread observed under ASan has
+Bounded SEQ opening succeeds; SsSeqPlay now aborts by name under the sanitizer
+probe. A title-picture overread observed under ASan has
 a bounded native copy (ADR-020); the sanitizer probe reaches this same stop.
 The SDL_GPU game-window diagnostic ran using Vulkan; its last captured scanout
 is black. This is neither a verified visible title screen
