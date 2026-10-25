@@ -73,15 +73,19 @@ ctest --preset linux-asan-ubsan
 
 Desktop presets also exist for `windows-release` (LLVM-mingw/UCRT, without MSVC)
 and `macos-universal-release`.
-These build the compatibility layer and eight original source units.
+These build the compatibility layer and ten original source units.
 Android presets await an NDK
 pin and platform configuration; no Android support is claimed yet.
 
 No SDL dependency, SDK, network, or game data is required by the port foundation.
 It is not a playable game. Only `math_util.c`, `farm_data_size.c`, `horse_names.c`,
-`picture_codes.c`, `event_flags.c`, `farm_tables.c`, `main.c`, and `cd/afile.c`
+`picture_codes.c`, `event_flags.c`, `farm_tables.c`, `farm_state.c`, `main.c`,
+`graphics/frame_buffers.c`, and `cd/afile.c`
 from `src/` are compiled so far. The game entry point is renamed to hm_game_main
 in the port build and archived, not linked as an executable or called by tests.
+The work-memory fixture includes main.c separately, makes its unused entry point
+local, and calls only the original frame setup/region helper functions. GPU/GS
+dependencies there are explicit test observations, not runtime implementations.
 
 ## Windows first
 
@@ -147,7 +151,9 @@ An earlier Ubuntu WSL launch failed (`HCS_E_HYPERV_NOT_INSTALLED`); the owner
 subsequently excluded WSL, so no further WSL attempts are required. Matching
 validation is deferred to a separate Linux host. CMake, Ninja and Clang were not found on the
 Windows PATH initially. After provisioning project-local tools, Windows release
-configure/build and all 17 tests passed. The Windows ASan/UBSan preset also
-built and passed 17 tests with Clang 20.1.8; Clang 19's ASan had failed during
+configure/build and all 18 tests passed. The Windows ASan/UBSan preset also
+built and passed 18 tests with Clang 20.1.8; Clang 19's ASan had failed during
 startup (ADR-005). The matching build, Linux/macOS builds and full game execution
-remain unverified. Original source files have not been edited.
+remain unverified. Nine native guards in three original files are listed in
+ANALYSIS.md. Their matching branches reconstruct the preceding source text
+exactly; this is not a claim that matching check passed.

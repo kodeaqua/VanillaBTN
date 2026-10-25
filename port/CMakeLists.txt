@@ -50,8 +50,10 @@ target_compile_definitions(hmbtn_game_options INTERFACE HMBTN_PORT=1)
 add_library(hmbtn_game_initial STATIC
     ../src/main/main.c
     ../src/main/cd/afile.c
+    ../src/main/graphics/frame_buffers.c
     ../src/main/geometry/math_util.c
     ../src/main/game/farm_data_size.c
+    ../src/main/game/farm_state.c
     ../src/main/game/horse_names.c
     ../src/main/game/event_flags.c
     ../src/main/game/farm_tables.c
@@ -76,6 +78,15 @@ if(BUILD_TESTING)
     add_executable(hmbtn_game_state_test tests/game_state.c tests/item_callback_traps.c)
     target_link_libraries(hmbtn_game_state_test PRIVATE hmbtn_game_initial hmbtn_psx_initial)
     add_test(NAME game.state COMMAND hmbtn_game_state_test)
+    add_executable(hmbtn_work_memory_test tests/work_memory.c tests/item_callback_traps.c)
+    target_link_libraries(hmbtn_work_memory_test PRIVATE hmbtn_game_initial hmbtn_psx_initial)
+    # This fixture includes the original main.c to exercise its static setup
+    # functions. Discard the unreachable game entry and its unfinished dependencies.
+    target_compile_options(hmbtn_work_memory_test PRIVATE -ffunction-sections -fdata-sections)
+    target_link_options(hmbtn_work_memory_test PRIVATE
+        "$<$<PLATFORM_ID:Windows,Linux,Android>:-Wl,--gc-sections>"
+        "$<$<PLATFORM_ID:Darwin>:-Wl,-dead_strip>")
+    add_test(NAME game.work_memory COMMAND hmbtn_work_memory_test)
     add_executable(hmbtn_layouts_test tests/layouts.c)
     target_link_libraries(hmbtn_layouts_test PRIVATE hmbtn_game_options)
     add_test(NAME compat.layouts COMMAND hmbtn_layouts_test)

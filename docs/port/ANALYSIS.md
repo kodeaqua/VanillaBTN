@@ -98,7 +98,8 @@ must remain unchanged until its meaning is established.
   require a separate inventory before runtime loading.
 
 Initial pointer-free asset layout checks now live in `port/tests/layouts.c`.
-Original source headers remain unmodified.
+Original asset declarations remain unmodified; the native main.h pointer getter
+guard is listed below.
 
 ## Repeatable lexical audit
 
@@ -110,28 +111,31 @@ regions. The initial run reports:
 | Item | Count |
 | --- | --- |
 | C sources / headers | 113 / 110 |
-| Ordinary function definitions, including static functions | 2627 |
+| Ordinary function definitions, including static functions | 2628 |
 | Unique ordinary external function names | 950 |
-| Duplicate ordinary external function name candidates | 0 |
-| External call-like names requiring classification | 299 |
+| Duplicate ordinary external function name candidates | 1 |
+| External call-like names requiring classification | 300 |
 | GTE-prefixed invocation names | 40 |
 
 This is not a preprocessor or a C semantic analysis. Macro-generated functions
 (including farm courtship helpers), callbacks, type casts, declarations, global
 data definitions and conditional compilation require compiler/linker analysis.
-The 299 candidates are not 299 confirmed SDK functions; the 40 GTE-prefixed
+The 300 candidates are not 300 confirmed SDK functions; the 40 GTE-prefixed
 names also include game helpers. Six regression fixtures cover comments,
 strings, macro continuations, initializer braces, prototypes, operators and
 source-line preservation, collision filtering and overlay ownership. Generated
 reports stay in ignored `build/`.
+The single duplicate-name candidate is main_get_region_base's mutually exclusive
+native/matching definitions in one file. This illustrates the audit's lack of
+preprocessing; it is not an actual linked collision.
 
 ## Initial native source compilation
 
-`hmbtn_game_initial` compiles eight original units with native guards listed below:
+`hmbtn_game_initial` compiles ten original units with native guards listed below:
 `main/geometry/math_util.c`, `main/game/farm_data_size.c`,
 `main/game/horse_names.c`, `main/game/picture_codes.c`,
-`main/game/event_flags.c`, `main/game/farm_tables.c`, `main/main.c`,
-and `main/cd/afile.c`.
+`main/game/event_flags.c`, `main/game/farm_tables.c`, `main/game/farm_state.c`,
+`main/graphics/frame_buffers.c`, `main/main.c`, and `main/cd/afile.c`.
 The port force-includes `compat/game.h`: fixed-width primitive types and scoped
 SDK integer aliases. Minimal VECTOR/SVECTOR/CVECTOR/MATRIX and GPU packet
 declarations follow source field usage and public GP0 formats (ADR-006).
@@ -185,6 +189,32 @@ The four pointer-to-s32 warnings in main.c are removed by native-only guards;
 its four unused-function warnings remain.
 afile.c adds 33 missing-pos initializer warnings for the existing A_FILE member
 table, two unused functions and two unused parameters. No warnings were suppressed.
+frame_buffers.c still warns about a truncated primitive address in ot_insert_prim.
+That routine is not exercised by the work-memory test and remains unsafe until
+native OT address encoding is implemented.
+
+## Native workspace validation
+
+The aligned 0xCF1E0-byte C workspace holds the 0x49000 image window, 0x47390
+section/free capacity and 0x3EE50 frame work region. It is not a PS1 RAM image;
+code, other globals, overlays and heap allocations remain outside it. Its offsets
+are derived from the matching layout, not an increased memory budget (ADR-008).
+
+`game.work_memory` includes original main.c instead of copying its functions,
+makes the unused game entry local, and calls the actual normal/wide frame setup,
+frame begin, GS work allocator/release and region accessors. It also links and
+calls original farm_state_init and frame_buffers_layout. Test-only GPU/GS functions
+record which OT regions are cleared and which work base is selected; they do not
+encode OT links or render. Unexpected host-debugger/system-error paths abort.
+
+Both layouts keep OT, primitive and GS work spans inside the native frame object.
+The demo buffer is correctly aligned below region_base, and its recording survives
+a frame-area reset. Original table registration and farm buffer pointers bind
+without subtracting addresses of separately linked overlay objects. Free-space
+checks cover zero use, a partial section, exact exhaustion and a negative budget
+one byte past capacity, preserving the signed vanilla result rather than clamping.
+Release and ASan/UBSan pass. Full scene loads, raw asset pointer relocation,
+overlay region copies and native OT packet links remain outside this coverage.
 
 ## CD bring-up surface
 
@@ -200,7 +230,7 @@ claimed as validated PSY-Q parity.
 CdInit, CdSearchFile, CdControl, CdRead, CdReadSync, CdSync, CdReadBreak and
 CdFlush are explicit named abort stubs. Eight failure tests check these APIs
 cannot silently claim successful initialization, metadata or reads. There are
-17 CTests in total: five behavior/layout tests and twelve unimplemented-API
+18 CTests in total: six behavior/layout tests and twelve unimplemented-API
 failure tests (four GTE, eight CD). This is not a disc IO, XA or title boot test.
 
 CdlFILE is host-side result metadata with only the fields used by the source,
@@ -213,7 +243,7 @@ SDK's binary layout. CD command constants cover only commands observed in source
 port force-include and the basename include directories. It writes per-file
 diagnostics to ignored `build/port/compile-probe.json`. No file is changed and no
 game code is linked or run. The result with Clang 20.1.8 is 65 syntax passes and
-48 failures out of 113 files, with 1647 warnings emitted before the error cap.
+48 failures out of 113 files, with 1643 warnings emitted before the error cap.
 
 Common blockers include missing abs/libsnd and other SDK headers, undeclared GPU API
 calls, MIPS register clobbers, SDK helper constants, GCC nested functions and
@@ -248,7 +278,7 @@ including its whitespace (line endings normalized for comparison). This check
 passed against the preceding git revision. It does not establish byte-matching
 compiler output. Overlay callers of main_get_region_base that still store its
 result in s32/u32 now require explicit port fixes before those paths can compile.
-The port now builds the eight game units above, not a game executable.
+The port now builds the ten game units above, not a game executable.
 Matching `check` is unverified: Ubuntu WSL failed to start with
 `HCS_E_HYPERV_NOT_INSTALLED`. Project-local Windows tools were subsequently
 provisioned: CMake 3.31.6 and Ninja 1.12.1. LLVM-mingw was upgraded from
