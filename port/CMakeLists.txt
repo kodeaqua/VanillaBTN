@@ -23,7 +23,7 @@ if(HMBTN_SANITIZERS)
     target_link_options(hmbtn_port_options INTERFACE -fsanitize=address,undefined)
 endif()
 
-add_library(hmbtn_work_memory STATIC compat/work_memory.c)
+add_library(hmbtn_work_memory STATIC compat/work_memory.c compat/cpu.c)
 target_link_libraries(hmbtn_work_memory PUBLIC hmbtn_port_options)
 
 # Compile original translation units with port-only compatibility hooks.
@@ -66,7 +66,7 @@ set_source_files_properties(../src/main/main.c PROPERTIES COMPILE_DEFINITIONS ma
 
 add_library(hmbtn_psx_initial STATIC
     psx/unimplemented.c psx/gte_stubs.c psx/cd_position.c psx/cd_stubs.c
-    psx/gpu_links.c psx/gpu_ot.c)
+    psx/gpu_links.c psx/gpu_ot.c psx/gpu_packets.c)
 target_link_libraries(hmbtn_psx_initial PUBLIC hmbtn_port_options)
 target_include_directories(hmbtn_psx_initial PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/compat/psyq")
 
@@ -95,6 +95,9 @@ if(BUILD_TESTING)
     add_executable(hmbtn_gpu_links_test tests/gpu_links.c)
     target_link_libraries(hmbtn_gpu_links_test PRIVATE hmbtn_game_initial hmbtn_psx_initial)
     add_test(NAME gpu.links COMMAND hmbtn_gpu_links_test)
+    add_executable(hmbtn_gpu_packets_test tests/gpu_packets.c)
+    target_link_libraries(hmbtn_gpu_packets_test PRIVATE hmbtn_psx_initial)
+    add_test(NAME gpu.packets COMMAND hmbtn_gpu_packets_test)
     foreach(rejection IN ITEMS null unaligned capacity unknown zero empty)
         if(rejection MATCHES "^(null|unaligned|capacity)$")
             set(context hm_gpu_link_encode)

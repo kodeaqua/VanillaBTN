@@ -202,4 +202,42 @@ void addPrim(u32 *head, void *packet);
 void AddPrim(u32 *head, void *packet);
 void DrawOTag(u32 *table);
 
+enum { HWD0 = 320, VWD0 = 240 };
+u16 getClut(s32 x, s32 y);
+u16 GetClut(s32 x, s32 y);
+u16 getTPage(s32 depth, s32 blend, s32 x, s32 y);
+u16 GetTPage(s32 depth, s32 blend, s32 x, s32 y);
+void setSprt(SPRT *packet);
+void setPolyFT4(POLY_FT4 *packet);
+void SetPolyF4(POLY_F4 *packet);
+void setSemiTrans(void *packet, s32 enabled);
+void SetSemiTrans(void *packet, s32 enabled);
+void setShadeTex(void *packet, s32 raw_texture);
+void setDrawTPage(void *packet, s32 display_enable, s32 dither, s32 page);
+void SetDrawMode(DR_MODE *packet, s32 display_enable, s32 dither, s32 page, const RECT *window);
+void SetDrawArea(DR_AREA *packet, const RECT *area);
+void SetDrawLoad(DR_LOAD *packet, const RECT *area);
+s32 LoadImage(const RECT *area, const u32 *pixels);
+s32 StoreImage(const RECT *area, u32 *pixels);
+s32 MoveImage(const RECT *area, s32 x, s32 y);
+s32 MoveImage2(const RECT *area, s32 x, s32 y);
+s32 ClearImage(const RECT *area, u8 r, u8 g, u8 b);
+s32 SetDispMask(s32 enabled);
+s32 FntPrint(const char *format, ...);
+
+/* Source call sites pass several primitive types; field macros retain their
+ * concrete types and evaluate only the requested primitive attributes. */
+#define setXY0(p, x, y) ((p)->x0 = (x), (p)->y0 = (y))
+#define setWH(p, width, height) ((p)->w = (width), (p)->h = (height))
+#define setUV0(p, u, v) ((p)->u0 = (u), (p)->v0 = (v))
+#define setRGB0(p, r, g, b) ((p)->r0 = (r), (p)->g0 = (g), (p)->b0 = (b))
+#define setXYWH(p, x, y, width, height) \
+    ((p)->x0 = (x), (p)->y0 = (y), (p)->x1 = (x) + (width), (p)->y1 = (y), \
+     (p)->x2 = (x), (p)->y2 = (y) + (height), \
+     (p)->x3 = (x) + (width), (p)->y3 = (y) + (height))
+#define setUVWH(p, u, v, width, height) \
+    ((p)->u0 = (u), (p)->v0 = (v), (p)->u1 = (u) + (width), (p)->v1 = (v), \
+     (p)->u2 = (u), (p)->v2 = (v) + (height), \
+     (p)->u3 = (u) + (width), (p)->v3 = (v) + (height))
+
 #endif

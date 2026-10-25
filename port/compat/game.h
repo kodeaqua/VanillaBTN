@@ -8,6 +8,7 @@
 
 #include "compat/types.h"
 #include "compat/work_memory.h"
+#include "compat/fixed_math.h"
 
 typedef u8 hm_psx_u_char;
 typedef u16 hm_psx_u_short;

@@ -5,7 +5,7 @@ As of 2026-10-25, no native game platform is brought up.
 | Target | Foundation preset | Validation |
 | --- | --- | --- |
 | Linux x86-64 | linux-release, linux-asan-ubsan | Deferred; requires a separate Linux host, no WSL |
-| Windows x86-64 | windows-release | Eleven original source units compile; local tests passed (25/25) |
+| Windows x86-64 | windows-release | Eleven original source units compile; local tests passed (26/26) |
 | Windows x86-64 sanitizers | windows-asan-ubsan | Clang 20.1.8 ASan/UBSan tests passed (25/25); coverage limited to the initial subset |
 | macOS universal | macos-universal-release | Pending; no macOS host tested |
 | Android arm64 | Pending NDK and minSdk selection | No device/build validation |

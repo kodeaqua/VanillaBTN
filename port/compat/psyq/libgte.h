@@ -40,5 +40,7 @@ s32 VectorNormal(VECTOR *input, VECTOR *output);
 void InitGeom(void);
 void SetGeomOffset(s32 x, s32 y);
 void SetGeomScreen(s32 distance);
+s32 ratan2(s32 y, s32 x);
+void OuterProduct0(VECTOR *first, VECTOR *second, VECTOR *result);
 
 #endif

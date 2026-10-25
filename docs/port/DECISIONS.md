@@ -189,3 +189,29 @@ runtime cost still need full-game/device profiling; no performance claim is made
 Matching source integrations must retain the exact original else branches.
 
 Public packet/OT reference: https://psx-spx.consoledev.net/graphicsprocessingunitgpu/.
+
+<a id="adr-010"></a>
+
+## ADR-010: Keep native stacks and explicit diagnostic markers
+
+Date: 2026-10-25. Status: accepted, following the native ABI/scratchpad default.
+
+Context: cpu_asm.h switches to a MIPS scratchpad stack and stores return addresses
+in 32-bit diagnostic words. Neither operation is valid on a 64-bit host. Source
+inspection shows no game-data accesses to the saved scratchpad SP; lastCaller is
+a diagnostic word also copied into save metadata, not an executable function pointer.
+
+Decision: Native calls retain their normal ABI stack. Provide aligned 1 KB C
+scratchpad storage and no-op only the stack-switch hints. SAVE_RETURN_ADDRESS
+writes the deterministic 0x504F5254 PORT diagnostic marker instead of truncating
+a host address. A game debugger-wait request reports a runtime error and aborts,
+rather than emitting a MIPS break instruction or hanging the native process.
+Keep all original CPU macros in an exact matching else branch when integrated.
+
+The SDK csin/ccos/csqrt names are mapped to explicit fixed-math declarations,
+avoiding collisions with the host C99 complex builtins. This does not yet
+implement their arithmetic. Packet helpers implement only source-used fields
+and GP0 encodings; video dimensions 320x240 follow the original main.c setup.
+
+Consequences: These hooks unblock native compilation, not GTE functionality or
+save-format parity. No approximation of an unimplemented GTE operation is added.
