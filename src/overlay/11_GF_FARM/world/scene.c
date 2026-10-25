@@ -288,7 +288,13 @@ s32 scene_resolve_selection(s32 selection)
     {
         selection = game_state.progress.estate.barnLevel * 4 + game_state.progress.clock.date.season + BARN_SCENE_BASE;
     }
+#ifdef HMBTN_PORT
+    /* PORT: no previous area exists on first entry; native address zero is
+     * unmapped - see docs/port/DECISIONS.md#adr-031. */
+    if (farm_area.mode.data && farm_area.mode.data->head.place.value == PLACE_MINE_43)
+#else
     if (farm_area.mode.data->head.place.value == PLACE_MINE_43)
+#endif
     {
         if (event_flag_get(EVENT_FLAG_MINE_NEXT_LAYER) == 0 && farm_area.mode.data->head.place.location == PLACE_44)
         {
@@ -299,7 +305,12 @@ s32 scene_resolve_selection(s32 selection)
             selection = game_state.progress.clock.date.season + MINE_43_SCENE_BASE;
         }
     }
+#ifdef HMBTN_PORT
+    /* PORT: retain the loaded-area path without reading address zero. */
+    if (farm_area.mode.data && farm_area.mode.data->head.place.value == PLACE_MINE)
+#else
     if (farm_area.mode.data->head.place.value == PLACE_MINE)
+#endif
     {
         if (event_flag_get(EVENT_FLAG_MINE_NEXT_LAYER) == 0 && farm_area.mode.data->head.place.location == PLACE_38)
         {

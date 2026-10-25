@@ -688,3 +688,23 @@ and rendered lighting parity remain unverified, like the analytic trig path.
 References: public GsF_LIGHT direction/normalization and ambient descriptions
 in the Net Yaroze library reference and public libgs overview; no SDK code was
 copied. GTE arithmetic remains in the separate scalar command implementation.
+
+<a id="adr-031"></a>
+
+## ADR-031: Select the first area without reading address zero
+
+Date: 2026-10-26. Status: native safety adaptation; hardware parity pending.
+
+The New Game replay reaches scene_resolve_selection before any area has been
+loaded. farm_state_init clears farm_area.mode.data. The two previous-mine
+override checks dereference that null pointer before scene_enter loads the
+first area's data. ASan/UBSan identifies the first dereference on Windows.
+
+For native builds, apply those overrides only when previous-area data exists.
+Leave the loaded-area path and original matching conditions unchanged. Do not
+map address zero or simulate PS1 RAM. A test calls the original selection
+function with no previous area, a house upgrade/season, and loaded mine flags.
+The contents read at address zero on original hardware are not established;
+this adaptation does not prove first-entry hardware parity. Matching check
+remains unavailable on this Windows-only host; source-branch reconstruction
+against 9ace470 passes for all 59 guards in 26 files.

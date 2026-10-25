@@ -372,9 +372,10 @@ and distinct-object C test check that capture semantics are retained.
 
 ## Port guards and validation
 
-Fifty-seven `HMBTN_PORT` guard blocks have been introduced under ADR-008 through
-ADR-029 (workspace, GPU/GTE/CPU adapters, nested helpers, event/text pointers,
-overlays, title copies, SEQ spans, animation table tails and estate queues):
+Fifty-nine `HMBTN_PORT` guard blocks have been introduced under ADR-008 through
+ADR-031 (workspace, GPU/GTE/CPU adapters, nested helpers, event/text pointers,
+overlays, title copies, SEQ spans, animation table tails, estate queues and
+initial area selection):
 
 | File | Guarded change |
 | --- | --- |
@@ -412,6 +413,7 @@ overlays, title copies, SEQ spans, animation table tails and estate queues):
 | src/main/graphics/anim.h | Retain initialized flexible tails and byte-read table entries (2 guards) |
 | src/overlay/11_GF_FARM/people/player.c | Preserve the native toy asset base (1 guard) |
 | src/overlay/11_GF_FARM/estate.c | Clear message queue fields instead of PS1 offsets (1 additional guard) |
+| src/overlay/11_GF_FARM/world/scene.c | Skip previous-mine overrides until an area is loaded (2 additional guards) |
 
 For each of these twenty-six files, selecting every matching `#else` branch and
 removing the new guard directives reconstructs the previous source text exactly,
