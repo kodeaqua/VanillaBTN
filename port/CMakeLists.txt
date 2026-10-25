@@ -23,7 +23,10 @@ if(HMBTN_SANITIZERS)
     target_link_options(hmbtn_port_options INTERFACE -fsanitize=address,undefined)
 endif()
 
-# Compile original translation units without changing the matching source tree.
+add_library(hmbtn_work_memory STATIC compat/work_memory.c)
+target_link_libraries(hmbtn_work_memory PUBLIC hmbtn_port_options)
+
+# Compile original translation units with port-only compatibility hooks.
 add_library(hmbtn_game_options INTERFACE)
 target_link_libraries(hmbtn_game_options INTERFACE hmbtn_port_options)
 target_include_directories(hmbtn_game_options INTERFACE
@@ -53,7 +56,7 @@ add_library(hmbtn_game_initial STATIC
     ../src/main/game/event_flags.c
     ../src/main/game/farm_tables.c
     ../src/main/game/picture_codes.c)
-target_link_libraries(hmbtn_game_initial PUBLIC hmbtn_game_options)
+target_link_libraries(hmbtn_game_initial PUBLIC hmbtn_game_options hmbtn_work_memory)
 # Keep the game's entry point separate from the host test runners. This source
 # is compiled into the archive only; no native game executable is linked yet.
 set_source_files_properties(../src/main/main.c PROPERTIES COMPILE_DEFINITIONS main=hm_game_main)

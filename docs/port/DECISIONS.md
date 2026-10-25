@@ -123,3 +123,35 @@ positions, not malformed locations or arbitrary out-of-range LBAs.
 
 Hardware reference for BCD MSF, 75 frames/second and the lead-in offset:
 https://psx-spx.consoledev.net/cdromdrive/.
+
+<a id="adr-008"></a>
+
+## ADR-008: Back the asset/frame workspace with normal C storage
+
+Date: 2026-10-25. Status: accepted, following the native memory default.
+
+Context: main.c treats 0x801BE1B0 as a writable frame workspace. Its frame buffers
+occupy 0x3EE50 bytes; the input demo and dynamically loaded farm data sit below
+it. Replacing only the frame address would leave pointer subtraction outside
+the allocated object. farm_state_init also derives its load window by subtracting
+overlay code addresses, which does not apply to statically linked host overlays.
+
+Decision: Use one aligned C byte array solely for this existing contiguous data
+workspace, not a 2 MB PS1 memory image. Keep the 0x49000 image window, 0x47390
+section/free capacity and 0x3EE50 frame work area. The capacity is derived from
+the matching addresses: align the low-to-high region distance (0x75FC8) to
+0x800 bytes, producing load window 0x8012DE20 and section start 0x80176E20;
+the distance to WORK_REGION is then 0x47390. Native frame/tag offsets remain
+unchanged. Overlay code and other globals/heap remain outside this storage.
+
+Native source hooks will select the buffer and return a byte pointer from
+main_get_region_base, preserving full host pointer width. Remaining overlay
+callers that assign that pointer to 32-bit integers must fail compilation until
+ported. The matching branches retain their original declarations and statements.
+No save-format or asset-pointer compatibility is implied by this workspace.
+
+Consequences: Frame/farm memory can be tested independently of GPU execution
+and disc IO. Free-space budgets and demo overlap retain their vanilla meaning.
+OT pointer encoding, overlay loading, asset bounds validation and the rest of
+boot remain separate work. Matching check still requires an unavailable Linux
+toolchain; textual branch preservation is additional evidence, not a substitute.
