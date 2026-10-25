@@ -270,3 +270,30 @@ the game's callers consume pixels, not padding. No claim is made about bus
 padding parity or GPU timing. No speculative rendering enhancement is added.
 
 Reference: https://psx-spx.consoledev.net/graphicsprocessingunitgpu/.
+
+<a id="adr-013"></a>
+
+## ADR-013: Hoist capture-free nested helpers through native adapters
+
+Date: 2026-10-25. Status: accepted, following the narrow source-guard default.
+
+Context: The original GCC code defines functions inside other functions. Clang
+rejects these definitions. Several helpers use only arguments and file globals,
+so moving their scope does not require closures or game-state changes.
+
+Decision: Keep original nested definitions untouched in matching else branches.
+For native builds, include static copies from port/compat/nested immediately
+before the enclosing function. Hoist only helpers inspected to capture no local
+variables. Keep names, parameter types, expressions and branches equivalent.
+Do not apply this pattern to captured-local helpers without explicit arguments.
+A regression test compares original and adapter tokens, excluding only static
+and whitespace/comments. Existing unusual comparisons remain unchanged.
+
+Consequences: Eight capture-free helpers in ground collision, animal headings,
+estate items, shop rows and winter event conditions now compile under Clang.
+Data-free tests exercise winding/edge/height geometry, comparison boundaries,
+estate flag priority and visible medal rows. These do not prove full gameplay
+parity. The native helper copies must remain synchronized with matching source.
+The matching compiler check remains unavailable on the Windows-only host;
+reconstructing exact matching text provides additional evidence, not a binary
+matching result. No compiler switch or new runtime dependency is introduced.
