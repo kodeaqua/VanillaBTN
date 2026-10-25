@@ -46,22 +46,32 @@ cmake --build build/port/windows-release --target hmbtn_boot_probe
 & ./build/port/windows-release/hmbtn_boot_probe.exe 'D:/my-disc/Harvest Moon - Back to Nature (USA).bin'
 ```
 
-Current sanitizer stop: `Unimplemented PSX API: SsSeqPlay`, with a nonzero abort
-exit. Before that point, the original code performs callback/VSync setup, real
-A_FILE reads, silent sound configuration, GTE/GPU setup, title initialization
-and streamed VAB sample-bank loading. Bounded SEQ parsing/opening succeeds.
-The native title-picture copy is bounded after an ASan-reported overread. This
-is an expected bring-up failure, not a completed boot. Unsupported SDK calls
-must retain their named failures while implementations are added. The console
-probe uses virtual time and has no SDL window; hardware presentation is tested
-separately in GPU_TESTING.md. Native overlay reentry also remains unsupported.
+The native title/menu now run, and a local replay passes naming/birthday setup
+and enters farm initialization. Farm rendering/player movement are not yet
+validated. Unsupported SDK calls retain named failures while bring-up proceeds.
+The console probe uses virtual time and has no SDL window. Native overlay
+reentry and file-backed memory cards remain unsupported.
 
 For the optional SDL game-window diagnostic, configure the existing GPU spike
 build with `-DHMBTN_BUILD_NATIVE_WINDOW=ON`, then build `hmbtn_native`. It accepts
 the same BIN argument. This is unfinished bring-up, not a playable release.
-The last observed scanout is black before the sequence-loading stop. Keyboard
+Vulkan captures show the title, New Game/Continue menu and naming dialogue. Keyboard
 arrows map to the D-pad, X/Z to Cross/Square, W/D to Triangle/Circle, Return to
-Start and Backspace to Select. No interactive gameplay response is verified.
+Start and Backspace to Select. Replay input is validated through the original
+pad polling code; physical keyboard interaction remains unverified.
 The development-only HMBTN_CAPTURE_FRAME environment variable can name a local
 BMP output; it overwrites the last scanout each tick. Keep captures under the
 ignored build directory. It is unset by default and is not release telemetry.
+
+Local diagnostics accept HMBTN_INPUT_REPLAY: a text file containing one
+`decimal_tick hexadecimal_PadButton_mask` transition per line, ordered strictly
+by VBlank tick. Blank lines and whole-line # comments are allowed. After the
+last transition, the final held mask persists, so finish with a zero mask.
+With replay configured, its pad samples override keyboard input. Clear that
+environment variable before manual play testing.
+
+HMBTN_BOOT_TICKS bounds either probe to 1..1000000 VBlanks. Reaching the limit
+prints a diagnostic completion message; that is not a completed game boot or
+playthrough. The window probe paces against host time; the console probe runs
+virtual ticks as fast as the reference renderer allows. Keep replays/captures
+under ignored build output unless they contain only authored input transitions.

@@ -283,15 +283,22 @@ The local hmbtn_disc_probe executable validated the owner's original USA track
 and read their initial sectors through both the parser and SDK-facing CD API.
 All 33 A_FILE offsets (32 member ranges) are monotonic and inside the
 133935104-byte archive. The probe is a diagnostic, not a game executable.
-No assets were extracted or added to git. The source's afile_init has not run.
+No assets were extracted or added to git. The subsequent native boot probe
+runs the original afile_init against the validated disc.
 
-There are 48 CTests, all passing in Windows release and ASan/UBSan. New coverage
+There are 58 CTests, all passing in Windows release and ASan/UBSan. New coverage
 includes SHA-1 published vectors, malformed synthetic sectors/directories,
 cross-sector file reads, deterministic CD transfer/cancel/error behavior,
 VRAM transfers/masks/wrapping and the original texture-pack decoder. Tests need
 no disc. The separate local disc probe also passed under ASan/UBSan.
 Digital pad replies, disconnected-card completion, analytic fixed-point trig,
 OT command execution and streamed VAB ownership now have additional coverage.
+SPU tests cover literal ADPCM predictor/shift/saturation vectors, ADSR phase
+transitions/frozen rates, Gaussian impulse values, loop/end behavior, native
+key status/release, sparse tone/sample lookup, SEQ/NRPN timing, reverb impulses,
+retired bank lifetime, audio-ring behavior and PCM equality across chunk sizes.
+Original pad polling, text addresses, animation tails and queue safety also
+have regressions. Full audio/raster parity remains unverified.
 
 The scalar inline GTE core now implements RTPS/RTPT, SQR, OP, MVMVA (source-used
 matrix and translation selectors), NCLIP, AVSZ3 and AVSZ4 with explicit signed shifts,
@@ -332,23 +339,25 @@ The routine native archive now compiles all 113 original units, including the so
 loader/request/XA-control code, farm event commands, player/scene-view code,
 debug overlay and minigames 3/5. Clean-room source-facing declarations for
 libsnd/libspu and matrix/font/lighting calls supply native call contracts only;
-their missing implementations still produce linker errors. This is not audio
-playback, controller polling, rendered output or a complete overlay lifecycle. SpuCommonAttr
+remaining implementations fail explicitly at runtime in the diagnostic. A
+complete overlay lifecycle and full gameplay are not yet validated. SpuCommonAttr
 is native configuration metadata with only source-used fields, not a proprietary
 SDK or asset ABI. SPU voice constants are the 24 bits consumed by key-status queries.
 Callback/VSync dispatch, sound initialization/configuration and GPU environments
 now have native state implementations. VAB banks load into owned native buffers;
-SEQ/XA audio playback remains unfinished. DrawOTag supports sprites, tiles and
-axis-aligned flat quads, not general polygons. The pending SDK layer contains named
+SEQ playback now drives native voices and the SDL audio callback consumes PCM;
+XA remains unfinished. DrawOTag supports sprites, tiles, polygons and lines in
+a CPU reference rasterizer. Hardware raster/audio parity remains unverified.
+The pending SDK layer contains named
 abort paths for remaining calls, preventing unsupported work from returning
-fabricated success. The real-disc console and SDL_GPU window probes reach
-sequence loading after real A_FILE reads and streamed VAB loading. The current
-sanitizer stop is SsSeqPlay: opening the bounded sequence succeeds. ASan boot found a
-title-picture overread; ADR-020 bounds the copy to its source array. After that
-fix the sanitizer probe reaches the same named stop without a prior finding.
-The SDL window ran through Vulkan; its last captured frame is black, so no
-visible title screen or gameplay is validated. Keyboard samples are connected
-but an interactive game response is unverified. File-backed cards are unfinished.
+fabricated success. Real-disc Vulkan captures show the title, Start menu and
+naming dialogue. The SDL/ASan window run completed 1200 VBlanks with actual
+audio callback consumption; underflows were observed. Replays pass naming and
+birthday setup and enter farm initialization, where SDK bring-up is incomplete.
+No farm rendering/player movement or full playthrough is claimed yet. Physical
+keyboard interaction, file-backed cards and overlay reentry remain unverified
+or unfinished. Native memory fixes cover the title-picture overread, truncated
+text addresses, discarded animation table tails and hardcoded queue offsets.
 
 Eleven capture-free GCC nested helpers now have file-scoped native adapters under
 ADR-013. Eight Python audit/regression tests pass, including token equality of
@@ -363,9 +372,9 @@ and distinct-object C test check that capture semantics are retained.
 
 ## Port guards and validation
 
-Fifty-one `HMBTN_PORT` guard blocks have been introduced under ADR-008 through
-ADR-022 (workspace, GPU links, CPU/GTE adapters, nested helpers, event pointers,
-private text declarations, overlays, bounded title copies and SEQ asset spans):
+Fifty-seven `HMBTN_PORT` guard blocks have been introduced under ADR-008 through
+ADR-029 (workspace, GPU/GTE/CPU adapters, nested helpers, event/text pointers,
+overlays, title copies, SEQ spans, animation table tails and estate queues):
 
 | File | Guarded change |
 | --- | --- |
@@ -399,8 +408,12 @@ private text declarations, overlays, bounded title copies and SEQ asset spans):
 | src/main/main.c | Select statically linked overlays without loading PS1 code (1 additional guard) |
 | src/overlay/27_GF_TITLE/title.c | Bound title-picture copy to the selected source array (1 guard) |
 | src/main/sound/sound.c | Register the copied native sequence asset bounds (1 guard) |
+| src/main/text/text_bank.h | Native offsetof and full text addresses (2 guards) |
+| src/main/graphics/anim.h | Retain initialized flexible tails and byte-read table entries (2 guards) |
+| src/overlay/11_GF_FARM/people/player.c | Preserve the native toy asset base (1 guard) |
+| src/overlay/11_GF_FARM/estate.c | Clear message queue fields instead of PS1 offsets (1 additional guard) |
 
-For each of these twenty-three files, selecting every matching `#else` branch and
+For each of these twenty-six files, selecting every matching `#else` branch and
 removing the new guard directives reconstructs the previous source text exactly,
 including its whitespace (line endings normalized for comparison). This check
 passed against baseline revision 9ace470. It does not establish byte-matching

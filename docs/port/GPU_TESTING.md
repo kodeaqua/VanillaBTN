@@ -24,5 +24,13 @@ no screenshot is saved, and no config/save files are written.
 Validated on 2026-10-25 with SDL3 3.2.28, Windows x86-64, Radeon RX Vega and
 driver 31.0.21925.1001. Output reported the Vulkan backend and successful upload,
 blit, readback and presentation. D3D12, Metal, other devices, suspend/resume and
-game-frame performance remain untested. The diagnostic has not been connected
-to the game's DrawOTag path. See ADR-018 for scope and backend status.
+game-frame performance remain untested. This synthetic diagnostic stays separate
+from the game-window target. See ADR-018 for scope and backend status.
+
+The optional HMBTN_BUILD_NATIVE_WINDOW=ON target hmbtn_native links the compiled
+game, reference DrawOTag rasterizer and SDL_GPU scanout. It accepts the original
+USA BIN argument described in DISC_TESTING.md. Local Vulkan captures now show
+the title/menu and initial New Game dialogue. A 1200-VBlank ASan/UBSan window
+run also exercised the SDL audio callback. No full-game, golden-frame parity or
+frame-time/latency budget is established. ASan and reference CPU rasterization
+are expected to affect pacing; observed audio underflows remain an open issue.

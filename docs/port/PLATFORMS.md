@@ -1,13 +1,13 @@
 # Platform status
 
-As of 2026-10-25, native Windows boot bring-up is in progress. No game title
-screen or gameplay has been validated.
+As of 2026-10-26, the native Windows title/menu and initial New Game dialogue
+render. A replay reaches farm initialization; farm gameplay is not validated.
 
 | Target | Foundation preset | Validation |
 | --- | --- | --- |
 | Linux x86-64 | linux-release, linux-asan-ubsan | Deferred; requires a separate Linux host, no WSL |
-| Windows x86-64 | windows-release | All 113 original source units compile; local tests passed (48/48) |
-| Windows x86-64 sanitizers | windows-asan-ubsan | All source units compile; Clang 20.1.8 ASan/UBSan tests passed (48/48); execution coverage remains limited |
+| Windows x86-64 | windows-release | All 113 original source units compile; local tests passed (58/58) |
+| Windows x86-64 sanitizers | windows-asan-ubsan | All source units compile; Clang 20.1.8 ASan/UBSan tests passed (58/58); execution coverage remains limited |
 | macOS universal | macos-universal-release | Pending; no macOS host tested |
 | Android arm64 | Pending NDK and minSdk selection | No device/build validation |
 
@@ -19,12 +19,12 @@ collisions, excluding compiler COFF reference entries. The console probe ran the
 original C entry point with the verified USA disc: callbacks, virtual VSync,
 silent audio setup, A_FILE initialization, draw/display setup and GTE/GS setup
 execute, followed by no-card initialization, title init and streamed VAB loading.
-Bounded SEQ opening succeeds; SsSeqPlay now aborts by name under the sanitizer
-probe. A title-picture overread observed under ASan has
-a bounded native copy (ADR-020); the sanitizer probe reaches this same stop.
-The SDL_GPU game-window diagnostic ran using Vulkan; its last captured scanout
-is black. This is neither a verified visible title screen
-nor gameplay. Unfinished SDK calls are named failure implementations, not fake
+Native sequencing/voices/reverb produce PCM, and an actual SDL audio callback
+consumes output. The Vulkan/ASan window test completed 1200 VBlanks and captures
+show the title/menu/dialogue. Replays enter farm startup after naming/birthday
+setup. Memory regressions found there are tracked in ADR-026/028/029. Farm
+rendering and player movement are not validated. Unfinished SDK calls fail by
+name, not fake
 success paths. Native overlay reentry also aborts until state reset is supported.
 The original
 frame/farm setup and region helpers are now tested using native data storage.
@@ -33,9 +33,10 @@ GS work allocation boundaries and signed free-space budgets pass under ASan/UBSa
 The workspace test observes GPU/GS setup calls. A separate gpu.links test now
 uses actual reverse OT initialization and the guarded original insertion/builders
 to validate pointer handles, packet order/lengths, cursor movement and re-clearing.
-Malformed handles and registry exhaustion fail explicitly. No rasterization or
-general polygon rasterization is covered. A separate gpu.commands test exercises
-flat rectangles, blending and 4-bit textured sprites through real DrawOTag.
+Malformed handles and registry exhaustion fail explicitly. GPU tests exercise
+texture/CLUTs, affine quad endpoints, Gouraud winding, dithering, line endpoints,
+polyline termination and shared-edge blending through real DrawOTag. Exact
+hardware raster rules and golden-frame parity still need validation.
 CD position helpers are tested over all 450000 valid two-digit-minute BCD
 positions. Disc/parser and SDK-facing reads now pass synthetic tests, including
 deterministic tick progression and IO failures. No disc is needed by CTest.
