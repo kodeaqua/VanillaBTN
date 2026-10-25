@@ -1,6 +1,10 @@
 #ifndef CPU_ASM_H
 #define CPU_ASM_H
 
+#ifdef HMBTN_PORT
+/* PORT: use the native ABI and diagnostic hooks — see docs/port/DECISIONS.md#adr-010 */
+#include "compat/cpu.h"
+#else
 /* The CPU operations C cannot express: the scratchpad stack, the return-address store
  * and the host-debugger break. */
 
@@ -34,5 +38,6 @@
 
 /* The SN Systems host-debugger poll; a no-op trap under no debugger. */
 #define pollhost() __asm__ volatile("break 1024")
+#endif
 
 #endif
