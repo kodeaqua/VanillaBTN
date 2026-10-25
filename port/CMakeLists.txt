@@ -52,6 +52,7 @@ add_library(hmbtn_game_initial STATIC
     ../src/main/cd/afile.c
     ../src/main/graphics/frame_buffers.c
     ../src/main/graphics/prim.c
+    ../src/main/graphics/texture_pack.c
     ../src/main/geometry/math_util.c
     ../src/main/game/farm_data_size.c
     ../src/main/game/farm_state.c
@@ -65,15 +66,36 @@ target_link_libraries(hmbtn_game_initial PUBLIC hmbtn_game_options hmbtn_work_me
 set_source_files_properties(../src/main/main.c PROPERTIES COMPILE_DEFINITIONS main=hm_game_main)
 
 add_library(hmbtn_psx_initial STATIC
-    psx/unimplemented.c psx/gte_stubs.c psx/cd_position.c psx/cd_stubs.c
-    psx/gpu_links.c psx/gpu_ot.c psx/gpu_packets.c)
+    psx/unimplemented.c psx/gte_stubs.c psx/cd_position.c psx/cd_runtime.c
+    psx/gpu_links.c psx/gpu_ot.c psx/gpu_packets.c psx/vram.c)
 target_link_libraries(hmbtn_psx_initial PUBLIC hmbtn_port_options)
 target_include_directories(hmbtn_psx_initial PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/compat/psyq")
+
+add_library(hmbtn_disc STATIC psx/disc.c psx/sha1.c)
+target_link_libraries(hmbtn_disc PUBLIC hmbtn_port_options)
+target_link_libraries(hmbtn_psx_initial PUBLIC hmbtn_disc)
+add_executable(hmbtn_disc_probe platform/disc_probe.c)
+target_link_libraries(hmbtn_disc_probe PRIVATE hmbtn_psx_initial)
 
 add_executable(hmbtn_ot_bench EXCLUDE_FROM_ALL analysis/ot_bench.c)
 target_link_libraries(hmbtn_ot_bench PRIVATE hmbtn_psx_initial)
 
 if(BUILD_TESTING)
+    add_executable(hmbtn_sha1_test tests/sha1.c)
+    target_link_libraries(hmbtn_sha1_test PRIVATE hmbtn_disc)
+    add_test(NAME disc.sha1 COMMAND hmbtn_sha1_test)
+    add_executable(hmbtn_disc_test tests/disc.c)
+    target_link_libraries(hmbtn_disc_test PRIVATE hmbtn_disc)
+    add_test(NAME disc.parser COMMAND hmbtn_disc_test)
+    add_executable(hmbtn_cd_runtime_test tests/cd_runtime.c)
+    target_link_libraries(hmbtn_cd_runtime_test PRIVATE hmbtn_psx_initial)
+    add_test(NAME cd.runtime COMMAND hmbtn_cd_runtime_test)
+    add_executable(hmbtn_vram_test tests/vram.c)
+    target_link_libraries(hmbtn_vram_test PRIVATE hmbtn_psx_initial)
+    add_test(NAME gpu.vram COMMAND hmbtn_vram_test)
+    add_executable(hmbtn_texture_test tests/texture_pack.c)
+    target_link_libraries(hmbtn_texture_test PRIVATE hmbtn_game_initial hmbtn_psx_initial)
+    add_test(NAME game.texture_upload COMMAND hmbtn_texture_test)
     add_executable(hmbtn_types_test tests/types.c)
     target_link_libraries(hmbtn_types_test PRIVATE hmbtn_port_options)
     add_test(NAME compat.types COMMAND hmbtn_types_test)
@@ -127,9 +149,10 @@ if(BUILD_TESTING)
     add_executable(hmbtn_cd_stub_test tests/cd_stub.c)
     target_link_libraries(hmbtn_cd_stub_test PRIVATE hmbtn_psx_initial)
     foreach(api IN ITEMS CdInit CdSearchFile CdControl CdRead CdReadSync CdSync CdReadBreak CdFlush)
-        add_test(NAME psx.unimplemented.${api}
+        add_test(NAME cd.unmounted.${api}
             COMMAND "${CMAKE_COMMAND}" "-DPROGRAM=$<TARGET_FILE:hmbtn_cd_stub_test>"
-                "-DAPI=${api}" -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_unimplemented.cmake")
+                "-DCASE=${api}" "-DCONTEXT=${api}" "-DDETAIL=no validated disc is attached"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_runtime_error.cmake")
     endforeach()
     add_executable(hmbtn_gte_stub_test tests/gte_stub.c)
     target_link_libraries(hmbtn_gte_stub_test PRIVATE hmbtn_psx_initial)

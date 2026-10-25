@@ -259,12 +259,32 @@ fixture passes its final three bytes to CdPosToInt under ASan; the helper must
 not read a fourth byte. Malformed BCD and out-of-domain input behavior is not
 claimed as validated PSY-Q parity.
 
-CdInit, CdSearchFile, CdControl, CdRead, CdReadSync, CdSync, CdReadBreak and
-CdFlush are explicit named abort stubs. Eight failure tests check these APIs
-cannot silently claim successful initialization, metadata or reads. There are
-25 CTests in total: seven behavior/layout tests, twelve unimplemented-API
-failure tests (four GTE, eight CD), and six GPU input/capacity rejection tests.
-This is not a disc IO, XA or title boot test.
+Disc access now uses a platform-owned positional stream, verified against the
+original raw BIN SHA-1 before mounting ISO-9660. The parser checks directory
+record bounds, both-endian extents/sizes, nested paths and track boundaries.
+Mode 1 and Mode 2 Form 1 supply 2048-byte data blocks; Form 2 is rejected by the
+filesystem reader rather than truncated. No SDK or game bytes are included.
+
+CdInit, CdSearchFile, Setloc/Setmode/Pause/Standby, CdRead, CdReadSync, CdSync,
+CdReadBreak and CdFlush have a single-threaded data-read implementation. Every
+SDK entry requires an attached validated disc. Eight rejection tests cover
+missing-disc failures. Nonblocking reads advance only through hm_cd_tick at
+75/150 sectors per second on a 60 Hz tick. Blocking ReadSync drains the pending
+transfer. Seek latency, XA commands/filtering, controller retry timing and full
+hardware status behavior are not yet implemented or parity validated.
+
+The local hmbtn_disc_probe executable validated the owner's original USA track
+(90967 raw sectors), found SYSTEM.CNF, SLUS_011.15, A_FILE.HDT and A_FILE.BIN,
+and read their initial sectors through both the parser and SDK-facing CD API.
+All 33 A_FILE offsets (32 member ranges) are monotonic and inside the
+133935104-byte archive. The probe is a diagnostic, not a game executable.
+No assets were extracted or added to git. The source's afile_init has not run.
+
+There are 31 CTests, all passing in Windows release and ASan/UBSan. New coverage
+includes SHA-1 published vectors, malformed synthetic sectors/directories,
+cross-sector file reads, deterministic CD transfer/cancel/error behavior,
+VRAM transfers/masks/wrapping and the original texture-pack decoder. Tests need
+no disc. The separate local disc probe also passed under ASan/UBSan.
 
 CdlFILE is host-side result metadata with only the fields used by the source,
 pos and size. It is never read from disc bytes and does not claim the proprietary
@@ -275,11 +295,11 @@ SDK's binary layout. CD command constants cover only commands observed in source
 `port/analysis/compile_probe.py` invokes Clang on all original C files with the
 port force-include and the basename include directories. It writes per-file
 diagnostics to ignored `build/port/compile-probe.json`. No file is changed and no
-game code is linked or run. The result with Clang 20.1.8 is 66 syntax passes and
-47 failures out of 113 files, with 1650 warnings emitted before the error cap.
+game code is linked or run. The result with Clang 20.1.8 is 87 syntax passes and
+26 failures out of 113 files, with 1738 warnings emitted before the error cap.
 
-Common blockers include missing abs/libsnd and other SDK headers, undeclared GPU API
-calls, MIPS register clobbers, SDK helper constants, GCC nested functions and
+Common blockers include missing libsnd and other SDK headers, undeclared GTE/font API
+calls, inline GTE commands, SDK helper constants, GCC nested functions and
 macro-generated declarations not accepted by modern C. The probe's five-error
 limit means this is not a complete error count. Syntax passes can still fail
 during code generation, linking, runtime layout checks or sanitizer execution.

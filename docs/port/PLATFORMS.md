@@ -5,17 +5,18 @@ As of 2026-10-25, no native game platform is brought up.
 | Target | Foundation preset | Validation |
 | --- | --- | --- |
 | Linux x86-64 | linux-release, linux-asan-ubsan | Deferred; requires a separate Linux host, no WSL |
-| Windows x86-64 | windows-release | Eleven original source units compile; local tests passed (26/26) |
-| Windows x86-64 sanitizers | windows-asan-ubsan | Clang 20.1.8 ASan/UBSan tests passed (25/25); coverage limited to the initial subset |
+| Windows x86-64 | windows-release | Twelve original source units compile; local tests passed (31/31) |
+| Windows x86-64 sanitizers | windows-asan-ubsan | Clang 20.1.8 ASan/UBSan tests passed (31/31); coverage limited to the initial subset |
 | macOS universal | macos-universal-release | Pending; no macOS host tested |
 | Android arm64 | Pending NDK and minSdk selection | No device/build validation |
 
 The owner prioritizes Windows. No workflow/CI changes are included or requested.
 Windows validation covers the initial source subset, not full game execution.
-The full-tree syntax probe passes 66 of 113 files and fails 47, with 1650 emitted
+The full-tree syntax probe passes 87 of 113 files and fails 26, with 1738 emitted
 warnings before its per-file error cap. This is diagnostic inventory, not a port build.
 Entry-point and A_FILE objects are in the native archive; their full boot flow,
-callbacks, disc IO and overlay behavior have not been executed. The original
+callbacks and overlay behavior have not been executed. Disc IO is tested
+separately through the native diagnostic, not through game boot. The original
 frame/farm setup and region helpers are now tested using native data storage.
 Normal and larger-work-area layouts, pointer bounds, input-demo preservation,
 GS work allocation boundaries and signed free-space budgets pass under ASan/UBSan.
@@ -25,7 +26,12 @@ to validate pointer handles, packet order/lengths, cursor movement and re-cleari
 Malformed handles and registry exhaustion fail explicitly. No rasterization or
 DrawOTag execution is covered.
 CD position helpers are tested over all 450000 valid two-digit-minute BCD
-positions; disc operations remain explicit abort stubs. No disc was required.
+positions. Disc/parser and SDK-facing reads now pass synthetic tests, including
+deterministic tick progression and IO failures. No disc is needed by CTest.
+The local disc probe passed with the owner's SHA-1-verified USA raw track in
+release and ASan/UBSan: four startup files read, 32 archive ranges checked.
+GPU upload/readback/fill and the original raw/row-RLE/column-RLE texture decoder
+are tested against native 1024x512 VRAM. There is no displayed frame yet.
 Six lexical-audit regression fixtures also passed using a local Python 3.11
 interpreter. Clang 19 ASan failed during startup; the pinned Clang 20 upgrade
 resolved that startup failure (ADR-005).

@@ -215,3 +215,58 @@ and GP0 encodings; video dimensions 320x240 follow the original main.c setup.
 
 Consequences: These hooks unblock native compilation, not GTE functionality or
 save-format parity. No approximation of an unimplemented GTE operation is added.
+
+<a id="adr-011"></a>
+
+## ADR-011: Mount validated raw tracks through platform-owned streams
+
+Date: 2026-10-25. Status: accepted, following the original-disc input default.
+
+Context: The game's archive reader needs ISO metadata and 2048-byte sector reads.
+Desktop paths and Android descriptors must not enter the portable CD parser.
+
+Decision: The platform owns an exact positional-read callback and stream length.
+Hash the complete raw BIN against disc/disc.sha1 before mounting ISO-9660.
+Decode sector headers explicitly; accept Mode 1 and Mode 2 Form 1 for filesystem
+reads and report unsupported Form 2 transfers. Validate directory record lengths,
+both-endian fields and extents without casting disc bytes to host structs.
+Keep all game data external. A local desktop probe provides validation before
+the SDL first-run UI exists; it is not a runnable port of the game.
+
+SDK reads use a single game-thread controller with an explicit 60 Hz tick and
+75/150-sector-per-second transfer budget, retaining fractional sectors. Polling
+does not advance time. Blocking ReadSync drains the request without host sleeps.
+No seek delay is added during bring-up. The eventual VSync platform integration
+must call this tick; no host callback thread may advance game state. Unsupported
+commands (including XA streaming) fail explicitly, not with simulated success.
+
+Consequences: Normal data reads and errors can be tested without disc assets.
+Exact PS1 seek/retry/status timing, CUE input, XA streaming and full boot remain
+unverified. SHA-1 is a known-image identifier, not an authentication mechanism.
+The implementation is original port code, not copied from the RFC example.
+
+References: https://psx-spx.consoledev.net/cdromformat/,
+https://psx-spx.consoledev.net/cdromdrive/,
+https://www.rfc-editor.org/rfc/rfc3174.
+
+<a id="adr-012"></a>
+
+## ADR-012: Keep a native VRAM transfer model before renderer submission
+
+Date: 2026-10-25. Status: accepted, following the 1024x512 VRAM model default.
+
+Decision: Keep 16-bit VRAM in ordinary C storage. LoadImage/StoreImage transfer
+little-endian pixels with independent X/Y wrapping and hardware copy-size masks.
+Transfers execute synchronously; DrawSync observes no pending work. ClearImage
+uses GP0 fill rounding and bypasses mask bits. Track changed 16x16-word tiles for
+future renderer uploads, with explicit acknowledgement rather than per-frame
+allocation. Preserve STP bits and implement set/check write masks.
+
+Consequences: Original texture-pack code is now compiled and tested on synthetic
+raw and RLE banks. This is not the SDL_GPU backend or a completed command
+rasterizer. MoveImage, OT command execution, displayed frames and full rendering
+parity remain pending. StoreImage leaves unused odd-pixel transfer padding alone;
+the game's callers consume pixels, not padding. No claim is made about bus
+padding parity or GPU timing. No speculative rendering enhancement is added.
+
+Reference: https://psx-spx.consoledev.net/graphicsprocessingunitgpu/.
