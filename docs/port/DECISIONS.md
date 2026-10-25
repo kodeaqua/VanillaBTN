@@ -78,3 +78,23 @@ Consequences: Setup downloads a new compiler archive once. The build wrapper
 uses `cmake --fresh` to preserve preset options across compiler upgrades; CMake's
 automatic compiler-change reconfiguration can otherwise discard options such
 as HMBTN_SANITIZERS. Old ignored tool directories need not be deleted.
+
+## ADR-006: Keep SDK words fixed-width and host descriptors native
+
+Date: 2026-10-25. Status: accepted, following the existing memory/type defaults.
+
+Context: Windows host sys/types.h does not provide the SDK's u_long spelling.
+Using host long for it would also become 64-bit on LP64 platforms. GPU packet
+words must remain 32-bit while host pointers must retain their full width.
+
+Decision: Force-include `compat/game.h` only in game-facing translation units.
+It loads host sys/types.h first, then maps u_char/u_short/u_long to namespaced
+fixed-width aliases. Do not redefine the C keyword long or force this mapping
+into the platform/runtime targets. GPU packets use 32-bit tag words; GS ordering
+table descriptors use native pointers. Assert packet and pointer-free asset
+layouts without asserting the PS1 size of pointer-bearing host state.
+
+Consequences: This establishes declarations and layout checks, not a GPU runtime
+or a solution to truncated links in original LINK_PRIM. Original data loaders,
+overlay dispatch and save serialization still need a separate 64-bit audit.
+Public packet format reference: https://psx-spx.consoledev.net/graphicsprocessingunitgpu/.

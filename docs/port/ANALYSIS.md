@@ -97,7 +97,8 @@ must remain unchanged until its meaning is established.
 - Save/card layouts, other asset structures, and embedded pointer relocation
   require a separate inventory before runtime loading.
 
-No asset layout assertions have yet been added to original structs.
+Initial pointer-free asset layout checks now live in `port/tests/layouts.c`.
+Original source headers remain unmodified.
 
 ## Repeatable lexical audit
 
@@ -126,34 +127,72 @@ reports stay in ignored `build/`.
 
 ## Initial native source compilation
 
-`hmbtn_game_initial` compiles four original, unmodified units:
+`hmbtn_game_initial` compiles six original, unmodified units:
 `main/geometry/math_util.c`, `main/game/farm_data_size.c`,
-`main/game/horse_names.c`, and `main/game/picture_codes.c`.
-The port force-includes its fixed-width types and supplies a minimal source-facing
-`VECTOR` declaration plus the four GTE function declarations used by math_util.
-`VECTOR` size and offsets are asserted. The GPU/GS shim headers are intentionally
-empty because this subset needs no declarations from them. They do not imply
-GPU or scene support. Missing declarations in later files remain compile errors.
+`main/game/horse_names.c`, `main/game/picture_codes.c`,
+`main/game/event_flags.c`, and `main/game/farm_tables.c`.
+The port force-includes `compat/game.h`: fixed-width primitive types and scoped
+SDK integer aliases. Minimal VECTOR/SVECTOR/CVECTOR/MATRIX and GPU packet
+declarations follow source field usage and public GP0 formats (ADR-006).
+GPU packet sizes/offsets and a known textured-quad byte sequence are checked;
+GS ordering-table descriptors retain native pointers. No GPU execution or OT
+address mapping is implemented. Original LINK_PRIM still truncates host pointers
+and must not be used as a native runtime until that issue is resolved.
 
 The four GTE calls (`rsin`, `rcos`, `SquareRoot0`, `VectorNormal`) abort with their
 names in all builds until faithfully implemented; they are not numerical
-approximations. Six tests cover type/endian assumptions, original integer power,
+approximations. Eight tests cover type/endian and layout assumptions, original integer power,
 32-bit wrapping, interpolation/truncation/clamping, vector operations and each
 stub's failure diagnostic. Static helper paths are not exercised by game.math.
+`game.state` exercises all 1184 valid event flags, word/sign-bit boundaries,
+native table registration across 19 estate runs, the skipRuns path, entry-state
+reset and shared-work busy/free behavior. The test defines a host FarmState and
+three explicitly test-only abort traps for item-action callback link dependencies.
+These callbacks are never invoked in the test and are not runtime implementations.
+Their original type-mismatched casts remain tracked below. Save serialization
+and pointer-bearing state layout parity have not been tested.
+
+`compat.layouts` checks A_FILE records, ANI headers/images/parts/ranges/frames,
+image bank headers, input replay records and estate rows. ANI frames are 10 bytes
+in the original declaration, with control at offset 7. No source edit was needed.
 No main loop, title screen, or renderer is linked yet.
 
-Native `llvm-nm --defined-only --extern-only` confirms six math functions and
-four data symbols in this subset. A syntax-only probe of `main/main.c` stops at
-missing `libetc.h`; its transitive SDK/game layouts remain to be brought up.
+An earlier `llvm-nm --defined-only --extern-only` pass confirmed six math functions
+and four data symbols in the initial four-unit subset. The current syntax-only
+probe of `main/main.c` passes the new libetc declarations, then stops at missing
+`libcd.h`; further SDK headers and the main-loop dependencies remain unavailable.
 
 Warnings retained in `math_util.c`: unused static functions `vec3_add`,
 `vec3_differs`, `vec3_move_toward`, `math_cross2_sign`, and
 `vec_dot_normalized`. These are tracked, not suppressed or removed.
+`farm_tables.c` adds 22 missing-braces warnings for the existing crop table and
+two incompatible function-pointer casts at lines 733 and 735. The latter adapt
+`item_use_coin` and `farm_adjust_stamina_fatigue` to ItemUseFn; calling these through
+that type needs a deliberate port solution before item actions are enabled.
+
+## Full-tree native syntax inventory
+
+`port/analysis/compile_probe.py` invokes Clang on all original C files with the
+port force-include and the basename include directories. It writes per-file
+diagnostics to ignored `build/port/compile-probe.json`. No file is changed and no
+game code is linked or run. The result with Clang 20.1.8 is 55 syntax passes and
+58 failures out of 113 files, with 1228 warnings emitted before the error cap.
+
+Common blockers include missing libcd/libapi/abs headers, undeclared GPU API
+calls, MIPS register clobbers, SDK helper constants, GCC nested functions and
+macro-generated declarations not accepted by modern C. The probe's five-error
+limit means this is not a complete error count. Syntax passes can still fail
+during code generation, linking, runtime layout checks or sanitizer execution.
+
+Warnings include pointer-to-integer/integer-to-pointer truncation, excess and
+missing initializers, incompatible callback types, and a transposed memset
+argument warning. They remain visible; broad warning suppression or automatic
+source cleanup would hide real fidelity and 64-bit hazards.
 
 ## Port guards and validation
 
 No `HMBTN_PORT` guards or original source edits have been introduced.
-The port now builds the four game units above, not a game executable.
+The port now builds the six game units above, not a game executable.
 Matching `check` is unverified: Ubuntu WSL failed to start with
 `HCS_E_HYPERV_NOT_INSTALLED`. Project-local Windows tools were subsequently
 provisioned: CMake 3.31.6 and Ninja 1.12.1. LLVM-mingw was upgraded from

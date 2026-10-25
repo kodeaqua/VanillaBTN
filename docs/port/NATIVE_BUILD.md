@@ -73,13 +73,13 @@ ctest --preset linux-asan-ubsan
 
 Desktop presets also exist for `windows-release` (LLVM-mingw/UCRT, without MSVC)
 and `macos-universal-release`.
-These build the compatibility layer and four initial original source units.
+These build the compatibility layer and six initial original source units.
 Android presets await an NDK
 pin and platform configuration; no Android support is claimed yet.
 
 No SDL dependency, SDK, network, or game data is required by the port foundation.
 It is not a playable game. Only `math_util.c`, `farm_data_size.c`, `horse_names.c`,
-and `picture_codes.c` from `src/` are compiled so far.
+`picture_codes.c`, `event_flags.c`, and `farm_tables.c` from `src/` are compiled so far.
 
 ## Windows first
 
@@ -128,13 +128,24 @@ python port/analysis/source_audit.py --output build/port/source-audit.json
 It reports lexical candidates, not a complete compiler/linker inventory. See
 `ANALYSIS.md` for limitations. Python is not required by the Windows build wrapper.
 
+For a syntax-only compiler inventory of all 113 original translation units:
+
+```powershell
+python port/analysis/compile_probe.py --compiler build/host-tools/llvm-mingw-20250709-ucrt-x86_64/bin/clang.exe --output build/port/compile-probe.json
+```
+
+This writes each file's diagnostics to ignored build output. Uncompilable units
+are expected at this stage: the command reports counts rather than treating all
+source errors as a script failure. It neither links nor runs the game. A syntax
+pass is not proof that MIPS inline assembly can be assembled by the native backend.
+
 ## Validation on 2026-10-25
 
 An earlier Ubuntu WSL launch failed (`HCS_E_HYPERV_NOT_INSTALLED`); the owner
 subsequently excluded WSL, so no further WSL attempts are required. Matching
 validation is deferred to a separate Linux host. CMake, Ninja and Clang were not found on the
 Windows PATH initially. After provisioning project-local tools, Windows release
-configure/build and all six tests passed. The Windows ASan/UBSan preset also
-built and passed six tests with Clang 20.1.8; Clang 19's ASan had failed during
+configure/build and all eight tests passed. The Windows ASan/UBSan preset also
+built and passed eight tests with Clang 20.1.8; Clang 19's ASan had failed during
 startup (ADR-005). The matching build, Linux/macOS builds and full game execution
 remain unverified. Original source files have not been edited.

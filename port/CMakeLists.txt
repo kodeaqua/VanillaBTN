@@ -28,16 +28,28 @@ add_library(hmbtn_game_options INTERFACE)
 target_link_libraries(hmbtn_game_options INTERFACE hmbtn_port_options)
 target_include_directories(hmbtn_game_options INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/compat/psyq"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/main/geometry")
+# Original headers refer to one another by basename. Keep the matching tree read-only.
+file(GLOB_RECURSE hm_game_headers CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../src/*.h")
+set(hm_game_include_dirs)
+foreach(header IN LISTS hm_game_headers)
+    get_filename_component(header_directory "${header}" DIRECTORY)
+    list(APPEND hm_game_include_dirs "${header_directory}")
+endforeach()
+list(REMOVE_DUPLICATES hm_game_include_dirs)
+target_include_directories(hmbtn_game_options INTERFACE ${hm_game_include_dirs})
 target_compile_options(hmbtn_game_options INTERFACE
-    -include "${CMAKE_CURRENT_SOURCE_DIR}/compat/types.h")
+    -include "${CMAKE_CURRENT_SOURCE_DIR}/compat/game.h")
 target_compile_definitions(hmbtn_game_options INTERFACE HMBTN_PORT=1)
 
 add_library(hmbtn_game_initial STATIC
     ../src/main/geometry/math_util.c
     ../src/main/game/farm_data_size.c
     ../src/main/game/horse_names.c
+    ../src/main/game/event_flags.c
+    ../src/main/game/farm_tables.c
     ../src/main/game/picture_codes.c)
 target_link_libraries(hmbtn_game_initial PUBLIC hmbtn_game_options)
 
@@ -52,6 +64,12 @@ if(BUILD_TESTING)
     add_executable(hmbtn_game_math_test tests/game_math.c)
     target_link_libraries(hmbtn_game_math_test PRIVATE hmbtn_game_initial hmbtn_psx_initial)
     add_test(NAME game.math COMMAND hmbtn_game_math_test)
+    add_executable(hmbtn_game_state_test tests/game_state.c tests/item_callback_traps.c)
+    target_link_libraries(hmbtn_game_state_test PRIVATE hmbtn_game_initial hmbtn_psx_initial)
+    add_test(NAME game.state COMMAND hmbtn_game_state_test)
+    add_executable(hmbtn_layouts_test tests/layouts.c)
+    target_link_libraries(hmbtn_layouts_test PRIVATE hmbtn_game_options)
+    add_test(NAME compat.layouts COMMAND hmbtn_layouts_test)
     add_executable(hmbtn_gte_stub_test tests/gte_stub.c)
     target_link_libraries(hmbtn_gte_stub_test PRIVATE hmbtn_psx_initial)
     foreach(api IN ITEMS rsin rcos SquareRoot0 VectorNormal)

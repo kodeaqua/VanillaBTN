@@ -8,11 +8,30 @@ typedef struct {
     s32 vx, vy, vz, pad;
 } VECTOR;
 
+typedef struct {
+    s16 vx, vy, vz, pad;
+} SVECTOR;
+
+typedef struct {
+    u8 r, g, b, cd;
+} CVECTOR;
+
+typedef struct {
+    s16 m[3][3];
+    s32 t[3];
+} MATRIX;
+
 _Static_assert(sizeof(VECTOR) == 16, "Four PS1 words per VECTOR");
 _Static_assert(__builtin_offsetof(VECTOR, vx) == 0, "VECTOR x offset");
 _Static_assert(__builtin_offsetof(VECTOR, vy) == 4, "VECTOR y offset");
 _Static_assert(__builtin_offsetof(VECTOR, vz) == 8, "VECTOR z offset");
 _Static_assert(__builtin_offsetof(VECTOR, pad) == 12, "VECTOR padding offset");
+_Static_assert(sizeof(SVECTOR) == 8, "SVECTOR layout");
+_Static_assert(__builtin_offsetof(SVECTOR, pad) == 6, "SVECTOR padding offset");
+_Static_assert(sizeof(CVECTOR) == 4, "CVECTOR layout");
+_Static_assert(__builtin_offsetof(CVECTOR, cd) == 3, "CVECTOR command offset");
+_Static_assert(sizeof(MATRIX) == 32, "MATRIX layout");
+_Static_assert(__builtin_offsetof(MATRIX, t) == 20, "MATRIX translation offset");
 
 s32 rsin(s32 angle);
 s32 rcos(s32 angle);
