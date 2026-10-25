@@ -34,3 +34,25 @@ the title/menu and initial New Game dialogue. A 1200-VBlank ASan/UBSan window
 run also exercised the SDL audio callback. No full-game, golden-frame parity or
 frame-time/latency budget is established. ASan and reference CPU rasterization
 are expected to affect pacing; observed audio underflows remain an open issue.
+
+Build the Windows release game window (also runs the unit suite):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File port/packaging/windows/build.ps1 -Preset windows-release -Game
+powershell -NoProfile -ExecutionPolicy Bypass -File port/packaging/windows/run.ps1 -DiscPath 'D:/Games/Harvest Moon USA.bin'
+```
+
+The launcher builds the release window if missing and clears diagnostic input
+replays/tick limits for the child game, restoring the caller's environment on
+exit. It does not copy disc data into the repository. Keyboard: arrows move,
+Enter is Start, X is Cross/confirm, Z is Square, D is Circle, W is Triangle,
+A/S are L1/R1, Q/E are L2/R2 and Backspace is Select. Free control and physical
+keyboard input remain under validation; save persistence is not implemented.
+
+The headless boot probe also accepts HMBTN_CAPTURE_FRAME to export its final
+15-bit scanout to BMP at HMBTN_BOOT_TICKS, and HMBTN_TRACE_GAME_STATE to print
+area/player state every 600 ticks. These diagnostics require the owner's disc
+for game frames. Store captures only in ignored build output. A 6000-tick
+Vulkan/ASan window capture shows farm terrain/player/HUD; a release headless
+capture shows the original grandparent dialogue. Later opening scenes still
+need fixes before this is a playable port.
