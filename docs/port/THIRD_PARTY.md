@@ -1,7 +1,18 @@
 # Third-party dependencies
 
-The native port foundation adds no third-party runtime dependencies.
-SDL3 and a renderer have not yet been integrated or selected by spike.
+The optional Windows GPU spike uses SDL3; normal data-free unit builds do not
+download or link it. No third-party PSX API implementation has been imported.
+
+| Dependency | Version | License | Source |
+| --- | --- | --- | --- |
+| SDL3 | 3.2.28 | zlib | https://github.com/libsdl-org/SDL/releases/tag/release-3.2.28 |
+
+The official SDL3-3.2.28.tar.gz asset is pinned to SHA-256
+1330671214d146f8aeb1ed399fc3e081873cdb38b5189d1f8bb6ab15bbc04211,
+verified against the publisher's GitHub release asset digest. FetchContent keeps
+the source and its LICENSE.txt in ignored build output. SDL's own notices remain
+intact. The spike links SDL statically and uses the system Vulkan driver on the
+tested Windows host. Packaging must retain applicable SDL/bundled notices.
 
 Windows host tools (downloaded to ignored `build/host-tools/`, not vendored):
 
