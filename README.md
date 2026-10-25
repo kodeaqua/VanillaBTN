@@ -32,7 +32,7 @@ cmake --build build/match --target check
 builds and checks only the 14 code binaries, which needs no game data.
 
 The separate native port is in Phase 0. Its presets live in `port/` and currently
-build the compatibility layer and ten source units, including the archived game
+build the compatibility layer and eleven source units, including the archived game
 entry point and A_FILE reader. No playable game executable is linked yet. See
 [reconnaissance and outstanding gates](docs/port/ANALYSIS.md).
 

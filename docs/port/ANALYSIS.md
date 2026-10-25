@@ -114,13 +114,13 @@ regions. The initial run reports:
 | Ordinary function definitions, including static functions | 2628 |
 | Unique ordinary external function names | 950 |
 | Duplicate ordinary external function name candidates | 1 |
-| External call-like names requiring classification | 300 |
+| External call-like names requiring classification | 301 |
 | GTE-prefixed invocation names | 40 |
 
 This is not a preprocessor or a C semantic analysis. Macro-generated functions
 (including farm courtship helpers), callbacks, type casts, declarations, global
 data definitions and conditional compilation require compiler/linker analysis.
-The 300 candidates are not 300 confirmed SDK functions; the 40 GTE-prefixed
+The 301 candidates are not 301 confirmed SDK functions; the 40 GTE-prefixed
 names also include game helpers. Six regression fixtures cover comments,
 strings, macro continuations, initializer braces, prototypes, operators and
 source-line preservation, collision filtering and overlay ownership. Generated
@@ -131,18 +131,19 @@ preprocessing; it is not an actual linked collision.
 
 ## Initial native source compilation
 
-`hmbtn_game_initial` compiles ten original units with native guards listed below:
+`hmbtn_game_initial` compiles eleven original units with native guards listed below:
 `main/geometry/math_util.c`, `main/game/farm_data_size.c`,
 `main/game/horse_names.c`, `main/game/picture_codes.c`,
 `main/game/event_flags.c`, `main/game/farm_tables.c`, `main/game/farm_state.c`,
-`main/graphics/frame_buffers.c`, `main/main.c`, and `main/cd/afile.c`.
+`main/graphics/frame_buffers.c`, `main/graphics/prim.c`, `main/main.c`, and `main/cd/afile.c`.
 The port force-includes `compat/game.h`: fixed-width primitive types and scoped
 SDK integer aliases. Minimal VECTOR/SVECTOR/CVECTOR/MATRIX and GPU packet
 declarations follow source field usage and public GP0 formats (ADR-006).
 GPU packet sizes/offsets and a known textured-quad byte sequence are checked;
-GS ordering-table descriptors retain native pointers. No GPU execution or OT
-address mapping is implemented. Original LINK_PRIM still truncates host pointers
-and must not be used as a native runtime until that issue is resolved.
+GS ordering-table descriptors retain native pointers. GPU link handles now map
+to full native pointers through a bounded registry (ADR-009). Native LINK_PRIM
+and ot_insert_prim share this codec with SDK addPrim/AddPrim; packet layouts
+stay fixed-width. Rasterization, DrawOTag and complete GPU execution remain absent.
 
 The four GTE calls (`rsin`, `rcos`, `SquareRoot0`, `VectorNormal`) abort with their
 names in all builds until faithfully implemented; they are not numerical
@@ -169,7 +170,7 @@ its port build definition; matching branches are preserved. These objects
 are not selected by the current test executables. The game's hardcoded
 WORK_REGION and frame table addresses now select a native data workspace, and
 the resident region helpers retain full pointers (ADR-008). Main-loop runtime
-dependencies, OT link encoding and overlay dispatch remain unsafe/unimplemented;
+dependencies, full GPU execution and overlay dispatch remain unsafe/unimplemented;
 the complete game entry point must not be executed yet (ADR-007).
 
 The new source-facing libcd/libapi/libmcrd/libmcx declarations and the narrow
@@ -189,9 +190,9 @@ The four pointer-to-s32 warnings in main.c are removed by native-only guards;
 its four unused-function warnings remain.
 afile.c adds 33 missing-pos initializer warnings for the existing A_FILE member
 table, two unused functions and two unused parameters. No warnings were suppressed.
-frame_buffers.c still warns about a truncated primitive address in ot_insert_prim.
-That routine is not exercised by the work-memory test and remains unsafe until
-native OT address encoding is implemented.
+The truncated primitive-address warning in frame_buffers.c is removed by its
+native link guard. Its unused debug hook parameter warning remains. The new
+gpu.links test exercises original ot_insert_prim with native pointers.
 
 ## Native workspace validation
 
@@ -213,8 +214,39 @@ a frame-area reset. Original table registration and farm buffer pointers bind
 without subtracting addresses of separately linked overlay objects. Free-space
 checks cover zero use, a partial section, exact exhaustion and a negative budget
 one byte past capacity, preserving the signed vanilla result rather than clamping.
-Release and ASan/UBSan pass. Full scene loads, raw asset pointer relocation,
-overlay region copies and native OT packet links remain outside this coverage.
+Release and ASan/UBSan pass. Full scene loads, raw asset pointer relocation and
+overlay region copies remain outside this coverage. GPU links are covered by
+the separate test below.
+
+## Native ordering-table links
+
+`psx/gpu_links.c` stores full pointers under nonzero 24-bit handles and preserves
+the top packet-length byte. 0xFFFFFF remains the end marker; zero and unknown
+handles fail instead of becoming host addresses. A fixed registry supports
+65536 live tag pointers without per-frame allocations; reset requires discarding
+every cached chain first. Tag lifetimes and payload extents remain the caller's
+responsibility. This is not asset-pointer relocation or an untrusted chain parser.
+
+`psx/gpu_ot.c` implements reverse ClearOTagR, setlen, addPrim and AddPrim. The
+generic add API preserves the head length; the guarded source helpers reproduce
+the original OT-specific behavior of clearing that length. Original primitive
+builders now compile and are linked into tests. ClearOTagR's return value is not
+used by the game; validation covers its chain side effects.
+
+`gpu.links` tests two live tag addresses with identical low 24 address bits,
+identity reuse, relocation-independent handle order, reverse OT traversal,
+LINK_PRIM length/value behavior, and original tile/rectangle/draw-mode bytes.
+It calls original frame_buffers_layout and ot_insert_prim, checks upper-index
+clamping and cursor advances, traverses a 2050-node chain, and verifies OT
+re-clearing preserves cached IDs. GS allocation in the builder test is an
+explicit test pool; its real source implementation is covered separately.
+Six rejection cases cover null/unaligned tags, zero/unknown handles, exhausted
+capacity and empty OT lengths. Capacity validation also checks reuse at the limit.
+No renderer, GPU synchronization or overlay pointer restoration is tested.
+
+A small optional benchmark measures only warm OT construction; measured setup,
+numbers and limitations are in PLATFORMS.md. There is no full-game performance
+or parity claim from these CPU packet tests.
 
 ## CD bring-up surface
 
@@ -230,8 +262,9 @@ claimed as validated PSY-Q parity.
 CdInit, CdSearchFile, CdControl, CdRead, CdReadSync, CdSync, CdReadBreak and
 CdFlush are explicit named abort stubs. Eight failure tests check these APIs
 cannot silently claim successful initialization, metadata or reads. There are
-18 CTests in total: six behavior/layout tests and twelve unimplemented-API
-failure tests (four GTE, eight CD). This is not a disc IO, XA or title boot test.
+25 CTests in total: seven behavior/layout tests, twelve unimplemented-API
+failure tests (four GTE, eight CD), and six GPU input/capacity rejection tests.
+This is not a disc IO, XA or title boot test.
 
 CdlFILE is host-side result metadata with only the fields used by the source,
 pos and size. It is never read from disc bytes and does not claim the proprietary
@@ -242,8 +275,8 @@ SDK's binary layout. CD command constants cover only commands observed in source
 `port/analysis/compile_probe.py` invokes Clang on all original C files with the
 port force-include and the basename include directories. It writes per-file
 diagnostics to ignored `build/port/compile-probe.json`. No file is changed and no
-game code is linked or run. The result with Clang 20.1.8 is 65 syntax passes and
-48 failures out of 113 files, with 1643 warnings emitted before the error cap.
+game code is linked or run. The result with Clang 20.1.8 is 66 syntax passes and
+47 failures out of 113 files, with 1650 warnings emitted before the error cap.
 
 Common blockers include missing abs/libsnd and other SDK headers, undeclared GPU API
 calls, MIPS register clobbers, SDK helper constants, GCC nested functions and
@@ -281,7 +314,7 @@ including its whitespace (line endings normalized for comparison). This check
 passed against the preceding git revision. It does not establish byte-matching
 compiler output. Overlay callers of main_get_region_base that still store its
 result in s32/u32 now require explicit port fixes before those paths can compile.
-The port now builds the ten game units above, not a game executable.
+The port now builds the eleven game units above, not a game executable.
 Matching `check` is unverified: Ubuntu WSL failed to start with
 `HCS_E_HYPERV_NOT_INSTALLED`. Project-local Windows tools were subsequently
 provisioned: CMake 3.31.6 and Ninja 1.12.1. LLVM-mingw was upgraded from

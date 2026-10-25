@@ -1,6 +1,7 @@
 #include <libgpu.h>
 
 #include "main.h"
+#include "frame_buffers.h"
 #include "prim.h"
 #include "psx/error.h"
 #include "psx/gpu_links.h"
@@ -21,6 +22,9 @@
  * allocator has separate coverage in game.work_memory. */
 _Alignas(16) static u8 hm_test_pool[512];
 static size_t hm_test_pool_used;
+FrameState frame_records[2];
+FrameState *current_frame;
+u8 *region_base;
 
 void *gs_work_alloc(s32 size) {
     if (size < 0 || (size_t)size > sizeof(hm_test_pool) - hm_test_pool_used) {
@@ -82,7 +86,8 @@ static int hm_test_chain(void) {
     AddPrim(&head, second);
     CHECK(head >> 24 == 7 && hm_gpu_link_decode(second[0]) == first);
     POLY_F3 triangle = {0};
-    CHECK(hm_gpu_link_prim(&head, &triangle, sizeof(triangle) / 4 - 1) == head);
+    u32 triangle_handle = LINK_PRIM(&head, &triangle, POLY_F3);
+    CHECK(triangle_handle == head);
     CHECK(head >> 24 == 0 && triangle.tag >> 24 == 4);
     CHECK(hm_gpu_link_decode(head) == (const u32 *)&triangle);
     CHECK(hm_gpu_link_decode(triangle.tag) == second);
@@ -140,9 +145,44 @@ static int hm_test_rejection(const char *name) {
             CHECK(hm_gpu_link_encode(&tags[index]) == index + 1);
         }
         CHECK(hm_gpu_link_encode(tags) == 1); /* Existing IDs still work at capacity. */
+        CHECK(hm_gpu_link_decode(HM_GPU_LINK_CAPACITY) == &tags[HM_GPU_LINK_CAPACITY - 1]);
         hm_gpu_link_encode(&tags[HM_GPU_LINK_CAPACITY]);
     }
     return 2; /* Every recognized rejection must abort, not return success/error. */
+}
+
+static int hm_test_original_ot_insert(void) {
+    hm_gpu_links_reset();
+    region_base = hm_work_region();
+    frame_buffers_layout();
+    current_frame = &frame_records[0];
+    u32 *first = current_frame->primCursor.tag;
+    setlen(first, 3);
+    CHECK(ot_insert_prim(FRAME_OT_DEPTH + 100, 16) == first);
+    CHECK(hm_gpu_link_decode(current_frame->ot[FRAME_OT_DEPTH - 1]) == first);
+    CHECK(first[0] >> 24 == 3);
+    CHECK(hm_gpu_link_decode(first[0]) == &current_frame->ot[FRAME_OT_DEPTH - 2]);
+    CHECK(current_frame->primCursor.bytes == (u8 *)first + 16);
+    u32 *second = current_frame->primCursor.tag;
+    setlen(second, 1);
+    CHECK(ot_insert_prim(1, 8) == second);
+    CHECK(hm_gpu_link_decode(current_frame->ot[1]) == second);
+    CHECK(current_frame->primCursor.bytes == (u8 *)first + 24);
+
+    const u32 *node = &current_frame->ot[FRAME_OT_DEPTH - 1];
+    u32 visited = 0;
+    while (node != NULL) {
+        CHECK(++visited <= FRAME_OT_DEPTH + 2);
+        node = hm_gpu_link_decode(*node);
+    }
+    CHECK(visited == FRAME_OT_DEPTH + 2);
+    u32 handle = hm_gpu_link_encode(first);
+    ClearOTagR(current_frame->ot, FRAME_OT_DEPTH);
+    CHECK(hm_gpu_link_encode(first) == handle); /* Re-clearing does not reset cached links. */
+    CHECK(hm_gpu_link_decode(current_frame->ot[FRAME_OT_DEPTH - 1])
+          == &current_frame->ot[FRAME_OT_DEPTH - 2]);
+    hm_gpu_links_reset();
+    return 0;
 }
 
 int main(int argc, char **argv) {
@@ -153,5 +193,6 @@ int main(int argc, char **argv) {
     CHECK(hm_test_addresses() == 0);
     CHECK(hm_test_chain() == 0);
     CHECK(hm_test_builders() == 0);
+    CHECK(hm_test_original_ot_insert() == 0);
     return 0;
 }

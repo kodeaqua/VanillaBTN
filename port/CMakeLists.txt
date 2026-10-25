@@ -70,6 +70,9 @@ add_library(hmbtn_psx_initial STATIC
 target_link_libraries(hmbtn_psx_initial PUBLIC hmbtn_port_options)
 target_include_directories(hmbtn_psx_initial PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/compat/psyq")
 
+add_executable(hmbtn_ot_bench EXCLUDE_FROM_ALL analysis/ot_bench.c)
+target_link_libraries(hmbtn_ot_bench PRIVATE hmbtn_psx_initial)
+
 if(BUILD_TESTING)
     add_executable(hmbtn_types_test tests/types.c)
     target_link_libraries(hmbtn_types_test PRIVATE hmbtn_port_options)

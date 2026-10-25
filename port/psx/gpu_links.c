@@ -4,6 +4,9 @@
 #include <string.h>
 
 enum { HM_GPU_LINK_BUCKETS = HM_GPU_LINK_CAPACITY * 2 };
+_Static_assert(HM_GPU_LINK_CAPACITY < HM_GPU_LINK_END, "Handles must not collide with the terminator");
+_Static_assert((HM_GPU_LINK_BUCKETS & (HM_GPU_LINK_BUCKETS - 1)) == 0,
+               "Hash bucket mask requires a power-of-two capacity");
 static const void *hm_gpu_link_pointers[HM_GPU_LINK_CAPACITY];
 static u32 hm_gpu_link_buckets[HM_GPU_LINK_BUCKETS];
 static u32 hm_gpu_link_count;
