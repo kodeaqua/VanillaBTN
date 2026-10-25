@@ -2,6 +2,8 @@
 #include "farm_state.h"
 #include "scene.h"
 #include <stdio.h>
+_Static_assert(sizeof(FarmModeScript) == 0xBDC, "scene file layout");
+_Static_assert(offsetof(FarmModeScript, models) == 0x948, "scene model file offset");
 #define CHECK(test)                                                                                \
     do {                                                                                           \
         if (!(test)) {                                                                             \
@@ -22,5 +24,10 @@ int main(void) {
     CHECK(scene_resolve_selection(100) == 100);
     event_flag_set(EVENT_FLAG_MINE_RETURN_43, 1);
     CHECK(scene_resolve_selection(100) == MINE_43_SCENE_BASE + 2);
+    for (u32 i = 0; i < SCENE_MODEL_COUNT; ++i)
+        farm_area.mode.script.models[i].flags = SCENE_ENTRY_ABSENT;
+    scene_entries_clear();
+    scene_morphs_clear();
+    scene_populate_objects();
     return 0;
 }
