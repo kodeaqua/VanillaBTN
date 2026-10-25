@@ -1,6 +1,9 @@
 /* Diagnostic entry into compiled game C. This is not a packaged game launcher;
  * unsupported runtime calls must stop here with their named error. */
 #include "psx/cd_runtime.h"
+#ifdef HMBTN_SDL_HOST
+#include "platform/game_host.h"
+#endif
 #include <limits.h>
 #include <stdio.h>
 
@@ -39,7 +42,19 @@ int main(int argc, char **argv) {
     hm_cd_attach(&disc);
     puts("Validated USA disc; entering compiled native game C");
     fflush(stdout);
+#ifdef HMBTN_SDL_HOST
+    if (!hm_game_host_start()) {
+        fprintf(stderr, "Cannot initialize native game window\n");
+        hm_game_host_stop();
+        hm_cd_detach();
+        fclose(file);
+        return 1;
+    }
+#endif
     int result = hm_game_main();
+#ifdef HMBTN_SDL_HOST
+    hm_game_host_stop();
+#endif
     hm_cd_detach();
     fclose(file);
     return result;
