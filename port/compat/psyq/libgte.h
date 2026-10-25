@@ -40,6 +40,8 @@ s32 VectorNormal(VECTOR *input, VECTOR *output);
 void InitGeom(void);
 void SetGeomOffset(s32 x, s32 y);
 void SetGeomScreen(s32 distance);
+void SetFogNear(s32 near_distance, s32 projection_distance);
+void SetFarColor(s32 r, s32 g, s32 b);
 s32 ratan2(s32 y, s32 x);
 void OuterProduct0(VECTOR *first, VECTOR *second, VECTOR *result);
 extern const MATRIX GsIDMATRIX;

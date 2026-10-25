@@ -15,6 +15,9 @@ typedef struct {
     s16 zsf[2];
     s32 mac[4];
     u32 flags;
+    s32 ofx, ofy, dqb;
+    s16 dqa, ir0;
+    u16 distance;
 } hm_gte_state;
 
 /* Explicit arithmetic shift and wrapping avoid signed shifts/overflow UB. */
@@ -119,11 +122,87 @@ static inline void hm_gte_average(hm_gte_state *state, int four) {
     state->otz = (u16)(depth < 0 ? 0 : depth > 65535 ? 65535 : depth);
 }
 
+static inline u32 hm_gte_divide(hm_gte_state *state, u16 numerator, u16 denominator) {
+    if ((u32)numerator >= (u32)denominator * 2) {
+        state->flags |= UINT32_C(1) << 17;
+        return 0x1FFFF;
+    }
+    u32 d = denominator, n = numerator;
+    while (d < 0x8000) {
+        d *= 2;
+        n *= 2;
+    }
+    u32 index = (d - 0x7FC0) / 128;
+    s32 seed = (s32)((0x40000u / (index + 256) + 1) / 2) - 257;
+    u32 u = (u32)(seed < 0 ? 0 : seed) + 257;
+    u32 reciprocal = (0x2000080u - d * u) / 256;
+    reciprocal = (0x80u + reciprocal * u) / 256;
+    u32 quotient = (u32)(((u64)n * reciprocal + 0x8000) / 65536);
+    /* Rounding can reach 0x20000 without the divide-overflow flag being set. */
+    return quotient > 0x1FFFF ? 0x1FFFF : quotient;
+}
+
+static inline s16 hm_gte_screen(hm_gte_state *state, s64 value, u32 flag) {
+    hm_gte_mac0(state, value);
+    s64 coordinate = hm_gte_shift(value, 16);
+    if (coordinate < -1024 || coordinate > 1023)
+        state->flags |= UINT32_C(1) << flag;
+    return (s16)(coordinate < -1024 ? -1024 : coordinate > 1023 ? 1023 : coordinate);
+}
+
+static inline void hm_gte_project(hm_gte_state *state, u32 vector, u32 shift, int lm,
+                                  int depth_cue) {
+    s64 z = 0;
+    for (u32 row = 0; row < 3; ++row) {
+        s64 sum = (s64)state->translation[0][row] * 4096;
+        for (u32 col = 0; col < 3; ++col)
+            sum = hm_gte_accumulate(
+                state, row, sum + (s64)state->matrix[0][row][col] * state->vector[vector][col]);
+        state->mac[row + 1] = hm_gte_word(hm_gte_shift(sum, shift));
+        if (row < 2) {
+            hm_gte_ir(state, row, state->mac[row + 1], lm);
+        } else {
+            z = hm_gte_shift(sum, 12);
+            if (z < -32768 || z > 32767)
+                state->flags |= UINT32_C(1) << 22;
+            s32 value = state->mac[3], minimum = lm ? 0 : -32768;
+            state->ir[2] = (s16)(value < minimum ? minimum : value > 32767 ? 32767 : value);
+        }
+    }
+    if (z < 0 || z > 65535)
+        state->flags |= UINT32_C(1) << 18;
+    for (u32 i = 0; i < 3; ++i)
+        state->sz[i] = state->sz[i + 1];
+    state->sz[3] = (u16)(z < 0 ? 0 : z > 65535 ? 65535 : z);
+    u32 ratio = hm_gte_divide(state, state->distance, state->sz[3]);
+    for (u32 i = 0; i < 2; ++i) {
+        state->sx[i] = state->sx[i + 1];
+        state->sy[i] = state->sy[i + 1];
+    }
+    state->sx[2] = hm_gte_screen(state, (s64)ratio * state->ir[0] + state->ofx, 14);
+    state->sy[2] = hm_gte_screen(state, (s64)ratio * state->ir[1] + state->ofy, 13);
+    if (depth_cue) {
+        s64 value = (s64)ratio * state->dqa + state->dqb;
+        hm_gte_mac0(state, value);
+        value = hm_gte_shift(value, 12);
+        if (value < 0 || value > 4096)
+            state->flags |= UINT32_C(1) << 12;
+        state->ir0 = (s16)(value < 0 ? 0 : value > 4096 ? 4096 : value);
+    }
+}
+
 static inline void hm_gte_command(hm_gte_state *state, u32 word) {
     u32 shift = (word & (1u << 19)) ? 12 : 0;
     int lm = (word & (1u << 10)) != 0;
     state->flags = 0;
     switch (word & 63) {
+    case 0x01:
+        hm_gte_project(state, 0, shift, lm, 1);
+        break;
+    case 0x30:
+        for (u32 vertex = 0; vertex < 3; ++vertex)
+            hm_gte_project(state, vertex, shift, lm, vertex == 2);
+        break;
     case 0x06:
         hm_gte_clip(state);
         break;
