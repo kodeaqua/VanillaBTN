@@ -8,12 +8,6 @@ int main(int argc, char **argv) {
     if (argc != 2) {
         return 2;
     }
-    if (strcmp(argv[1], "rsin") == 0) {
-        return rsin(0);
-    }
-    if (strcmp(argv[1], "rcos") == 0) {
-        return rcos(0);
-    }
     if (strcmp(argv[1], "SquareRoot0") == 0) {
         return SquareRoot0(0);
     }

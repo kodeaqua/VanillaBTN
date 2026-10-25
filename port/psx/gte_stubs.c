@@ -2,17 +2,7 @@
 
 #include "psx/unimplemented.h"
 
-/* Bring-up stubs: no approximation of PS1 math is allowed to pass silently. */
-s32 rsin(s32 angle) {
-    (void)angle;
-    hm_unimplemented("rsin");
-}
-
-s32 rcos(s32 angle) {
-    (void)angle;
-    hm_unimplemented("rcos");
-}
-
+/* Remaining high-level math must fail explicitly until implemented. */
 s32 SquareRoot0(s32 value) {
     (void)value;
     hm_unimplemented("SquareRoot0");
