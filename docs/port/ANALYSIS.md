@@ -140,7 +140,7 @@ preprocessing; it is not an actual linked collision.
 ## Initial native source compilation
 
 `hmbtn_game_initial` initially compiled these eleven original units, and now
-compiles 26 units after the additions documented below:
+compiles 29 units after the additions documented below:
 `main/geometry/math_util.c`, `main/game/farm_data_size.c`,
 `main/game/horse_names.c`, `main/game/picture_codes.c`,
 `main/game/event_flags.c`, `main/game/farm_tables.c`, `main/game/farm_state.c`,
@@ -312,8 +312,8 @@ SDK's binary layout. CD command constants cover only commands observed in source
 `port/analysis/compile_probe.py` invokes Clang on all original C files with the
 port force-include and the basename include directories. It writes per-file
 diagnostics to ignored `build/port/compile-probe.json`. No file is changed and no
-game code is linked or run. The result with Clang 20.1.8 is 101 syntax passes and
-12 failures out of 113 files, with 2076 warnings emitted before the error cap.
+game code is linked or run. The result with Clang 20.1.8 is 104 syntax passes and
+9 failures out of 113 files, with 2083 warnings emitted before the error cap.
 
 Common blockers include missing pad/card headers and SDK declarations,
 inline GTE commands, GCC nested functions, pointer-width assignments and
@@ -326,7 +326,7 @@ missing initializers, incompatible callback types, and a transposed memset
 argument warning. They remain visible; broad warning suppression or automatic
 source cleanup would hide real fidelity and 64-bit hazards.
 
-The routine native archive now compiles 26 original units, including the sound
+The routine native archive now compiles 29 original units, including the sound
 loader/request/XA-control code, farm event commands, player/scene-view code,
 debug overlay and minigames 3/5. Clean-room source-facing declarations for
 libsnd/libspu and matrix/font/lighting calls supply native call contracts only;
@@ -335,18 +335,19 @@ playback, controller polling, rendered output or a full overlay link. SpuCommonA
 is native configuration metadata with only source-used fields, not a proprietary
 SDK or asset ABI. SPU voice constants are the 24 bits consumed by key-status queries.
 
-Eight capture-free GCC nested helpers now have file-scoped native adapters under
+Eleven capture-free GCC nested helpers now have file-scoped native adapters under
 ADR-013. Seven Python audit/regression tests pass, including token equality of
-all eight adapter bodies against matching definitions. The C helper test covers
+all eleven adapter bodies against matching definitions. The C helper test covers
 triangle winding, boundary/height rejection, quad fallback, coordinate extrema,
-estate flag priority and the ten visible medal-price rows. The source compares
+estate flag priority, the ten visible medal-price rows and scene visibility
+handoff at its counter threshold. The source compares
 the ACTOR_FLAG_DIED_OF_AGE mask (1 << 19) with 1; that unusual comparison is
 preserved and covered rather than corrected. Captured-local helpers in other
 units remain pending.
 
 ## Port guards and validation
 
-Twenty-six `HMBTN_PORT` guard blocks have been introduced under ADR-008 (workspace),
+Thirty-two `HMBTN_PORT` guard blocks have been introduced under ADR-008 (workspace),
 ADR-009 (GPU links), ADR-010 (native CPU adapters) and ADR-013 (nested helpers):
 
 | File | Guarded change |
@@ -369,14 +370,17 @@ ADR-009 (GPU links), ADR-010 (native CPU adapters) and ADR-013 (nested helpers):
 | src/overlay/11_GF_FARM/estate.c | Include the static estate flag helper and exclude its nested copy (2 guards) |
 | src/overlay/11_GF_FARM/menu/shop_dialogues.c | Include the static medal-row helper and exclude its nested copy (2 guards) |
 | src/overlay/11_GF_FARM/event/event_rules.c | Include the static winter helper and exclude its nested copy (2 guards) |
+| src/overlay/11_GF_FARM/world/scene.c | Include the static visibility handoff helper and exclude its nested copy (2 guards) |
+| src/overlay/19_GF_MG2/mg2.c | Include the static board-marker helper and exclude its nested copy (2 guards) |
+| src/overlay/30_GF_swind/swind.c | Include the static screen-area helper and exclude its nested copy (2 guards) |
 
-For each of these twelve files, selecting every matching `#else` branch and
+For each of these fifteen files, selecting every matching `#else` branch and
 removing the new guard directives reconstructs the previous source text exactly,
 including its whitespace (line endings normalized for comparison). This check
 passed against baseline revision 9ace470. It does not establish byte-matching
 compiler output. Overlay callers of main_get_region_base that still store its
 result in s32/u32 now require explicit port fixes before those paths can compile.
-The port now builds 26 game units, not a game executable.
+The port now builds 29 game units, not a game executable.
 Matching `check` is unverified: its Linux toolchain is unavailable on the
 Windows-only host, and the owner excludes WSL. Project-local Windows tools were
 provisioned: CMake 3.31.6 and Ninja 1.12.1. LLVM-mingw was upgraded from

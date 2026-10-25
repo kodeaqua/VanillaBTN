@@ -384,8 +384,16 @@ static void swind_stub_2(void) {
 }
 
 /* One frame of the window, dispatched on swind_state. */
+#ifdef HMBTN_PORT
+/* PORT: Clang requires file-scoped helpers -- see docs/port/DECISIONS.md#adr-013 */
+#include "compat/nested/swind.inc"
+#else
+#endif
 void swind_window_tick(void) {
     /* Save (0) or restore (1) the screen area behind the window. */
+#ifdef HMBTN_PORT
+    /* PORT: helper is file-scoped in the native adapter -- see docs/port/DECISIONS.md#adr-013 */
+#else
     void swind_screen_area_copy(s32 restore) {
         u_long *buffer = (u_long *)STAGING_BUFFER;
 
@@ -396,6 +404,7 @@ void swind_window_tick(void) {
         }
         DrawSync(0);
     }
+#endif
 
     switch (swind_state) {
     case SWIND_STATE_OPEN:

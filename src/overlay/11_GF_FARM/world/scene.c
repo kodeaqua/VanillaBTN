@@ -856,11 +856,19 @@ static void scene_assign_slots(void)
 /* Pass the hidden flag around the three slot entries. The first stage waits until
  * the item is shipped; then each slot counts up to its limit and hands the flag on.
  * The last stage clears the shipped flag when it completes. */
+#ifdef HMBTN_PORT
+/* PORT: Clang requires file-scoped helpers -- see docs/port/DECISIONS.md#adr-013 */
+#include "compat/nested/scene.inc"
+#else
+#endif
 static void scene_flag_stage_tick(void)
 {
     /* Count one step on `owner`'s counter; when it reaches its limit, reset both
      * counters, hide `owner`, show `other`, record `nextStage` as the next stage and
      * return 1. */
+#ifdef HMBTN_PORT
+    /* PORT: helper is file-scoped in the native adapter -- see docs/port/DECISIONS.md#adr-013 */
+#else
     s32 scene_slot_handoff_step(FarmSceneModel * owner, FarmSceneModel * other, s32 nextStage)
     {
         FarmMorph *counter;
@@ -878,6 +886,7 @@ static void scene_flag_stage_tick(void)
         scene_flag_stage = nextStage;
         return 1;
     }
+#endif
 
     FarmSceneModel *slot0 = scene_slot_entries[0];
     u32 stage;
