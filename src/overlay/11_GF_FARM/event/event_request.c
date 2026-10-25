@@ -133,13 +133,24 @@ static void event_request_claim_unchecked(s32 event)
 /* Claim a request slot for `event` unless it is already queued (see scene_claim_entry). */
 struct FarmRequestSlot *event_request_claim(s32 event)
 {
+#ifdef HMBTN_PORT
+    /* PORT: return the claimed native pointer explicitly; the original relies
+     * on the callee's return register - see ADR-040. */
+    return scene_claim_entry(event, 1, 0);
+#else
     scene_claim_entry(event, 1, 0);
+#endif
 }
 
 /* As event_request_claim, but the claim may use any of the five slots. */
 struct FarmRequestSlot *event_request_claim_any(s32 event)
 {
+#ifdef HMBTN_PORT
+    /* PORT: preserve the callee's native pointer result - see ADR-040. */
+    return scene_claim_entry(event, 0, 1);
+#else
     scene_claim_entry(event, 0, 1);
+#endif
 }
 
 /* Advance one timer: 0xFF means stopped, and a running timer stops at 120. */

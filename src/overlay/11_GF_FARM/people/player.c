@@ -744,7 +744,16 @@ static void player_build_result(FarmPlayer *player)
     values.vz += table[1];
     farm_settle_on_ground(&values, 0);
     status_word = &player_status_word;
+#ifdef HMBTN_PORT
+    /* PORT: no ground primitive has no terrain flags; do not read native
+     * address zero - see docs/port/DECISIONS.md#adr-039. */
+    {
+        const void *primitive = ground_hit_primitive();
+        result_value = primitive ? hm_asset_s32le(primitive) : 0;
+    }
+#else
     result_value = *(s32 *)ground_hit_primitive();
+#endif
     *status_word = result_value;
     if (!(result_value & 0xFFFF0000))
     {
@@ -4382,7 +4391,16 @@ void player_update_position(void)
     {
         player_slide_on_bump();
     }
+#ifdef HMBTN_PORT
+    /* PORT: preserve an empty terrain result without reading native address
+     * zero - see docs/port/DECISIONS.md#adr-039. */
+    {
+        const void *primitive = ground_hit_primitive();
+        player_status_word = primitive ? (u32)hm_asset_s32le(primitive) : 0;
+    }
+#else
     player_status_word = *(u32 *)ground_hit_primitive();
+#endif
     pos = player->position;
     if (player->stateFlags & PLAYER_FLAG_AIRBORNE)
     {

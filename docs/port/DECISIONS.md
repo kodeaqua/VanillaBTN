@@ -858,3 +858,45 @@ thread. Preserve nonblocking CdReadSync semantics and the original matching
 loop. Do not advance CD data on arbitrary status polls or a host background
 thread. A local release replay then enters the original grandparent scene
 and dialogue instead of hanging. Longer input/scene coverage remains pending.
+
+The flashback's foreground load reaches the second empty polling loop in
+event_script_start, confirmed by an attached native debugger. Yield one native
+VBlank in that loop as well. Both waits service the same hardware tick path.
+
+<a id="adr-039"></a>
+
+## ADR-039: Handle an absent terrain primitive on native hosts
+
+Date: 2026-10-26. Status: native safety adaptation; low-memory parity pending.
+
+The extended opening replay changes to area 230. A native debugger catches
+player_frame_update reading address zero in its terrain-result helper. The
+ground query can return no primitive, but the source unconditionally reads
+its first word. player_update_position contains the same unconditional read.
+
+For native builds, an absent primitive supplies no terrain flags (word zero).
+Keep the first helper's existing 0x8000 fallback when no high flags are present;
+the position path retains the zero word. Read actual primitive words with the
+fixed-width byte accessor. Keep both original dereferences in matching branches.
+This lets the release replay enter the original flashback scene; it does not
+establish the contents/effects of original low-memory reads.
+
+<a id="adr-040"></a>
+
+## ADR-040: Return native event-request pointers explicitly
+
+Date: 2026-10-26. Status: accepted for native calling-convention correctness.
+
+The release replay runs the introductory script while the sanitizer replay
+clears New Game and enters the farm without it. Both event_request_claim
+wrappers call scene_claim_entry but omit return despite declaring a pointer
+result. Callers require that pointer to populate script id/flags. Relying on a
+callee's residual return register is undefined in native C and instrumentation
+can change the result. These omissions are visible compiler warnings.
+
+Native branches explicitly return scene_claim_entry's pointer. Keep the original
+call-only bodies for matching builds. A regression calls both original wrappers
+and checks returned slot identity, zeroed arguments, duplicate rejection, all
+five queue entries, full-queue failure and reuse after reset. Do not suppress
+the warning or force a guessed success pointer. Other return-type warnings
+remain tracked for their own call paths.

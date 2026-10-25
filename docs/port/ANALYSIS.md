@@ -288,7 +288,7 @@ All 33 A_FILE offsets (32 member ranges) are monotonic and inside the
 No assets were extracted or added to git. The subsequent native boot probe
 runs the original afile_init against the validated disc.
 
-There are 61 CTests, all passing in Windows release and ASan/UBSan. New coverage
+There are 62 CTests, all passing in Windows release and ASan/UBSan. New coverage
 includes SHA-1 published vectors, malformed synthetic sectors/directories,
 cross-sector file reads, deterministic CD transfer/cancel/error behavior,
 VRAM transfers/masks/wrapping and the original texture-pack decoder. Tests need
@@ -374,8 +374,8 @@ and distinct-object C test check that capture semantics are retained.
 
 ## Port guards and validation
 
-Sixty-three `HMBTN_PORT` guard blocks have been introduced under ADR-008 through
-ADR-038 (workspace, GPU/GTE/CPU adapters, nested helpers, event/text pointers,
+Sixty-eight `HMBTN_PORT` guard blocks have been introduced under ADR-008 through
+ADR-040 (workspace, GPU/GTE/CPU adapters, nested helpers, event/text pointers,
 overlays, title copies, SEQ spans, animation table tails, estate queues and
 initial area selection):
 
@@ -419,9 +419,11 @@ initial area selection):
 | src/overlay/11_GF_FARM/world/scene.c | Write visibility only for present spouse markers (1 additional guard) |
 | src/overlay/11_GF_FARM/people/player.c | Resolve cross-object probe step indices through named tables (1 additional guard) |
 | src/overlay/11_GF_FARM/people/player.c | Select the facing reach row without crossing row-zero bounds (1 additional guard) |
-| src/overlay/11_GF_FARM/event/event_script.c | Yield a native VBlank in the busy script-read loop (1 additional guard) |
+| src/overlay/11_GF_FARM/event/event_script.c | Yield native VBlanks in background/foreground busy script-read loops (2 additional guards) |
+| src/overlay/11_GF_FARM/people/player.c | Preserve no-terrain results without native address-zero reads (2 additional guards) |
+| src/overlay/11_GF_FARM/event/event_request.c | Explicitly return the claimed request pointers (2 guards) |
 
-For each of these twenty-six files, selecting every matching `#else` branch and
+For each of these twenty-seven files, selecting every matching `#else` branch and
 removing the new guard directives reconstructs the previous source text exactly,
 including its whitespace (line endings normalized for comparison). This check
 passed against baseline revision 9ace470. It does not establish byte-matching

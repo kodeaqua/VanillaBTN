@@ -1169,6 +1169,12 @@ static s32 event_script_start(void)
         afile_read_bytes(EVENT_SCRIPT_AFILE, start, size, data, 0, 1);
         while ((result = afile_read_bytes(EVENT_SCRIPT_AFILE, start, size, data, 0, 0)) == 0)
         {
+#ifdef HMBTN_PORT
+            /* PORT: keep CD transfer credit advancing in this busy wait -
+             * see docs/port/DECISIONS.md#adr-038. */
+            VSync(0);
+#else
+#endif
         }
         event_block_unpack((u16 *)result);
     }
