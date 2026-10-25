@@ -5,14 +5,14 @@ As of 2026-10-25, no native game platform is brought up.
 | Target | Foundation preset | Validation |
 | --- | --- | --- |
 | Linux x86-64 | linux-release, linux-asan-ubsan | Deferred; requires a separate Linux host, no WSL |
-| Windows x86-64 | windows-release | Twenty-six original source units compile; local tests passed (33/33) |
+| Windows x86-64 | windows-release | Twenty-nine original source units compile; local tests passed (33/33) |
 | Windows x86-64 sanitizers | windows-asan-ubsan | Clang 20.1.8 ASan/UBSan tests passed (33/33); coverage limited to the initial subset |
 | macOS universal | macos-universal-release | Pending; no macOS host tested |
 | Android arm64 | Pending NDK and minSdk selection | No device/build validation |
 
 The owner prioritizes Windows. No workflow/CI changes are included or requested.
 Windows validation covers the initial source subset, not full game execution.
-The full-tree syntax probe passes 101 of 113 files and fails 12, with 2076 emitted
+The full-tree syntax probe passes 104 of 113 files and fails 9, with 2083 emitted
 warnings before its per-file error cap. This is diagnostic inventory, not a port build.
 An additional local object-generation probe compiled all 87 successful units
 with Clang 20.1.8. This includes overlay code but is not a linked game. The

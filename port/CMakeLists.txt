@@ -59,6 +59,9 @@ add_library(hmbtn_game_initial STATIC
     ../src/overlay/11_GF_FARM/estate.c
     ../src/overlay/11_GF_FARM/menu/shop_dialogues.c
     ../src/overlay/11_GF_FARM/event/event_rules.c
+    ../src/overlay/11_GF_FARM/world/scene.c
+    ../src/overlay/19_GF_MG2/mg2.c
+    ../src/overlay/30_GF_swind/swind.c
     ../src/main/sound/cd_audio.c
     ../src/main/sound/sound.c
     ../src/main/sound/sound_request.c
