@@ -1,0 +1,2 @@
+/tools/setup-native.sh text eol=lf
+/tools/install_host_sdk.sh text eol=lf
