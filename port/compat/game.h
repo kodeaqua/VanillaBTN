@@ -8,6 +8,7 @@
 
 #include "compat/asset.h"
 #include "compat/fixed_math.h"
+#include "compat/player_steps.h"
 #include "compat/types.h"
 #include "compat/work_memory.h"
 
