@@ -1,4 +1,5 @@
 #include "actor.h"
+#include "scene.h"
 #include <libgte.h>
 #include <stdio.h>
 
@@ -14,10 +15,12 @@ static VECTOR *ground_pos;
 static s32 ground_dy, ground_tolerance, ground_pos_x, ground_pos_z;
 static s32 ground_edge0, ground_edge1, ground_edge2, ground_found;
 static SVECTOR *ground_triangle[3], *ground_vertices;
+static s32 scene_flag_stage;
 
 #include "compat/nested/animals.inc"
 #include "compat/nested/estate.inc"
 #include "compat/nested/ground.inc"
+#include "compat/nested/scene.inc"
 #include "compat/nested/shop.inc"
 
 int main(void) {
@@ -63,6 +66,16 @@ int main(void) {
     CHECK(has_medal_price(flags) == 0); /* Only ten visible rows are considered. */
     flags[9] = 2;
     CHECK(has_medal_price(flags) == 1);
+    FarmMorph first = {.step = 0, .steps = 2}, second = {.step = 7};
+    FarmSceneModel owner = {.morph = &first},
+                   other = {.flags = SCENE_ENTRY_HIDDEN, .morph = &second};
+    scene_flag_stage = 4;
+    CHECK(scene_slot_handoff_step(&owner, &other, 5) == 0);
+    CHECK(first.step == 1 && second.step == 7 && scene_flag_stage == 4);
+    CHECK(!(owner.flags & SCENE_ENTRY_HIDDEN) && (other.flags & SCENE_ENTRY_HIDDEN));
+    CHECK(scene_slot_handoff_step(&owner, &other, 5) == 1);
+    CHECK(first.step == 0 && second.step == 0 && scene_flag_stage == 5);
+    CHECK((owner.flags & SCENE_ENTRY_HIDDEN) && !(other.flags & SCENE_ENTRY_HIDDEN));
     flags[9] = 3;
     flags[0] = 2;
     CHECK(has_medal_price(flags) == 1);

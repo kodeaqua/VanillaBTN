@@ -289,8 +289,9 @@ Do not apply this pattern to captured-local helpers without explicit arguments.
 A regression test compares original and adapter tokens, excluding only static
 and whitespace/comments. Existing unusual comparisons remain unchanged.
 
-Consequences: Eight capture-free helpers in ground collision, animal headings,
-estate items, shop rows and winter event conditions now compile under Clang.
+Consequences: Eleven capture-free helpers in ground collision, animal headings,
+estate items, shop rows, winter event conditions, scene visibility, minigame 2
+and debug screen storage now compile under Clang.
 Data-free tests exercise winding/edge/height geometry, comparison boundaries,
 estate flag priority and visible medal rows. These do not prove full gameplay
 parity. The native helper copies must remain synchronized with matching source.

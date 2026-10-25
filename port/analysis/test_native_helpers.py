@@ -42,6 +42,9 @@ class NativeHelperTests(unittest.TestCase):
             ("overlay/11_GF_FARM/estate.c", "estate", ["estate_kind_value_for_flags"]),
             ("overlay/11_GF_FARM/menu/shop_dialogues.c", "shop", ["has_medal_price"]),
             ("overlay/11_GF_FARM/event/event_rules.c", "event_rules", ["winter_23_single_check"]),
+            ("overlay/11_GF_FARM/world/scene.c", "scene", ["scene_slot_handoff_step"]),
+            ("overlay/19_GF_MG2/mg2.c", "mg2", ["mg2_draw_board_marker"]),
+            ("overlay/30_GF_swind/swind.c", "swind", ["swind_screen_area_copy"]),
         ]
         for original, native, names in cases:
             matching = (root / "src" / original).read_text(encoding="utf-8")
