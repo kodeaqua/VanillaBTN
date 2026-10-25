@@ -1019,6 +1019,13 @@ void farm_apply_pending_mode(void)
             do
             {
                 sound_load_tick();
+#ifdef HMBTN_PORT
+                /* PORT: service CD ticks while waiting for the sound bank -
+                 * see docs/port/DECISIONS.md#adr-038. */
+                if (sound_fader_ready() == 0)
+                    VSync(0);
+#else
+#endif
             } while (sound_fader_ready() == 0);
             set_colours(frame_records, r, g, b);
         }

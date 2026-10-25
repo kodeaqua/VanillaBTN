@@ -863,6 +863,12 @@ The flashback's foreground load reaches the second empty polling loop in
 event_script_start, confirmed by an attached native debugger. Yield one native
 VBlank in that loop as well. Both waits service the same hardware tick path.
 
+Returning from the flashback reaches a sound-bank wait in
+farm_apply_pending_mode. Its repeated sound_load_tick calls also need the
+CD tick to complete the bank. A native debugger confirms this third spin.
+Yield while the bank remains pending, preserving the ordinary per-frame
+sound driver and the matching loop.
+
 <a id="adr-039"></a>
 
 ## ADR-039: Handle an absent terrain primitive on native hosts

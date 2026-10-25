@@ -25,10 +25,12 @@ consumes output. The Vulkan/ASan window test completed 1200 VBlanks and captures
 show the title/menu/dialogue. A later Vulkan/ASan window replay completed 6000
 VBlanks and its capture shows the farm terrain, player and HUD. The release
 probe reaches the opening grandparent dialogue after naming/birthday setup.
-The 12000-tick sanitizer idle test completed, but release/sanitizer opening
-script behavior differs and remains under investigation. Movement and later
-scene changes still need validation. Memory/scheduling regressions are tracked
-through ADR-038. Unfinished SDK calls fail by
+The 12000-tick sanitizer idle test completed. Missing event-request pointer
+returns explained the earlier release/sanitizer opening-script difference
+(ADR-040); both now traverse the grandparent/flashback scenes and request XA.
+Source-disc XA decoding/mixing has synthetic coverage (ADR-041). Movement and
+later scene changes still need validation. Memory/scheduling regressions are
+tracked through ADR-041. Unfinished SDK calls fail by
 name, not fake
 success paths. Native overlay reentry also aborts until state reset is supported.
 The original
