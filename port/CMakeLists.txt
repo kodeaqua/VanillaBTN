@@ -54,6 +54,11 @@ add_library(hmbtn_game_initial STATIC
     ../src/main/graphics/prim.c
     ../src/main/graphics/texture_pack.c
     ../src/main/geometry/math_util.c
+    ../src/main/geometry/ground.c
+    ../src/overlay/11_GF_FARM/animals/animals.c
+    ../src/overlay/11_GF_FARM/estate.c
+    ../src/overlay/11_GF_FARM/menu/shop_dialogues.c
+    ../src/overlay/11_GF_FARM/event/event_rules.c
     ../src/main/sound/cd_audio.c
     ../src/main/sound/sound.c
     ../src/main/sound/sound_request.c
@@ -90,6 +95,9 @@ add_executable(hmbtn_ot_bench EXCLUDE_FROM_ALL analysis/ot_bench.c)
 target_link_libraries(hmbtn_ot_bench PRIVATE hmbtn_psx_initial)
 
 if(BUILD_TESTING)
+    add_executable(hmbtn_nested_helpers_test tests/nested_helpers.c)
+    target_link_libraries(hmbtn_nested_helpers_test PRIVATE hmbtn_game_options)
+    add_test(NAME compat.nested_helpers COMMAND hmbtn_nested_helpers_test)
     add_executable(hmbtn_gte_core_test tests/gte_core.c)
     target_link_libraries(hmbtn_gte_core_test PRIVATE hmbtn_psx_initial)
     add_test(NAME gte.core COMMAND hmbtn_gte_core_test)
