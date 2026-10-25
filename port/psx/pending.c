@@ -20,16 +20,6 @@ VECTOR *ApplyMatrixLV(const MATRIX *matrix, const VECTOR *input, VECTOR *output)
     hm_unimplemented("ApplyMatrixLV");
 }
 
-s32 ChangeClearPAD(s32 mode) {
-    (void)mode;
-    hm_unimplemented("ChangeClearPAD");
-}
-
-void DrawOTag(u32 *table) {
-    (void)table;
-    hm_unimplemented("DrawOTag");
-}
-
 void FntFlush(s32 stream) {
     (void)stream;
     hm_unimplemented("FntFlush");
@@ -110,11 +100,6 @@ s32 McxAllInfo(s32 port, void *output) {
     (void)port;
     (void)output;
     hm_unimplemented("McxAllInfo");
-}
-
-s32 McxCardType(s32 port) {
-    (void)port;
-    hm_unimplemented("McxCardType");
 }
 
 s32 McxCurrCtrl(s32 port, s32 sound, s32 infrared, s32 unused) {
@@ -205,15 +190,6 @@ s32 McxShowTrans(s32 port, s32 shown, s32 timeout) {
     hm_unimplemented("McxShowTrans");
 }
 
-void McxStartCom(void) { hm_unimplemented("McxStartCom"); }
-
-s32 McxSync(s32 mode, s32 *command, s32 *result) {
-    (void)mode;
-    (void)command;
-    (void)result;
-    hm_unimplemented("McxSync");
-}
-
 s32 McxWriteDev(s32 port, s32 device, const u8 *fixed, const u8 *data) {
     (void)port;
     (void)device;
@@ -222,21 +198,11 @@ s32 McxWriteDev(s32 port, s32 device, const u8 *fixed, const u8 *data) {
     hm_unimplemented("McxWriteDev");
 }
 
-s32 MemCardAccept(s32 port) {
-    (void)port;
-    hm_unimplemented("MemCardAccept");
-}
-
 s32 MemCardCreateFile(s32 port, const char *name, s32 blocks) {
     (void)port;
     (void)name;
     (void)blocks;
     hm_unimplemented("MemCardCreateFile");
-}
-
-s32 MemCardExist(s32 port) {
-    (void)port;
-    hm_unimplemented("MemCardExist");
 }
 
 s32 MemCardFormat(s32 port) {
@@ -255,11 +221,6 @@ s32 MemCardGetDirentry(s32 port, const char *pattern, struct DIRENTRY *entries, 
     hm_unimplemented("MemCardGetDirentry");
 }
 
-void MemCardInit(s32 mode) {
-    (void)mode;
-    hm_unimplemented("MemCardInit");
-}
-
 s32 MemCardReadFile(s32 port, const char *name, void *buffer, s32 offset, s32 bytes) {
     (void)port;
     (void)name;
@@ -267,15 +228,6 @@ s32 MemCardReadFile(s32 port, const char *name, void *buffer, s32 offset, s32 by
     (void)offset;
     (void)bytes;
     hm_unimplemented("MemCardReadFile");
-}
-
-void MemCardStart(void) { hm_unimplemented("MemCardStart"); }
-
-s32 MemCardSync(s32 mode, s32 *command, s32 *result) {
-    (void)mode;
-    (void)command;
-    (void)result;
-    hm_unimplemented("MemCardSync");
 }
 
 s32 MemCardUnformat(s32 port) {
@@ -312,39 +264,6 @@ void OuterProduct0(VECTOR *first, VECTOR *second, VECTOR *result) {
     (void)result;
     hm_unimplemented("OuterProduct0");
 }
-
-s32 PadGetState(s32 port) {
-    (void)port;
-    hm_unimplemented("PadGetState");
-}
-
-s32 PadInfoMode(s32 port, s32 information, s32 index) {
-    (void)port;
-    (void)information;
-    (void)index;
-    hm_unimplemented("PadInfoMode");
-}
-
-void PadInitDirect(u8 *first, u8 *second) {
-    (void)first;
-    (void)second;
-    hm_unimplemented("PadInitDirect");
-}
-
-void PadSetAct(s32 port, u8 *actuators, s32 bytes) {
-    (void)port;
-    (void)actuators;
-    (void)bytes;
-    hm_unimplemented("PadSetAct");
-}
-
-s32 PadSetActAlign(s32 port, const u8 *alignment) {
-    (void)port;
-    (void)alignment;
-    hm_unimplemented("PadSetActAlign");
-}
-
-void PadStartCom(void) { hm_unimplemented("PadStartCom"); }
 
 MATRIX *RotMatrix(const SVECTOR *angle, MATRIX *matrix) {
     (void)angle;
@@ -449,29 +368,6 @@ void SsUtSetVVol(s32 voice, s32 left, s32 right) {
     hm_unimplemented("SsUtSetVVol");
 }
 
-void SsVabClose(s32 bank) {
-    (void)bank;
-    hm_unimplemented("SsVabClose");
-}
-
-s32 SsVabOpenHead(const void *header, s32 bank) {
-    (void)header;
-    (void)bank;
-    hm_unimplemented("SsVabOpenHead");
-}
-
-s32 SsVabTransBodyPartly(const void *data, s32 bytes, s32 bank) {
-    (void)data;
-    (void)bytes;
-    (void)bank;
-    hm_unimplemented("SsVabTransBodyPartly");
-}
-
-s32 SsVabTransCompleted(s32 mode) {
-    (void)mode;
-    hm_unimplemented("SsVabTransCompleted");
-}
-
 void VectorNormalS(const VECTOR *input, SVECTOR *output) {
     (void)input;
     (void)output;
@@ -482,16 +378,6 @@ void VectorNormalSS(const SVECTOR *input, SVECTOR *output) {
     (void)input;
     (void)output;
     hm_unimplemented("VectorNormalSS");
-}
-
-s32 hm_psx_ccos(s32 angle) {
-    (void)angle;
-    hm_unimplemented("hm_psx_ccos");
-}
-
-s32 hm_psx_csin(s32 angle) {
-    (void)angle;
-    hm_unimplemented("hm_psx_csin");
 }
 
 s32 hm_psx_csqrt(s32 value) {
