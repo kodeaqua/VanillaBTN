@@ -2,6 +2,6 @@
 #include <stddef.h>
 
 int main(void) {
-    SsSeqOpen(NULL, -1);
+    SsSeqPlay(-1, 1, 0);
     return 1;
 }

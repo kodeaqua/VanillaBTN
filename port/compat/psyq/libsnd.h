@@ -18,6 +18,8 @@ void SsSetRVol(s32 left, s32 right);
 void SsSetStereo(void);
 void SsSetMono(void);
 s32 SsSeqOpen(const u32 *data, s32 bank);
+/* Native asset bounds, supplied by the guarded original sound loader. */
+void hm_sound_sequence_register(const void *data, u32 bytes);
 void SsSeqClose(s32 sequence);
 void SsSeqPlay(s32 sequence, s32 mode, s32 repeats);
 void SsSeqStop(s32 sequence);

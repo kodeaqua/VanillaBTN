@@ -300,34 +300,11 @@ void SetDumpFnt(s32 stream) {
     hm_unimplemented("SetDumpFnt");
 }
 
-void SsSeqClose(s32 sequence) {
-    (void)sequence;
-    hm_unimplemented("SsSeqClose");
-}
-
-s32 SsSeqOpen(const u32 *data, s32 bank) {
-    (void)data;
-    (void)bank;
-    hm_unimplemented("SsSeqOpen");
-}
-
 void SsSeqPlay(s32 sequence, s32 mode, s32 repeats) {
     (void)sequence;
     (void)mode;
     (void)repeats;
     hm_unimplemented("SsSeqPlay");
-}
-
-void SsSeqSetVol(s32 sequence, s32 left, s32 right) {
-    (void)sequence;
-    (void)left;
-    (void)right;
-    hm_unimplemented("SsSeqSetVol");
-}
-
-void SsSeqStop(s32 sequence) {
-    (void)sequence;
-    hm_unimplemented("SsSeqStop");
 }
 
 s32 SsUtKeyOffV(s32 voice) {

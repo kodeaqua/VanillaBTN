@@ -61,7 +61,7 @@ set_source_files_properties(../src/main/main.c PROPERTIES COMPILE_DEFINITIONS ma
 
 add_library(hmbtn_psx_initial STATIC
     psx/unimplemented.c psx/gte_stubs.c psx/gte_runtime.c psx/trig.c psx/timing.c psx/sound_control.c psx/cd_position.c psx/cd_runtime.c
-    psx/gpu_links.c psx/gpu_ot.c psx/gpu_packets.c psx/gpu_environment.c psx/gpu_commands.c psx/vram.c psx/card.c psx/pad.c psx/sound_bank.c)
+    psx/gpu_links.c psx/gpu_ot.c psx/gpu_packets.c psx/gpu_environment.c psx/gpu_commands.c psx/vram.c psx/card.c psx/pad.c psx/sound_bank.c psx/sequence.c)
 target_link_libraries(hmbtn_psx_initial PUBLIC hmbtn_port_options)
 target_include_directories(hmbtn_psx_initial PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/compat/psyq")
 
@@ -104,6 +104,9 @@ add_executable(hmbtn_ot_bench EXCLUDE_FROM_ALL analysis/ot_bench.c)
 target_link_libraries(hmbtn_ot_bench PRIVATE hmbtn_psx_initial)
 
 if(BUILD_TESTING)
+    add_executable(hmbtn_sequence_test tests/sequence.c)
+    target_link_libraries(hmbtn_sequence_test PRIVATE hmbtn_psx_initial)
+    add_test(NAME spu.sequence_parser COMMAND hmbtn_sequence_test)
     add_executable(hmbtn_sound_bank_test tests/sound_bank.c)
     target_link_libraries(hmbtn_sound_bank_test PRIVATE hmbtn_psx_initial)
     add_test(NAME spu.bank COMMAND hmbtn_sound_bank_test)
@@ -149,8 +152,8 @@ if(BUILD_TESTING)
     endforeach()
     add_executable(hmbtn_pending_test tests/pending.c)
     target_link_libraries(hmbtn_pending_test PRIVATE hmbtn_psx_pending)
-    add_test(NAME psx.pending.SsSeqOpen
-        COMMAND "${CMAKE_COMMAND}" "-DPROGRAM=$<TARGET_FILE:hmbtn_pending_test>" "-DAPI=SsSeqOpen"
+    add_test(NAME psx.pending.SsSeqPlay
+        COMMAND "${CMAKE_COMMAND}" "-DPROGRAM=$<TARGET_FILE:hmbtn_pending_test>" "-DAPI=SsSeqPlay"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_unimplemented.cmake")
     add_executable(hmbtn_timing_test tests/timing.c)
     target_link_libraries(hmbtn_timing_test PRIVATE hmbtn_psx_initial)
