@@ -288,7 +288,7 @@ All 33 A_FILE offsets (32 member ranges) are monotonic and inside the
 No assets were extracted or added to git. The subsequent native boot probe
 runs the original afile_init against the validated disc.
 
-There are 59 CTests, all passing in Windows release and ASan/UBSan. New coverage
+There are 60 CTests, all passing in Windows release and ASan/UBSan. New coverage
 includes SHA-1 published vectors, malformed synthetic sectors/directories,
 cross-sector file reads, deterministic CD transfer/cancel/error behavior,
 VRAM transfers/masks/wrapping and the original texture-pack decoder. Tests need
@@ -374,8 +374,8 @@ and distinct-object C test check that capture semantics are retained.
 
 ## Port guards and validation
 
-Sixty `HMBTN_PORT` guard blocks have been introduced under ADR-008 through
-ADR-032 (workspace, GPU/GTE/CPU adapters, nested helpers, event/text pointers,
+Sixty-one `HMBTN_PORT` guard blocks have been introduced under ADR-008 through
+ADR-035 (workspace, GPU/GTE/CPU adapters, nested helpers, event/text pointers,
 overlays, title copies, SEQ spans, animation table tails, estate queues and
 initial area selection):
 
@@ -417,6 +417,7 @@ initial area selection):
 | src/overlay/11_GF_FARM/estate.c | Clear message queue fields instead of PS1 offsets (1 additional guard) |
 | src/overlay/11_GF_FARM/world/scene.c | Skip previous-mine overrides until an area is loaded (2 additional guards) |
 | src/overlay/11_GF_FARM/world/scene.c | Write visibility only for present spouse markers (1 additional guard) |
+| src/overlay/11_GF_FARM/people/player.c | Resolve cross-object probe step indices through named tables (1 additional guard) |
 
 For each of these twenty-six files, selecting every matching `#else` branch and
 removing the new guard directives reconstructs the previous source text exactly,

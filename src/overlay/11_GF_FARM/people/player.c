@@ -4592,7 +4592,13 @@ static s16 player_probe_target(FarmPlayer *player, VECTOR *pos, s32 kind_arg)
     found = 0;
     target = 0;
     probe.vy = pos->vy;
+#ifdef HMBTN_PORT
+    /* PORT: select the original adjacent table explicitly on native hosts -
+     * see docs/port/DECISIONS.md#adr-035. */
+    offset = hm_player_probe_step(kind, player->facing38, move_steps_small, move_steps_large, facing_reach);
+#else
     offset = &move_steps_small[kind + player->facing38 * 2];
+#endif
     probe.vx = pos->vx + offset[0];
     probe.vz = pos->vz + offset[1];
     player->stateFlags &= ~PLAYER_FLAG_BIT18;

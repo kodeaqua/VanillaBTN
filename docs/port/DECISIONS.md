@@ -773,3 +773,24 @@ parity remain open; no SDK implementation or table is copied.
 
 Reference: public Run-Time Library Reference 4.7, RotMatrix table 8-2,
 https://psx.arthus.net/sdk/Psy-Q/DOCS/LibRef47.pdf (page 8-116).
+
+<a id="adr-035"></a>
+
+## ADR-035: Resolve player probe steps across native table objects
+
+Date: 2026-10-26. Status: accepted for native bounds safety.
+
+The New Game replay reaches player_probe_target and indexes halfword 56 of
+move_steps_small[16]. Its callers use bases 0, 0x18 and 0x38 plus facing * 2.
+These cross object boundaries in the original overlay's adjacent data tables.
+A local read of the owner's validated farm overlay confirms the source order:
+small (16 halfwords), large (16), riding (8), hop (8), reach (16). No data is
+extracted into the repository.
+
+Native builds explicitly select small[facing * 2], large[8 + facing * 2], or
+reach[4 + facing], respectively. Do not assume native linker adjacency, clamp
+the index, expand the first array with copied game data, or disable bounds
+checks. Invalid facing/base values fail explicitly. Regression checks all
+three bases and four facings against the actual source arrays. The original
+matching expression remains unchanged. HOPS has a separate cross-table alias
+which remains tracked and has not yet been reached by this replay.
