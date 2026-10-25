@@ -11,6 +11,7 @@
 #include "compat/player_steps.h"
 #include "compat/types.h"
 #include "compat/work_memory.h"
+#include <libetc.h>
 
 typedef u8 hm_psx_u_char;
 typedef u16 hm_psx_u_short;

@@ -14,12 +14,28 @@
 extern int hm_game_main(void);
 
 #ifndef HMBTN_SDL_HOST
+#include "farm_state.h"
+#include "platform/frame_capture.h"
 static hm_input_replay hm_replay;
 static u64 hm_boot_tick_limit;
 static int hm_boot_replay;
+static int hm_boot_trace_state;
+static const char *hm_boot_capture;
 static void hm_boot_tick(void *context, u64 tick) {
     (void)context;
+    if (hm_boot_trace_state && tick % 600 == 0) {
+        const FarmPlayer *player = &game_state.player;
+        fprintf(stderr,
+                "Game tick %llu: area=%d place=%d,%d entry=%d player=%d,%d,%d mode=%u flags=%08x\n",
+                (unsigned long long)tick, farm_area.mode.area, farm_area.mode.place.value,
+                farm_area.mode.place.location, game_state.progress.entryStep, player->position.vx,
+                player->position.vy, player->position.vz, player->mode, player->stateFlags);
+    }
     if (hm_boot_tick_limit && tick > hm_boot_tick_limit) {
+        if (hm_boot_capture && !hm_frame_capture(hm_boot_capture)) {
+            fprintf(stderr, "Cannot capture native diagnostic scanout\n");
+            exit(1);
+        }
         printf("Native diagnostic completed %llu VBlanks\n",
                (unsigned long long)hm_boot_tick_limit);
         exit(0);
@@ -69,6 +85,8 @@ int main(int argc, char **argv) {
         return 1;
     }
     hm_boot_replay = replay != NULL;
+    hm_boot_trace_state = getenv("HMBTN_TRACE_GAME_STATE") != NULL;
+    hm_boot_capture = getenv("HMBTN_CAPTURE_FRAME");
     if (limit) {
         char *end;
         hm_boot_tick_limit = strtoull(limit, &end, 10);

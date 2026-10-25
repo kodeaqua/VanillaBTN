@@ -1,7 +1,8 @@
 # Platform status
 
-As of 2026-10-26, the native Windows title/menu and initial New Game dialogue
-render. A replay reaches farm initialization; farm gameplay is not validated.
+As of 2026-10-26, the native Windows title/menu, farm and opening grandparent
+dialogue render. The opening sequence and free player control are still under
+validation; this is not yet a fully playable port.
 
 | Target | Foundation preset | Validation |
 | --- | --- | --- |
@@ -21,9 +22,13 @@ silent audio setup, A_FILE initialization, draw/display setup and GTE/GS setup
 execute, followed by no-card initialization, title init and streamed VAB loading.
 Native sequencing/voices/reverb produce PCM, and an actual SDL audio callback
 consumes output. The Vulkan/ASan window test completed 1200 VBlanks and captures
-show the title/menu/dialogue. Replays enter farm startup after naming/birthday
-setup. Memory regressions found there are tracked in ADR-026/028/029. Farm
-rendering and player movement are not validated. Unfinished SDK calls fail by
+show the title/menu/dialogue. A later Vulkan/ASan window replay completed 6000
+VBlanks and its capture shows the farm terrain, player and HUD. The release
+probe reaches the opening grandparent dialogue after naming/birthday setup.
+The 12000-tick sanitizer idle test completed, but release/sanitizer opening
+script behavior differs and remains under investigation. Movement and later
+scene changes still need validation. Memory/scheduling regressions are tracked
+through ADR-038. Unfinished SDK calls fail by
 name, not fake
 success paths. Native overlay reentry also aborts until state reset is supported.
 The original
