@@ -374,8 +374,8 @@ and distinct-object C test check that capture semantics are retained.
 
 ## Port guards and validation
 
-Sixty-one `HMBTN_PORT` guard blocks have been introduced under ADR-008 through
-ADR-035 (workspace, GPU/GTE/CPU adapters, nested helpers, event/text pointers,
+Sixty-three `HMBTN_PORT` guard blocks have been introduced under ADR-008 through
+ADR-038 (workspace, GPU/GTE/CPU adapters, nested helpers, event/text pointers,
 overlays, title copies, SEQ spans, animation table tails, estate queues and
 initial area selection):
 
@@ -418,6 +418,8 @@ initial area selection):
 | src/overlay/11_GF_FARM/world/scene.c | Skip previous-mine overrides until an area is loaded (2 additional guards) |
 | src/overlay/11_GF_FARM/world/scene.c | Write visibility only for present spouse markers (1 additional guard) |
 | src/overlay/11_GF_FARM/people/player.c | Resolve cross-object probe step indices through named tables (1 additional guard) |
+| src/overlay/11_GF_FARM/people/player.c | Select the facing reach row without crossing row-zero bounds (1 additional guard) |
+| src/overlay/11_GF_FARM/event/event_script.c | Yield a native VBlank in the busy script-read loop (1 additional guard) |
 
 For each of these twenty-six files, selecting every matching `#else` branch and
 removing the new guard directives reconstructs the previous source text exactly,

@@ -795,6 +795,10 @@ three bases and four facings against the actual source arrays. The original
 matching expression remains unchanged. HOPS has a separate cross-table alias
 which remains tracked and has not yet been reached by this replay.
 
+The movement replay also reaches the original flattened facing_reach access
+through row zero. Native builds select facing_reach[facing] directly, keeping
+the same halfwords without pointer arithmetic beyond the first two-word row.
+
 <a id="adr-036"></a>
 
 ## ADR-036: Implement bounded nonoverlapping VRAM moves
@@ -834,3 +838,23 @@ that real implementations exist.
 
 Reference: public Run-Time Library Reference 4.7, RotMatrixX page 8-120,
 https://psx.arthus.net/sdk/Psy-Q/DOCS/LibRef47.pdf (axis matrix * m).
+
+<a id="adr-038"></a>
+
+## ADR-038: Yield at the event loader's busy CD poll
+
+Date: 2026-10-26. Status: accepted deterministic scheduling adaptation.
+
+The non-sanitized Windows release stalls during New Game after tick 4800.
+A native debugger backtrace identifies event_script_load_wait looping in
+afile_read_bytes/fade_is_settled. The original CD progresses asynchronously;
+the native runtime advances transfer credit only at deterministic VBlanks.
+This loop can poll forever without returning to a VSync call.
+
+Only in native builds, yield one VBlank when a script read is pending and the
+fade is not settled, immediately before repeating that busy loop. This services
+CD transfer credit, input, audio and original VBlank callbacks on the same game
+thread. Preserve nonblocking CdReadSync semantics and the original matching
+loop. Do not advance CD data on arbitrary status polls or a host background
+thread. A local release replay then enters the original grandparent scene
+and dialogue instead of hanging. Longer input/scene coverage remains pending.

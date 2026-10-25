@@ -1311,6 +1311,13 @@ static s32 event_script_load_wait(void)
             farm->requests.state = FARM_REQUEST_RUN;
             return 0;
         }
+#ifdef HMBTN_PORT
+        /* PORT: a busy CD poll must yield to deterministic hardware ticks -
+         * see docs/port/DECISIONS.md#adr-038. */
+        if (fade_is_settled() == 0)
+            VSync(0);
+#else
+#endif
     } while (fade_is_settled() == 0);
     return 0;
 }

@@ -734,7 +734,12 @@ static void player_build_result(FarmPlayer *player)
     index = player->facing38 << 2;
     values.vx = player->position.vx;
     values.vz = player->position.vz;
+#ifdef HMBTN_PORT
+    /* PORT: stay within the selected reach row - see ADR-035. */
+    table = facing_reach[player->facing38];
+#else
     table = facing_reach[0] + index / 2;
+#endif
     values.vx += table[0];
     values.vz += table[1];
     farm_settle_on_ground(&values, 0);
