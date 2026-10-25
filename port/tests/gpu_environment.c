@@ -1,5 +1,6 @@
 #include "psx/gpu_environment.h"
 #include "psx/vram.h"
+#include <inline_c.h>
 #include <libgs.h>
 #include <stdio.h>
 
@@ -32,6 +33,15 @@ int main(void) {
     CHECK(PutDispEnv(&display) == &display && state->display.disp.y == 240);
     CHECK(SetDispMask(1) == 0 && state->display_enabled);
     GsInitGraph(320, 240, 0, 0, 0);
+    GsSetProjection(160);
+    CHECK(hm_gte.distance == 160);
+    GsF_LIGHT light = {0, 0, 100, 208, 128, 64, 0};
+    GsSetFlatLight(0, &light);
+    CHECK(hm_gte.matrix[1][0][2] == -4096 && hm_gte.matrix[1][0][0] == 0);
+    CHECK(hm_gte.matrix[2][0][0] == 3328 && hm_gte.matrix[2][1][0] == 2048);
+    GsSetAmbient(2048, 2048, 2048);
+    CHECK(hm_gte.translation[1][0] == 2048 && hm_gte.translation[1][2] == 2048);
+    GsSetLightMode(0);
     GsDefDispBuff(0, 0, 0, 240);
     GsSetOffset(10, 20);
     GsSetDrawBuffOffset();

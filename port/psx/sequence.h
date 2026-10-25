@@ -15,4 +15,6 @@ typedef struct {
 int hm_seq_next(hm_seq_cursor *cursor, hm_seq_event *event);
 void hm_sound_sequence_register(const void *data, u32 bytes);
 void hm_sound_sequences_reset(void);
+void hm_sound_sequence_tick(void);
+void hm_sound_sequence_forget_voice(u32 voice);
 #endif

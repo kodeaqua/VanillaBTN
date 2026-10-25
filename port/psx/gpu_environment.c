@@ -147,6 +147,11 @@ void GsInit3D(void) {
     hm_gte.zsf[0] = 341;
     hm_gte.zsf[1] = 256;
 }
+void GsSetProjection(s32 distance) {
+    if (distance <= 0 || distance > 65535)
+        hm_runtime_error("GsSetProjection", "invalid projection distance");
+    SetGeomScreen(distance);
+}
 void GsSetWorkBase(void *base) {
     if (!base || ((uintptr_t)base & 3))
         hm_runtime_error("GsSetWorkBase", "null or unaligned work base");

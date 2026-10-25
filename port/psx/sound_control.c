@@ -1,12 +1,13 @@
 #include "psx/sound_control.h"
 #include "psx/error.h"
+#include "psx/reverb.h"
 #include "psx/sequence.h"
 #include "psx/sound_bank.h"
+#include "psx/sound_voice.h"
 #include <libsnd.h>
 #include <string.h>
 
 static hm_sound_control hm_sound;
-static u8 hm_voice_status[24];
 
 const hm_sound_control *hm_sound_configuration(void) { return &hm_sound; }
 
@@ -17,9 +18,10 @@ static void hm_sound_require(const char *api) {
 
 void SsInit(void) {
     hm_sound_sequences_reset();
+    hm_sound_voices_reset();
     hm_sound_banks_reset();
+    hm_reverb_reset();
     memset(&hm_sound, 0, sizeof(hm_sound));
-    memset(hm_voice_status, 0, sizeof(hm_voice_status));
     hm_sound.initialized = 1;
 }
 
@@ -82,6 +84,8 @@ void SsSetSerialVol(s32 channel, s32 left, s32 right) {
 
 void SsSetMVol(s32 left, s32 right) {
     hm_sound_require("SsSetMVol");
+    if (left < 0 || left > 127 || right < 0 || right > 127)
+        hm_runtime_error("SsSetMVol", "invalid master volume");
     hm_sound.master_left = left;
     hm_sound.master_right = right;
 }
@@ -98,6 +102,10 @@ void SsUtReverbOff(void) {
     hm_sound_require("SsUtReverbOff");
     hm_sound.reverb = 0;
 }
+void SsUtReverbOn(void) {
+    hm_sound_require("SsUtReverbOn");
+    hm_sound.reverb = 1;
+}
 void SsStart(void) {
     hm_sound_require("SsStart");
     if (!hm_sound.table || hm_sound.tick_mode != 1)
@@ -113,21 +121,17 @@ void SpuGetAllKeysStatus(u8 status[24]) {
     hm_sound_require("SpuGetAllKeysStatus");
     if (!status)
         hm_runtime_error("SpuGetAllKeysStatus", "null status output");
-    memcpy(status, hm_voice_status, sizeof(hm_voice_status));
+    for (u32 i = 0; i < 24; ++i)
+        status[i] = hm_sound_voice_status(i);
 }
 
 s32 SpuGetKeyStatus(u32 voices) {
     hm_sound_require("SpuGetKeyStatus");
     if (voices & 0xFF000000u)
         hm_runtime_error("SpuGetKeyStatus", "invalid voice mask");
-    /* No voice can be keyed on until the bank/playback APIs are implemented.
-     * Every status is genuinely off, not a fabricated playback completion. */
-    return 0;
-}
-
-void SsUtAllKeyOff(s32 mode) {
-    hm_sound_require("SsUtAllKeyOff");
-    if (mode != 0)
-        hm_runtime_error("SsUtAllKeyOff", "unsupported key-off mode");
-    memset(hm_voice_status, 0, sizeof(hm_voice_status));
+    s32 result = 0;
+    for (u32 i = 0; i < 24; ++i)
+        if (voices & (1u << i))
+            result |= hm_sound_voice_status(i);
+    return result;
 }

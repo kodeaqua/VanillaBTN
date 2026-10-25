@@ -1,6 +1,7 @@
 #include "psx/error.h"
 #include "psx/gpu_environment.h"
 #include "psx/gpu_links.h"
+#include "psx/gpu_raster.h"
 #include "psx/vram.h"
 #include <libgpu.h>
 #include <stdio.h>
@@ -12,7 +13,7 @@ static s32 hm_signed11(u32 value) {
 
 static s32 hm_limit(s32 value) { return value < 0 ? 0 : value > 31 ? 31 : value; }
 
-static void hm_gpu_pixel(s32 x, s32 y, u16 color, int blend) {
+void hm_gpu_pixel(s32 x, s32 y, u16 color, int blend) {
     const hm_gpu_environment *state = hm_gpu_environment_state();
     const RECT *clip = &state->draw.clip;
     if (x < 0 || x >= 1024 || y < 0 || y >= 512 || x < clip->x || y < clip->y ||
@@ -49,7 +50,7 @@ static void hm_gpu_pixel(s32 x, s32 y, u16 color, int blend) {
     hm_vram_draw_pixel((u32)x, (u32)y, color);
 }
 
-static u16 hm_gpu_texel(u32 u, u32 v, u16 clut) {
+u16 hm_gpu_texel(u32 u, u32 v, u16 clut) {
     const DRAWENV *draw = &hm_gpu_environment_state()->draw;
     u32 mask_x = (256u - (u32)draw->tw.w) & 248;
     u32 mask_y = (256u - (u32)draw->tw.h) & 248;
@@ -125,19 +126,10 @@ static u32 hm_gpu_command(const u32 *words, u32 available) {
         LoadImage(&area, words + 3);
         return length;
     }
-    if ((opcode & 0xFC) == 0x28) {
-        if (available < 5)
-            hm_runtime_error("DrawOTag", "truncated flat quad");
-        s32 x0 = hm_signed11(words[1]), x1 = hm_signed11(words[2]);
-        s32 y0 = hm_signed11(words[1] >> 16), y1 = hm_signed11(words[3] >> 16);
-        if (hm_signed11(words[3]) != x0 || hm_signed11(words[4]) != x1 ||
-            hm_signed11(words[2] >> 16) != y0 || hm_signed11(words[4] >> 16) != y1 || x1 < x0 ||
-            y1 < y0)
-            hm_runtime_error("DrawOTag", "non-rectangular quad rasterization is not implemented");
-        if (x1 - x0 <= 1023 && y1 - y0 <= 511)
-            hm_gpu_rectangle(words, opcode, (u32)(x1 - x0), (u32)(y1 - y0), 0);
-        return 5;
-    }
+    if ((opcode & 0xE0) == 0x20)
+        return hm_gpu_polygon(words, available);
+    if ((opcode & 0xE0) == 0x40)
+        return hm_gpu_line(words, available);
     if ((opcode & 0xE0) == 0x60) {
         int textured = (opcode & 4) != 0;
         u32 size = (opcode >> 3) & 3;

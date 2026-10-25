@@ -20,6 +20,8 @@ int main(void) {
     header[18] = 1;
     header[22] = 1;
     header[32 + 16 * 7] = 1; /* Sparse program seven, packed tone block zero. */
+    header[0xA22] = 4;       /* Sample one occupies 32 body bytes; sample zero is empty. */
+    header[0x820 + 22] = 1;  /* Program seven's first packed tone selects sample one. */
     SsInit();
     s32 bank = SsVabOpenHead(header, -1);
     CHECK(bank == 0 && hm_sound_bank_get(bank)->programs == 1);
@@ -34,6 +36,12 @@ int main(void) {
     const hm_sound_bank *loaded = hm_sound_bank_get(bank);
     CHECK(loaded->uploaded == 32 && loaded->body[23] == 0x12 && loaded->body[24] == 0x34);
     CHECK(loaded->body[31] == 0x34 && loaded->header[32 + 16 * 7] == 1);
+    const u8 *tone = hm_sound_bank_tone(bank, 7, 0);
+    CHECK(tone && tone[22] == 1 && !hm_sound_bank_tone(bank, 6, 0));
+    CHECK(!hm_sound_bank_tone(bank, 7, 1));
+    u32 sample_bytes;
+    CHECK(hm_sound_bank_sample(bank, 1, &sample_bytes) == loaded->body && sample_bytes == 32);
+    CHECK(!hm_sound_bank_sample(bank, 0, &sample_bytes));
     CHECK(SsVabOpenHead(header, bank) == -1);
     CHECK(SsVabOpenHead(header, -1) == 1);
     SsVabClose(bank);

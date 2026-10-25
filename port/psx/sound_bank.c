@@ -2,6 +2,7 @@
 #include "compat/asset.h"
 #include "psx/error.h"
 #include "psx/sound_control.h"
+#include "psx/sound_voice.h"
 #include <libsnd.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,17 +10,59 @@
 /* Native assets, not a mapped SPU RAM image. Offsets remain bank-relative. */
 static hm_sound_bank hm_banks[16];
 static s32 hm_transfer_bank = -1;
+struct hm_sound_samples {
+    u32 references;
+    u8 data[];
+};
 static u32 hm_u16le(const u8 *p) { return (u32)p[0] | ((u32)p[1] << 8); }
 
 const hm_sound_bank *hm_sound_bank_get(s32 bank) {
     return bank >= 0 && bank < 16 && hm_banks[bank].header ? hm_banks + bank : NULL;
+}
+hm_sound_samples *hm_sound_samples_retain(s32 bank) {
+    const hm_sound_bank *vab = hm_sound_bank_get(bank);
+    if (!vab)
+        hm_runtime_error("sound sample ownership", "invalid bank");
+    ++vab->storage->references;
+    return vab->storage;
+}
+void hm_sound_samples_release(hm_sound_samples *samples) {
+    if (samples && !--samples->references)
+        free(samples);
+}
+
+const u8 *hm_sound_bank_tone(s32 bank, u32 program, u32 tone) {
+    const hm_sound_bank *vab = hm_sound_bank_get(bank);
+    if (!vab || program >= 128)
+        return NULL;
+    const u8 *programs = vab->header + 32;
+    if (tone >= programs[program * 16])
+        return NULL;
+    u32 packed = 0;
+    for (u32 i = 0; i < program; ++i)
+        packed += programs[i * 16] != 0;
+    return vab->header + 0x820 + packed * 512 + tone * 32;
+}
+
+const u8 *hm_sound_bank_sample(s32 bank, u32 sample, u32 *bytes) {
+    const hm_sound_bank *vab = hm_sound_bank_get(bank);
+    if (!vab || !bytes || sample < 1 || sample > vab->samples || vab->uploaded != vab->body_bytes)
+        return NULL;
+    const u8 *sizes = vab->header + 0x820 + vab->programs * 512;
+    u32 offset = 0;
+    for (u32 i = 0; i < sample; ++i)
+        offset += hm_u16le(sizes + i * 2) * 8;
+    *bytes = hm_u16le(sizes + sample * 2) * 8;
+    if (offset > vab->body_bytes || *bytes > vab->body_bytes - offset)
+        return NULL;
+    return vab->body + offset;
 }
 
 void SsVabClose(s32 bank) {
     if (!hm_sound_bank_get(bank))
         hm_runtime_error("SsVabClose", "invalid bank");
     free(hm_banks[bank].header);
-    free(hm_banks[bank].body);
+    hm_sound_samples_release(hm_banks[bank].storage);
     memset(hm_banks + bank, 0, sizeof(hm_banks[bank]));
     if (hm_transfer_bank == bank)
         hm_transfer_bank = -1;
@@ -65,15 +108,16 @@ s32 SsVabOpenHead(const void *header, s32 bank) {
         return -1;
     u32 body_bytes = (u32)total - header_bytes;
     u8 *native_header = malloc(header_bytes);
-    u8 *body = calloc(body_bytes ? body_bytes : 1, 1);
-    if (!native_header || !body) {
+    hm_sound_samples *storage = calloc(sizeof(*storage) + (body_bytes ? body_bytes : 1), 1);
+    if (!native_header || !storage) {
         free(native_header);
-        free(body);
+        free(storage);
         return -1;
     }
     memcpy(native_header, header, header_bytes);
-    hm_banks[bank] = (hm_sound_bank){native_header, body,        header_bytes, body_bytes, 0,
-                                     (u16)programs, (u16)samples};
+    storage->references = 1;
+    hm_banks[bank] = (hm_sound_bank){native_header, storage->data, header_bytes, body_bytes, 0,
+                                     (u16)programs, (u16)samples,  storage};
     hm_transfer_bank = bank;
     return bank;
 }

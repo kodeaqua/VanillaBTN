@@ -1,13 +1,33 @@
 /* Diagnostic entry into compiled game C. This is not a packaged game launcher;
  * unsupported runtime calls must stop here with their named error. */
+#include "platform/input_replay.h"
 #include "psx/cd_runtime.h"
+#include "psx/pad.h"
+#include "psx/timing.h"
 #ifdef HMBTN_SDL_HOST
 #include "platform/game_host.h"
 #endif
 #include <limits.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 extern int hm_game_main(void);
+
+#ifndef HMBTN_SDL_HOST
+static hm_input_replay hm_replay;
+static u64 hm_boot_tick_limit;
+static int hm_boot_replay;
+static void hm_boot_tick(void *context, u64 tick) {
+    (void)context;
+    if (hm_boot_tick_limit && tick > hm_boot_tick_limit) {
+        printf("Native diagnostic completed %llu VBlanks\n",
+               (unsigned long long)hm_boot_tick_limit);
+        exit(0);
+    }
+    if (hm_boot_replay)
+        hm_pad_sample(0, 1, hm_input_replay_sample(&hm_replay, tick));
+}
+#endif
 
 static int hm_read_at(void *context, u64 offset, void *destination, size_t bytes) {
     FILE *file = context;
@@ -40,6 +60,26 @@ int main(int argc, char **argv) {
         return 1;
     }
     hm_cd_attach(&disc);
+#ifndef HMBTN_SDL_HOST
+    const char *replay = getenv("HMBTN_INPUT_REPLAY");
+    const char *limit = getenv("HMBTN_BOOT_TICKS");
+    if (replay && !hm_input_replay_load(&hm_replay, replay)) {
+        fprintf(stderr, "Cannot load input replay\n");
+        fclose(file);
+        return 1;
+    }
+    hm_boot_replay = replay != NULL;
+    if (limit) {
+        char *end;
+        hm_boot_tick_limit = strtoull(limit, &end, 10);
+        if (!*limit || *end || !hm_boot_tick_limit || hm_boot_tick_limit > 1000000) {
+            fprintf(stderr, "Invalid diagnostic tick limit\n");
+            fclose(file);
+            return 1;
+        }
+    }
+    hm_timing_reset((hm_timing_host){NULL, hm_boot_tick, NULL});
+#endif
     puts("Validated USA disc; entering compiled native game C");
     fflush(stdout);
 #ifdef HMBTN_SDL_HOST

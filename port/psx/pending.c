@@ -46,29 +46,6 @@ s32 FntPrint(const char *format, ...) {
     hm_unimplemented("FntPrint");
 }
 
-void GsSetAmbient(s32 red, s32 green, s32 blue) {
-    (void)red;
-    (void)green;
-    (void)blue;
-    hm_unimplemented("GsSetAmbient");
-}
-
-void GsSetFlatLight(s32 index, const GsF_LIGHT *light) {
-    (void)index;
-    (void)light;
-    hm_unimplemented("GsSetFlatLight");
-}
-
-void GsSetLightMode(s32 mode) {
-    (void)mode;
-    hm_unimplemented("GsSetLightMode");
-}
-
-void GsSetProjection(s32 distance) {
-    (void)distance;
-    hm_unimplemented("GsSetProjection");
-}
-
 void KanjiFntClose(void) { hm_unimplemented("KanjiFntClose"); }
 
 void KanjiFntFlush(s32 stream) {
@@ -298,51 +275,6 @@ MATRIX *RotMatrixZXY(const SVECTOR *angle, MATRIX *matrix) {
 void SetDumpFnt(s32 stream) {
     (void)stream;
     hm_unimplemented("SetDumpFnt");
-}
-
-void SsSeqPlay(s32 sequence, s32 mode, s32 repeats) {
-    (void)sequence;
-    (void)mode;
-    (void)repeats;
-    hm_unimplemented("SsSeqPlay");
-}
-
-s32 SsUtKeyOffV(s32 voice) {
-    (void)voice;
-    hm_unimplemented("SsUtKeyOffV");
-}
-
-s32 SsUtKeyOnV(s32 voice, s32 bank, s32 program, s32 tone, s32 note, s32 fine, s32 left,
-               s32 right) {
-    (void)voice;
-    (void)bank;
-    (void)program;
-    (void)tone;
-    (void)note;
-    (void)fine;
-    (void)left;
-    (void)right;
-    hm_unimplemented("SsUtKeyOnV");
-}
-
-void SsUtReverbOn(void) { hm_unimplemented("SsUtReverbOn"); }
-
-void SsUtSetReverbDepth(s32 left, s32 right) {
-    (void)left;
-    (void)right;
-    hm_unimplemented("SsUtSetReverbDepth");
-}
-
-s32 SsUtSetReverbType(s32 type) {
-    (void)type;
-    hm_unimplemented("SsUtSetReverbType");
-}
-
-void SsUtSetVVol(s32 voice, s32 left, s32 right) {
-    (void)voice;
-    (void)left;
-    (void)right;
-    hm_unimplemented("SsUtSetVVol");
 }
 
 void VectorNormalS(const VECTOR *input, SVECTOR *output) {

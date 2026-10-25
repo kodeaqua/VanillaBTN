@@ -1,4 +1,6 @@
 #include "platform/game_host.h"
+#include "platform/audio_output.h"
+#include "platform/input_replay.h"
 #include "psx/gpu_environment.h"
 #include "psx/pad.h"
 #include "psx/timing.h"
@@ -13,6 +15,9 @@ static SDL_GPUDevice *hm_device;
 static SDL_GPUTexture *hm_texture;
 static SDL_GPUTransferBuffer *hm_upload;
 static Uint64 hm_start;
+static hm_input_replay hm_replay;
+static int hm_replay_enabled;
+static u64 hm_host_tick_limit;
 enum { HM_SCAN_WIDTH = 1024, HM_SCAN_HEIGHT = 512, HM_SCAN_BYTES = 1024 * 512 * 4 };
 
 static void hm_host_fail(void) {
@@ -23,6 +28,11 @@ static void hm_host_fail(void) {
 
 static void hm_host_tick(void *context, u64 tick) {
     (void)context;
+    if (hm_host_tick_limit && tick > hm_host_tick_limit) {
+        printf("Native window completed %llu VBlanks\n", (unsigned long long)hm_host_tick_limit);
+        hm_game_host_stop();
+        exit(0);
+    }
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         if (event.type == SDL_EVENT_QUIT) {
@@ -40,6 +50,8 @@ static void hm_host_tick(void *context, u64 tick) {
     for (u32 i = 0; i < 16; ++i)
         if (mapping[i] != SDL_SCANCODE_UNKNOWN && keys[mapping[i]])
             held |= (u16)(1u << i);
+    if (hm_replay_enabled)
+        held = hm_input_replay_sample(&hm_replay, tick);
     hm_pad_sample(0, 1, held);
     Uint64 deadline = hm_start + tick * SDL_NS_PER_SECOND / 60;
     Uint64 now = SDL_GetTicksNS();
@@ -48,6 +60,11 @@ static void hm_host_tick(void *context, u64 tick) {
 
     const hm_gpu_environment *state = hm_gpu_environment_state();
     const RECT *area = &state->display.disp;
+    if (SDL_getenv("HMBTN_TRACE_SCANOUT") && tick % 60 == 0) {
+        fprintf(stderr, "Scanout tick %llu: enabled=%d area=%d,%d %dx%d\n",
+                (unsigned long long)tick, state->display_enabled, area->x, area->y, area->w,
+                area->h);
+    }
     if (!area->w || !area->h)
         return;
     if (area->w < 0 || area->w > HM_SCAN_WIDTH || area->h < 0 || area->h > HM_SCAN_HEIGHT) {
@@ -105,8 +122,25 @@ static void hm_host_tick(void *context, u64 tick) {
 }
 
 int hm_game_host_start(void) {
+    const char *limit = SDL_getenv("HMBTN_BOOT_TICKS");
+    if (limit) {
+        char *end;
+        hm_host_tick_limit = strtoull(limit, &end, 10);
+        if (!*limit || *end || !hm_host_tick_limit || hm_host_tick_limit > 1000000) {
+            fprintf(stderr, "Invalid diagnostic tick limit\n");
+            return 0;
+        }
+    }
+    const char *replay_path = SDL_getenv("HMBTN_INPUT_REPLAY");
+    if (replay_path) {
+        if (!hm_input_replay_load(&hm_replay, replay_path)) {
+            fprintf(stderr, "Cannot load input replay\n");
+            return 0;
+        }
+        hm_replay_enabled = 1;
+    }
     SDL_SetMainReady();
-    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD))
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD | SDL_INIT_AUDIO))
         return 0;
     hm_window = SDL_CreateWindow("Harvest Moon: Back to Nature - native bring-up", 640, 480, 0);
     hm_device = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL |
@@ -128,6 +162,10 @@ int hm_game_host_start(void) {
     hm_upload = SDL_CreateGPUTransferBuffer(hm_device, &transfer);
     if (!hm_texture || !hm_upload)
         return 0;
+    if (!hm_audio_output_start()) {
+        fprintf(stderr, "Native audio: %s\n", SDL_GetError());
+        return 0;
+    }
     hm_start = SDL_GetTicksNS();
     hm_timing_reset((hm_timing_host){NULL, hm_host_tick, NULL});
     printf("Native game window using SDL_GPU %s\n", SDL_GetGPUDeviceDriver(hm_device));
@@ -136,6 +174,7 @@ int hm_game_host_start(void) {
 }
 
 void hm_game_host_stop(void) {
+    hm_audio_output_stop();
     if (hm_device) {
         SDL_WaitForGPUIdle(hm_device);
         if (hm_upload)

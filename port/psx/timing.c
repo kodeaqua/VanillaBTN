@@ -1,6 +1,7 @@
 #include "psx/timing.h"
 #include "psx/cd_runtime.h"
 #include "psx/error.h"
+#include "psx/sound_voice.h"
 #include <libapi.h>
 #include <libetc.h>
 #include <stdio.h>
@@ -47,6 +48,7 @@ s32 VSync(s32 mode) {
         hm_cd_tick();
         if (hm_vblank)
             hm_vblank();
+        hm_sound_tick();
         hm_in_tick = 0;
     }
     return 0;
