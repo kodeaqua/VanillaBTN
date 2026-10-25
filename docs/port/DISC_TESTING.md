@@ -46,10 +46,22 @@ cmake --build build/port/windows-release --target hmbtn_boot_probe
 & ./build/port/windows-release/hmbtn_boot_probe.exe 'D:/my-disc/Harvest Moon - Back to Nature (USA).bin'
 ```
 
-Current observed stop: `Unimplemented PSX API: MemCardInit`, with a nonzero abort
+Current observed stop: `Unimplemented PSX API: SsSeqOpen`, with a nonzero abort
 exit. Before that point, the original code performs callback/VSync setup, real
-A_FILE reads, silent sound configuration, and GTE/GPU environment setup. This
+A_FILE reads, silent sound configuration, GTE/GPU setup, title initialization
+and streamed VAB sample-bank loading. Release and sanitizer boot reach this stop.
+The native title-picture copy is bounded after an ASan-reported overread. This
 is an expected bring-up failure, not a completed boot. Unsupported SDK calls
 must retain their named failures while implementations are added. The console
 probe uses virtual time and has no SDL window; hardware presentation is tested
 separately in GPU_TESTING.md. Native overlay reentry also remains unsupported.
+
+For the optional SDL game-window diagnostic, configure the existing GPU spike
+build with `-DHMBTN_BUILD_NATIVE_WINDOW=ON`, then build `hmbtn_native`. It accepts
+the same BIN argument. This is unfinished bring-up, not a playable release.
+The last observed scanout is black before the sequence-loading stop. Keyboard
+arrows map to the D-pad, X/Z to Cross/Square, W/D to Triangle/Circle, Return to
+Start and Backspace to Select. No interactive gameplay response is verified.
+The development-only HMBTN_CAPTURE_FRAME environment variable can name a local
+BMP output; it overwrites the last scanout each tick. Keep captures under the
+ignored build directory. It is unset by default and is not release telemetry.

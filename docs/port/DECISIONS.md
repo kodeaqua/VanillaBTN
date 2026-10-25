@@ -437,3 +437,56 @@ Native GPU environments now retain clip/offset/display state and GS work-buffer
 pointers; background clears update the actual VRAM model. ResetGraph preserves
 VRAM and OT handle identity. DrawOTag, MoveImage and unsupported scanout modes
 still abort. The window presentation spike is separate from the game probe.
+
+<a id="adr-020"></a>
+
+## ADR-020: Bound native title-picture copies to their source arrays
+
+Date: 2026-10-25. Status: accepted for native memory safety.
+
+Observed: ASan boot with the owner's verified disc reports a 6144-byte read
+from title_image_1, whose declared length is 4200 bytes. The original fixed-size
+TitleImage assignment crosses into neighboring matching globals. All three
+pictures are smaller than the destination. Native global placement and ASan
+redzones cannot reproduce that incidental adjacency.
+
+Decision: A narrow HMBTN_PORT branch selects the same random picture once and
+copies its declared complete bytes. Leave the destination tail untouched; it
+is outside that picture's compressed asset. The original assignment remains
+in the matching else branch. This avoids reading unrelated native globals
+without modifying the asset or suppressing ASan. No visual parity is claimed
+until the loading-picture decoder and screen are exercised. Matching check is
+unavailable on this Windows-only host; textual else reconstruction is separate
+evidence, not a matching build result.
+
+<a id="adr-021"></a>
+
+## ADR-021: Implement real device absence and incremental GPU/audio assets
+
+Date: 2026-10-25. Status: incremental bring-up; parity pending.
+
+Digital pad replies publish sampled buttons in original wire order, including
+after the game clears its reply buffer. The current memory-card controller has
+no mounted card and completes detection with a real no-card error. File writes
+remain unsupported; no persistence is advertised.
+
+Generate an original nearest-integer Q12 quarter-wave table from the analytic
+sine function, rather than importing SDK table data. rsin/rcos wrap at 4096
+units; exhaustive tests compare the analytic reference. Proprietary SDK table
+quantization parity is unverified and remains a fidelity gate.
+
+DrawOTag walks native handles and executes environment registers, inline VRAM
+uploads, fills, tiles, sprites and axis-aligned flat quads into reference VRAM.
+Texture depth, CLUT, texture-window, modulation, mask, clip and blending state
+are applied. Other polygons/opcodes still abort explicitly. This is an initial
+CPU correctness path, not a measured final renderer or a performance-budget
+claim. A separate optional SDL_GPU game-window target uploads current scanout;
+the standalone synthetic hardware spike remains available.
+
+VAB v7 headers and streamed sample bodies are owned native assets with bounded
+allocation, sparse program metadata and synchronous chunk copies. This is
+actual bank loading, not sample playback. Sequence/key-on/mixer/reverb work
+remains unfinished. The real-disc sanitizer probe now stops at SsSeqOpen.
+
+Reference: https://psx-spx.consoledev.net/cdromfileformats/#cdrom-file-audio-sample-sets-vab-and-vhvb-sony
+and https://psx-spx.consoledev.net/graphicsprocessingunitgpu/.

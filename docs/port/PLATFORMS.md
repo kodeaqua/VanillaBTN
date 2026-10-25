@@ -6,8 +6,8 @@ screen or gameplay has been validated.
 | Target | Foundation preset | Validation |
 | --- | --- | --- |
 | Linux x86-64 | linux-release, linux-asan-ubsan | Deferred; requires a separate Linux host, no WSL |
-| Windows x86-64 | windows-release | All 113 original source units compile; local tests passed (44/44) |
-| Windows x86-64 sanitizers | windows-asan-ubsan | All source units compile; Clang 20.1.8 ASan/UBSan tests passed (44/44); execution coverage remains limited |
+| Windows x86-64 | windows-release | All 113 original source units compile; local tests passed (47/47) |
+| Windows x86-64 sanitizers | windows-asan-ubsan | All source units compile; Clang 20.1.8 ASan/UBSan tests passed (47/47); execution coverage remains limited |
 | macOS universal | macos-universal-release | Pending; no macOS host tested |
 | Android arm64 | Pending NDK and minSdk selection | No device/build validation |
 
@@ -18,7 +18,11 @@ visible and do not establish runtime safety. Strong game definitions have no
 collisions, excluding compiler COFF reference entries. The console probe ran the
 original C entry point with the verified USA disc: callbacks, virtual VSync,
 silent audio setup, A_FILE initialization, draw/display setup and GTE/GS setup
-execute, then MemCardInit aborts by name. This is neither a displayed game frame
+execute, followed by no-card initialization, title init and streamed VAB loading.
+SsSeqOpen now aborts by name. A title-picture overread observed under ASan has
+a bounded native copy (ADR-020); the sanitizer probe reaches this same stop.
+The SDL_GPU game-window diagnostic ran using Vulkan; its last captured scanout
+is black. This is neither a verified visible title screen
 nor gameplay. Unfinished SDK calls are named failure implementations, not fake
 success paths. Native overlay reentry also aborts until state reset is supported.
 The original
@@ -29,7 +33,8 @@ The workspace test observes GPU/GS setup calls. A separate gpu.links test now
 uses actual reverse OT initialization and the guarded original insertion/builders
 to validate pointer handles, packet order/lengths, cursor movement and re-clearing.
 Malformed handles and registry exhaustion fail explicitly. No rasterization or
-DrawOTag execution is covered.
+general polygon rasterization is covered. A separate gpu.commands test exercises
+flat rectangles, blending and 4-bit textured sprites through real DrawOTag.
 CD position helpers are tested over all 450000 valid two-digit-minute BCD
 positions. Disc/parser and SDK-facing reads now pass synthetic tests, including
 deterministic tick progression and IO failures. No disc is needed by CTest.

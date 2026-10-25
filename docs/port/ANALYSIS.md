@@ -285,11 +285,13 @@ All 33 A_FILE offsets (32 member ranges) are monotonic and inside the
 133935104-byte archive. The probe is a diagnostic, not a game executable.
 No assets were extracted or added to git. The source's afile_init has not run.
 
-There are 44 CTests, all passing in Windows release and ASan/UBSan. New coverage
+There are 47 CTests, all passing in Windows release and ASan/UBSan. New coverage
 includes SHA-1 published vectors, malformed synthetic sectors/directories,
 cross-sector file reads, deterministic CD transfer/cancel/error behavior,
 VRAM transfers/masks/wrapping and the original texture-pack decoder. Tests need
 no disc. The separate local disc probe also passed under ASan/UBSan.
+Digital pad replies, disconnected-card completion, analytic fixed-point trig,
+OT command execution and streamed VAB ownership now have additional coverage.
 
 The scalar inline GTE core now implements RTPS/RTPT, SQR, OP, MVMVA (source-used
 matrix and translation selectors), NCLIP, AVSZ3 and AVSZ4 with explicit signed shifts,
@@ -335,12 +337,17 @@ playback, controller polling, rendered output or a complete overlay lifecycle. S
 is native configuration metadata with only source-used fields, not a proprietary
 SDK or asset ABI. SPU voice constants are the 24 bits consumed by key-status queries.
 Callback/VSync dispatch, sound initialization/configuration and GPU environments
-now have native state implementations. No VAB/SEQ/XA audio playback or primitive
-rasterization is claimed. The separately linked pending SDK layer contains named
+now have native state implementations. VAB banks load into owned native buffers;
+SEQ/XA audio playback remains unfinished. DrawOTag supports sprites, tiles and
+axis-aligned flat quads, not general polygons. The pending SDK layer contains named
 abort paths for remaining calls, preventing unsupported work from returning
-fabricated success. A console boot probe reaches MemCardInit after real A_FILE
-startup reads; no title or gameplay frame has run. The SDL_GPU hardware blit
-spike passed separately through Vulkan, not through the game loop.
+fabricated success. The real-disc console and SDL_GPU window probes reach
+SsSeqOpen after real A_FILE reads and streamed VAB loading. ASan boot found a
+title-picture overread; ADR-020 bounds the copy to its source array. After that
+fix the sanitizer probe reaches the same named stop without a prior finding.
+The SDL window ran through Vulkan; its last captured frame is black, so no
+visible title screen or gameplay is validated. Keyboard samples are connected
+but an interactive game response is unverified. File-backed cards are unfinished.
 
 Eleven capture-free GCC nested helpers now have file-scoped native adapters under
 ADR-013. Eight Python audit/regression tests pass, including token equality of
@@ -355,9 +362,9 @@ and distinct-object C test check that capture semantics are retained.
 
 ## Port guards and validation
 
-Forty-nine `HMBTN_PORT` guard blocks have been introduced under ADR-008 through
-ADR-017 (workspace, GPU links, CPU/GTE adapters, nested helpers, event pointers,
-private text declarations and static overlay dispatch):
+Fifty `HMBTN_PORT` guard blocks have been introduced under ADR-008 through
+ADR-020 (workspace, GPU links, CPU/GTE adapters, nested helpers, event pointers,
+private text declarations, static overlay dispatch and bounded title copies):
 
 | File | Guarded change |
 | --- | --- |
@@ -389,8 +396,9 @@ private text declarations and static overlay dispatch):
 | src/overlay/11_GF_FARM/people/harvest_sprites.c | Explicit captured-object helper, nested-body exclusion and macro cleanup (3 guards) |
 | src/main/overlay_regions.c | Bind asset regions to native workspace (1 guard) |
 | src/main/main.c | Select statically linked overlays without loading PS1 code (1 additional guard) |
+| src/overlay/27_GF_TITLE/title.c | Bound title-picture copy to the selected source array (1 guard) |
 
-For each of these twenty-one files, selecting every matching `#else` branch and
+For each of these twenty-two files, selecting every matching `#else` branch and
 removing the new guard directives reconstructs the previous source text exactly,
 including its whitespace (line endings normalized for comparison). This check
 passed against baseline revision 9ace470. It does not establish byte-matching
