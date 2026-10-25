@@ -93,6 +93,12 @@ typedef struct FarmEventBlock
     s16 slotFlags[24];
     s32 entryOffsets[24];
 } FarmEventBlock;
+#ifdef HMBTN_PORT
+/* PORT: retain the disc layout while staging addresses grow -- see docs/port/DECISIONS.md#adr-016 */
+_Static_assert(sizeof(FarmEventBlock) == 148, "Event block fixed header prefix");
+_Static_assert(__builtin_offsetof(FarmEventBlock, entryOffsets) == 52, "Event entry offsets");
+#else
+#endif
 
 static s32 event_chunk_checksum(u32 *src, u32 size);
 static s32 event_script_start(void);
@@ -125,7 +131,12 @@ static s32 vram_stash_block(u8 *data, s16 x, s16 y)
     u8 *p;
     s32 i;
     s32 size;
+#ifdef HMBTN_PORT
+    /* PORT: native staging address -- see docs/port/DECISIONS.md#adr-016 */
+    uintptr_t dest;
+#else
     u32 dest;
+#endif
 
     p = data;
     for (i = 0; i < EVENT_CHUNK_COUNT; i++)
@@ -145,7 +156,12 @@ static s32 vram_stash_block(u8 *data, s16 x, s16 y)
         size = (data + vram_chunk_offsets[EVENT_CHUNK_COUNT] - vram_chunk_offsets[0]) - p;
         if (main_region_free_bytes() >= size)
         {
+#ifdef HMBTN_PORT
+            /* PORT: preserve the complete address -- see docs/port/DECISIONS.md#adr-016 */
+            vram_stash_tail = (uintptr_t)main_get_region_base() - size;
+#else
             vram_stash_tail = main_get_region_base() - size;
+#endif
             dest = vram_stash_tail;
             if (dest & 3)
             {
@@ -166,7 +182,12 @@ static s32 vram_stash_block(u8 *data, s16 x, s16 y)
  * script starts. */
 static u8 *event_script_base;
 static u8 *event_script_cursor;
+#ifdef HMBTN_PORT
+/* PORT: runtime address, not an asset word -- see docs/port/DECISIONS.md#adr-016 */
+uintptr_t event_block_base;
+#else
 u32 event_block_base;
+#endif
 s32 event_block_offsets[25];
 u32 event_step_index;
 u32 event_script_unused_80129228[2];
@@ -178,7 +199,12 @@ s16 event_sprite_offset_y;
 u32 event_block_size;
 s16 event_request_status[4];
 s32 chunk_checksums[EVENT_CHUNK_COUNT];
+#ifdef HMBTN_PORT
+/* PORT: runtime address, not an asset word -- see docs/port/DECISIONS.md#adr-016 */
+uintptr_t vram_stash_tail;
+#else
 u32 vram_stash_tail;
+#endif
 
 /* Read chunk `chunk` of the block that vram_stash_block uploaded back into `buffer`.
  * The part of the chunk that is still in VRAM comes back with StoreImage; the
@@ -778,7 +804,12 @@ static s32 event_chunk_checksum(u32 *src, u32 size)
 {
     u32 i;
     s32 sum;
+#ifdef HMBTN_PORT
+    /* PORT: alignment of the complete address -- see docs/port/DECISIONS.md#adr-016 */
+    if ((uintptr_t)src & 3)
+#else
     if ((u32)src & 3)
+#endif
     {
         SystemError(0x43, 0x190);
     }
@@ -1460,7 +1491,12 @@ static void event_object_draw(FarmPositionObject *object, AnimState *item)
 static void event_block_unpack(u16 *buffer)
 {
     u32 size;
+#ifdef HMBTN_PORT
+    /* PORT: native workspace address -- see docs/port/DECISIONS.md#adr-016 */
+    uintptr_t top;
+#else
     s32 top;
+#endif
     u32 length;
     s32 entry;
     u8 *results;
@@ -1476,7 +1512,12 @@ static void event_block_unpack(u16 *buffer)
     }
     block = (FarmEventBlock *)buffer;
     size = event_block_first_size(block);
+#ifdef HMBTN_PORT
+    /* PORT: preserve the complete address -- see docs/port/DECISIONS.md#adr-016 */
+    top = (uintptr_t)main_get_region_base();
+#else
     top = main_get_region_base();
+#endif
     event_block_size = size;
     top -= size;
     villager_sprites_copy();
@@ -1535,7 +1576,12 @@ static s32 event_block_first_size(FarmEventBlock *block)
 /* Offset of entry index in the block. */
 static s32 event_block_entry(FarmEventBlock *block, s32 index)
 {
+#ifdef HMBTN_PORT
+    /* PORT: index fixed-width offsets through a native pointer -- see docs/port/DECISIONS.md#adr-016 */
+    return hm_asset_s32le((u8 *)block + __builtin_offsetof(FarmEventBlock, entryOffsets) + (ptrdiff_t)index * 4);
+#else
     return *(s32 *)((index << 2) + (s32)block->entryOffsets);
+#endif
 }
 
 /* Data of entry index in the block. */

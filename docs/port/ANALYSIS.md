@@ -1,7 +1,8 @@
 # Native port reconnaissance
 
-Status: Phase 0 in progress, 2026-10-25. This is a source inspection, not a
-successful native boot or a verified matching baseline.
+Status: native Windows bring-up in progress, 2026-10-25. All 113 original C
+units compile. A native console probe executes the original boot prefix, but
+title rendering/gameplay and the matching baseline remain unverified.
 
 ## Source and overlays
 
@@ -36,18 +37,13 @@ the destination table. `main.c`'s overlay read macro delegates to
 only the disc read is insufficient: dispatch, copied tables, and address
 arithmetic must also be audited before static host linking.
 
-Global symbol collisions have not yet been established using compiled overlay
-objects. The repeatable lexical audit below found no duplicate ordinary external
-function definitions, but excludes macro-generated functions and global data.
-Do not prefix every symbol blindly: resident imports must remain shared.
-
-A local Clang 20.1.8 object-generation probe now succeeds for the 87 units that
-pass syntax checking. Its LLVM nm inventory finds no duplicate external source
-definitions in that subset; the 19 repeated .refptr names are compiler-generated
-COFF references, not game definitions. There remain 289 undefined names outside
-the subset, including missing game units, SDK APIs and host C runtime imports.
-The remaining 26 units and an actual whole-program link must still be checked
-before deciding the final overlay namespacing map.
+All 113 native objects now build with Clang 20.1.8. An LLVM nm inventory finds
+no duplicate strong external source definitions, excluding compiler-generated
+COFF .refptr entries. The reachable resident/overlay graph links into the native
+boot diagnostic. Existing source namespaces retain resident imports; no blanket
+symbol prefixing is applied. Native LOAD_OVERLAY selects a member/region registry
+instead of reading executable PS1 bytes. First activation uses C initializers;
+reentry fails explicitly until native global/BSS restoration is implemented.
 
 ## SDK surface
 
@@ -140,7 +136,7 @@ preprocessing; it is not an actual linked collision.
 ## Initial native source compilation
 
 `hmbtn_game_initial` initially compiled these eleven original units, and now
-compiles 29 units after the additions documented below:
+compiles all 113 units after the additions documented below:
 `main/geometry/math_util.c`, `main/game/farm_data_size.c`,
 `main/game/horse_names.c`, `main/game/picture_codes.c`,
 `main/game/event_flags.c`, `main/game/farm_tables.c`, `main/game/farm_state.c`,
@@ -289,19 +285,22 @@ All 33 A_FILE offsets (32 member ranges) are monotonic and inside the
 133935104-byte archive. The probe is a diagnostic, not a game executable.
 No assets were extracted or added to git. The source's afile_init has not run.
 
-There are 33 CTests, all passing in Windows release and ASan/UBSan. New coverage
+There are 44 CTests, all passing in Windows release and ASan/UBSan. New coverage
 includes SHA-1 published vectors, malformed synthetic sectors/directories,
 cross-sector file reads, deterministic CD transfer/cancel/error behavior,
 VRAM transfers/masks/wrapping and the original texture-pack decoder. Tests need
 no disc. The separate local disc probe also passed under ASan/UBSan.
 
-The scalar inline GTE core now implements SQR, OP, MVMVA (source-used matrix and
-translation selectors), NCLIP, AVSZ3 and AVSZ4 with explicit signed shifts,
+The scalar inline GTE core now implements RTPS/RTPT, SQR, OP, MVMVA (source-used
+matrix and translation selectors), NCLIP, AVSZ3 and AVSZ4 with explicit signed shifts,
 44-bit accumulator wrapping, MAC0 overflow, IR/OTZ saturation and flag summary.
 Literal formula vectors cover signs, limits and summary-bit exclusions. This
-core is not yet connected to inline_c.h or the SDK entry points. Perspective
-projection and the unused MVMVA hardware-bug selectors fail explicitly; no
-hardware capture or full-game GTE parity is claimed.
+core is connected to clean-room inline_c/gtemac helpers and the native source
+command macros. UNR division, FIFO/packet placement, clipping, matrix snapshots
+and the original gte_project_vertex XY/depth/rejection path are exercised.
+Unused MVMVA hardware-bug selectors and unfinished high-level math still fail
+explicitly. Complete SDK init defaults and hardware/full-game parity remain
+unverified; this is not a full GTE instruction-set implementation.
 
 CdlFILE is host-side result metadata with only the fields used by the source,
 pos and size. It is never read from disc bytes and does not claim the proprietary
@@ -312,8 +311,9 @@ SDK's binary layout. CD command constants cover only commands observed in source
 `port/analysis/compile_probe.py` invokes Clang on all original C files with the
 port force-include and the basename include directories. It writes per-file
 diagnostics to ignored `build/port/compile-probe.json`. No file is changed and no
-game code is linked or run. The result with Clang 20.1.8 is 104 syntax passes and
-9 failures out of 113 files, with 2083 warnings emitted before the error cap.
+game code is linked or run by this analysis command. All 113 files now pass
+syntax checking. The separate CMake native build compiles all of them and links
+the boot probe. Warnings remain visible and inventoried in the local report.
 
 Common blockers include missing pad/card headers and SDK declarations,
 inline GTE commands, GCC nested functions, pointer-width assignments and
@@ -326,29 +326,38 @@ missing initializers, incompatible callback types, and a transposed memset
 argument warning. They remain visible; broad warning suppression or automatic
 source cleanup would hide real fidelity and 64-bit hazards.
 
-The routine native archive now compiles 29 original units, including the sound
+The routine native archive now compiles all 113 original units, including the sound
 loader/request/XA-control code, farm event commands, player/scene-view code,
 debug overlay and minigames 3/5. Clean-room source-facing declarations for
 libsnd/libspu and matrix/font/lighting calls supply native call contracts only;
 their missing implementations still produce linker errors. This is not audio
-playback, controller polling, rendered output or a full overlay link. SpuCommonAttr
+playback, controller polling, rendered output or a complete overlay lifecycle. SpuCommonAttr
 is native configuration metadata with only source-used fields, not a proprietary
 SDK or asset ABI. SPU voice constants are the 24 bits consumed by key-status queries.
+Callback/VSync dispatch, sound initialization/configuration and GPU environments
+now have native state implementations. No VAB/SEQ/XA audio playback or primitive
+rasterization is claimed. The separately linked pending SDK layer contains named
+abort paths for remaining calls, preventing unsupported work from returning
+fabricated success. A console boot probe reaches MemCardInit after real A_FILE
+startup reads; no title or gameplay frame has run. The SDL_GPU hardware blit
+spike passed separately through Vulkan, not through the game loop.
 
 Eleven capture-free GCC nested helpers now have file-scoped native adapters under
-ADR-013. Seven Python audit/regression tests pass, including token equality of
+ADR-013. Eight Python audit/regression tests pass, including token equality of
 all eleven adapter bodies against matching definitions. The C helper test covers
 triangle winding, boundary/height rejection, quad fallback, coordinate extrema,
 estate flag priority, the ten visible medal-price rows and scene visibility
 handoff at its counter threshold. The source compares
 the ACTOR_FLAG_DIED_OF_AGE mask (1 << 19) with 1; that unusual comparison is
-preserved and covered rather than corrected. Captured-local helpers in other
-units remain pending.
+preserved and covered rather than corrected. The remaining captured-local
+harvest helper receives its captured object explicitly; a body-token comparison
+and distinct-object C test check that capture semantics are retained.
 
 ## Port guards and validation
 
-Thirty-two `HMBTN_PORT` guard blocks have been introduced under ADR-008 (workspace),
-ADR-009 (GPU links), ADR-010 (native CPU adapters) and ADR-013 (nested helpers):
+Forty-nine `HMBTN_PORT` guard blocks have been introduced under ADR-008 through
+ADR-017 (workspace, GPU links, CPU/GTE adapters, nested helpers, event pointers,
+private text declarations and static overlay dispatch):
 
 | File | Guarded change |
 | --- | --- |
@@ -373,14 +382,21 @@ ADR-009 (GPU links), ADR-010 (native CPU adapters) and ADR-013 (nested helpers):
 | src/overlay/11_GF_FARM/world/scene.c | Include the static visibility handoff helper and exclude its nested copy (2 guards) |
 | src/overlay/19_GF_MG2/mg2.c | Include the static board-marker helper and exclude its nested copy (2 guards) |
 | src/overlay/30_GF_swind/swind.c | Include the static screen-area helper and exclude its nested copy (2 guards) |
+| src/include/gte.h | Dispatch command words into native GTE state (1 guard) |
+| src/main/text/text.h | Exclude conflicting externs for private format strings (1 guard) |
+| src/overlay/11_GF_FARM/event/event_script.c | Native addresses, full-pointer alignment, byte-read offsets and fixed-prefix assertions (9 guards) |
+| src/overlay/11_GF_FARM/event/event_script.h | Match native staging address declaration (1 guard) |
+| src/overlay/11_GF_FARM/people/harvest_sprites.c | Explicit captured-object helper, nested-body exclusion and macro cleanup (3 guards) |
+| src/main/overlay_regions.c | Bind asset regions to native workspace (1 guard) |
+| src/main/main.c | Select statically linked overlays without loading PS1 code (1 additional guard) |
 
-For each of these fifteen files, selecting every matching `#else` branch and
+For each of these twenty-one files, selecting every matching `#else` branch and
 removing the new guard directives reconstructs the previous source text exactly,
 including its whitespace (line endings normalized for comparison). This check
 passed against baseline revision 9ace470. It does not establish byte-matching
-compiler output. Overlay callers of main_get_region_base that still store its
-result in s32/u32 now require explicit port fixes before those paths can compile.
-The port now builds 29 game units, not a game executable.
+compiler output. Event staging callers preserve complete native addresses;
+additional pointer/layout hazards remain before full gameplay is safe.
+The port now builds all 113 units and links a boot diagnostic, not a playable game.
 Matching `check` is unverified: its Linux toolchain is unavailable on the
 Windows-only host, and the owner excludes WSL. Project-local Windows tools were
 provisioned: CMake 3.31.6 and Ninja 1.12.1. LLVM-mingw was upgraded from

@@ -298,3 +298,142 @@ parity. The native helper copies must remain synchronized with matching source.
 The matching compiler check remains unavailable on the Windows-only host;
 reconstructing exact matching text provides additional evidence, not a binary
 matching result. No compiler switch or new runtime dependency is introduced.
+
+The harvest carry helper captures its enclosing object. Its native adapter
+receives that object explicitly; a call macro passes the current object and is
+undefined at the end of the enclosing function. The function body is unchanged.
+A token test checks its body, and a C test passes different captured/argument
+objects to verify the distinction is preserved.
+
+<a id="adr-014"></a>
+
+## ADR-014: Dispatch source GTE commands into native scalar state
+
+Date: 2026-10-25. Status: accepted, following the clean-room GTE default.
+
+Decision: Replace the two raw MIPS command macros only in the native branch.
+The source-used inline load/store helpers operate on native C GTE state, with
+fixed-width packet stores. RTPS/RTPT use the public UNR reciprocal calculation,
+44-bit wrapping, signed shifts, FIFO movement and documented saturation/flags.
+Use integer arithmetic throughout, including exceptional quotient saturation
+without divide-overflow. Matrix stack snapshots preserve rotation/translation;
+source-used projection setters update the same state.
+
+Consequences: The original gte_project_vertex is exercised by a fixture with
+traps for unrelated camera/draw dependencies. Normal XY/depth and behind-camera
+rejection pass. GTE vectors also cover triple FIFOs, packet field placement,
+clipping, flags and in-place matrix multiplication. Color commands, uncommon
+MVMVA selectors, high-level trigonometry/normalization and complete SDK init
+defaults are not parity validated. Unsupported calls still fail explicitly.
+InitGeom supplies the source's OT scaling; full hardware captures and replay
+comparisons remain required. No CPU interpreter or SDK implementation is copied.
+
+Reference: https://psx-spx.consoledev.net/geometrytransformationenginegte/.
+
+<a id="adr-015"></a>
+
+## ADR-015: Separate native SDK metadata from asset ABIs
+
+Date: 2026-10-25. Status: accepted, following source-facing compatibility defaults.
+
+Decision: Declare only pad/card/PocketStation APIs observed in the source.
+DIRENTRY is native result metadata with a terminated filename and fixed-width
+size, not an SDK/on-card struct. McxFuncExecFlag is an opaque native completion
+identifier (0x100), not a guessed SDK opcode or a PocketStation wire command.
+The native backend must translate its own identifiers; unsupported PocketStation
+commands currently abort. No protocol implementation is claimed by declarations.
+
+The three text_fmt_* strings are defined static and used only inside text.c.
+Suppress conflicting extern declarations in the native header branch while
+retaining the original declarations in the exact matching else branch.
+
+Consequences: All source units can be diagnosed with typed native declarations.
+Windows long-pointer type warnings remain visible; LP64 ports require further
+fixes before runtime validation. Card persistence and host pad polling are
+unfinished. No proprietary header layout or code is imported.
+
+<a id="adr-016"></a>
+
+## ADR-016: Keep event staging addresses native and asset offsets fixed
+
+Date: 2026-10-25. Status: accepted, following native pointer/asset-offset defaults.
+
+Decision: Use uintptr_t for the event block base, VRAM-tail staging address and
+their address temporaries. Preserve alignment checks on the full host address.
+Read signed 32-bit entry offsets through a little-endian byte helper, without
+casting a host pointer to s32 or restricting a terminal offset to the declared
+array prefix. Asset bounds remain the caller's responsibility. Assert the
+FarmEventBlock fixed prefix is 148 bytes, with entry offsets at byte 52.
+
+Consequences: Runtime addresses grow without changing disc offsets or packed
+data. Source changes remain narrow guarded declarations/expressions. Asset-word
+tests include unaligned signed reads under sanitizers. Real event playback,
+all remaining pointer/layout hazards and save ABI parity are not validated.
+
+<a id="adr-017"></a>
+
+## ADR-017: Link native overlays and reject unsupported reentry
+
+Date: 2026-10-25. Status: accepted for initial bring-up; reset lifecycle pending.
+
+Decision: Compile all 113 original C units, including all thirteen overlays,
+into the native archive. Their existing source names have no duplicate strong
+external definitions; preserve resident imports without blindly prefixing them.
+The native LOAD_OVERLAY path selects a validated member/region registry entry
+instead of copying PS1 executable bytes. Existing asset-region references bind
+to the native data workspace. Compiled C initializers supply first-use state.
+
+Consequences: The full graph links into the boot diagnostic. A second activation
+of the same overlay aborts explicitly until native data/BSS restoration is
+implemented; silently retaining mutated globals would change vanilla behavior.
+Registry reset resets metadata only. No reentry, save/load lifecycle or full
+playthrough parity is claimed. No BIOS, dynamic module or executable disc data
+is loaded. The user's image remains required for original non-code assets.
+
+<a id="adr-018"></a>
+
+## ADR-018: Validate SDL_GPU presentation on Windows Vulkan
+
+Date: 2026-10-25. Status: provisional for Windows; other devices pending.
+
+Decision: Pin SDL3 3.2.28 with the publisher's GitHub asset SHA-256 digest and
+retain its zlib license. Build an optional standalone presentation spike behind
+HMBTN_BUILD_GPU_SPIKE=ON, leaving data-free unit builds offline by default.
+Keep all SDL headers in port/platform. Upload a synthetic 320x240 RGBA texture,
+blit it to an offscreen target, verify byte-exact GPU readback and present eight
+frames, with at most two frames in flight. No custom shader dependency is needed
+for this blit test.
+
+Result: Passed using SDL_GPU Vulkan on the owner's Radeon RX Vega / Windows
+driver 31.0.21925.1001. The GPU shader blit and swapchain were exercised. This
+does not demonstrate PS1 primitive rasterization, a rendered game frame, D3D12,
+Metal, Android or performance budgets. SDL_GPU remains the first backend route;
+cross-platform suitability still needs validation. No fallback is selected here.
+
+References: https://github.com/libsdl-org/SDL/releases/tag/release-3.2.28,
+https://wiki.libsdl.org/SDL3/SDL_BlitGPUTexture.
+
+<a id="adr-019"></a>
+
+## ADR-019: Advance callbacks and silent sound state on the game thread
+
+Date: 2026-10-25. Status: accepted for bring-up, following deterministic execution.
+
+Decision: VSync waits advance explicit 60 Hz ticks; query modes do not advance
+time. Advance CD transfers and VBlank callbacks at these points. A platform
+wait/scanline hook supplies host pacing/profiling; the console probe uses virtual
+time. Preserve callbacks across repeated ResetCallback calls from archive reads.
+SetMem(2) validates the original BIOS hint without allocating an emulated RAM
+image. SystemError reports the original error words and aborts.
+
+Implement real silent sound initialization/configuration: sequence table limits,
+reserved voices, common volume masks, stereo/CD routing and start/stop state.
+Key statuses are genuinely off because bank loading and key-on still abort;
+no playback is falsely marked complete. Configuration-only acknowledgements
+must not be mistaken for an implemented mixer. VAB/SEQ decoding, live voice
+mixing, ADSR, reverb, XA and audio output remain pending.
+
+Native GPU environments now retain clip/offset/display state and GS work-buffer
+pointers; background clears update the actual VRAM model. ResetGraph preserves
+VRAM and OT handle identity. DrawOTag, MoveImage and unsupported scanout modes
+still abort. The window presentation spike is separate from the game probe.

@@ -114,8 +114,12 @@ s32 text_bank_ready(s32 code);
 void text_draw_face_by_code(u_long *ot, s32 code, s16 x, s16 y);
 void text_clear_bank(void);
 
+#ifdef HMBTN_PORT
+/* PORT: these format strings are private to text.c -- see docs/port/DECISIONS.md#adr-015 */
+#else
 extern char text_fmt_dec[];
 extern char text_fmt_hex[];
 extern char text_fmt_int[];
+#endif
 
 #endif /* TEXT_H */

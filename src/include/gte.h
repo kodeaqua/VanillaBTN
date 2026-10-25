@@ -5,9 +5,15 @@
 
 #include <inline_c.h>
 
+#ifdef HMBTN_PORT
+/* PORT: native fixed-point commands -- see docs/port/DECISIONS.md#adr-014 */
+#define SDK_GTE_COMMAND(word) hm_gte_command(&hm_gte, (word))
+#define SDK_GTE_COMMAND_B(word) hm_gte_command(&hm_gte, (word))
+#else
 #define SDK_GTE_COMMAND(word) __asm__ volatile("nop;" "nop;" ".word " #word)
 /* The `_b` forms: the same command without the two leading nops. */
 #define SDK_GTE_COMMAND_B(word) __asm__ volatile(".word " #word)
+#endif
 
 #undef gte_rtps
 #define gte_rtps()  SDK_GTE_COMMAND(0x4A180001)

@@ -44,8 +44,14 @@
 #include "title.h"
 
 /* Read one overlay from A_FILE into its region. */
+#ifdef HMBTN_PORT
+/* PORT: select statically linked C, never load executable disc bytes -- see docs/port/DECISIONS.md#adr-017 */
+#include "overlay/registry.h"
+#define LOAD_OVERLAY(member, region) hm_overlay_select((member), (region))
+#else
 #define LOAD_OVERLAY(member, region) \
     afile_read_range((member), (member) + 1, overlay_region_table[region], overlay_region_table[region])
+#endif
 
 /* Offsets within the region at region_base where each frame's pieces start: the
  * tag arrays of its three ordering tables (64, 16 and 2 entries), the main OT,
