@@ -139,7 +139,8 @@ preprocessing; it is not an actual linked collision.
 
 ## Initial native source compilation
 
-`hmbtn_game_initial` compiles eleven original units with native guards listed below:
+`hmbtn_game_initial` initially compiled these eleven original units, and now
+compiles 26 units after the additions documented below:
 `main/geometry/math_util.c`, `main/game/farm_data_size.c`,
 `main/game/horse_names.c`, `main/game/picture_codes.c`,
 `main/game/event_flags.c`, `main/game/farm_tables.c`, `main/game/farm_state.c`,
@@ -288,7 +289,7 @@ All 33 A_FILE offsets (32 member ranges) are monotonic and inside the
 133935104-byte archive. The probe is a diagnostic, not a game executable.
 No assets were extracted or added to git. The source's afile_init has not run.
 
-There are 32 CTests, all passing in Windows release and ASan/UBSan. New coverage
+There are 33 CTests, all passing in Windows release and ASan/UBSan. New coverage
 includes SHA-1 published vectors, malformed synthetic sectors/directories,
 cross-sector file reads, deterministic CD transfer/cancel/error behavior,
 VRAM transfers/masks/wrapping and the original texture-pack decoder. Tests need
@@ -311,8 +312,8 @@ SDK's binary layout. CD command constants cover only commands observed in source
 `port/analysis/compile_probe.py` invokes Clang on all original C files with the
 port force-include and the basename include directories. It writes per-file
 diagnostics to ignored `build/port/compile-probe.json`. No file is changed and no
-game code is linked or run. The result with Clang 20.1.8 is 96 syntax passes and
-17 failures out of 113 files, with 2072 warnings emitted before the error cap.
+game code is linked or run. The result with Clang 20.1.8 is 101 syntax passes and
+12 failures out of 113 files, with 2076 warnings emitted before the error cap.
 
 Common blockers include missing pad/card headers and SDK declarations,
 inline GTE commands, GCC nested functions, pointer-width assignments and
@@ -325,7 +326,7 @@ missing initializers, incompatible callback types, and a transposed memset
 argument warning. They remain visible; broad warning suppression or automatic
 source cleanup would hide real fidelity and 64-bit hazards.
 
-The routine native archive now compiles 21 original units, including the sound
+The routine native archive now compiles 26 original units, including the sound
 loader/request/XA-control code, farm event commands, player/scene-view code,
 debug overlay and minigames 3/5. Clean-room source-facing declarations for
 libsnd/libspu and matrix/font/lighting calls supply native call contracts only;
@@ -334,10 +335,19 @@ playback, controller polling, rendered output or a full overlay link. SpuCommonA
 is native configuration metadata with only source-used fields, not a proprietary
 SDK or asset ABI. SPU voice constants are the 24 bits consumed by key-status queries.
 
+Eight capture-free GCC nested helpers now have file-scoped native adapters under
+ADR-013. Seven Python audit/regression tests pass, including token equality of
+all eight adapter bodies against matching definitions. The C helper test covers
+triangle winding, boundary/height rejection, quad fallback, coordinate extrema,
+estate flag priority and the ten visible medal-price rows. The source compares
+the ACTOR_FLAG_DIED_OF_AGE mask (1 << 19) with 1; that unusual comparison is
+preserved and covered rather than corrected. Captured-local helpers in other
+units remain pending.
+
 ## Port guards and validation
 
-Thirteen `HMBTN_PORT` guard blocks have been introduced under ADR-008 (workspace),
-ADR-009 (GPU links) and ADR-010 (native CPU adapters):
+Twenty-six `HMBTN_PORT` guard blocks have been introduced under ADR-008 (workspace),
+ADR-009 (GPU links), ADR-010 (native CPU adapters) and ADR-013 (nested helpers):
 
 | File | Guarded change |
 | --- | --- |
@@ -354,22 +364,28 @@ ADR-009 (GPU links) and ADR-010 (native CPU adapters):
 | src/main/graphics/frame_buffers.c | ot_insert_prim uses the same native link codec |
 | src/include/cpu_asm.h | Keep the native stack and use explicit diagnostic hooks |
 | src/main/graphics/anim.c | Check alignment using the full host pointer |
+| src/main/geometry/ground.c | Include two static helpers and exclude their nested copies (3 guards) |
+| src/overlay/11_GF_FARM/animals/animals.c | Include three static helpers and exclude nested copies (4 guards) |
+| src/overlay/11_GF_FARM/estate.c | Include the static estate flag helper and exclude its nested copy (2 guards) |
+| src/overlay/11_GF_FARM/menu/shop_dialogues.c | Include the static medal-row helper and exclude its nested copy (2 guards) |
+| src/overlay/11_GF_FARM/event/event_rules.c | Include the static winter helper and exclude its nested copy (2 guards) |
 
-For each of these seven files, selecting every matching `#else` branch and
+For each of these twelve files, selecting every matching `#else` branch and
 removing the new guard directives reconstructs the previous source text exactly,
 including its whitespace (line endings normalized for comparison). This check
-passed against the preceding git revision. It does not establish byte-matching
+passed against baseline revision 9ace470. It does not establish byte-matching
 compiler output. Overlay callers of main_get_region_base that still store its
 result in s32/u32 now require explicit port fixes before those paths can compile.
-The port now builds the eleven game units above, not a game executable.
-Matching `check` is unverified: Ubuntu WSL failed to start with
-`HCS_E_HYPERV_NOT_INSTALLED`. Project-local Windows tools were subsequently
+The port now builds 26 game units, not a game executable.
+Matching `check` is unverified: its Linux toolchain is unavailable on the
+Windows-only host, and the owner excludes WSL. Project-local Windows tools were
 provisioned: CMake 3.31.6 and Ninja 1.12.1. LLVM-mingw was upgraded from
 20241001 (Clang 19.1.1) to 20250709 (Clang 20.1.8) after ASan failed during
 startup on this host; see ADR-005. Windows release and ASan/UBSan tests are
 recorded in PLATFORMS.md.
 An Android NDK Clang 18.0.3 freestanding syntax check of the type test also passed;
-this is not an Android build. No disc, full-game, or device tests were run.
+this is not an Android build. Disc diagnostics are recorded above; full-game
+and device tests have not run.
 
 Remaining Phase 0 gates: native matching baseline, complete SDK and layout
 inventory, compiled overlay symbol collision map, broader sanitizer coverage, and reproducible

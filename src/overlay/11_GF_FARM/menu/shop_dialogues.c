@@ -5149,6 +5149,11 @@ static void shop_menu_clear(FarmMenu *menu) {
  * frame around them. A value is drawn by its row's flag: 0 a price in gold, 2 a
  * price in medals, 3 a row of dashes as wide as the value column, anything else
  * nothing. */
+#ifdef HMBTN_PORT
+/* PORT: Clang requires file-scoped helpers -- see docs/port/DECISIONS.md#adr-013 */
+#include "compat/nested/shop.inc"
+#else
+#endif
 static void shop_menu_draw(FarmMenu *menu, s16 x, s16 y) {
     u_long *display;
     s16 valueX;
@@ -5163,6 +5168,9 @@ static void shop_menu_draw(FarmMenu *menu, s16 x, s16 y) {
     s32 i;
 
     /* Whether any row's value is a medal price (flag 2). */
+#ifdef HMBTN_PORT
+    /* PORT: helper is file-scoped in the native adapter -- see docs/port/DECISIONS.md#adr-013 */
+#else
     s32 has_medal_price(u8 *flags) {
         s32 j;
 
@@ -5173,6 +5181,7 @@ static void shop_menu_draw(FarmMenu *menu, s16 x, s16 y) {
         }
         return 0;
     }
+#endif
 
     display = &current_frame->otTags[0][15];
     valueX = menu->columns[0] * 8 + 28;

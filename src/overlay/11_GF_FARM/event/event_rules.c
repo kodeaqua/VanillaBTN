@@ -571,9 +571,17 @@ static s32 event_time_check(s32 command) {
 
 /* Is condition `id` (0..21) of the farm's event script met? Records the id in
  * event_pending_pair when it is. */
+#ifdef HMBTN_PORT
+/* PORT: Clang requires file-scoped helpers -- see docs/port/DECISIONS.md#adr-013 */
+#include "compat/nested/event_rules.inc"
+#else
+#endif
 static s32 event_condition_test(s32 id)
 {
     /* Winter 23rd, while the player is single and the marriage flag `which` is not set. */
+#ifdef HMBTN_PORT
+    /* PORT: helper is file-scoped in the native adapter -- see docs/port/DECISIONS.md#adr-013 */
+#else
     s32 winter_23_single_check(s32 which)
     {
         if (game_state.progress.clock.date.season == SEASON_WINTER &&
@@ -584,6 +592,7 @@ static s32 event_condition_test(s32 id)
         }
         return 0;
     }
+#endif
 
     s32 result;
     s32 limit;

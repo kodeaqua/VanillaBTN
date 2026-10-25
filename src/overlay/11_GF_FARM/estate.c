@@ -1519,8 +1519,16 @@ static KindValues estate_kind_values[4] = {
 };
 
 /* Set the item of each record from its state flags, using the kind's three values. */
+#ifdef HMBTN_PORT
+/* PORT: Clang requires file-scoped helpers -- see docs/port/DECISIONS.md#adr-013 */
+#include "compat/nested/estate.inc"
+#else
+#endif
 static void estate_record_ids_update(s16 kind, s16 count, FarmEstateRecord *records) {
     /* Pick the item value for the record's state flags, or 0 when none is set. */
+#ifdef HMBTN_PORT
+    /* PORT: helper is file-scoped in the native adapter -- see docs/port/DECISIONS.md#adr-013 */
+#else
     s32 estate_kind_value_for_flags(u16 flags, s16 valueWhenBit13, s16 valueWhenBit11, s16 valueWhenBit12)
     {
         if (flags & 0x2000) return valueWhenBit13;
@@ -1528,6 +1536,7 @@ static void estate_record_ids_update(s16 kind, s16 count, FarmEstateRecord *reco
         if (flags & 0x1000) return valueWhenBit12;
         return 0;
     }
+#endif
 
     s32 i;
     s32 itemId;
