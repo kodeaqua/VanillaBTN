@@ -59,3 +59,22 @@ available, preserving the requirement to report an unverified matching baseline.
 Consequences: An unavailable Linux matching toolchain does not block Windows
 port progress. Matching source protection and honest validation reports remain
 required. No claim of a successful matching check follows from Windows tests.
+
+## ADR-005: Upgrade the Windows compiler for sanitizer startup
+
+Date: 2026-10-25. Status: accepted within the existing LLVM-mingw toolchain choice.
+
+Context: LLVM-mingw 20241001 / Clang 19.1.1 compiled the sanitizer targets but
+ASan crashed before main with `interception_win: unhandled instruction`
+(`44 0f b6 1a`). This matches the upstream Windows interceptor issue:
+https://github.com/mstorsjo/llvm-mingw/issues/477.
+
+Decision: Pin LLVM-mingw 20250709 / Clang 20.1.8 and its archive SHA-256.
+Keep ASan and UBSan enabled together in `windows-asan-ubsan`; never suppress
+the startup issue by disabling interceptors. Sanitizer builds use the toolchain's
+ASan DLL on PATH; release builds retain static compiler runtime linkage.
+
+Consequences: Setup downloads a new compiler archive once. The build wrapper
+uses `cmake --fresh` to preserve preset options across compiler upgrades; CMake's
+automatic compiler-change reconfiguration can otherwise discard options such
+as HMBTN_SANITIZERS. Old ignored tool directories need not be deleted.

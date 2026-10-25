@@ -36,7 +36,9 @@ the destination table. `main.c`'s overlay read macro delegates to
 only the disc read is insufficient: dispatch, copied tables, and address
 arithmetic must also be audited before static host linking.
 
-Global symbol collisions have not yet been established using compiled objects.
+Global symbol collisions have not yet been established using compiled overlay
+objects. The repeatable lexical audit below found no duplicate ordinary external
+function definitions, but excludes macro-generated functions and global data.
 Do not prefix every symbol blindly: resident imports must remain shared.
 
 ## SDK surface
@@ -55,8 +57,9 @@ Observed calls include:
 | Audio | `SpuSetCommonAttr`, `SpuGetAllKeysStatus`, `SsSeqOpen`, `SsSeqPlay`, `SsSeqStop`, `SsSeqPause`, `SsSeqReplay`, `SsSeqSetVol`, `SsSeqClose` in `main/sound/sound.c` |
 | GTE | `gte_rtps`, `gte_rtpt`, `gte_nclip`, `gte_avsz3`, `gte_avsz4`, `gte_sqr0`, `gte_op12` definitions in `include/gte.h` |
 
-A complete call/macro inventory and undefined-symbol comparison are still required.
-No SDK header contents have been copied into the port.
+A lexical call/macro inventory is now available; an undefined-symbol comparison
+of the complete program is still required. No SDK header contents have been
+copied into the port.
 
 ## Audio and video streams
 
@@ -96,18 +99,71 @@ must remain unchanged until its meaning is established.
 
 No asset layout assertions have yet been added to original structs.
 
+## Repeatable lexical audit
+
+`port/analysis/source_audit.py` scans source and headers without any SDK input.
+It writes deterministic JSON with source/line evidence for includes, ordinary
+function definitions, external call candidates, GTE invocations, and overlay
+regions. The initial run reports:
+
+| Item | Count |
+| --- | --- |
+| C sources / headers | 113 / 110 |
+| Ordinary function definitions, including static functions | 2627 |
+| Unique ordinary external function names | 950 |
+| Duplicate ordinary external function name candidates | 0 |
+| External call-like names requiring classification | 299 |
+| GTE-prefixed invocation names | 40 |
+
+This is not a preprocessor or a C semantic analysis. Macro-generated functions
+(including farm courtship helpers), callbacks, type casts, declarations, global
+data definitions and conditional compilation require compiler/linker analysis.
+The 299 candidates are not 299 confirmed SDK functions; the 40 GTE-prefixed
+names also include game helpers. Six regression fixtures cover comments,
+strings, macro continuations, initializer braces, prototypes, operators and
+source-line preservation, collision filtering and overlay ownership. Generated
+reports stay in ignored `build/`.
+
+## Initial native source compilation
+
+`hmbtn_game_initial` compiles four original, unmodified units:
+`main/geometry/math_util.c`, `main/game/farm_data_size.c`,
+`main/game/horse_names.c`, and `main/game/picture_codes.c`.
+The port force-includes its fixed-width types and supplies a minimal source-facing
+`VECTOR` declaration plus the four GTE function declarations used by math_util.
+`VECTOR` size and offsets are asserted. The GPU/GS shim headers are intentionally
+empty because this subset needs no declarations from them. They do not imply
+GPU or scene support. Missing declarations in later files remain compile errors.
+
+The four GTE calls (`rsin`, `rcos`, `SquareRoot0`, `VectorNormal`) abort with their
+names in all builds until faithfully implemented; they are not numerical
+approximations. Six tests cover type/endian assumptions, original integer power,
+32-bit wrapping, interpolation/truncation/clamping, vector operations and each
+stub's failure diagnostic. Static helper paths are not exercised by game.math.
+No main loop, title screen, or renderer is linked yet.
+
+Native `llvm-nm --defined-only --extern-only` confirms six math functions and
+four data symbols in this subset. A syntax-only probe of `main/main.c` stops at
+missing `libetc.h`; its transitive SDK/game layouts remain to be brought up.
+
+Warnings retained in `math_util.c`: unused static functions `vec3_add`,
+`vec3_differs`, `vec3_move_toward`, `math_cross2_sign`, and
+`vec_dot_normalized`. These are tracked, not suppressed or removed.
+
 ## Port guards and validation
 
 No `HMBTN_PORT` guards or original source edits have been introduced.
-The Phase 0 port only builds a fixed-width type/endian test, not game code.
+The port now builds the four game units above, not a game executable.
 Matching `check` is unverified: Ubuntu WSL failed to start with
 `HCS_E_HYPERV_NOT_INSTALLED`. Project-local Windows tools were subsequently
-provisioned: LLVM-mingw 20241001 (Clang 19.1.1), CMake 3.31.6 and Ninja 1.12.1.
-Windows release configure/build passed; `compat.types` passed (1/1).
+provisioned: CMake 3.31.6 and Ninja 1.12.1. LLVM-mingw was upgraded from
+20241001 (Clang 19.1.1) to 20250709 (Clang 20.1.8) after ASan failed during
+startup on this host; see ADR-005. Windows release and ASan/UBSan tests are
+recorded in PLATFORMS.md.
 An Android NDK Clang 18.0.3 freestanding syntax check of the type test also passed;
-this is not an Android build. No disc, game, sanitizer, or device tests were run.
+this is not an Android build. No disc, full-game, or device tests were run.
 
 Remaining Phase 0 gates: native matching baseline, complete SDK and layout
-inventory, compiled symbol collision map, sanitizer runs, and reproducible
+inventory, compiled overlay symbol collision map, broader sanitizer coverage, and reproducible
 matching host-tool pins. The owner prioritizes Windows and excludes workflow/CI
 work for now. Existing workflows remain unchanged.

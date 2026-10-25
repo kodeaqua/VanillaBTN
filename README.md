@@ -7,7 +7,7 @@ your own copy of the disc, the whole disc image.
 ## Building
 
 The native port currently targets Windows first. To build and test its Phase 0
-foundation locally (not a playable game yet):
+foundation and initial source subset locally (not a playable game yet):
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File port/packaging/windows/build.ps1
@@ -32,7 +32,7 @@ cmake --build build/match --target check
 builds and checks only the 14 code binaries, which needs no game data.
 
 The separate native port is in Phase 0. Its presets live in `port/` and currently
-build only the compatibility foundation, not a playable game. See
+build the compatibility layer and four initial source units, not a playable game. See
 [reconnaissance and outstanding gates](docs/port/ANALYSIS.md).
 
 ## Exceptions

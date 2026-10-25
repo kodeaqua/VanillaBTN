@@ -5,10 +5,10 @@ $toolRoot = Join-Path $repoRoot 'build/host-tools'
 New-Item -ItemType Directory -Force $toolRoot | Out-Null
 $packages = @(
     @{
-        Archive = 'llvm-mingw.zip'
-        Url = 'https://github.com/mstorsjo/llvm-mingw/releases/download/20241001/llvm-mingw-20241001-ucrt-x86_64.zip'
-        Sha256 = '09b9aecf4a9ceb4ad942aa8b6b6126895678383532f565e26219adc493e50466'
-        Probe = 'llvm-mingw-20241001-ucrt-x86_64/bin/clang.exe'
+        Archive = 'llvm-mingw-20250709.zip'
+        Url = 'https://github.com/mstorsjo/llvm-mingw/releases/download/20250709/llvm-mingw-20250709-ucrt-x86_64.zip'
+        Sha256 = '82babcd6aae4dc3606e8e0471d816989c384b4bf86a139f184a8b4a1b2c2758d'
+        Probe = 'llvm-mingw-20250709-ucrt-x86_64/bin/clang.exe'
     },
     @{
         Archive = 'cmake.zip'
@@ -42,7 +42,7 @@ foreach ($package in $packages) {
     }
 }
 $toolPaths = @(
-    (Join-Path $toolRoot 'llvm-mingw-20241001-ucrt-x86_64/bin'),
+    (Join-Path $toolRoot 'llvm-mingw-20250709-ucrt-x86_64/bin'),
     (Join-Path $toolRoot 'cmake-3.31.6-windows-x86_64/bin'),
     $toolRoot
 )

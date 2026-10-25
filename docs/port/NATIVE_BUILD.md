@@ -73,11 +73,13 @@ ctest --preset linux-asan-ubsan
 
 Desktop presets also exist for `windows-release` (LLVM-mingw/UCRT, without MSVC)
 and `macos-universal-release`.
-These validate only the compatibility foundation. Android presets await an NDK
+These build the compatibility layer and four initial original source units.
+Android presets await an NDK
 pin and platform configuration; no Android support is claimed yet.
 
 No SDL dependency, SDK, network, or game data is required by the port foundation.
-It is not a playable game and does not yet compile `src/`.
+It is not a playable game. Only `math_util.c`, `farm_data_size.c`, `horse_names.c`,
+and `picture_codes.c` from `src/` are compiled so far.
 
 ## Windows first
 
@@ -88,7 +90,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File port/packaging/windows/b
 ```
 
 The policy override applies only to this process, not to machine/user settings.
-The script downloads checksum-pinned LLVM-mingw 20241001, CMake 3.31.6 and Ninja
+The script downloads checksum-pinned LLVM-mingw 20250709, CMake 3.31.6 and Ninja
 1.12.1 into ignored `build/host-tools/`, verifies cached archives, then configures,
 builds and tests `windows-release`. It does not require administrator access,
 WSL, MSVC or the PSX SDK. Subsequent runs reuse local downloads. Network is
@@ -104,11 +106,35 @@ cmake --build --preset windows-release
 ctest --preset windows-release
 ```
 
+For native Windows ASan/UBSan tests:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File port/packaging/windows/build.ps1 -Preset windows-asan-ubsan
+```
+
+The sanitizer preset uses a dynamic ASan runtime from the toolchain directory
+added to PATH by setup; release builds retain static linkage. The wrapper uses
+`cmake --fresh` so compiler upgrades cannot drop cached preset options. When
+running CMake directly after upgrading a compiler, also use `--fresh` on configure.
+
+The optional source audit requires any local Python 3.10+ interpreter, independently
+of the port build. It does not need an SDK, a network connection, or game assets:
+
+```powershell
+python -m unittest discover -s port/analysis -p "test_*.py"
+python port/analysis/source_audit.py --output build/port/source-audit.json
+```
+
+It reports lexical candidates, not a complete compiler/linker inventory. See
+`ANALYSIS.md` for limitations. Python is not required by the Windows build wrapper.
+
 ## Validation on 2026-10-25
 
 An earlier Ubuntu WSL launch failed (`HCS_E_HYPERV_NOT_INSTALLED`); the owner
 subsequently excluded WSL, so no further WSL attempts are required. Matching
 validation is deferred to a separate Linux host. CMake, Ninja and Clang were not found on the
 Windows PATH initially. After provisioning project-local tools, Windows release
-configure/build passed and `compat.types` passed (1/1). The matching build,
-Linux/macOS builds, sanitizers and game execution remain unverified.
+configure/build and all six tests passed. The Windows ASan/UBSan preset also
+built and passed six tests with Clang 20.1.8; Clang 19's ASan had failed during
+startup (ADR-005). The matching build, Linux/macOS builds and full game execution
+remain unverified. Original source files have not been edited.

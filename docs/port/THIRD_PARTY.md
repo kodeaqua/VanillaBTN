@@ -7,7 +7,7 @@ Windows host tools (downloaded to ignored `build/host-tools/`, not vendored):
 
 | Tool | Version | License | Source |
 | --- | --- | --- | --- |
-| LLVM-mingw | 20241001, Clang 19.1.1 | LLVM Apache-2.0 with LLVM exceptions; mingw-w64 permissive component notices | https://github.com/mstorsjo/llvm-mingw/releases/tag/20241001 |
+| LLVM-mingw | 20250709, Clang 20.1.8 | LLVM Apache-2.0 with LLVM exceptions; mingw-w64 permissive component notices | https://github.com/mstorsjo/llvm-mingw/releases/tag/20250709 |
 | CMake | 3.31.6 | BSD-3-Clause | https://github.com/Kitware/CMake/releases/tag/v3.31.6 |
 | Ninja | 1.12.1 | Apache-2.0 | https://github.com/ninja-build/ninja/releases/tag/v1.12.1 |
 
@@ -15,7 +15,8 @@ Archive SHA-256 pins are in `port/packaging/windows/setup-toolchain.ps1`.
 CMake was checked against its published SHA-256 manifest. LLVM-mingw and Ninja
 pins were computed from the official GitHub release downloads, not independently
 signed publisher manifests. Tool packages retain their own third-party notices.
-The test executable imports Windows system UCRT/API DLLs; no tool package or
+Release test executables import Windows system UCRT/API DLLs. Sanitizer tests
+also load the toolchain's ASan runtime DLL from PATH; no tool package or
 third-party runtime DLL is redistributed by this change. Distribution notice
 review remains required when packaging the actual game.
 
