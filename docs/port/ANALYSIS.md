@@ -127,7 +127,7 @@ reports stay in ignored `build/`.
 
 ## Initial native source compilation
 
-`hmbtn_game_initial` compiles eight original, unmodified units:
+`hmbtn_game_initial` compiles eight original units with native guards listed below:
 `main/geometry/math_util.c`, `main/game/farm_data_size.c`,
 `main/game/horse_names.c`, `main/game/picture_codes.c`,
 `main/game/event_flags.c`, `main/game/farm_tables.c`, `main/main.c`,
@@ -161,11 +161,12 @@ No main loop, title screen, or renderer is linked into an executable yet.
 An earlier `llvm-nm --defined-only --extern-only` pass confirmed six math functions
 and four data symbols in the initial four-unit subset. A new pass confirms
 `hm_game_main` and `afile_init` in the archive. main.c is renamed only through
-its port build definition; the original source remains unchanged. These objects
+its port build definition; matching branches are preserved. These objects
 are not selected by the current test executables. The game's hardcoded
-WORK_REGION, frame table addresses, native pointer truncation and region-gap
-arithmetic remain unsafe for execution. Main-loop runtime dependencies and
-overlay dispatch have not been solved (ADR-007).
+WORK_REGION and frame table addresses now select a native data workspace, and
+the resident region helpers retain full pointers (ADR-008). Main-loop runtime
+dependencies, OT link encoding and overlay dispatch remain unsafe/unimplemented;
+the complete game entry point must not be executed yet (ADR-007).
 
 The new source-facing libcd/libapi/libmcrd/libmcx declarations and the narrow
 GPU/GS/GTE startup declarations permit native entry-point code generation.
@@ -180,7 +181,8 @@ Warnings retained in `math_util.c`: unused static functions `vec3_add`,
 two incompatible function-pointer casts at lines 733 and 735. The latter adapt
 `item_use_coin` and `farm_adjust_stamina_fatigue` to ItemUseFn; calling these through
 that type needs a deliberate port solution before item actions are enabled.
-main.c adds four pointer-to-s32 warnings and four unused-function warnings.
+The four pointer-to-s32 warnings in main.c are removed by native-only guards;
+its four unused-function warnings remain.
 afile.c adds 33 missing-pos initializer warnings for the existing A_FILE member
 table, two unused functions and two unused parameters. No warnings were suppressed.
 
@@ -226,7 +228,26 @@ source cleanup would hide real fidelity and 64-bit hazards.
 
 ## Port guards and validation
 
-No `HMBTN_PORT` guards or original source edits have been introduced.
+Nine `HMBTN_PORT` guard blocks have been introduced, all under ADR-008:
+
+| File | Guarded change |
+| --- | --- |
+| src/main/main.c | WORK_REGION selects native storage |
+| src/main/main.c | main_region_gap_const subtracts pointers within that storage |
+| src/main/main.c | main_region_free_bytes preserves the budget without overlay-address subtraction |
+| src/main/main.c | main_get_region_base returns a full native byte pointer |
+| src/main/main.c | Normal frame OT base uses its original offset |
+| src/main/main.c | Wide frame OT base uses its original offset |
+| src/main/main.h | Native region accessor has a pointer return type |
+| src/main/game/farm_state.c | Overlay-address temporaries are matching-only |
+| src/main/game/farm_state.c | Farm load window binds to native storage |
+
+For each of these three files, selecting every matching `#else` branch and
+removing the new guard directives reconstructs the previous source text exactly,
+including its whitespace (line endings normalized for comparison). This check
+passed against the preceding git revision. It does not establish byte-matching
+compiler output. Overlay callers of main_get_region_base that still store its
+result in s32/u32 now require explicit port fixes before those paths can compile.
 The port now builds the eight game units above, not a game executable.
 Matching `check` is unverified: Ubuntu WSL failed to start with
 `HCS_E_HYPERV_NOT_INSTALLED`. Project-local Windows tools were subsequently

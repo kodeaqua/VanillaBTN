@@ -50,7 +50,12 @@
 /* Offsets within the region at region_base where each frame's pieces start: the
  * tag arrays of its three ordering tables (64, 16 and 2 entries), the main OT,
  * the primitive buffer and the work area. */
+#ifdef HMBTN_PORT
+/* PORT: use the native data workspace — see docs/port/DECISIONS.md#adr-008 */
+#define WORK_REGION hm_work_region()
+#else
 #define WORK_REGION ((u8 *)0x801BE1B0)
+#endif
 #define REGION_TAGS1 0x200
 #define REGION_TAGS2 0x280
 #define REGION_WORK 0x33090
@@ -518,6 +523,10 @@ void gs_work_release(void *end) {
 }
 
 static s32 main_region_gap_const(void) {
+#ifdef HMBTN_PORT
+    /* PORT: subtract pointers within one native object — see docs/port/DECISIONS.md#adr-008 */
+    return (s32)(region_base - farm_area.loadWindow) - 0x83000;
+#else
     s32 region = (s32)region_base;
     s32 base = (s32)overlay_region_table[OVERLAY_HIGH];
     s32 offset = 0xFFF7D000;
@@ -526,11 +535,16 @@ static s32 main_region_gap_const(void) {
     region -= base;
     region += offset;
     return region - (end - base);
+#endif
 }
 
 /* Free bytes between farm_area.loadWindow and region_base, less farm_section_size and a fixed
  * 0x49000 bytes. */
 s32 main_region_free_bytes(void) {
+#ifdef HMBTN_PORT
+    /* PORT: preserve the budget without overlay-address math — see docs/port/DECISIONS.md#adr-008 */
+    return (s32)(region_base - farm_area.loadWindow) - FARM_IMAGE_SIZE - farm_section_size;
+#else
     u8 *region;
     u8 *table_high;
     s32 section_size;
@@ -547,6 +561,7 @@ s32 main_region_free_bytes(void) {
     window_end = farm_area.loadWindow;
     offset = total - section_size;
     return offset - (window_end - table_high);
+#endif
 }
 
 /* The start of the free region: main_region_free_bytes below region_base. */
@@ -554,9 +569,16 @@ u8 *main_region_free_start(void) {
     return region_base - main_region_free_bytes();
 }
 
+#ifdef HMBTN_PORT
+/* PORT: retain the full host pointer — see docs/port/DECISIONS.md#adr-008 */
+u8 *main_get_region_base(void) {
+    return region_base;
+}
+#else
 s32 main_get_region_base(void) {
     return (s32)region_base;
 }
+#endif
 
 /* Start a frame: point the GS work area at its work base, select its ordering-table block (0x3000
  * bytes per frame index), clear the tables and rewind the primitive cursor. */
@@ -626,7 +648,12 @@ static void main_init_frame_records(void) {
     base = WORK_REGION;
     region_base = base;
     memset(base, 0, REGION_BYTES);
+#ifdef HMBTN_PORT
+    /* PORT: preserve the OT offset inside native storage — see docs/port/DECISIONS.md#adr-008 */
+    frame_ot_base_init = frame_ot_base = base + REGION_FRAME_OT_BASE;
+#else
     frame_ot_base_init = frame_ot_base = (u8 *)0x801F7000;
+#endif
     for (i = 0; i < 2; i++) {
         frame_records[i].otTags[0] = (u_long *)(base + i * 0x100);
         frame_records[i].otTagCounts[0] = 64;
@@ -690,7 +717,12 @@ static void main_init_frame_records_wide(void) {
     base = WORK_REGION;
     region_base = base;
     memset(base, 0, REGION_BYTES);
+#ifdef HMBTN_PORT
+    /* PORT: the wide work area ends eight bytes before the limit — see docs/port/DECISIONS.md#adr-008 */
+    frame_ot_base_init = frame_ot_base = base + REGION_BYTES - 8;
+#else
     frame_ot_base_init = frame_ot_base = (u8 *)0x801FCFF8;
+#endif
     for (i = 0; i < 2; i++) {
         frame_records[i].otTags[0] = (u_long *)(base + i * 0x100);
         frame_records[i].otTagCounts[0] = 64;
