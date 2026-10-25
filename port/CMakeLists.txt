@@ -60,7 +60,7 @@ target_link_libraries(hmbtn_game_initial PUBLIC hmbtn_game_options hmbtn_work_me
 set_source_files_properties(../src/main/main.c PROPERTIES COMPILE_DEFINITIONS main=hm_game_main)
 
 add_library(hmbtn_psx_initial STATIC
-    psx/unimplemented.c psx/gte_stubs.c psx/gte_runtime.c psx/gs_lighting.c psx/trig.c psx/timing.c psx/sound_control.c psx/spu_decode.c psx/spu_voice.c psx/cd_position.c psx/cd_runtime.c
+    psx/unimplemented.c psx/gte_vectors.c psx/gte_runtime.c psx/gs_lighting.c psx/trig.c psx/timing.c psx/sound_control.c psx/spu_decode.c psx/spu_voice.c psx/cd_position.c psx/cd_runtime.c
     psx/gpu_links.c psx/gpu_ot.c psx/gpu_packets.c psx/gpu_environment.c psx/gpu_commands.c psx/gpu_polygon.c psx/gpu_line.c psx/vram.c psx/card.c psx/pad.c psx/sound_bank.c psx/sequence.c psx/sound_voice.c psx/reverb.c)
 target_link_libraries(hmbtn_psx_initial PUBLIC hmbtn_port_options)
 target_include_directories(hmbtn_psx_initial PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/compat/psyq")
@@ -281,11 +281,7 @@ if(BUILD_TESTING)
                 "-DCASE=${api}" "-DCONTEXT=${api}" "-DDETAIL=no validated disc is attached"
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_runtime_error.cmake")
     endforeach()
-    add_executable(hmbtn_gte_stub_test tests/gte_stub.c)
-    target_link_libraries(hmbtn_gte_stub_test PRIVATE hmbtn_psx_initial)
-    foreach(api IN ITEMS SquareRoot0 VectorNormal)
-        add_test(NAME psx.unimplemented.${api}
-            COMMAND "${CMAKE_COMMAND}" "-DPROGRAM=$<TARGET_FILE:hmbtn_gte_stub_test>"
-                "-DAPI=${api}" -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_unimplemented.cmake")
-    endforeach()
+    add_executable(hmbtn_gte_vectors_test tests/gte_vectors.c)
+    target_link_libraries(hmbtn_gte_vectors_test PRIVATE hmbtn_psx_initial)
+    add_test(NAME psx.gte_vectors COMMAND hmbtn_gte_vectors_test)
 endif()

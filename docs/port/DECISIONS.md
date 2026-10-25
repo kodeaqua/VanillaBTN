@@ -726,3 +726,32 @@ receive the same flags. Keep both original writes in the matching branch.
 Extend the scene regression to populate a synthetic area with every model
 absent. This does not emulate the original writes to address zero or establish
 their hardware effects. No mapped low-memory page or fake scene is introduced.
+
+<a id="adr-033"></a>
+
+## ADR-033: Supply terrain and camera vector arithmetic
+
+Date: 2026-10-26. Status: deterministic reference; SDK quantization pending.
+
+The real-disc New Game path reaches ground_height_at and calls OuterProduct0.
+Implement it through the existing scalar GTE OP command with shift zero and
+preserve the rotation matrix, as documented for the non-inline SDK function.
+Add source-used camera operations: ApplyMatrixLV multiplies three Q12 matrix
+rows by a 32-bit vector, supports aliases and writes only three output words.
+It does not add the matrix translation. This matters because the original
+camera passes its three-word translation storage as the output VECTOR.
+
+Supply integer SquareRoot0 and VectorNormal/S/SS reference implementations.
+Normalize using a Q12 integer length to retain fractional lengths; preserve
+output padding because the camera writes normalized vectors into matrix rows.
+Return the squared input length from VectorNormal. Reject inputs outside its
+documented signed squared-length range. Zero vectors produce zero components.
+No host floating-point math or per-call allocation is used.
+
+Tests cover every signed-domain square boundary, fractional/axis/zero normals,
+in-place inputs, output padding, matrix/translation aliases and OP matrix
+preservation. Full SDK lookup quantization, intermediate register side effects
+of matrix/vector helpers and zero-vector hardware parity are unverified.
+Reference: public Run-Time Library Reference 4.7, ApplyMatrixLV, VectorNormal
+and OuterProduct descriptions; Inline Programming Reference OP preservation
+distinction. Only API facts and the existing scalar hardware core are used.

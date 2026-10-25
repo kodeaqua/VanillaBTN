@@ -13,13 +13,6 @@
 #include <libsnd.h>
 #include <libspu.h>
 
-VECTOR *ApplyMatrixLV(const MATRIX *matrix, const VECTOR *input, VECTOR *output) {
-    (void)matrix;
-    (void)input;
-    (void)output;
-    hm_unimplemented("ApplyMatrixLV");
-}
-
 void FntFlush(s32 stream) {
     (void)stream;
     hm_unimplemented("FntFlush");
@@ -235,13 +228,6 @@ s32 MoveImage2(const RECT *area, s32 x, s32 y) {
     hm_unimplemented("MoveImage2");
 }
 
-void OuterProduct0(VECTOR *first, VECTOR *second, VECTOR *result) {
-    (void)first;
-    (void)second;
-    (void)result;
-    hm_unimplemented("OuterProduct0");
-}
-
 MATRIX *RotMatrix(const SVECTOR *angle, MATRIX *matrix) {
     (void)angle;
     (void)matrix;
@@ -275,18 +261,6 @@ MATRIX *RotMatrixZXY(const SVECTOR *angle, MATRIX *matrix) {
 void SetDumpFnt(s32 stream) {
     (void)stream;
     hm_unimplemented("SetDumpFnt");
-}
-
-void VectorNormalS(const VECTOR *input, SVECTOR *output) {
-    (void)input;
-    (void)output;
-    hm_unimplemented("VectorNormalS");
-}
-
-void VectorNormalSS(const SVECTOR *input, SVECTOR *output) {
-    (void)input;
-    (void)output;
-    hm_unimplemented("VectorNormalSS");
 }
 
 s32 hm_psx_csqrt(s32 value) {

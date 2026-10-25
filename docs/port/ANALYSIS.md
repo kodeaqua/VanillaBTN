@@ -148,11 +148,13 @@ GPU packet sizes/offsets and a known textured-quad byte sequence are checked;
 GS ordering-table descriptors retain native pointers. GPU link handles now map
 to full native pointers through a bounded registry (ADR-009). Native LINK_PRIM
 and ot_insert_prim share this codec with SDK addPrim/AddPrim; packet layouts
-stay fixed-width. Rasterization, DrawOTag and complete GPU execution remain absent.
+stay fixed-width. DrawOTag and the source-used primitive rasterizers now have
+CPU reference implementations; hardware rasterization parity remains pending.
 
-The four GTE calls (`rsin`, `rcos`, `SquareRoot0`, `VectorNormal`) abort with their
-names in all builds until faithfully implemented; they are not numerical
-approximations. The initial tests cover type/endian and layout assumptions, original integer power,
+The high-level trig/vector calls now use deterministic integer reference
+implementations (ADR-033), including terrain cross products and camera matrix
+application. Exact SDK lookup quantization remains unverified; remaining
+unimplemented calls still abort by name. Tests cover type/endian and layout assumptions, original integer power,
 32-bit wrapping, interpolation/truncation/clamping, vector operations and each
 stub's failure diagnostic. Static helper paths are not exercised by game.math.
 `game.state` exercises all 1184 valid event flags, word/sign-bit boundaries,

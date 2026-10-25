@@ -11,22 +11,6 @@ void debug_hook_run(s32 value) {
     (void)value;
     hm_runtime_error("game.projection fixture", "unexpected model draw");
 }
-void VectorNormalS(const VECTOR *in, SVECTOR *out) {
-    (void)in;
-    (void)out;
-    hm_runtime_error("game.projection fixture", "unexpected VectorNormalS");
-}
-void VectorNormalSS(const SVECTOR *in, SVECTOR *out) {
-    (void)in;
-    (void)out;
-    hm_runtime_error("game.projection fixture", "unexpected VectorNormalSS");
-}
-VECTOR *ApplyMatrixLV(const MATRIX *matrix, const VECTOR *in, VECTOR *out) {
-    (void)matrix;
-    (void)in;
-    (void)out;
-    hm_runtime_error("game.projection fixture", "unexpected ApplyMatrixLV");
-}
 #define HM_ROTATION_TRAP(name)                                                                     \
     MATRIX *name(s32 angle, MATRIX *matrix) {                                                      \
         (void)angle;                                                                               \
