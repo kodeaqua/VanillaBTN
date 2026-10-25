@@ -1,5 +1,6 @@
 #include "psx/sound_control.h"
 #include "psx/error.h"
+#include "psx/sound_bank.h"
 #include <libsnd.h>
 #include <string.h>
 
@@ -14,6 +15,7 @@ static void hm_sound_require(const char *api) {
 }
 
 void SsInit(void) {
+    hm_sound_banks_reset();
     memset(&hm_sound, 0, sizeof(hm_sound));
     memset(hm_voice_status, 0, sizeof(hm_voice_status));
     hm_sound.initialized = 1;
