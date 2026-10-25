@@ -46,16 +46,17 @@ cmake --build build/port/windows-release --target hmbtn_boot_probe
 & ./build/port/windows-release/hmbtn_boot_probe.exe 'D:/my-disc/Harvest Moon - Back to Nature (USA).bin'
 ```
 
-The native title/menu now run, and a local replay passes naming/birthday setup
-and enters farm initialization. Farm rendering/player movement are not yet
-validated. Unsupported SDK calls retain named failures while bring-up proceeds.
+The native title/menu now run, and local release/sanitizer replays complete
+naming/birthday, the opening scenes and free movement in the house. See
+WINDOWS_PLAYTEST.md for the authored replay and verified capture hash.
+Unsupported SDK calls retain named failures while broader gameplay is tested.
 The console probe uses virtual time and has no SDL window. Native overlay
 reentry and file-backed memory cards remain unsupported.
 
 For the optional SDL game-window diagnostic, configure the existing GPU spike
 build with `-DHMBTN_BUILD_NATIVE_WINDOW=ON`, then build `hmbtn_native`. It accepts
-the same BIN argument. This is unfinished bring-up, not a playable release.
-Vulkan captures show the title, New Game/Continue menu and naming dialogue. Keyboard
+the same BIN argument. This is a development build with limited gameplay
+coverage. Vulkan captures show the title, menu, naming dialogue and farm. Keyboard
 arrows map to the D-pad, X/Z to Cross/Square, W/D to Triangle/Circle, Return to
 Start and Backspace to Select. Replay input is validated through the original
 pad polling code; physical keyboard interaction remains unverified.

@@ -429,7 +429,9 @@ including its whitespace (line endings normalized for comparison). This check
 passed against baseline revision 9ace470. It does not establish byte-matching
 compiler output. Event staging callers preserve complete native addresses;
 additional pointer/layout hazards remain before full gameplay is safe.
-The port now builds all 113 units and links a boot diagnostic, not a playable game.
+The port builds all 113 units and links a boot diagnostic and SDL game window.
+Local 31000-VBlank release/sanitizer replays complete the opening and verify
+house movement; wider gameplay and full-playthrough parity remain unverified.
 Matching `check` is unverified: its Linux toolchain is unavailable on the
 Windows-only host, and the owner excludes WSL. Project-local Windows tools were
 provisioned: CMake 3.31.6 and Ninja 1.12.1. LLVM-mingw was upgraded from

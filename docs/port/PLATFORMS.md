@@ -1,8 +1,8 @@
 # Platform status
 
-As of 2026-10-26, the native Windows title/menu, farm and opening grandparent
-dialogue render. The opening sequence and free player control are still under
-validation; this is not yet a fully playable port.
+As of 2026-10-26, native Windows replays complete the opening and validate free
+player movement inside the house. Title/menu, farm, flashback and house render.
+Full playthrough and broader gameplay remain unverified; see WINDOWS_PLAYTEST.md.
 
 | Target | Foundation preset | Validation |
 | --- | --- | --- |
@@ -28,8 +28,11 @@ probe reaches the opening grandparent dialogue after naming/birthday setup.
 The 12000-tick sanitizer idle test completed. Missing event-request pointer
 returns explained the earlier release/sanitizer opening-script difference
 (ADR-040); both now traverse the grandparent/flashback scenes and request XA.
-Source-disc XA decoding/mixing has synthetic coverage (ADR-041). Movement and
-later scene changes still need validation. Memory/scheduling regressions are
+Source-disc XA decoding/mixing has synthetic coverage (ADR-041). The 31000-tick
+release and optimized sanitizer replays both complete the opening, respond to
+right/down input and produce byte-identical final house BMP captures. This
+does not establish original-hardware parity. Later scene changes and broader
+gameplay still need validation. Memory/scheduling regressions are
 tracked through ADR-041. Unfinished SDK calls fail by
 name, not fake
 success paths. Native overlay reentry also aborts until state reset is supported.

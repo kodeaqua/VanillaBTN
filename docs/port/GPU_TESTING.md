@@ -46,13 +46,14 @@ The launcher builds the release window if missing and clears diagnostic input
 replays/tick limits for the child game, restoring the caller's environment on
 exit. It does not copy disc data into the repository. Keyboard: arrows move,
 Enter is Start, X is Cross/confirm, Z is Square, D is Circle, W is Triangle,
-A/S are L1/R1, Q/E are L2/R2 and Backspace is Select. Free control and physical
-keyboard input remain under validation; save persistence is not implemented.
+A/S are L1/R1, Q/E are L2/R2 and Backspace is Select. A 31000-tick replay now
+validates free movement in the house (WINDOWS_PLAYTEST.md). Physical keyboard
+input remains unverified by automation; save persistence is not implemented.
 
 The headless boot probe also accepts HMBTN_CAPTURE_FRAME to export its final
 15-bit scanout to BMP at HMBTN_BOOT_TICKS, and HMBTN_TRACE_GAME_STATE to print
 area/player state every 600 ticks. These diagnostics require the owner's disc
 for game frames. Store captures only in ignored build output. A 6000-tick
 Vulkan/ASan window capture shows farm terrain/player/HUD; a release headless
-capture shows the original grandparent dialogue. Later opening scenes still
-need fixes before this is a playable port.
+capture shows the original grandparent dialogue. Longer headless replays now
+complete the opening and house movement; broader gameplay remains under test.
