@@ -41,6 +41,14 @@ objects. The repeatable lexical audit below found no duplicate ordinary external
 function definitions, but excludes macro-generated functions and global data.
 Do not prefix every symbol blindly: resident imports must remain shared.
 
+A local Clang 20.1.8 object-generation probe now succeeds for the 87 units that
+pass syntax checking. Its LLVM nm inventory finds no duplicate external source
+definitions in that subset; the 19 repeated .refptr names are compiler-generated
+COFF references, not game definitions. There remain 289 undefined names outside
+the subset, including missing game units, SDK APIs and host C runtime imports.
+The remaining 26 units and an actual whole-program link must still be checked
+before deciding the final overlay namespacing map.
+
 ## SDK surface
 
 `sdk/objects.txt` selects objects from LIBAPI, LIBC, LIBCARD, LIBCD, LIBETC,
@@ -280,11 +288,19 @@ All 33 A_FILE offsets (32 member ranges) are monotonic and inside the
 133935104-byte archive. The probe is a diagnostic, not a game executable.
 No assets were extracted or added to git. The source's afile_init has not run.
 
-There are 31 CTests, all passing in Windows release and ASan/UBSan. New coverage
+There are 32 CTests, all passing in Windows release and ASan/UBSan. New coverage
 includes SHA-1 published vectors, malformed synthetic sectors/directories,
 cross-sector file reads, deterministic CD transfer/cancel/error behavior,
 VRAM transfers/masks/wrapping and the original texture-pack decoder. Tests need
 no disc. The separate local disc probe also passed under ASan/UBSan.
+
+The scalar inline GTE core now implements SQR, OP, MVMVA (source-used matrix and
+translation selectors), NCLIP, AVSZ3 and AVSZ4 with explicit signed shifts,
+44-bit accumulator wrapping, MAC0 overflow, IR/OTZ saturation and flag summary.
+Literal formula vectors cover signs, limits and summary-bit exclusions. This
+core is not yet connected to inline_c.h or the SDK entry points. Perspective
+projection and the unused MVMVA hardware-bug selectors fail explicitly; no
+hardware capture or full-game GTE parity is claimed.
 
 CdlFILE is host-side result metadata with only the fields used by the source,
 pos and size. It is never read from disc bytes and does not claim the proprietary
