@@ -1282,8 +1282,17 @@ static void scene_slot_flag_move(void)
             }
         }
     }
+#ifdef HMBTN_PORT
+    /* PORT: areas without spouse markers have no objects to update; do not
+     * write to native address zero - see docs/port/DECISIONS.md#adr-032. */
+    if (scene_marked_entries[0])
+        scene_marked_entries[0]->flags &= ~SCENE_ENTRY_HIDDEN;
+    if (scene_marked_entries[1])
+        scene_marked_entries[1]->flags |= SCENE_ENTRY_HIDDEN;
+#else
     scene_marked_entries[0]->flags &= ~SCENE_ENTRY_HIDDEN;
     scene_marked_entries[1]->flags |= SCENE_ENTRY_HIDDEN;
+#endif
 }
 
 /* Show the marked entry for the spouse's place: entry 1 when the spouse is at home,

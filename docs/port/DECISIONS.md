@@ -708,3 +708,21 @@ The contents read at address zero on original hardware are not established;
 this adaptation does not prove first-entry hardware parity. Matching check
 remains unavailable on this Windows-only host; source-branch reconstruction
 against 9ace470 passes for all 59 guards in 26 files.
+
+<a id="adr-032"></a>
+
+## ADR-032: Leave absent spouse-marker objects untouched
+
+Date: 2026-10-26. Status: native safety adaptation; hardware parity pending.
+
+After the first area's models are populated, scene_slot_flag_move searches for
+two optional marked entries, then unconditionally writes both pointers. The
+New Game replay reaches an area without a marked entry and UBSan reports a
+null FarmSceneModel access. The source asset struct has no native pointers;
+tests assert its 0xBDC size and model offset 0x948 to exclude layout drift.
+
+Only native builds skip the flag write for an absent entry. Existing entries
+receive the same flags. Keep both original writes in the matching branch.
+Extend the scene regression to populate a synthetic area with every model
+absent. This does not emulate the original writes to address zero or establish
+their hardware effects. No mapped low-memory page or fake scene is introduced.
