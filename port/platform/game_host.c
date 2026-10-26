@@ -29,6 +29,7 @@
 #include "platform/user_data.h"
 #ifdef HMBTN_ENH_PAUSE_MENU
 #include "enhance/pause_menu/assets.h"
+#include "enhance/pause_menu/canvas.h"
 #include "enhance/pause_menu/menu.h"
 #include "platform/graphics_options.h"
 #endif
@@ -58,6 +59,7 @@ static hm_graphics_options hm_options;
 static int hm_ignore_held;
 static int hm_pause_enabled;
 static u8 hm_pause_background[320 * 240 * 4];
+static u8 hm_pause_frozen[1024 * 240 * 4];
 #endif
 #ifdef HMBTN_GPU_RASTER
 static hm_gpu_renderer *hm_gpu_output;
@@ -365,8 +367,33 @@ static void hm_host_pause(void) {
         hm_interpolation_render(SDL_GetTicksNS() - hm_start, &live, &interpolated))
         area = &interpolated.area;
 #endif
+    u32 pause_width = 320;
+#ifdef HMBTN_ENH_WIDESCREEN
+    hm_software_view wide = {0};
+    hm_software_output *frozen_output = NULL;
+    RECT wide_area = hm_widescreen_area(*area);
+    if (state->display_enabled && wide_area.w > 320 && wide_area.h == 240) {
+        frozen_output = hm_software_output_create();
+        if (frozen_output && hm_software_output_prepare(frozen_output, wide_area.w, 240)) {
+            hm_render_frame frozen_frame = hm_game_render_frame();
+            hm_replay_sink previous = hm_software_output_begin(frozen_output);
+            int replayed = 0;
+#ifdef HMBTN_ENH_INTERPOLATION
+            if (hm_options.interpolation && frozen_frame.eligible)
+                replayed = hm_interpolation_replay(SDL_GetTicksNS() - hm_start, &frozen_frame);
+#endif
+            if (!replayed)
+                replayed = hm_software_output_replay(frozen_output, &frozen_frame);
+            int completed = hm_software_output_end(frozen_output, previous, &wide);
+            if (replayed && completed)
+                pause_width = wide.width;
+            else
+                wide = (hm_software_view){0};
+        }
+    }
+#endif
     for (unsigned y = 0; y < 240; ++y)
-        for (unsigned x = 0; x < 320; ++x) {
+        for (unsigned x = 0; x < pause_width; ++x) {
             u16 color = state->display_enabled && area->w > 0 && area->h > 0
                             ? hm_vram_pixel((u32)area->x + x * (u32)area->w / 320,
                                             (u32)area->y + y * (u32)area->h / 240)
@@ -377,14 +404,21 @@ static void hm_host_pause(void) {
                             .pixels[((u32)area->y + y * (u32)area->h / 240) * interpolated.stride +
                                     (u32)area->x + x * (u32)area->w / 320];
 #endif
-            u8 *out = hm_pause_background + (y * 320 + x) * 4;
+#ifdef HMBTN_ENH_WIDESCREEN
+            if (wide.pixels)
+                color = wide.pixels[y * pause_width + x];
+#endif
+            u8 *out = hm_pause_frozen + (y * pause_width + x) * 4;
             for (unsigned k = 0; k < 3; ++k) {
                 unsigned value = (color >> (k * 5)) & 31;
                 out[k] = (u8)((value << 3) | (value >> 2));
             }
             out[3] = 255;
         }
-    if (!hm_host_image_size(320, 240))
+#ifdef HMBTN_ENH_WIDESCREEN
+    hm_software_output_destroy(frozen_output);
+#endif
+    if (!hm_host_image_size(pause_width, 240))
         hm_host_fail();
     int running = 1;
     const char *notice = "";
@@ -460,7 +494,7 @@ static void hm_host_pause(void) {
             u8 *pixels = SDL_MapGPUTransferBuffer(hm_device, hm_upload, true);
             if (!pixels)
                 hm_host_fail();
-            SDL_memcpy(pixels, hm_pause_background, sizeof(hm_pause_background));
+            hm_pause_canvas_extract(hm_pause_background, hm_pause_frozen, pause_width);
             if (value_dirty) {
                 value[0] = 0;
                 if (menu.page == HM_PAUSE_GRAPHICS)
@@ -471,9 +505,10 @@ static void hm_host_pause(void) {
                 value_dirty = 0;
             }
             view.notice = notice;
-            hm_pause_draw(&hm_assets, pixels, &menu, &view);
+            hm_pause_draw(&hm_assets, hm_pause_background, &menu, &view);
+            hm_pause_canvas_compose(pixels, hm_pause_frozen, pause_width, hm_pause_background);
             SDL_UnmapGPUTransferBuffer(hm_device, hm_upload);
-            hm_host_submit(320, 240, 0, 0);
+            hm_host_submit(pause_width, 240, 0, pause_width > 320);
         }
         Uint64 now = SDL_GetTicksNS();
         if (hm_presentation.next_ns > now) {
