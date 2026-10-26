@@ -1,3 +1,4 @@
+#include "platform/gpu_present.h"
 #ifdef HMBTN_ENH_WIDESCREEN
 #include "enhance/widescreen/widescreen.h"
 #include "gfx/game_frame.h"
@@ -197,23 +198,14 @@ static void hm_host_output_size(int *w, int *h) {
 }
 #endif
 static void hm_host_blit(SDL_GPUCommandBuffer *command, SDL_GPUTexture *image, u32 image_width,
-                         u32 image_height, SDL_GPUTexture *swapchain, Uint32 width, Uint32 height,
-                         int linear, int wide) {
-    Uint32 destination_width = width, destination_height = height;
-    if (!wide && (u64)width * 3 > (u64)height * 4)
-        destination_width = height * 4 / 3;
-    else if (!wide)
-        destination_height = width * 3 / 4;
-    SDL_GPUBlitInfo blit = {.source = {.texture = image, .w = image_width, .h = image_height},
-                            .destination = {.texture = swapchain,
-                                            .x = (width - destination_width) / 2,
-                                            .y = (height - destination_height) / 2,
-                                            .w = destination_width,
-                                            .h = destination_height},
-                            .load_op = SDL_GPU_LOADOP_CLEAR,
-                            .clear_color = {0, 0, 0, 1},
-                            .filter = linear ? SDL_GPU_FILTER_LINEAR : SDL_GPU_FILTER_NEAREST};
-    SDL_BlitGPUTexture(command, &blit);
+                         u32 image_height, SDL_GPUTexture *target, Uint32 width, Uint32 height,
+                         int linear, int expanded) {
+    int enabled = 0;
+#ifdef HMBTN_ENH_WIDESCREEN
+    enabled = hm_widescreen_enabled();
+#endif
+    hm_gpu_present_image(command, image, image_width, image_height, target, width, height, linear,
+                         expanded, enabled);
 }
 static int hm_host_submit(u32 image_width, u32 image_height, int linear, int wide) {
     SDL_GPUCommandBuffer *command = SDL_AcquireGPUCommandBuffer(hm_device);
@@ -274,12 +266,14 @@ static int hm_host_gpu_present(const RECT *native_area) {
     u32 width = (u32)output_area.w, height = (u32)output_area.h;
 #if defined(HMBTN_ENH_SCALING) && defined(HMBTN_ENH_PAUSE_MENU)
     if (hm_options.scaling) {
-        if (!hm_host_scaling_prepare())
-            return 0;
         int w, h;
         if (!SDL_GetWindowSizeInPixels(hm_window, &w, &h) || w <= 0 || h <= 0)
             return 0;
         hm_host_output_size(&w, &h);
+        if (w > 4096 || h > 4096) {
+            hm_host_scaling_unavailable();
+            return 0;
+        }
         width = (u32)w;
         height = (u32)h;
     }
@@ -447,6 +441,11 @@ static void hm_host_pause(void) {
             if (action == HM_PAUSE_CHANGE_GRAPHICS) {
                 if (hm_graphics_change(hm_device, hm_window, &hm_options, menu.selected,
                                        input == HM_PAUSE_LEFT ? -1 : 1)) {
+#ifdef HMBTN_ENH_WIDESCREEN
+                    int changed_w, changed_h;
+                    if (SDL_GetWindowSizeInPixels(hm_window, &changed_w, &changed_h))
+                        hm_widescreen_configure(hm_options.widescreen, changed_w, changed_h);
+#endif
                     hm_host_reset_presentation();
                     notice = hm_graphics_save(&hm_options) ? "" : "Cannot save settings";
                 } else
@@ -535,7 +534,10 @@ static void hm_host_present_scanout(u64 tick) {
     int scaling_active = 0;
     hm_replay_sink previous_sink = {0};
 #if defined(HMBTN_ENH_PAUSE_MENU)
-    scaling_active = state->display_enabled && hm_options.scaling && hm_host_scaling_prepare();
+    /* Auto never stalls simulation with a viewport-sized CPU retry. The
+     * explicit Software renderer remains the full-resolution reference. */
+    scaling_active = state->display_enabled && hm_options.scaling && hm_options.renderer &&
+                     hm_host_scaling_prepare();
 #endif
     if (scaling_active)
         previous_sink = hm_scaling_begin();
@@ -829,6 +831,11 @@ int hm_game_host_start(hm_disc *disc) {
         if (!hm_graphics_swapchain(hm_device, hm_window, &hm_options))
             return 0;
     }
+#endif
+#if defined(HMBTN_ENH_WIDESCREEN) && defined(HMBTN_ENH_PAUSE_MENU)
+    int initial_w, initial_h;
+    if (SDL_GetWindowSizeInPixels(hm_window, &initial_w, &initial_h))
+        hm_widescreen_configure(hm_options.widescreen, initial_w, initial_h);
 #endif
 #if defined(HMBTN_ENH_INTERPOLATION) && defined(HMBTN_ENH_PAUSE_MENU)
     if (!hm_interpolation_enable(hm_options.interpolation)) {

@@ -259,3 +259,36 @@ A native CPU-only build with Widescreen ON, GPU/Scaling/Filtering OFF succeeds;
 a native build with Widescreen OFF also succeeds. The release game process was
 left running; a separate windows-wide-preview executable was linked for owner
 manual testing instead of replacing the locked release executable.
+
+### All-screen widescreen and dialogue fallback (2026-10-26)
+
+ADR-057 removes the world-only viewport decision and preserves full-window
+presentation across 2D/loading/pause/native fallback. Title background tile
+spans expose existing assets; logos and text keep their native proportional
+canvas. Offscreen Vulkan/D3D12 compare presentation alternating expanded GPU,
+native fallback and Widescreen OFF. No gameplay was launched for these checks.
+
+Before the fix, a synthetic oversized text clip fails GPU scene construction
+at gpu_scene.c's new regression assertion. The same clip with visible glyphs
+now succeeds; genuinely offscreen writes/texture feedback still reject. Sampled
+UV rows outside a framebuffer now succeed even when their enclosing page
+intersects it. This proves the technical triggers, not the owner's exact trace.
+
+Release, Radeon RX Vega, SDL_GetTicksNS, 25 serialized output renders. Workload:
+two textured sprites, a flat world triangle, UI/fade, 40 synthetic 8x12 glyphs,
+an oversized dialogue clip and restored native clipping. Native retry is the
+new Auto fallback policy; viewport-sized CPU retry is the previous policy:
+
+| Driver | Filter | Previous CPU retry 1920x1080 ms | Native CPU retry 428x240 ms | GPU capture/upload/compute/fence 1920x1080 ms |
+|---|---|---:|---:|---:|
+| Vulkan | Nearest | 31.145 | 3.676 | 1.304 |
+| Vulkan | Bilinear | 36.373 | 4.035 | 1.314 |
+| D3D12 | Nearest | 31.458 | 3.666 | 1.376 |
+| D3D12 | Bilinear | 36.201 | 4.031 | 1.319 |
+
+These are isolated synthetic output costs, not gameplay frame rates or complete
+frame budgets. Probe fences serialize work; normal rendering uses no fence or
+readback. CPU fallback preserves the current native VRAM path; performance
+profiling of actual game logic, pacing/waits and GPU work remains for the
+follow-up runtime-fixes branch. Aggregate CPU/GPU usage alone is not a measure
+of available game-thread headroom.

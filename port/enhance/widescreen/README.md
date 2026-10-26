@@ -18,14 +18,17 @@ size. This rounding gives a small subpixel aspect approximation at native height
 21:9/32:9 use the same calculation. Maximum logical width is 1024. Portrait/4:3
 remain native. OFF retains 4:3 bars and original source culling.
 
-The current scope is the farm normal-view world renderer, including its UI
-layers. Title, menu-only scenes, minigames, direct/loading scanouts and the ESC
-pause canvas retain 4:3. Authored scene edges can expose empty space; this feature
-does not create level geometry or enlarge weather particle pools. Further actor
-or scene-specific culling may still need adjustment after owner gameplay checks.
+Widescreen presentation now applies from the first logo through title, load/save,
+minigames, gameplay and pause (ADR-057). The title's original scrolling 0x25
+background tiles are tagged separately and exposed beyond their old clip;
+logo/text/cursor packets stay proportional. Native/pause/direct/loading output
+fills extra background from original edge columns, keeping centered content.
+Original black logo background remains black. Nothing invents new level scenery
+or enlarges weather particle pools. Scene-specific geometry/coverage still needs
+owner testing. GPU/native fallback never changes the presentation aspect.
 Original primitive memory/overlay backups stay intact. Model submission stops
 with an 8 KiB UI reserve if its original arena fills. Two optional 256 KiB GS
-arenas supply sprite packet space; OFF/scene exit restores original work arenas.
+arenas supply sprite packet space; OFF restores original work arenas.
 CPU fallback at large output sizes can be slow.
 
 Technical checks cover world/UI separation, full-screen fills, unchanged native
@@ -34,3 +37,8 @@ GPU readback on Vulkan/D3D12 at native/enlarged output with both filtering modes
 No gameplay or replay was launched. Owner validation across maps, weather,
 transitions, dense fields, dialogue, interpolation and monitor changes is pending.
 See ADR-056, ANALYSIS.md and PLATFORMS.md.
+
+GPU Auto uses native-resolution retry for unsupported scenes to avoid a large CPU
+raster stall; explicit Software retains viewport-sized reference rendering.
+Supported GPU scenes still use Enhance Scaling's requested size. A retry can
+reduce detail temporarily. See PLATFORMS.md for synthetic dialogue measurements.

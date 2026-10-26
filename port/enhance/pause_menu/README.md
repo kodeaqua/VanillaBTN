@@ -55,8 +55,8 @@ game/RNG/audio faster. See ../interpolation/README.md for scope and limits. GPU/
 Enhance Scaling can rerasterize triangle geometry at the viewport resolution
 through GPU Auto or the software reference; enhance.scaling defaults false.
 See ../scaling/README.md for coverage, limits and measured costs. Widescreen
-Mode now expands the farm world viewport while keeping UI centered and native
-sized (ADR-056); enhance.widescreen defaults false. See ../widescreen/README.md
+Mode now covers all screens while keeping UI centered and native
+sized (ADR-057); enhance.widescreen defaults false. See ../widescreen/README.md
 for scope and owner validation. FXAA/MSAA remain unavailable. Original texture
 assets and native simulation are retained.
 

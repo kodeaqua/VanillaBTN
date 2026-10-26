@@ -11,6 +11,7 @@ void hm_widescreen_configure(int enabled, int width, int height) {
         requested_margin = (int)(logical - 320 + 1) / 2;
     }
 }
+int hm_widescreen_enabled(void) { return requested_margin != 0; }
 void hm_widescreen_scene(int world) { world_scene = !!world; }
 int hm_widescreen_margin(void) { return world_scene ? requested_margin : 0; }
 int hm_widescreen_angle(int angle) {

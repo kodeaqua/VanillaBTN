@@ -44,21 +44,14 @@ static int hm_scene_overlap(int x, int y, int w, int h, const RECT *r) {
 static int hm_scene_material(hm_gpu_scene *s, u32 *p, u32 op, u32 page, u32 clut) {
     const hm_gpu_environment *env = hm_gpu_environment_state();
     const DRAWENV *d = &env->draw;
-    if (d->clip.x < s->area.x || d->clip.y < s->area.y ||
-        d->clip.x + d->clip.w > s->area.x + s->area.w ||
-        d->clip.y + d->clip.h > s->area.y + s->area.h) {
-        s->failure = "offscreen draw dependencies";
-        return 0;
-    }
     if (op & 4) {
         u32 depth = (page >> 7) & 3;
         if (depth > 2) {
             s->failure = "reserved texture depth";
             return 0;
         }
-        if (hm_scene_overlap((page & 15) * 64, (page & 16) * 16, 64 << depth, 256, &s->native) ||
-            (depth < 2 && hm_scene_overlap((clut & 63) * 16, (clut >> 6) & 511, depth ? 256 : 16, 1,
-                                           &s->native))) {
+        if (depth < 2 && hm_scene_overlap((clut & 63) * 16, (clut >> 6) & 511, depth ? 256 : 16, 1,
+                                          &s->native)) {
             s->failure = "framebuffer texture feedback";
             return 0;
         }
@@ -83,6 +76,40 @@ static int hm_scene_material(hm_gpu_scene *s, u32 *p, u32 op, u32 page, u32 clut
     p[17] = env->display_enabled;
     return 1;
 }
+/* Conservative sampled UV footprint, including texture-window remapping and
+ * 8-bit wrapping. A page can share unused rows with the native framebuffer. */
+static int hm_scene_texture_bounds(hm_gpu_scene *s, const u32 *p, u32 u, u32 v, u32 width,
+                                   u32 height) {
+    if (!(p[1] & 4) || !width || !height)
+        return 1;
+    u32 depth = (p[2] >> 7) & 3, mx = (256 - p[7]) & 248, my = (256 - p[8]) & 248;
+    int x0 = 1024, x1 = -1, y0 = 512, y1 = -1;
+    if (width > 256)
+        width = 256;
+    if (height > 256)
+        height = 256;
+    for (u32 i = 0; i < width; ++i) {
+        u32 mapped = ((((u + i) & 255) & ~mx) | (p[5] & mx)) & 255;
+        int x = (int)(mapped >> (2 - depth));
+        if (x < x0)
+            x0 = x;
+        if (x > x1)
+            x1 = x;
+    }
+    for (u32 i = 0; i < height; ++i) {
+        int y = (int)(((((v + i) & 255) & ~my) | (p[6] & my)) & 255);
+        if (y < y0)
+            y0 = y;
+        if (y > y1)
+            y1 = y;
+    }
+    if (hm_scene_overlap((p[2] & 15) * 64 + x0, (p[2] & 16) * 16 + y0, x1 - x0 + 1, y1 - y0 + 1,
+                         &s->native)) {
+        s->failure = "framebuffer texture feedback";
+        return 0;
+    }
+    return 1;
+}
 static void hm_scene_add(hm_gpu_scene *s, u32 *p, int x0, int y0, int x1, int y1) {
     if (s->failure)
         return;
@@ -91,6 +118,21 @@ static void hm_scene_add(hm_gpu_scene *s, u32 *p, int x0, int y0, int x1, int y1
         --y0;
         ++x1;
         ++y1;
+    }
+    if (x0 < (int)p[9])
+        x0 = (int)p[9];
+    if (y0 < (int)p[10])
+        y0 = (int)p[10];
+    if (x1 > (int)p[9] + (int)p[11])
+        x1 = (int)p[9] + (int)p[11];
+    if (y1 > (int)p[10] + (int)p[12])
+        y1 = (int)p[10] + (int)p[12];
+    if (x0 >= x1 || y0 >= y1)
+        return;
+    if (x0 < s->area.x || y0 < s->area.y || x1 > s->area.x + s->area.w ||
+        y1 > s->area.y + s->area.h) {
+        s->failure = "offscreen draw dependencies";
+        return;
     }
     if (x0 < s->area.x)
         x0 = s->area.x;
@@ -179,10 +221,7 @@ static void hm_scene_triangle(hm_gpu_scene *s, u32 *material, const u32 xy[3], c
     }
     if (x1 - x0 > 1023 || y1 - y0 > 511)
         return;
-    int margin = s->motion_previous ? 1 : 0;
-    if (x1 + margin <= s->area.x || y1 + margin <= s->area.y ||
-        x0 - margin >= s->area.x + s->area.w || y0 - margin >= s->area.y + s->area.h)
-        return;
+
     s64 area = (s64)((s32)p[20] - (s32)p[18]) * ((s32)p[23] - (s32)p[19]) -
                (s64)((s32)p[21] - (s32)p[19]) * ((s32)p[22] - (s32)p[18]);
     if (s->motion_previous) {
@@ -210,6 +249,22 @@ static void hm_scene_triangle(hm_gpu_scene *s, u32 *material, const u32 xy[3], c
         tmp = p[28];
         p[28] = p[29];
         p[29] = tmp;
+    }
+    if (p[1] & 4) {
+        u32 u0 = 255, u1 = 0, v0 = 255, v1 = 0;
+        for (int i = 0; i < 3; ++i) {
+            u32 u = p[27 + i] & 255, v = (p[27 + i] >> 8) & 255;
+            if (u < u0)
+                u0 = u;
+            if (u > u1)
+                u1 = u;
+            if (v < v0)
+                v0 = v;
+            if (v > v1)
+                v1 = v;
+        }
+        if (!hm_scene_texture_bounds(s, p, u0, v0, u1 - u0 + 1, v1 - v0 + 1))
+            return;
     }
     hm_scene_add(s, p, x0, y0, x1, y1);
 }
@@ -272,6 +327,8 @@ static void hm_scene_rectangle(hm_gpu_scene *s, const u32 *w, u32 available) {
         p[37] = hm_scene_scaled(qx + (s64)width * 65536, s->area.x, s->width, s->area.w);
         p[38] = hm_scene_scaled(qy + (s64)height * 65536, s->area.y, s->height, s->area.h);
     }
+    if (!hm_scene_texture_bounds(s, p, p[27] & 255, (p[27] >> 8) & 255, width, height))
+        return;
     hm_scene_add(s, p, x, y, x + (int)width, y + (int)height);
 }
 static void hm_scene_line_segment(hm_gpu_scene *s, u32 xy0, u32 xy1, u32 c0, u32 c1, u32 op,

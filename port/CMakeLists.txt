@@ -76,12 +76,14 @@ target_compile_options(hmbtn_game_options INTERFACE
 target_compile_definitions(hmbtn_game_options INTERFACE HMBTN_PORT=1)
 
 file(GLOB_RECURSE hm_game_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../src/*.c")
-add_library(hmbtn_game_initial STATIC ${hm_game_sources} overlay/game_lifecycle.c gfx/game_frame.c gfx/field_identity.c enhance/widescreen/game_buffers.c)
+add_library(hmbtn_game_initial STATIC ${hm_game_sources} overlay/game_lifecycle.c gfx/game_frame.c gfx/field_identity.c enhance/widescreen/game_buffers.c enhance/widescreen/title_background.c)
 target_link_libraries(hmbtn_game_initial PUBLIC hmbtn_game_options hmbtn_work_memory hmbtn_overlay)
 # Keep the game's entry point separate from the host test runners. This source
 # is compiled into the archive only; no native game executable is linked yet.
 set_source_files_properties(../src/main/main.c PROPERTIES COMPILE_DEFINITIONS
     "main=hm_game_main;PutDrawEnv=hm_game_put_draw_env;DrawOTag=hm_game_draw_ot;ClearOTagR=hm_game_clear_ot;GsSetWorkBase=hm_game_set_work_base")
+set_source_files_properties(../src/overlay/27_GF_TITLE/title.c PROPERTIES COMPILE_DEFINITIONS
+    "anim_draw_sprt_cursor=hm_title_draw_sprt_cursor")
 set_source_files_properties(../src/overlay/11_GF_FARM/field/field.c PROPERTIES COMPILE_DEFINITIONS
     "estate_point_project=hm_field_point_project;anim_draw_sprt_cursor=hm_field_draw_sprt_cursor")
 
@@ -168,6 +170,8 @@ if(HMBTN_BUILD_GPU_SPIKE OR HMBTN_BUILD_NATIVE_WINDOW)
         URL_HASH SHA256=1330671214d146f8aeb1ed399fc3e081873cdb38b5189d1f8bb6ab15bbc04211
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
     FetchContent_MakeAvailable(SDL3)
+    add_library(hmbtn_gpu_presentation STATIC platform/gpu_present.c)
+    target_link_libraries(hmbtn_gpu_presentation PUBLIC hmbtn_port_options SDL3::SDL3)
     if(HMBTN_GPU_RASTER)
         set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
             "${CMAKE_CURRENT_SOURCE_DIR}/gfx/shaders/scene.hlsl"
@@ -190,7 +194,7 @@ if(HMBTN_BUILD_GPU_SPIKE OR HMBTN_BUILD_NATIVE_WINDOW)
         target_link_libraries(hmbtn_gpu_renderer PUBLIC hmbtn_gpu_scene SDL3::SDL3)
         add_executable(hmbtn_gpu_renderer_probe EXCLUDE_FROM_ALL analysis/gpu_renderer_probe.c)
         target_compile_definitions(hmbtn_gpu_renderer_probe PRIVATE SDL_MAIN_HANDLED)
-        target_link_libraries(hmbtn_gpu_renderer_probe PRIVATE hmbtn_gpu_renderer)
+        target_link_libraries(hmbtn_gpu_renderer_probe PRIVATE hmbtn_gpu_renderer hmbtn_gpu_presentation)
         target_compile_definitions(hmbtn_gpu_renderer_probe PRIVATE HM_SCALE_REFERENCE=1)
         target_link_libraries(hmbtn_gpu_renderer_probe PRIVATE hmbtn_software_raster)
         if(HMBTN_ENH_FILTERING)
@@ -207,7 +211,7 @@ if(HMBTN_BUILD_GPU_SPIKE OR HMBTN_BUILD_NATIVE_WINDOW)
             platform/audio_output.c platform/audio_ring.c platform/user_data.c)
         target_compile_definitions(hmbtn_native PRIVATE SDL_MAIN_HANDLED HMBTN_SDL_HOST=1)
         target_link_libraries(hmbtn_native PRIVATE hmbtn_game_initial hmbtn_psx_pending SDL3::SDL3)
-        target_link_libraries(hmbtn_native PRIVATE hmbtn_settings_json)
+        target_link_libraries(hmbtn_native PRIVATE hmbtn_settings_json hmbtn_gpu_presentation)
         target_link_libraries(hmbtn_native PRIVATE hmbtn_presentation_clock)
         if(HMBTN_ENH_FILTERING)
             target_compile_definitions(hmbtn_native PRIVATE HMBTN_ENH_FILTERING=1)

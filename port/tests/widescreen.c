@@ -1,5 +1,6 @@
 #include "enhance/widescreen/widescreen.h"
 #include "gfx/gpu_scene.h"
+#include "gfx/packet_identity.h"
 #include "gfx/software_output.h"
 #include "psx/gpu_environment.h"
 #include "psx/gpu_raster.h"
@@ -38,7 +39,7 @@ int main(void) {
     CHECK(hm_widescreen_margin() == 352);
     hm_widescreen_configure(1, 1920, 1080);
     hm_widescreen_scene(0);
-    CHECK(!hm_widescreen_margin());
+    CHECK(!hm_widescreen_margin() && hm_widescreen_enabled());
     hm_widescreen_scene(1);
     hm_vram_reset();
     ResetGraph(0);
@@ -94,6 +95,20 @@ int main(void) {
     hm_gpu_execute_words(full, 5);
     CHECK(hm_software_output_end(out, previous, &view));
     CHECK(view.pixels[15 * 428 + 20] == (31 << 10) && view.pixels[15 * 428 + 400] == (31 << 10));
+    hm_vram_reset();
+    /* UI-only/title capture can selectively widen existing background assets. */
+    hm_packet_identity_reset();
+    hm_render_begin(&frame);
+    hm_render_group(0);
+    CHECK(hm_packet_background_span(world, world + 3));
+    hm_render_packet(world, 3);
+    hm_render_packet(ui, 3);
+    hm_render_end();
+    previous = hm_software_output_begin(out);
+    CHECK(hm_software_output_replay(out, &frame));
+    CHECK(hm_software_output_end(out, previous, &view));
+    CHECK(view.pixels[15 * 428 + 20] == 31 && view.pixels[55 * 428 + 20] == 0);
+    hm_packet_identity_reset();
     hm_gpu_scene_destroy(gpu);
     hm_software_output_destroy(out);
     hm_widescreen_configure(0, 1920, 1080);

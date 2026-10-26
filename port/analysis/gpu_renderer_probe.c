@@ -2,6 +2,7 @@
 #include "enhance/widescreen/widescreen.h"
 #endif
 /* Offscreen, synthetic GPU readback. Never opens a window or starts the game. */
+#include "platform/gpu_present.h"
 #include "platform/gpu_renderer.h"
 #include "psx/gpu_environment.h"
 #include "psx/gpu_raster.h"
@@ -49,23 +50,25 @@ static void setup(void) {
                                          : 0));
     for (u32 i = 0; i < 256; ++i)
         hm_vram_draw_pixel(896 + i, 252, i % 7 ? (u16)(i * 113 + 0x8001) : 0);
+    for (u32 i = 0; i < 16; ++i)
+        hm_vram_draw_pixel(896 + i, 490, i ? (u16)(0x8000 | i * 1057) : 0);
+    for (u32 y = 0; y < 16; ++y)
+        for (u32 x = 0; x < 8; ++x) {
+            hm_vram_draw_pixel(x, 240 + y, 0x1234);
+            hm_vram_draw_pixel(896 + x, y, 0x3211);
+        }
 }
-static int readback(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
-                    const hm_gpu_scene_data *scene, u8 *pixels) {
+static int download_image(SDL_GPUDevice *device, SDL_GPUCommandBuffer *command,
+                          SDL_GPUTexture *image, u32 width, u32 height, u8 *pixels) {
     SDL_GPUTransferBufferCreateInfo info = {.usage = SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD,
-                                            .size = scene->width * scene->height * 4};
+                                            .size = width * height * 4};
     SDL_GPUTransferBuffer *download = SDL_CreateGPUTransferBuffer(device, &info);
     CHECK(download);
-    SDL_GPUCommandBuffer *command = SDL_AcquireGPUCommandBuffer(device);
-    CHECK(command);
-    SDL_GPUTexture *image = hm_gpu_renderer_encode(renderer, command, scene);
-    CHECK(image);
     SDL_GPUCopyPass *copy = SDL_BeginGPUCopyPass(command);
     CHECK(copy);
-    SDL_GPUTextureRegion from = {.texture = image, .w = scene->width, .h = scene->height, .d = 1};
-    SDL_GPUTextureTransferInfo to = {.transfer_buffer = download,
-                                     .pixels_per_row = scene->width,
-                                     .rows_per_layer = scene->height};
+    SDL_GPUTextureRegion from = {.texture = image, .w = width, .h = height, .d = 1};
+    SDL_GPUTextureTransferInfo to = {
+        .transfer_buffer = download, .pixels_per_row = width, .rows_per_layer = height};
     SDL_DownloadFromGPUTexture(copy, &from, &to);
     SDL_EndGPUCopyPass(copy);
     SDL_GPUFence *fence = SDL_SubmitGPUCommandBufferAndAcquireFence(command);
@@ -77,6 +80,56 @@ static int readback(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
     SDL_memcpy(pixels, mapped, info.size);
     SDL_UnmapGPUTransferBuffer(device, download);
     SDL_ReleaseGPUTransferBuffer(device, download);
+    return 0;
+}
+static int readback(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
+                    const hm_gpu_scene_data *scene, u8 *pixels) {
+    SDL_GPUCommandBuffer *command = SDL_AcquireGPUCommandBuffer(device);
+    CHECK(command);
+    SDL_GPUTexture *image = hm_gpu_renderer_encode(renderer, command, scene);
+    CHECK(image);
+    return download_image(device, command, image, scene->width, scene->height, pixels);
+}
+static int hm_probe_presentation(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
+                                 hm_gpu_scene *builder) {
+    setup();
+    RECT area = {0, 0, 32, 32};
+    hm_replay_sink previous = hm_gpu_scene_begin(builder, 32, 32);
+    hm_replay_begin(&area);
+    u32 colors[] = {0x600000ff, 0,          0x00200020, 0x6000ff00, 8,
+                    0x00200010, 0x60ff0000, 24,         0x00200008};
+    hm_gpu_execute_words(colors, sizeof colors / sizeof *colors);
+    hm_gpu_scene_data data;
+    CHECK(hm_gpu_scene_end(builder, previous, &data));
+    SDL_GPUTextureCreateInfo info = {.type = SDL_GPU_TEXTURETYPE_2D,
+                                     .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
+                                     .usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET |
+                                              SDL_GPU_TEXTUREUSAGE_SAMPLER,
+                                     .width = 128,
+                                     .height = 48,
+                                     .layer_count_or_depth = 1,
+                                     .num_levels = 1,
+                                     .sample_count = SDL_GPU_SAMPLECOUNT_1};
+    SDL_GPUTexture *target = SDL_CreateGPUTexture(device, &info);
+    CHECK(target);
+    for (int mode = 0; mode < 4; ++mode) {
+        SDL_GPUCommandBuffer *command = SDL_AcquireGPUCommandBuffer(device);
+        CHECK(command);
+        SDL_GPUTexture *image = hm_gpu_renderer_encode(renderer, command, &data);
+        CHECK(image);
+        hm_gpu_present_image(command, image, 32, 32, target, 128, 48, 0, mode == 2, mode != 0);
+        CHECK(!download_image(device, command, target, 128, 48, actual));
+        u32 row = 24 * 128 * 4;
+        CHECK(actual[row] == (mode ? 255 : 0));
+        CHECK(actual[row + 127 * 4 + 2] == (mode ? 255 : 0));
+        CHECK(actual[row + 64 * 4 + 1] == 255);
+        if (mode != 2) {
+            CHECK(actual[row + 47 * 4] == 255);
+            CHECK(actual[row + 48 * 4 + 1] == 255);
+        }
+    }
+    SDL_ReleaseGPUTexture(device, target);
+    puts("Whole-canvas presentation and GPU/native fallback aspect comparisons passed");
     return 0;
 }
 static int fixture(SDL_GPUDevice *device, hm_gpu_renderer *renderer, hm_gpu_scene *builder,
@@ -255,6 +308,17 @@ static void hm_probe_wide_draw(void) {
     hm_gpu_execute_words(ui, sizeof ui / sizeof *ui);
     u32 fade[] = {0xe1000040, 0x2a101010, 0, 320, 240u << 16, 320u | (240u << 16)};
     hm_gpu_execute_words(fade, sizeof fade / sizeof *fade);
+    u32 origin = (u32)hm_gpu_environment_state()->draw.ofs[1];
+    u32 clip[] = {0xe3000000u | 16u | ((origin + 160) << 10),
+                  0xe4000000u | 319u | ((origin + 255) << 10), 0xe100060e};
+    hm_gpu_execute_words(clip, 3);
+    for (int i = 0; i < 40; ++i) {
+        u32 glyph[] = {0x64808080, xy(20 + (i % 20) * 8, 170 + (i / 20) * 12), 0x7ab80000,
+                       xy(8, 12)};
+        hm_gpu_execute_words(glyph, 4);
+    }
+    u32 restore[] = {0xe3000000u | (origin << 10), 0xe4000000u | 319u | ((origin + 239) << 10)};
+    hm_gpu_execute_words(restore, 2);
 }
 static int hm_probe_wide_benchmark(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
                                    hm_gpu_scene *builder) {
@@ -284,6 +348,18 @@ static int hm_probe_wide_benchmark(SDL_GPUDevice *device, hm_gpu_renderer *rende
             hm_replay_bind(previous);
         }
         printf("Wide CPU 1920x1080 filter=%d: %.3f ms/render\n", filter,
+               (double)(SDL_GetTicksNS() - start) / 1e6 / passes);
+        surface.width = 428;
+        surface.height = 240;
+        start = SDL_GetTicksNS();
+        for (int i = 0; i < passes; ++i) {
+            work_vram = saved_vram;
+            hm_replay_sink previous = hm_replay_bind(hm_software_sink(&surface));
+            hm_replay_begin(&area);
+            hm_probe_wide_draw();
+            hm_replay_bind(previous);
+        }
+        printf("Auto native fallback CPU 428x240 filter=%d: %.3f ms/render\n", filter,
                (double)(SDL_GetTicksNS() - start) / 1e6 / passes);
         hm_gpu_scene_texture_filter(builder, filter);
         start = SDL_GetTicksNS();
@@ -456,6 +532,11 @@ int main(int argc, char **argv) {
             }
     }
     texture_linear = 0;
+    u32 dialog_clip[] = {0xe4000000u | 31u | (63u << 10), 0x600000ff, xy(2, 2), xy(4, 4)};
+    CHECK(!fixture(device, renderer, builder, dialog_clip, 4, 32, 32, 0));
+    CHECK(!fixture(device, renderer, builder, dialog_clip, 4, 128, 96, 9));
+    u32 safe_page[] = {0xe1000600, 0x65808080, xy(2, 2), (0x7ab8u << 16) | 0xf000, xy(4, 4)};
+    CHECK(!fixture(device, renderer, builder, safe_page, 5, 32, 32, 0));
     CHECK(!hm_probe_random_cases(device, renderer, builder));
 #ifdef HM_FILTER_REFERENCE
     texture_linear = 1;
@@ -471,6 +552,7 @@ int main(int argc, char **argv) {
 #ifdef HMBTN_ENH_WIDESCREEN
     CHECK(!hm_probe_widescreen(device, renderer, builder));
 #endif
+    CHECK(!hm_probe_presentation(device, renderer, builder));
     if (argc > 2 && !SDL_strcmp(argv[2], "--benchmark")) {
         CHECK(!hm_probe_benchmark(device, renderer, builder));
 #ifdef HMBTN_ENH_WIDESCREEN

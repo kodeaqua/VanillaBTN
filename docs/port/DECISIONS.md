@@ -1513,3 +1513,56 @@ and unchanged native projection are covered by unit tests. A mechanical check
 removing only the new guards reconstructs each original source file exactly.
 Matching check could not run: the matching Linux toolchain is unavailable on
 this Windows host and the owner prohibits WSL. No matching result is claimed.
+
+## ADR-057: Stable widescreen presentation across every screen and fallback
+
+Date: 2026-10-26
+
+Context: The owner requires widescreen from the Natsume logo through title,
+load/save, gameplay and pause, preserving proportional logos/text and extending
+background from original assets. They report aspect switching depending on
+whether a dialogue is visible, plus dialogue lag with Enhance Scaling. This
+supersedes ADR-056's world-only/pause/non-world presentation restriction.
+
+Decision: Separate the persistent full-window presentation setting from replay
+availability and world interpolation eligibility. Every 320x240 frame can use
+the expanded private canvas, including 2D views and minigames. Camera culling
+continues to use original coordinates and only expands horizontal visibility.
+Do not gate the viewport on farm normal-view or dialogue state. Initialize the
+setting before the first logo and refresh it during pause/display changes.
+
+The title's existing animation 0x25 tiled background is marked at construction
+through a title.c-only CMake adapter. Generic packet span metadata changes its
+replay group, widening its clip to expose existing background tiles. Other
+logo/text/cursor packets retain original positioning and scale. Full-screen
+flat backgrounds/fades already cover the canvas. Extra canvas initialization
+uses clamped native edge/background pixels rather than neighboring VRAM. For
+direct/loading/native fallback or the pause canvas, the shared SDL compositor
+fills side regions from original edge columns and places original content at
+its proportional centered size. Original black background remains black; no
+invented scenery or replacement assets are introduced.
+
+Two synthetic reproductions confirm excessive GPU fallback: a draw clip that
+extends below the viewport although visible glyphs stay inside, and an atlas
+page that intersects the framebuffer while the sampled UV rows do not. Test
+actual primitive bounds after clipping for offscreen writes; retain rejection
+when writes really leave the output. Bound texture feedback by the sampled UV
+footprint after wrap/window remapping, plus conservative CLUT checks, rather
+than the entire page. Genuine framebuffer feedback remains unsupported.
+
+GPU Auto retries unsupported scenes at native internal resolution, followed by
+GPU presentation. It never retries a viewport-sized CPU raster while pacing
+simulation. Explicit Renderer > Software retains full-resolution CPU reference
+output. Supported Auto scenes still render at the requested enhanced resolution.
+Do not allocate a full-resolution software surface just to prepare GPU output.
+The viewport and UI proportions remain consistent when output paths change;
+unsupported-frame fallback can temporarily reduce detail. This is a quality/
+latency tradeoff, not complete GPU coverage or a gameplay performance guarantee.
+
+Validation: 82/82 Release and ASan/UBSan tests. Offscreen Vulkan/D3D12 verify
+world/UI, title-style background metadata, clip/UV feedback regressions, fades,
+and full-window presentation alternating GPU/native output with OFF parity.
+Synthetic dialogue workload timings are recorded in PLATFORMS.md. Owner actual
+logo/title/save/load, all-map and dialog/transition validation remains pending.
+No additional decomp source guard or external dependency is added. FXAA/MSAA
+remain deferred; save/load crash fixes follow after merging this graphics PR.

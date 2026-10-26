@@ -8,7 +8,10 @@ typedef struct {
 static hm_identity_span hm_spans[HM_IDENTITY_SPANS];
 static u32 hm_span_count;
 static int hm_span_invalid;
+static hm_identity_span hm_backgrounds[128];
+static u32 hm_background_count;
 void hm_packet_identity_reset(void) {
+    hm_background_count = 0;
     hm_span_count = 0;
     hm_span_invalid = 0;
 }
@@ -45,4 +48,19 @@ int hm_packet_identity_get(const void *packet, u64 *entity, u32 *part) {
     *entity = span->entity;
     *part = (u32)((at - span->begin) / 4);
     return 1;
+}
+
+int hm_packet_background_span(const void *begin, const void *end) {
+    uintptr_t first = (uintptr_t)begin, last = (uintptr_t)end;
+    if (!first || last <= first || hm_background_count == 128)
+        return 0;
+    hm_backgrounds[hm_background_count++] = (hm_identity_span){first, last, 0};
+    return 1;
+}
+int hm_packet_background_get(const void *packet) {
+    uintptr_t at = (uintptr_t)packet;
+    for (u32 i = 0; i < hm_background_count; ++i)
+        if (at >= hm_backgrounds[i].begin && at < hm_backgrounds[i].end)
+            return 1;
+    return 0;
 }

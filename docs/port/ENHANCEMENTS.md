@@ -14,7 +14,7 @@ The owner requested the native pause interface and graphics settings on
 | FPS limit | Native (30), Off (Unlimited), or monitor-derived rational caps; fixed 60 Hz game ticks; native images unless optional interpolation is enabled |
 | Visual interpolation | Optional private primitive replay for normal farm views; synthetic checks pass, owner gameplay validation pending |
 | Enhance Scaling | Optional viewport-resolution output through GPU Auto or Software; default OFF; gameplay checks pending |
-| Widescreen Mode | Optional expanded farm world viewport with centered native UI (ADR-056); gameplay validation pending |
+| Widescreen Mode | All-screen wide canvas, original title background tiles, proportional UI and stable fallback (ADR-057); owner validation pending |
 | FXAA/MSAA | OFF; renderer paths pending |
 
 HMBTN_ENH_PAUSE_MENU defaults OFF in CMake; Windows build.ps1 -Game enables it.
@@ -77,3 +77,10 @@ enhance.widescreen defaults false. Windows -Game includes it. OFF and non-world
 scenes retain 4:3 bars. GPU Auto/Software, native/enhanced output and palette
 filtering share the path. Original UI size, GTE projection and game clocks stay
 native. See port/enhance/widescreen/README.md for current limits and owner checks.
+
+ADR-057 supersedes the world-only restriction above: Widescreen now applies to
+logo/title/load/save/minigames/pause as well as world rendering, with native
+logos/text and background extension from original assets. GPU/native fallback
+keeps the presentation aspect. Auto retries at native internal resolution to
+bound stalls; explicit Software keeps full-resolution CPU output. Actual
+in-game dialogue performance and all-screen visuals remain owner-tested.

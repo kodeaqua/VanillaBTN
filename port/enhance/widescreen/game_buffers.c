@@ -14,7 +14,7 @@ void hm_game_set_work_base(void *base) {
         GsSetWorkBase(base);
         return;
     }
-    hm_widescreen_scene(hm_game_render_frame().world_view && current_frame->drawEnv.clip.w == 320 &&
+    hm_widescreen_scene(current_frame->drawEnv.clip.w == 320 &&
                         current_frame->drawEnv.clip.h == 240);
     if (current_frame == &frame_records[0] || current_frame == &frame_records[1]) {
         int i = current_frame == &frame_records[1];

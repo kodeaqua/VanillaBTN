@@ -41,7 +41,8 @@ override this one for their subtree.
 - The owner prioritizes requested graphics work before the pending sleep/save
   crash. Windows -Game also compiles Enhance Scaling; enhance.scaling defaults
   OFF. Widescreen now has an opt-in expanded farm world viewport (ADR-056);
-  OFF and non-world scenes retain 4:3. Gameplay coverage remains owner-tested.
+  OFF retains 4:3. ADR-057 extends ON presentation to all screens and keeps
+  native/CPU fallback aspect stable. Gameplay coverage remains owner-tested.
   Report CPU raster performance and untested gameplay/device behavior plainly.
 
 These explicit owner decisions override conflicting roadmap, CI skeleton,
@@ -371,3 +372,11 @@ remains selectable. Keep native VRAM/readback compatibility and safe CPU
 fallback while coverage is validated. Synthetic offscreen GPU probes are
 technical checks; interactive gameplay testing remains with the owner. Never
 present partial GPU coverage as complete or remove the reference prematurely.
+
+## Current owner follow-up (2026-10-26)
+
+Finish all-screen widescreen and its aspect/dialogue-fallback corrections, then
+open a PR and merge to main. Create a new branch from latest main for save/load,
+performance and other runtime fixes. FXAA/MSAA are explicitly deferred. Profile
+actual timing and waits before attributing low aggregate CPU/GPU use to a cause;
+interactive gameplay testing stays with the owner.

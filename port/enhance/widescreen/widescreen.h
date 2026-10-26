@@ -5,6 +5,7 @@
 void hm_widescreen_configure(int enabled, int width, int height);
 void hm_widescreen_scene(int world);
 int hm_widescreen_margin(void);
+int hm_widescreen_enabled(void);
 int hm_widescreen_angle(int angle);
 int hm_widescreen_radius(int radius);
 RECT hm_widescreen_area(RECT native);

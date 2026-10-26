@@ -574,3 +574,18 @@ Source projection/depth remain native. Wider CPU culling feeds existing OTs;
 private replay expands world clipping while UI remains native. Original
 primitive/overlay backup buffers are unchanged; private GS work arenas are
 restored on OFF/scene exit. See ADR-056 for visibility/capacity limitations.
+
+### All-screen viewport and fallback correction (ADR-057)
+
+Widescreen eligibility no longer depends on farm view/dialogue state. Native
+320x240 replay uses a stable expanded domain across scenes; direct/native/pause
+presentation fills extra horizontal background from original edge columns.
+The title.c-only animation adapter tags existing 0x25 tiled-background packet
+spans; packet observation preserves these as background/world groups without
+changing source commands, animation progression or RNG. No new src/ edits.
+
+GPU rejection now uses clipped actual primitive bounds and sampled UV footprints
+instead of oversized draw clips or full texture pages. Genuine offscreen writes,
+feedback, unsupported transfers/capacities still fall back. Auto fallback retries
+at native internal resolution, retaining full-size software only when explicitly
+selected. Owner real-world aspect/dialogue observations still need revalidation.

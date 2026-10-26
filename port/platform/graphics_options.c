@@ -393,7 +393,7 @@ void hm_graphics_value(const hm_graphics_options *o, int item, char *text, size_
                      o->scaling ? "On - viewport resolution" : "Off - PS1 resolution");
     else if (item == 4)
         SDL_snprintf(text, capacity, "%s",
-                     o->widescreen ? "On - farm world viewport" : "Off - original 4:3");
+                     o->widescreen ? "On - all screens" : "Off - original 4:3");
     else if (item == 7)
         SDL_snprintf(text, capacity, "%s",
                      o->vsync ? "On - synchronized display" : "Off - tearing possible");

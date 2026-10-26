@@ -95,6 +95,34 @@ int main(void) {
     previous = hm_gpu_scene_begin(s, 0, 0);
     hm_replay_begin(&area);
     CHECK(!hm_gpu_scene_end(s, previous, &data));
+    /* A clip extending past the viewport is safe when its geometry stays inside. */
+    setup(32, 32);
+    area = (RECT){0, 0, 32, 32};
+    previous = hm_gpu_scene_begin(s, 32, 32);
+    hm_replay_begin(&area);
+    u32 dialog[] = {0xe4000000u | 31u | (63u << 10), 0x600000ff, 0x00020002, 0x00040004};
+    hm_gpu_execute_words(dialog, 4);
+    CHECK(hm_gpu_scene_end(s, previous, &data));
+    /* Page overlaps the framebuffer, but the sampled rows do not. */
+    setup(32, 32);
+    previous = hm_gpu_scene_begin(s, 32, 32);
+    hm_replay_begin(&area);
+    u32 safe_uv[] = {0xe1000600, 0x65808080, 0x00020002, (getClut(896, 490) << 16) | 0xf000,
+                     0x00040004};
+    hm_gpu_execute_words(safe_uv, 5);
+    CHECK(hm_gpu_scene_end(s, previous, &data));
+    setup(32, 32);
+    previous = hm_gpu_scene_begin(s, 32, 32);
+    hm_replay_begin(&area);
+    u32 unsafe_clip[] = {0xe4000000u | 31u | (63u << 10), 0x600000ff, 0x00280002, 0x00040004};
+    hm_gpu_execute_words(unsafe_clip, 4);
+    CHECK(!hm_gpu_scene_end(s, previous, &data));
+    setup(32, 32);
+    previous = hm_gpu_scene_begin(s, 32, 32);
+    hm_replay_begin(&area);
+    safe_uv[3] = (u32)getClut(896, 490) << 16;
+    hm_gpu_execute_words(safe_uv, 5);
+    CHECK(!hm_gpu_scene_end(s, previous, &data));
     hm_gpu_scene_destroy(s);
     return 0;
 }

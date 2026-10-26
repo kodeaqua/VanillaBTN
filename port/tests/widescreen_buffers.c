@@ -49,6 +49,9 @@ int main(void) {
     CHECK(cursor != work[1]);
     world = 0;
     hm_game_set_work_base(current_frame->workBase);
+    CHECK(cursor != work[1] && hm_widescreen_margin());
+    hm_widescreen_configure(0, 1920, 1080);
+    hm_game_set_work_base(current_frame->workBase);
     CHECK(cursor == work[1] && !hm_widescreen_margin());
     puts("Wide GS arenas preserve allocation cursor, OFF layout and overlay backup primitives");
     return 0;

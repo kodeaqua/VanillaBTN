@@ -55,3 +55,11 @@ UI stays on its original canvas. Full-screen flat F4 fades/fills cover the wider
 output. GPU initial pixels outside native framebuffer bounds are black; feedback
 checks retain native bounds. Near-boundary enlarged triangle coverage uses exact
 Q8 edge signs via 32-bit word arithmetic. See enhance/widescreen/README.md.
+
+ADR-057 keeps all-screen widescreen presentation independent of replay success.
+Generic background spans identify original title tiles without marking logos or
+text as background. Sampled UV footprints and actual clipped writes now decide
+feedback/offscreen rejection. platform/gpu_present.c is the shared compositor
+for direct/native and expanded output; offscreen probes compare both paths.
+Auto fallback uses native internal size; explicit Software keeps the enlarged
+reference raster. World projection and game clocks remain unchanged.

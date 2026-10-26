@@ -40,8 +40,7 @@ DRAWENV *hm_game_put_draw_env(DRAWENV *environment) {
     DRAWENV *result = PutDrawEnv(environment);
     hm_render_frame frame = hm_game_render_frame();
 #ifdef HMBTN_ENH_WIDESCREEN
-    hm_widescreen_scene(frame.world_view && environment->clip.w == 320 &&
-                        environment->clip.h == 240);
+    hm_widescreen_scene(environment->clip.w == 320 && environment->clip.h == 240);
 #endif
     hm_render_begin(&frame);
     return result;
