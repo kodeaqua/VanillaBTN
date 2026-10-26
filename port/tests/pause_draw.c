@@ -16,8 +16,9 @@ int main(void) {
     const u8 *glyph = canvas + (66 * 320 + 136) * 4;
     /* prim_make_gouraud_rect consumes 0xRRGGBB, not the reversed order
      * suggested by an old comment in window_frame.c. Keep that source intact. */
-    if (canvas[0] != 0x11 || gradient[0] != 0xF4 || gradient[1] != 0xDF || gradient[2] != 0xBD ||
-        gradient[3] != 255 || glyph[0] != 255 || glyph[1] != 0) {
+    if (canvas[0] != 10 || canvas[1] != 10 || canvas[2] != 10 || canvas[3] != 0x11 ||
+        gradient[0] != 0xF4 || gradient[1] != 0xDF || gradient[2] != 0xBD || gradient[3] != 255 ||
+        glyph[0] != 255 || glyph[1] != 0) {
         fprintf(stderr, "Original dialog geometry or cached glyph composition differs\n");
         return 1;
     }
@@ -33,7 +34,7 @@ int main(void) {
     const u8 *row_value = canvas + (49 * 320 + 192) * 4;
     const u8 *gap = canvas + (38 * 320 + 16) * 4;
     const u8 *detail = canvas + (205 * 320 + 24) * 4;
-    if (label[0] != 255 || row_value[0] != 255 || gap[0] != 0x11 || detail[0] != 255) {
+    if (label[0] != 255 || row_value[0] != 255 || gap[0] != 10 || detail[0] != 255) {
         fprintf(stderr, "Graphics columns, separated header or detail panel overlap\n");
         return 1;
     }

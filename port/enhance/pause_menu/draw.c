@@ -103,6 +103,11 @@ static void hm_center(const hm_pause_assets *assets, const char *text, int y) {
 }
 void hm_pause_draw(const hm_pause_assets *assets, u8 *rgba, const hm_pause_menu *menu,
                    const hm_pause_view *view) {
+    /* The host supplies a fresh frozen background each presentation. Apply a
+     * 40% black scrim before drawing the original, fully bright dialog art. */
+    for (size_t pixel = 0; pixel < 320 * 240; ++pixel)
+        for (size_t channel = 0; channel < 3; ++channel)
+            rgba[pixel * 4 + channel] = (u8)((u32)rgba[pixel * 4 + channel] * 3 / 5);
     hm_canvas = rgba;
     if (menu->page == HM_PAUSE_GRAPHICS) {
         hm_pause_original_frame(NULL, 12, 8, 296, 28);

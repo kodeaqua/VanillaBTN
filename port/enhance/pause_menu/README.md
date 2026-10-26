@@ -28,6 +28,11 @@ Arrows navigate/change options; Enter or X confirms; D goes back. Exit Game
 closes the application. The requested tree is Resume, Settings > Graphics,
 Exit Game. Root and settings have no extra entries.
 
+The frozen gameplay background receives a 40% black overlay before drawing the
+original dialog and text at full brightness. Each pause presentation starts
+from the unchanged snapshot, so darkness does not accumulate. Resume reads
+the native scene again; this UI effect never modifies game VRAM.
+
 Implemented platform controls: monitor selection; Windowed, exclusive Fullscreen
 and Borderless Fullscreen; resolutions enumerated from SDL's driver display
 modes; nearest or bilinear final-frame presentation. Borderless follows the

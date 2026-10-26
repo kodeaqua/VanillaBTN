@@ -13,7 +13,8 @@ typedef struct {
     const char *notice;
 } hm_pause_view;
 int hm_pause_assets_load(hm_pause_assets *assets, hm_disc *disc);
-/* RGBA canvas is always the original logical 320x240; never touches game VRAM. */
+/* Supply a fresh 320x240 RGBA background: dims RGB by 40%, then draws original
+ * dialog art at full brightness. Never touches game VRAM. */
 void hm_pause_draw(const hm_pause_assets *assets, u8 *rgba, const hm_pause_menu *menu,
                    const hm_pause_view *view);
 #endif
