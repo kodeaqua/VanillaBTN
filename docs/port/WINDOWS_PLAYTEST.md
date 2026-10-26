@@ -225,3 +225,17 @@ not open owner save files or run gameplay. Still owner-tested: shop dialogue
 lifecycles, married status UI, interactive animal exchange and card failure/retry,
 plus the earlier Saibara and repeated-sleep camera reports. No new gameplay launch
 was performed during this batch.
+
+### Third source-audit batch (2026-10-27)
+
+ADR-067 repairs reachable null output accesses in dog-ball pickup and boolean
+terrain probes used by animals/basket code. It also fixes full-width sequence
+sentinel comparison, uninitialized query fields and native minigame frame/state
+callback signatures. Missing texture-bank images now give explicit diagnostics
+instead of using an uninitialized rectangle.
+
+Release and ASan/UBSan pass 106/106 tests. Fixtures exercise the actual pickup,
+basket and callback dispatch code with synthetic state, not interactive game
+sessions. Owner checks still needed: dog retrieves ball, animal movement/basket
+placement, sound, MG1/MG4, and earlier NPC/camera reports. No claim that all
+analyzer warnings or full-game paths are resolved.

@@ -53,21 +53,21 @@ can also occur at camera clamp boundaries and is not itself proof of corruption.
 | --- | --- |
 | family_table_lookup returns raw PS1 addresses used as status text | Resolved by ADR-065: validated original-disc text and full-width native return |
 | shop_screen_start_handlers has one declared entry but is indexed by request id | Resolved by ADR-065: verified original vector adjacency and explicit native indexing |
-| shop_basket_step and MG1/PdaSamp non-void fall-through | Basket now forwards pending/completed state (ADR-065); MG1/PdaSamp still need caller review |
+| shop_basket_step and MG1/PdaSamp non-void fall-through | Basket forwards completion (ADR-065); MG1 is now a native void frame handler (ADR-067); unsupported PdaSamp still needs review |
 | Livestock-transfer raw SaveFile/SaveImage views | Resolved by ADR-066 native partner view and bounded stash; interactive failure/abort/retry still unverified |
-| Additional incompatible callback casts in main/minigames | Some pass ignored extra arguments; review individually, not blanket suppression |
-| sound_update pointer-to-s32 sentinel comparison | No dereference through the truncated value, but native sentinel comparison should be reviewed |
-| cue_history scriptOffset uses subtraction of truncated pointers | Stored result is an offset inside one loaded asset, not a host address; verify bounds before changing |
+| Additional incompatible callback casts in main/minigames | MG1/MG4 native frame/state signatures corrected (ADR-067); main/PdaSamp diagnostic paths remain open |
+| sound_update pointer-to-s32 sentinel comparison | Resolved by full-width pointer comparison and ordinary/opaque/sentinel slot fixtures (ADR-067) |
+| cue_history scriptOffset uses subtraction of truncated pointers | Selected offsets are masked u16 values up to 0xFFFC inside the same asset; wrapped s32 subtraction preserves this offset, no host address is dereferenced; no change made |
 | player_try_nearby_action casts the greeting result to a pointer | Current callee always returns zero, so this does not currently dereference a nonzero result |
-| Analyzer: texture pack/event/probe uninitialized paths | Validate asset/type/range and caller invariants; no speculative default values added |
+| Analyzer: texture pack/event/probe uninitialized paths | Texture index and terrain/estate probe findings resolved (ADR-067); event-facing range precondition still needs caller validation |
 | Analyzer: helper/animal by-value vectors include uninitialized padding | Distinguish unused padding from actual vx/vy/vz use; do not alter original logic blindly |
-| Analyzer: name-entry/estate/grid/helper null paths | Review real caller preconditions and reproduce with bounded fixtures |
+| Analyzer: name-entry/estate/grid/helper null paths | Estate pickup/boolean query null outputs resolved (ADR-067); name-entry/grid/helper callers still need individual validation |
 | Nine debug-font API traps and partial SDK modes | See API_COVERAGE.md; no full-SDK implementation claim |
 
 The matching check cannot run on this Windows host: the Linux matching toolchain
 is unavailable and the owner excludes WSL. New HMBTN_PORT branches retain exact
 original alternatives; textual reconstruction is not a matching compiler check.
-Release and ASan/UBSan now pass 99/99 tests without disc data. ADR-065/066 close
+Release and ASan/UBSan now pass 106/106 tests without disc data. ADR-065/066 close
 the first batch's shop/family/transfer layout findings. Seven changed translation
 units passed targeted follow-up analysis without core/unix/security findings.
 An additional read-only fixture loaded all five family names from the validated
@@ -75,6 +75,26 @@ owner BIN; it did not run gameplay or access saves. The original 928-byte transf
 stash was separately reproduced as an ASan global-buffer-overflow.
 Remaining rows below still need individual caller/layout evidence; this batch
 does not establish complete gameplay coverage.
+
+## Third follow-up batch (ADR-067)
+
+The optional estate pickup is a real dog-ball caller contract, not only an analyzer
+hypothesis. A bounded fixture reproduces a null member read; a separate actual
+terrain caller fixture reproduces a null store. Corrections retain record flags,
+seasonal forms and boolean callback decisions, using local outputs only when none
+are requested. Sequence low-word sentinel behavior is reproduced with a mocked
+opaque address (never dereferenced) and checked alongside a real aligned fixture.
+
+Texture bank missing-image paths now fail explicitly; valid decoder output stays
+covered. Terrain hit class/estate probe fields are initialized. MG1's void frame
+use and MG4's seven no-argument state callbacks now match native declarations.
+Six touched translation units pass targeted analysis without selected analyzer,
+function-cast, pointer-cast or return findings. The whole-tree inventory below
+remains the original baseline, not a claim that all remaining warnings vanished.
+
+Ignored evidence: build/port/audit3-before-tests.log,
+audit3-probe-before-tests.log, audit3-analyzer.json, audit3-release-tests.log and
+audit3-asan-tests.log. No owner assets or gameplay runs are used.
 
 ## Per-file automated coverage
 

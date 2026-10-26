@@ -686,3 +686,27 @@ payload bytes. The family text loader passes synthetic fixtures and an isolated
 read-only check with the validated owner BIN. Release and ASan/UBSan pass 99 tests;
 targeted Clang analysis of seven touched units reports no core/unix/security
 findings. Gameplay and matching compiler output remain unverified.
+
+### Third audit batch: optional outputs and callback ABI (ADR-067)
+
+New matching-source guards:
+- src/overlay/11_GF_FARM/estate.c: optional pickup seasonal output and initialized
+  basket probe (2).
+- src/overlay/11_GF_FARM/farm_probe.c: tile hit-class initialization, optional
+  capped output and local discard outputs for boolean-only occupant calls (3).
+- src/main/sound/sound.c: full-width sequence sentinel comparison (1).
+- src/main/graphics/texture_pack.c: diagnostic header, null bank and image index
+  bounds (3).
+- src/overlay/17_GF_MG1/mg1.c: void native award-frame declaration/definition and
+  return, since only the void frame table consumes it (3).
+- src/overlay/23_GF_MG4/mg4.c: no-argument native state callback type and call (2).
+
+The old optional-pickup and boolean terrain paths reproduce null member/store
+errors in bounded fixtures. Native sequence comparison fails its mocked low-word
+sentinel fixture before correction. Valid pickup transformations, actor flags,
+terrain decisions and callback quotas remain covered. Runtime image diagnostics
+replace an uninitialized rectangle on missing images, not a successful fallback.
+Both Windows builds pass all 106 tests; targeted analysis of six changed units
+reports zero selected analyzer/ABI warnings. Original source reconstruction is
+checked separately; matching compiler output and interactive gameplay remain
+unverified. No gameplay was launched in this batch.

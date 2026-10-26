@@ -1824,3 +1824,53 @@ card failure/abort/retry behavior, original-PS1 interchange or full-game parity.
 The original exchange transaction/error policy is unchanged; no atomic-write or
 rollback guarantee is introduced. Matching check remains unavailable (no Linux
 toolchain, no WSL); textual source reconstruction is a separate check.
+
+## ADR-067: Optional probe outputs, pointer sentinels and native frame callbacks
+
+Date: 2026-10-27
+
+Context: The source audit's estate pickup warning is reachable: the dog approach
+path calls estate_field_pickup with a null output, but seasonal mapping reads it
+unconditionally. Boolean-only animal/estate terrain queries similarly omit tile
+and flag outputs that farm_tile_occupant writes, including at the callback cap.
+Bounded source fixtures reproduce both null writes/reads under UBSan. A synthetic
+opaque pointer also demonstrates sound_update misclassifying a non-sentinel
+native address when its low word is 0xFFFFFFFF.
+
+Decision: Under narrow HMBTN_PORT guards, seasonal mapping runs only when an item
+output is requested; record enable/claimed changes remain unchanged. Terrain
+queries use local discard outputs when callers omit them, and the capped branch
+clears flags only when provided. Initialize the standalone tile probe's hit class
+and the estate basket probe's unused map/padding, preserving filled coordinates,
+location, query result and callback counts. Compare full sequence pointers against
+SOUND_BUFFER_NONE, keeping slot/open/start behavior intact.
+
+An absent image index previously leaves the image-bank upload rectangle
+uninitialized. Reject null banks and indices outside count explicitly; keep the
+existing non-bank zero result and valid raw/RLE uploads. These checks do not
+validate an entire bank's encoded byte extent or RLE destination capacity.
+
+MG4 state functions all take no arguments: use a matching native function pointer
+and call, without passing the handler table as a fabricated context. MG1's award
+frame is used exclusively by a void frame dispatcher; make its native declaration
+and definition void and retain state advancement through mg1_state.step. Do not
+invent a pending integer result for the original non-void fall-through. Original
+matching alternatives remain exact.
+
+Validation: Old pickup and sequence fixtures fail before correction; the added
+boolean terrain fixture independently reproduces a null store before correction.
+Tests cover every season's optional pickup/seasonal item forms, one-time grapes,
+ordinary/opaque/sentinel sequence slots, no duplicate opens, stereo/mono, all seven
+MG4 slots/menu order, field/greenhouse classes, omitted outputs, callback cap and
+the actual estate_basket_check caller. Texture tests check named null/empty/index
+failures and retain the original decoder's valid output regressions. The opaque
+sequence pointer is never dereferenced and is not a claim about real allocations
+or audible music. MG1's waiting-screen behavior has compile/analyzer validation,
+not an interactive minigame test.
+
+Windows Release and ASan/UBSan each pass 106/106 tests. Targeted Clang analysis
+of six modified game units reports no core/unix/security findings or the selected
+callback/return/pointer-cast warnings. No gameplay/replay or owner save data is
+used. Matching check cannot run without the separate Linux toolchain (WSL is
+excluded); disabled native guards are checked textually instead. No full-game,
+other-platform or performance claim follows from this batch.

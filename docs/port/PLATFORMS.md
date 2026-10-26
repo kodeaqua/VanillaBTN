@@ -318,3 +318,12 @@ name fixture reads the SHA-1-validated owner disc without executing gameplay.
 Seven touched translation units pass targeted Clang analysis without selected
 core/unix/security diagnostics. No performance improvement or other-device result
 is claimed. Matching check is unavailable without the separate Linux toolchain.
+
+### Third source-audit validation (2026-10-27)
+
+Native Windows Release and ASan/UBSan builds and ctest --output-on-failure pass
+106/106 tests each. Targeted Clang analysis of six changed game translation units
+reports zero selected core/unix/security and callback/return/pointer-cast findings.
+Two original fixtures fail before repair, and a separate boolean terrain fixture
+reproduces a null store. These are synthetic technical checks only; gameplay,
+other devices, matching output and performance remain unverified by this batch.
