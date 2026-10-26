@@ -239,6 +239,11 @@ s32 farm_probe_tile(VECTOR pos, LimitPair place, s16 mode, s32 flag) {
     query.flags = &flags;
     query.current = 0;
     query.mask = 0;
+#ifdef HMBTN_PORT
+    /* PORT: classification writes this even when the caller ignores flags -
+     * see docs/port/DECISIONS.md#adr-067. */
+    query.hitFlags = FARM_HIT_TILE;
+#endif
     field_world_to_cell(&pos, &kind, &aux);
     if (kind == 0x2C && mode == FACING_RIGHT) {
         return 1;
@@ -362,7 +367,13 @@ s32 farm_callback_capped(VECTOR *pos, LimitPair limits, s32 width, s32 depth, vo
         farm_callbacks_queued = count + 1;
         return farm_tile_occupant(pos, limits, out_tile, out_flags, walker, mask);
     }
+#ifdef HMBTN_PORT
+    /* PORT: output is optional for boolean-only probes - see docs/port/DECISIONS.md#adr-067 */
+    if (out_flags)
+        *out_flags = 0;
+#else
     *out_flags = 0;
+#endif
     return 1;
 }
 
@@ -667,6 +678,16 @@ static s32 farm_record_hit_test(FarmTileQuery *query, FarmEstateRecord *record) 
  * callee; the first hit returns 1 (some also mark *flags), else 0. */
 s32 farm_tile_occupant(VECTOR *pos, LimitPair place, void **tile, s32 *flags, void *current,
                   s32 mask) {
+#ifdef HMBTN_PORT
+    /* PORT: many animal/estate callers only need the boolean result -
+     * see docs/port/DECISIONS.md#adr-067. Keep writes in local storage. */
+    void *discard_tile = 0;
+    s32 discard_flags = 0;
+    if (!tile)
+        tile = &discard_tile;
+    if (!flags)
+        flags = &discard_flags;
+#endif
     FarmTileQuery query;
     FarmEstateRecord *spot;
     FarmAction *object;

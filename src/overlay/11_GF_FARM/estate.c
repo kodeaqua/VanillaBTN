@@ -1022,9 +1022,18 @@ s32 estate_field_pickup(FarmEstateRecord *record, FarmStoredItem *result) {
         result->id = record->itemId;
         result->count = 1;
     }
+#ifdef HMBTN_PORT
+    /* PORT: dog pickup intentionally omits the output - see docs/port/DECISIONS.md#adr-067 */
+    if (result != 0) {
+        if (game_state.progress.clock.date.season == SEASON_FALL && result->id == ITEM_WEEDS) result->id = ITEM_DEAD_WEED;
+        if (result->id == ITEM_STONE && game_state.progress.clock.date.season == SEASON_WINTER) result->id = ITEM_WINTER_STONE;
+        if (result->id == ITEM_BRANCH && game_state.progress.clock.date.season == SEASON_WINTER) result->id = ITEM_WINTER_BRANCH;
+    }
+#else
     if (game_state.progress.clock.date.season == SEASON_FALL && result->id == ITEM_WEEDS) result->id = ITEM_DEAD_WEED;
     if (result->id == ITEM_STONE && game_state.progress.clock.date.season == SEASON_WINTER) result->id = ITEM_WINTER_STONE;
     if (result->id == ITEM_BRANCH && game_state.progress.clock.date.season == SEASON_WINTER) result->id = ITEM_WINTER_BRANCH;
+#endif
     return 1;
 }
 
@@ -1414,7 +1423,13 @@ void estate_trigger_stamp_first(void) {
 /* Check the basket and the dog ball against the probe point: place the stamps they are
  * near, and disarm the trigger when the dog ball lies outside places 1 to 6. */
 void estate_basket_check(void) {
+#ifdef HMBTN_PORT
+    /* PORT: unused map/padding must not carry indeterminate bits by value -
+     * see docs/port/DECISIONS.md#adr-067. Used location/coordinates are filled below. */
+    EstatePlaceProbe probe = {0};
+#else
     EstatePlaceProbe probe;
+#endif
     s32 near;
     s32 disarm;
     near = 0;
