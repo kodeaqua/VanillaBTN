@@ -23,14 +23,18 @@ int main(void) {
     hm_pause_handle(&menu, HM_PAUSE_DOWN);
     CHECK(menu.selected == 0);
     hm_pause_handle(&menu, HM_PAUSE_CONFIRM);
-    CHECK(menu.page == HM_PAUSE_GRAPHICS && hm_pause_count(&menu) == 7);
+    CHECK(menu.page == HM_PAUSE_GRAPHICS && hm_pause_count(&menu) == 9);
     CHECK(!strcmp(hm_pause_label(&menu, 4), "Widescreen Mode"));
-    for (int i = 0; i < 7; ++i) {
+    CHECK(!strcmp(hm_pause_label(&menu, 7), "VSync") &&
+          !strcmp(hm_pause_label(&menu, 8), "FPS Limit"));
+    for (int i = 0; i < HM_PAUSE_GRAPHICS_ITEMS; ++i) {
         CHECK(menu.selected == i);
+        CHECK(menu.selected >= menu.first_visible &&
+              menu.selected < menu.first_visible + HM_PAUSE_VISIBLE_ROWS);
         CHECK(hm_pause_handle(&menu, HM_PAUSE_RIGHT) == HM_PAUSE_CHANGE_GRAPHICS);
         hm_pause_handle(&menu, HM_PAUSE_DOWN);
     }
-    CHECK(menu.selected == 0);
+    CHECK(menu.selected == 0 && menu.first_visible == 0);
     hm_pause_handle(&menu, HM_PAUSE_BACK);
     CHECK(menu.page == HM_PAUSE_SETTINGS);
     hm_pause_handle(&menu, HM_PAUSE_BACK);

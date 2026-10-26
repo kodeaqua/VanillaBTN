@@ -8,7 +8,7 @@ typedef struct {
     u16 font[HM_PAUSE_FONT_W * HM_PAUSE_FONT_H];
 } hm_pause_assets;
 typedef struct {
-    const char *values[7];
+    const char *values[HM_PAUSE_GRAPHICS_ITEMS];
     const char *detail;
     const char *notice;
 } hm_pause_view;

@@ -8,8 +8,8 @@ Full playthrough and broader gameplay remain unverified; see WINDOWS_PLAYTEST.md
 | Target | Foundation preset | Validation |
 | --- | --- | --- |
 | Linux x86-64 | linux-release, linux-asan-ubsan | Deferred; requires a separate Linux host, no WSL |
-| Windows x86-64 | windows-release | All 113 original source units and native window build; tests passed (74/74 with -Game) |
-| Windows x86-64 sanitizers | windows-asan-ubsan | All source units and native window build; Clang 20.1.8 ASan/UBSan tests passed (74/74 with pause enabled); gameplay coverage remains limited |
+| Windows x86-64 | windows-release | All 113 original source units and native window build; tests passed (75/75 with -Game) |
+| Windows x86-64 sanitizers | windows-asan-ubsan | All source units and native window build; Clang 20.1.8 ASan/UBSan tests passed (75/75 with pause enabled); gameplay coverage remains limited |
 | macOS universal | macos-universal-release | Pending; no macOS host tested |
 | Android arm64 | Pending NDK and minSdk selection | No device/build validation |
 
@@ -42,6 +42,11 @@ real English font (5645 nonzero pixels) and verifies startup VRAM is zeroed;
 it runs no game loop or window. Physical ESC, audio pause/resume, monitor/mode
 changes and visual presentation remain owner checks. Advanced renderer options
 are explicitly pending; see ENHANCEMENTS.md and ADR-048.
+VSync/FPS controls add a rational presentation-clock regression, bringing the
+total to 75 in both Windows builds. It checks exact deadlines and unchanged
+VBlank counts without starting gameplay. Native presentation caps at 30; the
+original hardware tick stays 60 Hz. Higher caps duplicate images. Physical
+VSync, achieved FPS and in-game time remain owner checks; see ADR-049.
 Windows validation compiles all original translation units and links the native
 boot diagnostic. The full-tree syntax inventory passes 113/113; warnings remain
 visible and do not establish runtime safety. Strong game definitions have no

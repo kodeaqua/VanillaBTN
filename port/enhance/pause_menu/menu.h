@@ -2,6 +2,7 @@
 #define HMBTN_PAUSE_MENU_H
 
 typedef enum { HM_PAUSE_ROOT, HM_PAUSE_SETTINGS, HM_PAUSE_GRAPHICS } hm_pause_page;
+enum { HM_PAUSE_GRAPHICS_ITEMS = 9, HM_PAUSE_VISIBLE_ROWS = 7 };
 typedef enum {
     HM_PAUSE_UP,
     HM_PAUSE_DOWN,
@@ -19,6 +20,7 @@ typedef enum {
 typedef struct {
     hm_pause_page page;
     int selected;
+    int first_visible;
 } hm_pause_menu;
 void hm_pause_open(hm_pause_menu *menu);
 int hm_pause_count(const hm_pause_menu *menu);

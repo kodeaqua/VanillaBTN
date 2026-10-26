@@ -35,6 +35,18 @@ desktop resolution. These display operations require the owner's hardware test.
 Normal presentation preserves 4:3 with black bars. Bilinear currently filters
 the final framebuffer, not each original primitive's texture samples.
 
+VSync offers synchronized On (mailbox/FIFO) or supported immediate Off. FPS
+Limit offers Native (30) and monitor refresh-derived rates, preserving rational
+values such as 60000/1001 (shown as 59.94). Windowed/borderless choices use the
+desktop resolution; exclusive choices use the selected resolution. VSync can
+reduce achieved presentation to the active OS refresh. A cap does not switch
+desktop refresh. The nine-item list scrolls through seven visible rows.
+
+Presentation deadlines are independent of the fixed 60 Hz hardware ticks.
+Original normal game updates remain 30 Hz through VSync(2). Higher caps repeat
+native pictures, without advancing game/RNG/audio faster. Interpolated motion
+is not implemented. GPU/OS stalls and achieved FPS remain owner hardware tests.
+
 The Graphics menu lists Enhance Scaling, Widescreen Mode and Anti-Aliasing as
 OFF with renderer support pending. They cannot be enabled yet. Native higher
 resolution scene rendering, extended camera/frustum/culling and FXAA/MSAA need
@@ -43,7 +55,8 @@ is represented as those features.
 
 The graphics object in Documents/BackToNature/settings.json stores monitor
 ordinal, window_mode (0 windowed, 1 exclusive, 2 borderless), width, height and
-bilinear (0 or 1). Unknown root properties are preserved when replacing the
+bilinear (0 or 1), vsync (0 or 1), fps_numerator and fps_denominator. Zero FPS
+numerator selects Native. Defaults are VSync On and Native (30). Unknown root properties are preserved when replacing the
 owned graphics object. Malformed JSON is not overwritten. Writes use the
 existing temporary-file replacement and instance lock. Missing or invalid
 graphics fields fall back to windowed 640x480, nearest filtering, monitor 0.
@@ -51,5 +64,7 @@ graphics fields fall back to windowed 640x480, nearest filtering, monitor 0.
 Tests use synthetic glyph data for menu geometry/navigation, JSON validation and
 unknown-property preservation. A separate local asset probe decodes the real
 font and checks VRAM is reset, without opening a window or starting the game.
+Presentation-clock tests verify exact rational boundaries and unchanged native
+VBlank callback counts across caps; these do not run the actual game clock.
 Physical ESC behavior, audio pause/resume and display switching remain owner
 gameplay tests. No interactive session or replay is run by the agent.

@@ -39,7 +39,7 @@ static int hm_read(void *context, u64 offset, void *destination, size_t bytes) {
            fread(destination, 1, bytes, context) == bytes;
 }
 int main(int argc, char **argv) {
-    if (argc != 2 && argc != 4)
+    if (argc != 2 && argc != 4 && argc != 5)
         return 2;
     FILE *file = fopen(argv[1], "rb");
     if (!file || fseek(file, 0, SEEK_END))
@@ -70,7 +70,7 @@ int main(int argc, char **argv) {
                 return 1;
             }
     fclose(file);
-    if (argc == 4) {
+    if (argc >= 4) {
         hm_pause_menu menu;
         hm_pause_open(&menu);
         hm_pause_draw(&assets, hm_preview, &menu, NULL);
@@ -79,13 +79,36 @@ int main(int argc, char **argv) {
         for (size_t i = 0; i < sizeof(hm_preview); ++i)
             hm_preview[i] = 0;
         menu.page = HM_PAUSE_GRAPHICS;
-        menu.selected = 1;
+        menu.selected = 8;
+        menu.first_visible = 2;
         /* Visual layout fixture values, not a live monitor or game session. */
-        const hm_pause_view view = {
-            .values = {"1", "Windowed", "1920 x 1080", "Off", "Off", "Off", "Nearest"},
-            .detail = "Windowed"};
+        const hm_pause_view view = {.values = {"1", "Windowed", "1920 x 1080", "Off", "Off", "Off",
+                       "Nearest", "On", "59.94"},
+            .detail = "59.94 FPS limit"};
         hm_pause_draw(&assets, hm_preview, &menu, &view);
         if (!hm_preview_write(argv[3]))
+            return 1;
+    }
+    if (argc == 5) {
+        for (unsigned y = 0; y < 240; ++y)
+            for (unsigned x = 0; x < 320; ++x) {
+                u8 *p = hm_preview + (y * 320 + x) * 4;
+                p[0] = 244;
+                p[1] = 223;
+                p[2] = 189;
+            }
+        for (unsigned y = 0; y < HM_PAUSE_FONT_H; ++y)
+            for (unsigned x = 0; x < HM_PAUSE_FONT_W; ++x) {
+                u16 color = assets.font[y * HM_PAUSE_FONT_W + x];
+                if (!color)
+                    continue;
+                u8 *p = hm_preview + ((y + 60) * 320 + x + 96) * 4;
+                for (unsigned channel = 0; channel < 3; ++channel) {
+                    unsigned value = (color >> (channel * 5)) & 31;
+                    p[channel] = (u8)((value << 3) | (value >> 2));
+                }
+            }
+        if (!hm_preview_write(argv[4]))
             return 1;
     }
     printf("Original pause font cache decoded: %u opaque pixels; game VRAM restored to zero\n",

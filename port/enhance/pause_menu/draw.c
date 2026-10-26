@@ -73,6 +73,8 @@ static void hm_text(const hm_pause_assets *assets, const char *text, int x, int 
             glyph = 0x6A;
         else if (c == ')')
             glyph = 0x6B;
+        else if (c == '.')
+            glyph = 0x6C;
         else
             continue;
         for (unsigned row = 0; row < 12; ++row)
@@ -104,10 +106,17 @@ void hm_pause_draw(const hm_pause_assets *assets, u8 *rgba, const hm_pause_menu 
     if (menu->page == HM_PAUSE_GRAPHICS) {
         hm_pause_original_frame(NULL, 12, 8, 296, 28);
         hm_center(assets, "Settings - Graphics", 16);
+        char range[] = {'(', (char)('1' + menu->first_visible),
+                        '-', (char)('0' + menu->first_visible + HM_PAUSE_VISIBLE_ROWS),
+                        ')', 0};
+        hm_text(assets, range, 264, 16);
         hm_pause_original_frame(NULL, 12, 40, 296, 156);
-        hm_pause_original_frame(NULL, 20, 45 + menu->selected * 20, 280, 20);
-        for (int i = 0; i < hm_pause_count(menu); ++i) {
-            int y = 49 + i * 20;
+        int first = menu->first_visible;
+        hm_pause_original_frame(NULL, 20, 45 + (menu->selected - first) * 20, 280, 20);
+        for (int row = 0; row < HM_PAUSE_VISIBLE_ROWS && first + row < hm_pause_count(menu);
+             ++row) {
+            int i = first + row;
+            int y = 49 + row * 20;
             if (i == menu->selected)
                 hm_text(assets, "-", 26, y);
             hm_text(assets, hm_pause_label(menu, i), 40, y);

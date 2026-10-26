@@ -1187,3 +1187,46 @@ opening a window or entering the game. The owner performs interactive pause,
 audio, fullscreen and gameplay validation. No new dependency or decomp source
 change is required for this initial interface. Performance budgets and rendering
 enhancement parity remain unverified.
+
+<a id="adr-049"></a>
+
+## ADR-049: Independent rational presentation limits and VSync control
+
+Date: 2026-10-26. Status: implemented; owner device/gameplay tests pending.
+
+The owner requests VSync On/Off and Native or monitor-derived FPS limits without
+changing game time. Original main_run_frame uses VSync(2): 30 normal updates
+at the port's fixed 60 Hz hardware tick. Keep this source, psx/timing.c, CD,
+SPU, RNG and game callbacks unchanged. During each host tick wait, service a
+separate presentation clock and pump OS events. Sample input at the tick
+boundary. No new game-logic thread or variable simulation step is introduced.
+
+Accumulate absolute rational nanosecond deadlines, preserving 60000/1001 rather
+than truncating to 59 or 60. Drop overdue presentations instead of submitting
+catch-up bursts. Display settings reset only presentation scheduling; paused
+wall time remains excluded from the game epoch. Native caps presentation at 30.
+Other choices come from the monitor's desktop-resolution modes when windowed/
+borderless, or selected resolution when exclusive. Persist fps_numerator and
+fps_denominator in graphics; zero numerator means Native. Unsupported saved
+rates revert to Native. An FPS cap does not itself change desktop refresh.
+
+On uses synchronized mailbox if available, otherwise FIFO. Off requires
+supported immediate presentation; reject unsupported changes and retain the
+effective setting. An unavailable stored Off setting falls back to On. Bound
+VSync-On presentation by the current physical refresh and recompute on display
+changes. Acquire through SDL's non-waiting frame-fence path; cancel when no
+swapchain image is available and retain two frames in flight. SDL 3.2.28 Vulkan
+WSI acquisition can still wait internally, so no zero-driver-stall guarantee
+is made. Hardware stalls and achieved FPS remain owner device checks.
+
+Higher caps repeat the latest native image. They add no game update, animation
+advance, RNG call or audio generation. They do not provide 75 unique scene
+frames or interpolation. Graphics now has nine items with seven visible rows
+and scrolling. Decimal rates use the original narrow dot glyph, verified from
+a private asset-only atlas; no extracted font is committed.
+
+A synthetic regression checks 200000 rational presentation boundaries per
+rate and verifies 300 real native VSync(2) calls still give 600 VBlank callbacks
+at 30, 59, 60, 75, 144, 240 and 60000/1001 caps. Late dropping, menu scrolling
+and decimal composition are covered. These are technical checks, not gameplay
+time or physical VSync tests. No dependency or matching-source edit is added.

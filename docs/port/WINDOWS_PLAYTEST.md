@@ -98,6 +98,16 @@ Known issue: the owner reports a crash when sleeping/saving, with native exit
 -1073741819 (0xC0000005). This remains open. Card persistence tests do not prove
 the original in-game serialization and sleep/save lifecycle work.
 
+Graphics also offers VSync and FPS Limit. Up/down scrolls the nine-item list;
+left/right changes the selected value. Native is a 30 FPS presentation cap.
+Other rates come from the monitor's modes; fractional rates retain their exact
+ratio in settings.json. VSync On is synchronized; unsupported Off is refused.
+The selected cap does not change desktop refresh, and VSync can limit output
+to the active display rate. Game hardware ticks remain fixed at 60 Hz and the
+normal original loop still uses VSync(2). High caps repeat native images;
+interpolated scene motion is not implemented. Release and ASan/UBSan pass 75
+technical tests. The owner validates physical VSync, FPS and gameplay timing.
+
 | Keyboard | Original pad |
 | --- | --- |
 | Arrows | D-pad |

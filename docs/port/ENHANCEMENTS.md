@@ -10,6 +10,8 @@ The owner requested the native pause interface and graphics settings on
 | Original dialog presentation/font | Original window-frame C and runtime disc glyph cache; synthetic composition and local asset decoding checks pass |
 | Monitor/window mode/resolution | SDL display controls implemented; owner monitor/fullscreen test pending |
 | Filtering | Nearest/bilinear final-frame presentation; per-texture filtering is pending |
+| VSync | On (mailbox/FIFO) or supported immediate Off; device validation pending |
+| FPS limit | Native (30) or monitor-derived rational caps; fixed 60 Hz game ticks; repeated native images without interpolation |
 | Enhance Scaling | OFF; native higher-resolution scene renderer pending |
 | Widescreen Mode | OFF path uses centered 4:3 and black bars; expanded camera/culling ON path pending |
 | FXAA/MSAA | OFF; renderer paths pending |
@@ -26,3 +28,5 @@ state, RNG, CD progress, GPU VRAM or SPU synthesis advances inside the pause UI
 loop. Paused wall time is excluded from the pacing epoch. No game art, fonts,
 SDK material or BIOS is included in the repository. See ADR-048 and
 port/enhance/pause_menu/README.md for controls, schema and current limits.
+VSync/FPS controls follow ADR-049. Presentation counts do not advance game time.
+Achieved FPS, physical VSync and gameplay time remain owner tests.

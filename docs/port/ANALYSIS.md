@@ -288,8 +288,8 @@ All 33 A_FILE offsets (32 member ranges) are monotonic and inside the
 No assets were extracted or added to git. The subsequent native boot probe
 runs the original afile_init against the validated disc.
 
-There are 72 base CTests, one optional SDL filesystem test and one optional
-pause-frame test, all 74 passing in Windows release and ASan/UBSan builds with
+There are 73 base CTests, one optional SDL filesystem test and one optional
+pause-frame test, all 75 passing in Windows release and ASan/UBSan builds with
 the native pause interface enabled. New coverage
 includes SHA-1 published vectors, malformed synthetic sectors/directories,
 cross-sector file reads, deterministic CD transfer/cancel/error behavior,
@@ -470,6 +470,11 @@ Known owner-reported issue: sleeping/saving still crashes with 0xC0000005
 (native exit -1073741819). This is queued after the pause layout work; no fix
 or confirmed faulting source line is claimed. Raw PS1 packing views and the
 in-game save ABI remain unaudited even though the native card backend tests pass.
+VSync/FPS settings use a separate rational presentation clock (ADR-049). The
+original VSync(2) game loop and fixed 60 Hz tick runtime are untouched. Synthetic
+tests verify invariant native callback counts across presentation caps. Extra
+presentations duplicate the native image; interpolation and physical/gameplay
+validation remain pending. No further matching guard is required.
 The port builds all 113 units and links a boot diagnostic and SDL game window.
 Local 39000-VBlank release/sanitizer replays complete the opening and verify
 house exit and free farm movement after the Thomas/Zack dialogue. Wider

@@ -25,7 +25,7 @@ int main(void) {
     menu.page = HM_PAUSE_GRAPHICS;
     menu.selected = 4;
     const hm_pause_view view = {
-        .values = {"1", "Windowed", "1920 x 1080", "Off", "Off", "Off", "Nearest"},
+        .values = {"1", "Windowed", "1920 x 1080", "Off", "Off", "Off", "Nearest", "On", "59.94"},
         .detail = "Off - not available yet",
         .notice = ""};
     hm_pause_draw(&assets, canvas, &menu, &view);
@@ -35,6 +35,16 @@ int main(void) {
     const u8 *detail = canvas + (205 * 320 + 24) * 4;
     if (label[0] != 255 || row_value[0] != 255 || gap[0] != 0x11 || detail[0] != 255) {
         fprintf(stderr, "Graphics columns, separated header or detail panel overlap\n");
+        return 1;
+    }
+    menu.selected = 8;
+    menu.first_visible = 2;
+    hm_pause_draw(&assets, canvas, &menu, &view);
+    const u8 *fps_label = canvas + (169 * 320 + 40) * 4;
+    const u8 *fps_value = canvas + (169 * 320 + 192) * 4;
+    const u8 *decimal = canvas + (169 * 320 + 208) * 4;
+    if (fps_label[0] != 255 || fps_value[0] != 255 || decimal[0] != 255 || decimal[1] != 0) {
+        fprintf(stderr, "Scrolled FPS option is outside the visible menu\n");
         return 1;
     }
     return 0;
