@@ -53,3 +53,9 @@ original texture assets and 4:3 bars. The CPU target supports up to 4096 per axi
 with native fallback. Per-texture filtering and GPU scene rasterization remain
 pending; high FPS at high resolutions is not established. See
 port/enhance/scaling/README.md and the synthetic measurements in PLATFORMS.md.
+
+Interpolation now uses stable field-cell identities and a shared-vertex mesh
+coherence guard (ADR-053). The owner confirmed the reported ground cuts disappear
+with Interpolation OFF. Synthetic reproductions for mismatched neighboring
+history and reordered field packets pass after the fix; owner farm confirmation
+is still pending. History changes may reduce interpolation cadence locally.

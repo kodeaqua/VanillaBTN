@@ -155,6 +155,13 @@ void hm_gpu_execute_words(const u32 *words, u32 count) {
     if (!words && count)
         hm_runtime_error("hm_gpu_execute_words", "null command array");
     for (u32 at = 0; at < count;) {
+        u32 consumed = hm_replay_consume(words + at, count - at);
+        if (consumed) {
+            if (consumed > count - at)
+                hm_runtime_error("hm_gpu_execute_words", "invalid backend command length");
+            at += consumed;
+            continue;
+        }
         hm_replay_command(words + at, count - at, 0);
         u32 length = hm_gpu_command(words + at, count - at);
         hm_replay_command(words + at, length, 1);

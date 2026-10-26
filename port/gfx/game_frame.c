@@ -1,6 +1,7 @@
 #include "gfx/game_frame.h"
 #include "farm_main.h"
 #include "farm_state.h"
+#include "gfx/packet_identity.h"
 #include "loading_screen.h"
 #include "main.h"
 #include "psx/timing.h"
@@ -40,4 +41,9 @@ void hm_game_draw_ot(u32 *table) {
     DrawOTag(table);
     if (active_ot && table == active_ot + 1)
         hm_render_end();
+}
+u32 *hm_game_clear_ot(u32 *table, s32 count) {
+    if (current_frame && table == current_frame->ot)
+        hm_packet_identity_reset();
+    return ClearOTagR(table, count);
 }

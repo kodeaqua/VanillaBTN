@@ -176,3 +176,13 @@ or representative headroom. Texturing, overdraw and interpolation can cost
 substantially more. Repeated non-interpolated scanouts are cached. A GPU scene
 raster path remains the next performance step before claiming high-resolution
 high-FPS support.
+
+## Shared replay and ground-seam regression
+
+Date: 2026-10-26. Integration builds pass 79/79 release and ASan/UBSan tests.
+Portable packet tests verify reference-counted replay capture, native-context
+preservation and bounded output rejection. A connected-mesh regression against
+the f93bb01 interpolation object fails at a visible black gap; the corrected
+implementation passes. Stable field-cell identities survive inserted work
+packets. The owner isolated actual farm cuts to Interpolation ON, but has not
+yet confirmed this correction in gameplay. No game session/replay was launched.

@@ -1330,3 +1330,42 @@ GPU scene rasterization, per-texture filtering, FXAA/MSAA and widescreen camera
 remain separate pending work. See PLATFORMS.md for full measurement limits.
 Release/ASan/UBSan pass 77 isolated tests. Native builds also link with features
 OFF and with scaling ON / interpolation OFF. No matching source/guard is changed.
+
+<a id="adr-053"></a>
+
+## ADR-053: Shared replay ownership and coherent interpolation identity
+
+Date: 2026-10-26. Status: technical regressions pass; owner gameplay pending.
+
+The owner requests a GPU output path shared by native resolution and scaling,
+and reports black cuts across farm ground which disappear with Interpolation
+OFF. Inspection shows field cells are sprite draws from shared animation
+records, while packet addresses depend on prior work-buffer allocation. Packet
+offsets alone are not stable identities. Independently falling back neighboring
+polygons can also open a hole between current and interpolated positions.
+
+Extract bounded frame capture into reference-counted gfx/frame_replay so output
+backends do not depend on enhance.scaling. Each replay restores native VRAM and
+GPU environments. Generic destination hooks can consume private geometry and
+fractional motion metadata without a redundant CPU output raster. The normal
+game's CPU VRAM still supplies authoritative readback/transfer semantics; no
+logic, timing, RNG or GTE changes are introduced.
+
+Add bounded construction identities for field sprites, keyed by the original
+world-cell SVECTOR and part offset. CMake remaps field.c projection/sprite calls
+to read-only port adapters, and main.c's ClearOTagR resets the registry. Actual
+source files remain unchanged. Invalid/nonmonotonic spans fail closed.
+
+Group world polygons sharing normalized screen vertices. If any member lacks
+compatible history, or a shared vertex has conflicting previous coordinates,
+render that connected component at current positions. This trades some local
+interpolation cadence for a closed mesh. Separate sprites are unaffected.
+Fractional destination metadata retains original current texture poses.
+
+A synthetic two-quad reproduction fails against f93bb01 (black gap at x=8..9)
+and passes with the coherence guard. Other checks cover conflicting history,
+stable cell identities despite inserted packets and output-backend motion.
+Portable GPU packet tests cover bounds, fallback, independent replay ownership
+and native state preservation. Windows integration passes 79 release and
+ASan/UBSan tests; these are not gameplay confirmation of the reported scene.
+No new matching source guard or third-party dependency is required for this layer.

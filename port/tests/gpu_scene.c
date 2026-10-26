@@ -1,0 +1,100 @@
+#include "gfx/gpu_scene.h"
+#include "gfx/frame_replay.h"
+#include "psx/gpu_environment.h"
+#include "psx/gpu_raster.h"
+#include "psx/timing.h"
+#include "psx/vram.h"
+#include <stdio.h>
+#include <string.h>
+#define CHECK(x)                                                                                   \
+    do {                                                                                           \
+        if (!(x)) {                                                                                \
+            fprintf(stderr, "Failed at %d: %s\n", __LINE__, #x);                                   \
+            return 1;                                                                              \
+        }                                                                                          \
+    } while (0)
+static hm_vram_context before, after;
+static void setup(int width, int height) {
+    hm_vram_reset();
+    ResetGraph(0);
+    DRAWENV draw;
+    SetDefDrawEnv(&draw, 0, 0, width, height);
+    draw.dtd = 0;
+    draw.dfe = 1;
+    PutDrawEnv(&draw);
+    DISPENV display;
+    SetDefDispEnv(&display, 0, 0, width, height);
+    PutDispEnv(&display);
+}
+int main(void) {
+    hm_gpu_scene *s = hm_gpu_scene_create();
+    CHECK(s);
+    setup(32, 32);
+    u32 rectangle[] = {0x600000ff, 0x00020002, 0x00040004};
+    hm_frame_replay *a = hm_frame_replay_acquire(), *b = hm_frame_replay_acquire();
+    CHECK(a && b);
+    hm_frame_replay_release(a);
+    hm_render_frame live = {.key = 9, .tick = 2, .eligible = 0}; /* Not a farm or enhancement. */
+    hm_render_begin(&live);
+    hm_gpu_execute_words(rectangle, 3);
+    hm_render_packet(rectangle, 3);
+    hm_render_end();
+    CHECK(hm_frame_replay_serial(b, &live));
+    hm_vram_snapshot(&before);
+    hm_gpu_environment env = *hm_gpu_environment_state();
+    u64 ticks = hm_timing_ticks();
+    hm_replay_sink previous = hm_gpu_scene_begin(s, 32, 32);
+    hm_gpu_scene_data data;
+    CHECK(hm_frame_replay_draw(b, &live) && hm_gpu_scene_end(s, previous, &data));
+    CHECK(data.width == 32 && data.height == 32 && data.bytes <= HM_SCENE_MAX_WORDS * sizeof(u32));
+    CHECK(data.words[10] == 1 && data.words[HM_SCENE_HEADER] == 0);
+    hm_vram_snapshot(&after);
+    CHECK(!memcmp(&before, &after, sizeof(before)));
+    CHECK(!memcmp(&env, hm_gpu_environment_state(), sizeof(env)) && ticks == hm_timing_ticks());
+    hm_render_invalidate();
+    CHECK(!hm_frame_replay_serial(b, &live));
+    hm_frame_replay_release(b);
+    /* GPU geometry consumes only output: it must not run the CPU raster a second
+     * time, while embedded polygon tpages still affect subsequent sprites. */
+    setup(32, 32);
+    RECT area = {0, 0, 32, 32};
+    u32 texture[] = {0x25000000, 0,          0, 0x00000010, (282u << 16) | 8, 0x00100000,
+                     0x0800,     0x65000000, 0, 0,          0x00040004};
+    previous = hm_gpu_scene_begin(s, 32, 32);
+    hm_replay_begin(&area);
+    hm_gpu_execute_words(texture, 11);
+    CHECK(hm_gpu_scene_end(s, previous, &data) && hm_gpu_environment_state()->draw.tpage == 282);
+    CHECK(hm_vram_pixel(0, 0) == 0);
+    setup(32, 32);
+    previous = hm_gpu_scene_begin(s, 32, 32);
+    hm_replay_begin(&area);
+    u32 feedback[] = {0x65000000, 0, 0, 0x00040004};
+    hm_gpu_execute_words(feedback, 4);
+    CHECK(!hm_gpu_scene_end(s, previous, &data) && hm_gpu_scene_fallback(s)[0]);
+    setup(32, 32);
+    previous = hm_gpu_scene_begin(s, 32, 32);
+    hm_replay_begin(&area);
+    u32 fill[] = {0x020000ff, 0, 0x00040004};
+    hm_gpu_execute_words(fill, 3);
+    CHECK(!hm_gpu_scene_end(s, previous, &data));
+    setup(32, 32);
+    previous = hm_gpu_scene_begin(s, 32, 32);
+    hm_replay_begin(&area);
+    for (int i = 0; i < 257; ++i)
+        hm_gpu_execute_words(rectangle, 3);
+    CHECK(!hm_gpu_scene_end(s, previous, &data));
+    setup(1024, 512);
+    area = (RECT){0, 0, 1024, 512};
+    previous = hm_gpu_scene_begin(s, 32, 32);
+    hm_replay_begin(&area);
+    for (int i = 0; i <= HM_SCENE_PRIMITIVES; ++i) {
+        rectangle[1] = (u32)((i % 64) * 16) | ((u32)(((i / 64) % 32) * 16) << 16);
+        hm_gpu_execute_words(rectangle, 3);
+    }
+    CHECK(!hm_gpu_scene_end(s, previous, &data));
+    previous = hm_gpu_scene_begin(s, 0, 0);
+    hm_replay_begin(&area);
+    CHECK(!hm_gpu_scene_end(s, previous, &data));
+    hm_gpu_scene_destroy(s);
+    return 0;
+}

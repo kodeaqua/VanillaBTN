@@ -341,5 +341,5 @@ static void hm_scaled_command(void *context, const u32 *w, u32 available, int af
     }
 }
 hm_replay_sink hm_scaled_sink(hm_scaled_surface *s) {
-    return (hm_replay_sink){s, hm_scaled_begin, hm_scaled_command};
+    return (hm_replay_sink){s, hm_scaled_begin, hm_scaled_command, NULL, NULL};
 }

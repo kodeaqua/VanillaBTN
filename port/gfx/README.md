@@ -1,0 +1,42 @@
+# Shared output capture
+
+Native scene output and enhancements consume the same read-only frame replay.
+frame_replay owns two bounded native command streams, pre-draw VRAM and GPU
+environments. Clients acquire/release a shared capture independently; enabling
+scaling is not a prerequisite for a native output backend. The selected stream
+matches native front scanout. Direct/loading, expired or missing captures fail
+closed. Private execution restores the native contexts before returning.
+
+replay_sink supports ordinary reference execution, backend-owned geometry
+consumption and optional fractional motion metadata. GPU packet construction
+consumes private geometry without rasterizing it a second time on the CPU;
+embedded polygon tpages still update the private environment. The game's normal
+low-resolution CPU VRAM remains authoritative for reads, transfers and logical
+compatibility. This change does not remove that compatibility work.
+
+gpu_scene emits an output-independent command representation with a 16-word
+header, packed 16-bit VRAM snapshot, 40-word primitive records and 16x16 logical
+tile lists. Each tile has at most 256 ordered references; a scene has at most
+8192 primitives and 2048 tiles. All records use explicit uint32_t fields and
+byte offsets are bounded by HM_SCENE_MAX_WORDS. No disc data is interpreted as
+one of these records. Material records include CLUT/tpage, texture window,
+clipping, display-write controls, dither and mask flags. Lines become logical
+cells (flat axis-aligned lines are compact rectangles). Quad triangle order
+and shared-edge ownership are retained.
+
+Output backend execution is separate from this portable capture/packet layer.
+Snapshots are immutable input; only backend-owned output is written. Source
+texture/CLUT overlap with output, offscreen draw dependencies, inline VRAM
+transfers and capacity overflow reject GPU packet output so the caller can
+use the software reference. Conservative rejection may reduce GPU coverage.
+
+packet_identity records construction spans without changing the packets.
+Native-only adapters identify field/greenhouse sprites by the projected world
+cell, rather than a work-buffer offset which changes when other sprites are
+allocated. The registry resets with the main OT and is bounded; ambiguous
+spans are rejected. Interpolation additionally groups polygons by shared
+normalized screen vertices. Missing or conflicting history makes the entire
+connected component current, avoiding cracks between mixed frame positions.
+Unconnected sprites retain independent interpolation. Fractional metadata can
+be consumed by an output backend while CPU reference scanout keeps its original
+pixel quantization. See ADR-053.

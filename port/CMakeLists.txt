@@ -37,7 +37,7 @@ add_library(hmbtn_settings_json STATIC platform/settings_json.c)
 target_link_libraries(hmbtn_settings_json PUBLIC hmbtn_port_options)
 add_library(hmbtn_presentation_clock STATIC platform/presentation_clock.c)
 target_link_libraries(hmbtn_presentation_clock PUBLIC hmbtn_port_options)
-add_library(hmbtn_frame_events STATIC gfx/frame_events.c)
+add_library(hmbtn_frame_events STATIC gfx/frame_events.c gfx/packet_identity.c)
 target_link_libraries(hmbtn_frame_events PUBLIC hmbtn_port_options)
 
 add_library(hmbtn_overlay STATIC overlay/registry.c)
@@ -65,15 +65,17 @@ target_compile_options(hmbtn_game_options INTERFACE
 target_compile_definitions(hmbtn_game_options INTERFACE HMBTN_PORT=1)
 
 file(GLOB_RECURSE hm_game_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../src/*.c")
-add_library(hmbtn_game_initial STATIC ${hm_game_sources} overlay/game_lifecycle.c gfx/game_frame.c)
+add_library(hmbtn_game_initial STATIC ${hm_game_sources} overlay/game_lifecycle.c gfx/game_frame.c gfx/field_identity.c)
 target_link_libraries(hmbtn_game_initial PUBLIC hmbtn_game_options hmbtn_work_memory hmbtn_overlay)
 # Keep the game's entry point separate from the host test runners. This source
 # is compiled into the archive only; no native game executable is linked yet.
 set_source_files_properties(../src/main/main.c PROPERTIES COMPILE_DEFINITIONS
-    "main=hm_game_main;PutDrawEnv=hm_game_put_draw_env;DrawOTag=hm_game_draw_ot")
+    "main=hm_game_main;PutDrawEnv=hm_game_put_draw_env;DrawOTag=hm_game_draw_ot;ClearOTagR=hm_game_clear_ot")
+set_source_files_properties(../src/overlay/11_GF_FARM/field/field.c PROPERTIES COMPILE_DEFINITIONS
+    "estate_point_project=hm_field_point_project;anim_draw_sprt_cursor=hm_field_draw_sprt_cursor")
 
 add_library(hmbtn_psx_initial STATIC
-    gfx/replay_sink.c
+    gfx/replay_sink.c gfx/frame_replay.c
     psx/xa_decode.c psx/card_store.c
     psx/gte_rotation.c
     psx/unimplemented.c psx/gte_vectors.c psx/gte_runtime.c psx/gs_lighting.c psx/trig.c psx/timing.c psx/sound_control.c psx/spu_decode.c psx/spu_voice.c psx/cd_position.c psx/cd_runtime.c
@@ -84,6 +86,8 @@ target_include_directories(hmbtn_psx_initial PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}
 add_library(hmbtn_disc STATIC psx/disc.c psx/sha1.c)
 target_link_libraries(hmbtn_disc PUBLIC hmbtn_port_options)
 target_link_libraries(hmbtn_psx_initial PUBLIC hmbtn_disc)
+add_library(hmbtn_gpu_scene STATIC gfx/gpu_scene.c)
+target_link_libraries(hmbtn_gpu_scene PUBLIC hmbtn_psx_initial)
 if(HMBTN_ENH_SCALING)
     add_library(hmbtn_scaling STATIC enhance/scaling/scaling.c enhance/scaling/raster.c)
     target_link_libraries(hmbtn_scaling PUBLIC hmbtn_psx_initial)
@@ -104,6 +108,9 @@ if(HMBTN_ENH_INTERPOLATION)
         add_executable(hmbtn_interpolation_test tests/interpolation.c)
         target_link_libraries(hmbtn_interpolation_test PRIVATE hmbtn_interpolation)
         add_test(NAME enhance.interpolation COMMAND hmbtn_interpolation_test)
+        add_executable(hmbtn_interpolation_mesh_test tests/interpolation_mesh.c)
+        target_link_libraries(hmbtn_interpolation_mesh_test PRIVATE hmbtn_interpolation hmbtn_gpu_scene)
+        add_test(NAME enhance.interpolation_mesh_seams COMMAND hmbtn_interpolation_mesh_test)
     endif()
 endif()
 add_executable(hmbtn_disc_probe platform/disc_probe.c)
@@ -175,6 +182,9 @@ add_executable(hmbtn_ot_bench EXCLUDE_FROM_ALL analysis/ot_bench.c)
 target_link_libraries(hmbtn_ot_bench PRIVATE hmbtn_psx_initial)
 
 if(BUILD_TESTING)
+    add_executable(hmbtn_gpu_scene_test tests/gpu_scene.c)
+    target_link_libraries(hmbtn_gpu_scene_test PRIVATE hmbtn_gpu_scene)
+    add_test(NAME gfx.gpu_scene_packets COMMAND hmbtn_gpu_scene_test)
     add_executable(hmbtn_presentation_clock_test tests/presentation_clock.c)
     target_link_libraries(hmbtn_presentation_clock_test PRIVATE hmbtn_presentation_clock hmbtn_psx_initial)
     add_test(NAME platform.presentation_clock COMMAND hmbtn_presentation_clock_test)

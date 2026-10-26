@@ -40,3 +40,12 @@ irregular ticks and exact preservation of native VRAM/environment/commands/ticks
 These tests do not establish gameplay smoothness, complete primitive identity,
 full-playthrough parity or achieved FPS. Owner gameplay/device testing remains
 necessary, particularly walking, camera scroll, actor animation and transitions.
+
+The subsequent ground-seam regression adds stable cell identities for field
+sprites and connected-polygon coherence (ADR-053). A sprite's work allocation
+can move when another sprite is inserted; identity follows its world cell and
+packet part instead. Shared vertices must agree about their previous position;
+otherwise the entire connected mesh uses current geometry. This prevents the
+tested holes caused by mixing current and intermediate neighboring positions.
+It can reduce interpolation cadence when history changes. Actual farm gameplay
+confirmation remains with the owner.

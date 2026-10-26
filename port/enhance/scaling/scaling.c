@@ -6,66 +6,21 @@
 #include <stdlib.h>
 #include <string.h>
 
-enum { WORDS = 65536 };
+#include "gfx/frame_replay.h"
 typedef struct {
-    hm_render_frame meta;
-    hm_gpu_environment env;
-    hm_vram_context before;
-    u32 words[WORDS], used;
-    int complete;
-    u64 serial;
-} captured_frame;
-typedef struct {
-    captured_frame frames[2];
-    hm_gpu_environment env;
-    hm_vram_context work;
+    hm_frame_replay *replay;
     hm_scaled_surface surface;
-    int current, capturing;
-    u64 serial, cached_serial, cached_revision;
+    u64 cached_serial, cached_revision;
 } scaling;
 static scaling *state;
-static void hm_scaling_capture_invalidate(void *context) {
-    scaling *s = context;
-    s->capturing = 0;
-    s->frames[0].complete = s->frames[1].complete = 0;
-}
-static void hm_scaling_capture_begin(void *context, const hm_render_frame *meta) {
-    scaling *s = context;
-    s->current ^= 1;
-    captured_frame *f = &s->frames[s->current];
-    f->meta = *meta;
-    f->env = *hm_gpu_environment_state();
-    f->used = 0;
-    f->complete = 0;
-    f->serial = ++s->serial;
-    hm_vram_snapshot(&f->before);
-    s->capturing = 1;
-}
-static void hm_scaling_capture_packet(void *context, const u32 *words, u32 count) {
-    scaling *s = context;
-    if (!s->capturing)
-        return;
-    captured_frame *f = &s->frames[s->current];
-    if (count > WORDS - f->used) {
-        s->capturing = 0;
-        return;
-    }
-    memcpy(f->words + f->used, words, count * sizeof(*words));
-    f->used += count;
-}
-static void hm_scaling_capture_end(void *context) {
-    scaling *s = context;
-    if (s->capturing)
-        s->frames[s->current].complete = s->frames[s->current].used != 0;
-    s->capturing = 0;
-}
 int hm_scaling_enable(int enabled) {
     if (!enabled) {
-        hm_render_unsubscribe(state);
-        if (state)
+        if (state) {
+            hm_frame_replay_release(state->replay);
             free(state->surface.pixels);
-        free(state);
-        state = NULL;
+            free(state);
+            state = NULL;
+        }
         return 1;
     }
     if (state)
@@ -73,9 +28,8 @@ int hm_scaling_enable(int enabled) {
     state = calloc(1, sizeof(*state));
     if (!state)
         return 0;
-    if (!hm_render_subscribe((hm_render_observer){state, hm_scaling_capture_begin, NULL,
-                                                  hm_scaling_capture_packet, hm_scaling_capture_end,
-                                                  hm_scaling_capture_invalidate})) {
+    state->replay = hm_frame_replay_acquire();
+    if (!state->replay) {
         free(state);
         state = NULL;
         return 0;
@@ -105,36 +59,17 @@ int hm_scaling_replay(const hm_render_frame *live) {
     scaling *s = state;
     if (!s || live->bypass)
         return 0;
-    const hm_gpu_environment *current = hm_gpu_environment_state();
-    captured_frame *f = NULL;
-    for (int i = 0; i < 2; ++i) {
-        captured_frame *candidate = &s->frames[s->current ^ i];
-        if (candidate->complete && candidate->meta.key == live->key &&
-            candidate->env.draw.clip.x == current->display.disp.x &&
-            candidate->env.draw.clip.y == current->display.disp.y &&
-            candidate->env.draw.clip.w == current->display.disp.w &&
-            candidate->env.draw.clip.h == current->display.disp.h &&
-            live->tick >= candidate->meta.tick && live->tick - candidate->meta.tick <= 4) {
-            f = candidate;
-            break;
-        }
-    }
-    if (!f)
+    u64 serial = hm_frame_replay_serial(s->replay, live);
+    if (!serial)
         return 0;
-    if (s->cached_serial == f->serial && s->cached_revision == s->surface.revision) {
+    if (s->cached_serial == serial && s->cached_revision == s->surface.revision) {
         s->surface.begun = 1;
         return 1;
     }
-    s->work = f->before;
-    s->env = f->env;
-    hm_vram_context *saved_vram = hm_vram_bind(&s->work);
-    hm_gpu_environment *saved_env = hm_gpu_environment_bind(&s->env);
-    hm_replay_begin(&f->env.draw.clip);
-    hm_gpu_execute_words(f->words, f->used);
-    hm_gpu_environment_bind(saved_env);
-    hm_vram_bind(saved_vram);
+    if (!hm_frame_replay_draw(s->replay, live))
+        return 0;
     if (s->surface.begun) {
-        s->cached_serial = f->serial;
+        s->cached_serial = serial;
         s->cached_revision = s->surface.revision;
     }
     return s->surface.begun;

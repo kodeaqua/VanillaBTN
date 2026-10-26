@@ -515,3 +515,15 @@ release and sanitizer tests pass. The native executable also links with scaling
 ON / interpolation OFF and with enhancements OFF. No new matching guard/source
 edit, dependency or game data is introduced. High-FPS gameplay, framebuffer
 feedback quality, GPU resource changes and real-device output remain unverified.
+
+The owner subsequently isolated black farm-ground cuts to Interpolation ON.
+Field cells use anim_draw_sprt_cursor with shared AnimState records and mutable
+GS allocation offsets. Native-only port adapters now tag constructed field
+packets by world cell and packet part. main.c's native ClearOTagR call sites
+reset the bounded registry. Source files and matching guards are unchanged.
+Connected polygons also require consistent previous shared-vertex coordinates;
+otherwise the component uses current positions. A two-quad regression fails
+against f93bb01 and passes with this guard. Real farm confirmation is pending.
+Shared gfx/frame_replay now owns capture independently of scaling; generic
+destination hooks support private geometry consumption and fractional motion.
+Portable packet and seam tests bring Windows release/sanitizer totals to 79.
