@@ -40,7 +40,7 @@ static s32 hm_card_request(s32 port, s32 command) {
     return 1;
 }
 s32 MemCardAccept(s32 port) { return hm_card_request(port, 1); }
-s32 MemCardExist(s32 port) { return hm_card_request(port, 2); }
+s32 MemCardExist(s32 port) { return hm_card_request(port, 1); }
 s32 MemCardSync(s32 mode, s32 *command, s32 *result) {
     hm_card_require("MemCardSync");
     if ((mode != 0 && mode != 1) || !command || !result)

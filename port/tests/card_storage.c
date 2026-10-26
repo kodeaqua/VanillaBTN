@@ -46,6 +46,7 @@ int main(void) {
     McxStartCom();
     CHECK(present[0] && present[1]);
     CHECK(MemCardAccept(0) == 1 && complete(1, McErrNone));
+    CHECK(MemCardExist(0) == 1 && complete(1, McErrNone));
     CHECK(McxCardType(0) == 1);
     s32 command, result;
     CHECK(McxSync(0, &command, &result) == 1 && result == McxErrInvalid);
