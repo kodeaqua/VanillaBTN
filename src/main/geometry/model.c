@@ -15,6 +15,10 @@
 #include "math_util.h"
 #include "model.h"
 #include "prim.h"
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_WIDESCREEN)
+/* PORT: render-only horizontal visibility ? see docs/port/DECISIONS.md#adr-056 */
+#include "enhance/widescreen/widescreen.h"
+#endif
 
 static void camera_build_view(void);
 static s32 model_point_in_frustum(SVECTOR *pos);
@@ -428,6 +432,10 @@ static void model_draw_tmd_object(TmdObject *table, TmdObject *object) {
     model_frame = current_frame;
     /* flat triangles */
 loopF3:
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_WIDESCREEN)
+    /* PORT: retain a UI reserve in the native arena ? see docs/port/DECISIONS.md#adr-056 */
+    if (hm_widescreen_margin() && prim > current_frame->primStart + current_frame->primSize - 52 - 8192) goto done;
+#endif
     if (count <= 0) {
         goto done;
     }
@@ -475,6 +483,10 @@ loopF3:
     goto loopF3;
     /* gouraud triangles */
 loopG3:
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_WIDESCREEN)
+    /* PORT: retain a UI reserve in the native arena ? see docs/port/DECISIONS.md#adr-056 */
+    if (hm_widescreen_margin() && prim > current_frame->primStart + current_frame->primSize - 52 - 8192) goto done;
+#endif
     if (count <= 0) {
         goto done;
     }
@@ -524,6 +536,10 @@ loopG3:
     goto loopG3;
     /* textured flat triangles */
 loopFT3:
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_WIDESCREEN)
+    /* PORT: retain a UI reserve in the native arena ? see docs/port/DECISIONS.md#adr-056 */
+    if (hm_widescreen_margin() && prim > current_frame->primStart + current_frame->primSize - 52 - 8192) goto done;
+#endif
     if (count <= 0) {
         goto done;
     }
@@ -574,6 +590,10 @@ loopFT3:
     goto loopFT3;
     /* textured gouraud triangles */
 loopGT3:
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_WIDESCREEN)
+    /* PORT: retain a UI reserve in the native arena ? see docs/port/DECISIONS.md#adr-056 */
+    if (hm_widescreen_margin() && prim > current_frame->primStart + current_frame->primSize - 52 - 8192) goto done;
+#endif
     if (count <= 0) {
         goto done;
     }
@@ -626,6 +646,10 @@ loopGT3:
     goto loopGT3;
     /* flat quads */
 loopF4:
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_WIDESCREEN)
+    /* PORT: retain a UI reserve in the native arena ? see docs/port/DECISIONS.md#adr-056 */
+    if (hm_widescreen_margin() && prim > current_frame->primStart + current_frame->primSize - 52 - 8192) goto done;
+#endif
     if (count <= 0) {
         goto done;
     }
@@ -681,6 +705,10 @@ loopF4:
     goto loopF4;
     /* gouraud quads */
 loopG4:
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_WIDESCREEN)
+    /* PORT: retain a UI reserve in the native arena ? see docs/port/DECISIONS.md#adr-056 */
+    if (hm_widescreen_margin() && prim > current_frame->primStart + current_frame->primSize - 52 - 8192) goto done;
+#endif
     if (count <= 0) {
         goto done;
     }
@@ -739,6 +767,10 @@ loopG4:
     goto loopG4;
     /* textured flat quads */
 loopFT4:
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_WIDESCREEN)
+    /* PORT: retain a UI reserve in the native arena ? see docs/port/DECISIONS.md#adr-056 */
+    if (hm_widescreen_margin() && prim > current_frame->primStart + current_frame->primSize - 52 - 8192) goto done;
+#endif
     if (count <= 0) {
         goto done;
     }
@@ -798,6 +830,10 @@ loopFT4:
     goto loopFT4;
     /* textured gouraud quads */
 loopGT4:
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_WIDESCREEN)
+    /* PORT: retain a UI reserve in the native arena ? see docs/port/DECISIONS.md#adr-056 */
+    if (hm_widescreen_margin() && prim > current_frame->primStart + current_frame->primSize - 52 - 8192) goto done;
+#endif
     if (count == 0) {
         goto done;
     }
@@ -868,11 +904,23 @@ done:
 /* Screen clip tests on the x of a packed XY word (its low halfword). The drawing band is
  * x in [-19, 320), the wide band [-19, 400). */
 static inline s32 near_x(s16 x) {
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_WIDESCREEN)
+    /* PORT: expanded world clip band ? see docs/port/DECISIONS.md#adr-056 */
+    s32 margin = hm_widescreen_margin();
+    return x >= -CLIP_BAND_MARGIN - margin && x < 320 + margin;
+#else
     return (u16)(x + CLIP_BAND_MARGIN) < 320 + CLIP_BAND_MARGIN;
+#endif
 }
 
 static inline s32 wide_x(s16 x) {
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_WIDESCREEN)
+    /* PORT: expanded world clip band ? see docs/port/DECISIONS.md#adr-056 */
+    s32 margin = hm_widescreen_margin();
+    return x >= -CLIP_BAND_MARGIN - margin && x < 400 + margin;
+#else
     return (u16)(x + CLIP_BAND_MARGIN) < 400 + CLIP_BAND_MARGIN;
+#endif
 }
 
 static s32 model_clip_test3(s32 a, s32 b, s32 c) {
@@ -925,8 +973,14 @@ static void camera_frustum_setup(VECTOR *eye, VECTOR *target) {
     view_direction.vz = eye->vz - normal.vz * 2;
     m[2] = GsIDMATRIX;
     m[3] = GsIDMATRIX;
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_WIDESCREEN)
+    /* PORT: horizontal camera frustum ? see docs/port/DECISIONS.md#adr-056 */
+    RotMatrixY(hm_widescreen_angle(frustum_angles[0]), &m[0]);
+    RotMatrixY(hm_widescreen_angle(frustum_angles[1]), &m[1]);
+#else
     RotMatrixY(frustum_angles[0], &m[0]);
     RotMatrixY(frustum_angles[1], &m[1]);
+#endif
     RotMatrixX(frustum_angles[2], &m[2]);
     RotMatrixX(frustum_angles[3], &m[3]);
     PushMatrix();

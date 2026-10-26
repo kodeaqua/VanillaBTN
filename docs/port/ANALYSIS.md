@@ -554,3 +554,23 @@ and enlarged tolerance comparisons with Nearest/Bilinear. Filtering-ON with
 scaling-OFF also compiles. No game was launched, no gameplay FPS measurement
 was made, and atlas behavior in actual gameplay remains owner-tested.
 No decomp-side source or matching guard changed.
+
+### Widescreen source guards and renderer (ADR-056, 2026-10-26)
+
+New guards all require HMBTN_PORT && HMBTN_ENH_WIDESCREEN:
+- src/main/geometry/model.c: enhancement include, near_x/wide_x clip bands,
+  horizontal camera_frustum_setup angles, and eight primitive-pass arena-reserve
+  checks in model_draw_tmd_object.
+- src/overlay/11_GF_FARM/estate.c: enhancement include and estate_point_on_screen
+  horizontal sprite/weather drawing box. The sole external caller is weather
+  drawing; particle stepping/respawn and RNG remain outside the visibility test.
+- src/overlay/11_GF_FARM/field/field.c: enhancement include and the two opposite
+  corners in field_square_cells (rendering-only grid coverage).
+
+The original else branches/disabled source reconstruct HEAD exactly in a local
+mechanical comparison. This is not a matching binary check: that requires the
+unavailable Linux matching toolchain; WSL remains prohibited. No SDK/GAP changes.
+Source projection/depth remain native. Wider CPU culling feeds existing OTs;
+private replay expands world clipping while UI remains native. Original
+primitive/overlay backup buffers are unchanged; private GS work arenas are
+restored on OFF/scene exit. See ADR-056 for visibility/capacity limitations.

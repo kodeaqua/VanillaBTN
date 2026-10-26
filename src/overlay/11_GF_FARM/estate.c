@@ -1,3 +1,7 @@
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_WIDESCREEN)
+/* PORT: render-only sprite visibility ? see docs/port/DECISIONS.md#adr-056 */
+#include "enhance/widescreen/widescreen.h"
+#endif
 /* Farm estate bookkeeping: gold, the message queues, the daily notices and the
  * farm's search records. */
 
@@ -1783,7 +1787,14 @@ static s32 estate_season_bit(void) {
 /* Whether a projected point lies inside the screen box that the sprites are drawn in. */
 int estate_point_on_screen(s32 x, s32 y) {
     int result = 0;
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_WIDESCREEN)
+    /* PORT: sprite visibility at expanded viewport ? see docs/port/DECISIONS.md#adr-056 */
+    s32 margin = hm_widescreen_margin();
+    if (x >= ESTATE_SCREEN_BOX_LEFT - margin && x < ESTATE_SCREEN_BOX_LEFT + ESTATE_SCREEN_BOX_WIDTH + margin)
+        result = (u32)(y - ESTATE_SCREEN_BOX_TOP) < ESTATE_SCREEN_BOX_HEIGHT;
+#else
     if ((u32)(x - ESTATE_SCREEN_BOX_LEFT) < ESTATE_SCREEN_BOX_WIDTH) result = (u32)(y - ESTATE_SCREEN_BOX_TOP) < ESTATE_SCREEN_BOX_HEIGHT;
+#endif
     return result;
 }
 

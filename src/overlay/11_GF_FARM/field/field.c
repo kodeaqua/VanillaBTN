@@ -1,3 +1,7 @@
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_WIDESCREEN)
+/* PORT: render-only field coverage ? see docs/port/DECISIONS.md#adr-056 */
+#include "enhance/widescreen/widescreen.h"
+#endif
 /* The farm field: the 25 x 45 outdoor grid and the 7 x 7 greenhouse, their crop
  * growth, their cell textures, their drawing and the tools that clear them. */
 
@@ -955,11 +959,23 @@ static void field_square_cells(s32 *out) {
     centreZ = farm_area.mode.scroll.centre.vz;
     for (pass = 0; pass < 2; pass++) {
         if (pass != 0) {
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_WIDESCREEN)
+            /* PORT: field draw coverage ? see docs/port/DECISIONS.md#adr-056 */
+            worldX = centreX + hm_widescreen_radius(3600);
+            worldZ = centreZ - hm_widescreen_radius(3600);
+#else
             worldX = centreX + 3600;
             worldZ = centreZ - 3600;
+#endif
         } else {
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_WIDESCREEN)
+            /* PORT: field draw coverage ? see docs/port/DECISIONS.md#adr-056 */
+            worldX = centreX - hm_widescreen_radius(3600);
+            worldZ = centreZ + hm_widescreen_radius(3600);
+#else
             worldX = centreX - 3600;
             worldZ = centreZ + 3600;
+#endif
         }
         column = (worldX + 4400) / 400;
         row = (worldZ - 1600) / -400;

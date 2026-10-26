@@ -1454,3 +1454,62 @@ Nearest and Bilinear, CLUT depths, texture windows, masks/blends, deterministic
 random primitives, native and enlarged outputs. Native comparisons are exact;
 enlarged color tolerance is 9/255. These do not establish gameplay performance
 or full-game atlas compatibility; owner gameplay validation remains pending.
+
+## ADR-056: Expanded horizontal world viewport with native UI
+
+Date: 2026-10-26
+
+Context: The owner requests Widescreen Mode that reveals additional world, with
+OFF retaining original 4:3 bars. Stretching the framebuffer cannot reveal it.
+The main OT already identifies world packets separately from UI layer OTs.
+Original model/sprite/field CPU culling otherwise discards the extra geometry.
+
+Decision: HMBTN_ENH_WIDESCREEN defaults OFF in CMake; Windows -Game compiles it.
+Runtime enhance.widescreen defaults false. The existing Graphics row toggles it.
+Keep the original GTE projection, screen coordinates, camera eye/target, depth,
+simulation ticks and RNG. Expand the private output's logical horizontal domain
+symmetrically around its original center. At 16:9 this is [-54,374) x [0,240),
+rounded to even 428 logical pixels; 21:9 and 32:9 follow the active pixel aspect.
+Logical width is bounded to 1024; portrait/4:3 retain the native view.
+
+Record OT world/UI group boundaries in shared replay and forward them through
+interpolation. Widen only full-width world clips; ordinary UI stays centered at
+native coordinates and native size. Exact untextured full-screen F4 fade/fill
+packets cover the expanded view. Clear the added sides to black instead of
+sampling adjacent/wrapped native VRAM. Texture feedback checks still use the
+native framebuffer rectangle, not virtual sides. GPU and software support both
+native-height and enhanced output. Unsupported/direct/loading scanouts retain
+4:3 fallback. Title/menu-only scenes and minigames retain 4:3; this first world
+camera implementation targets the farm normal-view renderer, including UI overlays.
+The ESC pause canvas itself retains its original centered 4:3 backdrop.
+
+Narrow guarded source changes are required for the static model clip bands,
+horizontal frustum angles, estate sprite visibility and field draw radius.
+Each uses HMBTN_PORT && HMBTN_ENH_WIDESCREEN and preserves the exact original
+#else (or absence of the added guard). Guard locations are listed in ANALYSIS.
+Only rendering coverage changes. Keep original primitive arenas/sizes and overlay
+backup memory intact; stop model submission with an 8 KiB UI reserve when the
+original arena is exhausted. Dense scenes can therefore omit excess geometry.
+Use two private 256 KiB GS work arenas while wide world drawing is active;
+restore original pointers/sizes on OFF or leaving the world. The main.c-only
+GsSetWorkBase adapter preserves ordinary cursor advancement.
+
+An enlarged synthetic triangle exposed floating edge cancellation at the new
+aspect. Use exact Q8 signed 64-bit edge signs near the boundary, implemented
+with 32-bit word arithmetic so shader-int64 support is not required. Nearest
+native shader coverage remains on its existing integer path.
+
+Consequences: Extra authored world is submitted and rendered, without stretching
+original UI or changing the game camera's simulation state. This does not create
+new level geometry, enlarge weather particle pools, or change their RNG. Some
+assets/actors have additional original visibility rules; all locations, weather,
+dense scenes, transitions and gameplay still need owner validation. CPU fallback
+at 1080p can be expensive. No full-game parity or high-FPS claim is made.
+
+Validation: Release and ASan/UBSan unit suites; Vulkan/D3D12 offscreen world/UI,
+texture-filtering, fade and both framebuffer-origin comparisons. Exact native
+comparisons and 9/255 enlarged color tolerance. GS cursor/OFF arena preservation
+and unchanged native projection are covered by unit tests. A mechanical check
+removing only the new guards reconstructs each original source file exactly.
+Matching check could not run: the matching Linux toolchain is unavailable on
+this Windows host and the owner prohibits WSL. No matching result is claimed.
