@@ -45,7 +45,7 @@ Limit offers Native (30), Off (Unlimited), and monitor refresh-derived rates, pr
 values such as 60000/1001 (shown as 59.94). Windowed/borderless choices use the
 desktop resolution; exclusive choices use the selected resolution. VSync can
 reduce achieved presentation to the active OS refresh. A cap does not switch
-desktop refresh. The ten-item list scrolls through seven visible rows.
+desktop refresh. The eleven-item list scrolls through seven visible rows.
 
 Presentation deadlines are independent of the fixed 60 Hz hardware ticks.
 Original normal game updates remain 30 Hz through VSync(2). Higher caps repeat
@@ -79,3 +79,9 @@ Off (Unlimited) removes the software presentation cap. VSync On still follows
 the active monitor refresh when available; choose VSync Off for uncapped
 submission if the driver supports immediate presentation. Simulation remains
 native regardless of presentation attempts. See ADR-051.
+
+Renderer selects GPU Auto (graphics.renderer=0, default) or Software (1).
+GPU Auto uses shared scene output at native and enhanced resolution, exposing
+active GPU versus CPU fallback in its detail row. Unsupported shaders/commands
+retain software output. GPU native integer readback checks pass, but actual
+gameplay remains owner-tested. See ADR-054 and gfx/README.md for coverage limits.

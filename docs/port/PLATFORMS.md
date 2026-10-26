@@ -8,8 +8,8 @@ Full playthrough and broader gameplay remain unverified; see WINDOWS_PLAYTEST.md
 | Target | Foundation preset | Validation |
 | --- | --- | --- |
 | Linux x86-64 | linux-release, linux-asan-ubsan | Deferred; requires a separate Linux host, no WSL |
-| Windows x86-64 | windows-release | All 113 original source units and native window build; tests passed (77/77 with -Game) |
-| Windows x86-64 sanitizers | windows-asan-ubsan | All source units and native window build; Clang 20.1.8 ASan/UBSan tests passed (77/77 with pause, interpolation and scaling compiled); gameplay coverage remains limited |
+| Windows x86-64 | windows-release | All 113 original source units and native window build; tests passed (79/79 with -Game) |
+| Windows x86-64 sanitizers | windows-asan-ubsan | All source units and native window build; Clang 20.1.8 ASan/UBSan tests passed (79/79 with shared GPU output, pause, interpolation and scaling compiled); gameplay coverage remains limited |
 | macOS universal | macos-universal-release | Pending; no macOS host tested |
 | Android arm64 | Pending NDK and minSdk selection | No device/build validation |
 
@@ -186,3 +186,36 @@ the f93bb01 interpolation object fails at a visible black gap; the corrected
 implementation passes. Stable field-cell identities survive inserted work
 packets. The owner isolated actual farm cuts to Interpolation ON, but has not
 yet confirmed this correction in gameplay. No game session/replay was launched.
+
+## Shared GPU output, offscreen validation
+
+Date: 2026-10-26. Host: Ryzen 5 4500 / Radeon RX Vega, driver 31.0.21925.1001.
+Clang 20.1.8 release (-O2, x86-64-v2); SDL 3.2.28. Offscreen compute probes pass
+on Vulkan and D3D12. No window, disc, game loop or input replay is used. Native
+RGB is byte-exact against the software reference for fixed fixtures and 2048
+deterministic random primitives. Tests cover masks, blending, texture depths/
+windows, clipping, lines, display-write control and both framebuffer origins.
+High-resolution comparisons allow up to 9/255 per color channel (one 5-bit step);
+fractional sprite motion across a tile boundary has a separate exact check.
+Game scene coverage and full playthrough remain owner validation.
+
+Timing tool: hmbtn_gpu_renderer_probe <driver> --benchmark, SDL_GetTicksNS,
+50 passes per size, one large flat triangle over a synthetic 32x32 logical area.
+CPU includes private VRAM restore, output seeding and reference raster. GPU
+includes restore, packet creation, upload, compute and a fence wait. No output
+readback, presentation, game logic, audio or full-scene overdraw is timed. Normal
+runtime does not perform this benchmark fence wait.
+
+| Output | CPU / Vulkan-run | GPU / Vulkan | CPU / D3D12-run | GPU / D3D12 |
+| --- | --- | --- | --- | --- |
+| 320x240 | 0.344 ms | 0.484 ms | 0.382 ms | 0.566 ms |
+| 640x480 | 1.246 ms | 0.569 ms | 1.324 ms | 0.616 ms |
+| 1440x1080 | 6.198 ms | 0.644 ms | 6.360 ms | 0.882 ms |
+
+These warm single-run synthetic numbers show a high-resolution benefit and
+small native-resolution overhead. They are not achieved gameplay FPS or a port
+overhead guarantee. Native CPU VRAM compatibility is still maintained. GPU Auto
+conservatively falls back on unsupported dependencies/transfers or capacity.
+The owner's active windows-release executable remains untouched; a separately
+linked windows-gpu-preview executable contains the latest changes while that
+process is open. Owner gameplay confirmation of the field-seam fix is pending.

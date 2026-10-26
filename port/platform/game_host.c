@@ -1,3 +1,8 @@
+#ifdef HMBTN_GPU_RASTER
+#include "gfx/frame_replay.h"
+#include "gfx/game_frame.h"
+#include "platform/gpu_renderer.h"
+#endif
 #ifdef HMBTN_ENH_SCALING
 #include "enhance/scaling/scaling.h"
 #include "gfx/game_frame.h"
@@ -42,6 +47,15 @@ static int hm_ignore_held;
 static int hm_pause_enabled;
 static u8 hm_pause_background[320 * 240 * 4];
 #endif
+#ifdef HMBTN_GPU_RASTER
+static hm_gpu_renderer *hm_gpu_output;
+static hm_gpu_scene *hm_gpu_commands;
+static hm_frame_replay *hm_gpu_replay;
+static hm_gpu_scene_data hm_gpu_cached;
+static u64 hm_gpu_cached_serial;
+static int hm_gpu_fallback_reported;
+#endif
+
 enum { HM_SCAN_WIDTH = 1024, HM_SCAN_HEIGHT = 512 };
 
 static void hm_host_fail(void) {
@@ -152,6 +166,25 @@ static void hm_host_display_event(Uint32 type) {
     (void)type;
 #endif
 }
+static void hm_host_blit(SDL_GPUCommandBuffer *command, SDL_GPUTexture *image, u32 image_width,
+                         u32 image_height, SDL_GPUTexture *swapchain, Uint32 width, Uint32 height,
+                         int linear) {
+    Uint32 destination_width = width, destination_height = height;
+    if ((u64)width * 3 > (u64)height * 4)
+        destination_width = height * 4 / 3;
+    else
+        destination_height = width * 3 / 4;
+    SDL_GPUBlitInfo blit = {.source = {.texture = image, .w = image_width, .h = image_height},
+                            .destination = {.texture = swapchain,
+                                            .x = (width - destination_width) / 2,
+                                            .y = (height - destination_height) / 2,
+                                            .w = destination_width,
+                                            .h = destination_height},
+                            .load_op = SDL_GPU_LOADOP_CLEAR,
+                            .clear_color = {0, 0, 0, 1},
+                            .filter = linear ? SDL_GPU_FILTER_LINEAR : SDL_GPU_FILTER_NEAREST};
+    SDL_BlitGPUTexture(command, &blit);
+}
 static int hm_host_submit(u32 image_width, u32 image_height, int linear) {
     SDL_GPUCommandBuffer *command = SDL_AcquireGPUCommandBuffer(hm_device);
     if (!command)
@@ -176,30 +209,110 @@ static int hm_host_submit(u32 image_width, u32 image_height, int linear) {
         .texture = hm_texture, .w = image_width, .h = image_height, .d = 1};
     SDL_UploadToGPUTexture(copy, &source, &region, true);
     SDL_EndGPUCopyPass(copy);
-    if (swapchain) {
-        Uint32 destination_width = width, destination_height = height;
-#ifdef HMBTN_ENH_PAUSE_MENU
-        if ((u64)width * 3 > (u64)height * 4)
-            destination_width = height * 4 / 3;
-        else
-            destination_height = width * 3 / 4;
-#endif
-        SDL_GPUBlitInfo blit = {
-            .source = {.texture = hm_texture, .w = image_width, .h = image_height},
-            .destination = {.texture = swapchain,
-                            .x = (width - destination_width) / 2,
-                            .y = (height - destination_height) / 2,
-                            .w = destination_width,
-                            .h = destination_height},
-            .load_op = SDL_GPU_LOADOP_CLEAR,
-            .clear_color = {0, 0, 0, 1},
-            .filter = linear ? SDL_GPU_FILTER_LINEAR : SDL_GPU_FILTER_NEAREST};
-        SDL_BlitGPUTexture(command, &blit);
-    }
+    hm_host_blit(command, hm_texture, image_width, image_height, swapchain, width, height, linear);
     if (!SDL_SubmitGPUCommandBuffer(command))
         hm_host_fail();
     return 1;
 }
+
+#ifdef HMBTN_GPU_RASTER
+static int hm_host_gpu_present(const RECT *native_area) {
+    if (!hm_gpu_output || !hm_gpu_commands || native_area->w <= 0 || native_area->h <= 0)
+        return 0;
+#ifdef HMBTN_ENH_PAUSE_MENU
+    if (hm_options.renderer) {
+        hm_frame_replay_release(hm_gpu_replay);
+        hm_gpu_replay = NULL;
+        hm_gpu_cached_serial = 0;
+        return 0;
+    }
+#endif
+    if (!hm_gpu_replay) {
+        hm_gpu_replay = hm_frame_replay_acquire();
+        hm_gpu_cached_serial = 0;
+        if (!hm_gpu_replay)
+            return 0;
+    }
+    /* Diagnostic capture deliberately uses the software reference. */
+    if (SDL_getenv("HMBTN_CAPTURE_FRAME"))
+        return 0;
+    u32 width = (u32)native_area->w, height = (u32)native_area->h;
+#if defined(HMBTN_ENH_SCALING) && defined(HMBTN_ENH_PAUSE_MENU)
+    if (hm_options.scaling) {
+        if (!hm_host_scaling_prepare())
+            return 0;
+        int w, h;
+        if (!SDL_GetWindowSizeInPixels(hm_window, &w, &h) || w <= 0 || h <= 0)
+            return 0;
+        if ((u64)w * 3 > (u64)h * 4)
+            w = h * 4 / 3;
+        else
+            h = w * 3 / 4;
+        width = (u32)w;
+        height = (u32)h;
+    }
+#endif
+    hm_render_frame live = hm_game_render_frame();
+    u64 serial = hm_frame_replay_serial(hm_gpu_replay, &live);
+    int interpolate = 0;
+#if defined(HMBTN_ENH_INTERPOLATION) && defined(HMBTN_ENH_PAUSE_MENU)
+    interpolate = hm_options.interpolation && live.eligible;
+#endif
+    u64 cache_serial = interpolate ? 0 : serial;
+    if (!cache_serial || hm_gpu_cached_serial != cache_serial || hm_gpu_cached.width != width ||
+        hm_gpu_cached.height != height) {
+        hm_gpu_cached_serial = 0;
+        hm_gpu_cached = (hm_gpu_scene_data){0};
+        hm_replay_sink previous = hm_gpu_scene_begin(hm_gpu_commands, width, height);
+        int replayed = 0;
+#ifdef HMBTN_ENH_INTERPOLATION
+        if (interpolate)
+            replayed = hm_interpolation_replay(SDL_GetTicksNS() - hm_start, &live);
+#endif
+        if (!replayed)
+            replayed = hm_frame_replay_draw(hm_gpu_replay, &live);
+        if (!hm_gpu_scene_end(hm_gpu_commands, previous, &hm_gpu_cached) || !replayed) {
+            if (serial && !hm_gpu_fallback_reported) {
+                fprintf(stderr, "GPU scene fallback: %s\n", hm_gpu_scene_fallback(hm_gpu_commands));
+                hm_gpu_fallback_reported = 1;
+            }
+            return 0;
+        }
+        hm_gpu_cached_serial = cache_serial;
+    }
+    SDL_GPUCommandBuffer *command = SDL_AcquireGPUCommandBuffer(hm_device);
+    if (!command)
+        hm_host_fail();
+    SDL_GPUTexture *swapchain = NULL;
+    Uint32 window_width, window_height;
+    if (!SDL_AcquireGPUSwapchainTexture(command, hm_window, &swapchain, &window_width,
+                                        &window_height)) {
+        SDL_CancelGPUCommandBuffer(command);
+        hm_host_fail();
+    }
+    if (!swapchain) {
+        SDL_CancelGPUCommandBuffer(command);
+        return 1;
+    }
+    SDL_GPUTexture *image = hm_gpu_renderer_encode(hm_gpu_output, command, &hm_gpu_cached);
+    if (!image) {
+        SDL_CancelGPUCommandBuffer(command);
+        if (!hm_gpu_fallback_reported) {
+            fprintf(stderr, "GPU output unavailable; using software rendering\n");
+            hm_gpu_fallback_reported = 1;
+        }
+        return 0;
+    }
+    int linear = 0;
+#ifdef HMBTN_ENH_PAUSE_MENU
+    linear = hm_options.linear;
+#endif
+    hm_host_blit(command, image, width, height, swapchain, window_width, window_height, linear);
+    if (!SDL_SubmitGPUCommandBuffer(command))
+        hm_host_fail();
+    return 1;
+}
+#endif
 
 #ifdef HMBTN_ENH_PAUSE_MENU
 static void hm_host_pause(void) {
@@ -338,6 +451,17 @@ static void hm_host_pause(void) {
 static void hm_host_present_scanout(u64 tick) {
     const hm_gpu_environment *state = hm_gpu_environment_state();
     const RECT *area = &state->display.disp;
+#ifdef HMBTN_ENH_PAUSE_MENU
+    hm_options.gpu_active = 0;
+#endif
+#ifdef HMBTN_GPU_RASTER
+    if (state->display_enabled && hm_host_gpu_present(area)) {
+#ifdef HMBTN_ENH_PAUSE_MENU
+        hm_options.gpu_active = 1;
+#endif
+        return;
+    }
+#endif
 #if defined(HMBTN_ENH_SCALING) || defined(HMBTN_ENH_INTERPOLATION)
     hm_render_frame live = hm_game_render_frame();
 #endif
@@ -581,6 +705,22 @@ int hm_game_host_start(hm_disc *disc) {
         return 0;
     }
 #endif
+#ifdef HMBTN_GPU_RASTER
+    hm_gpu_output = hm_gpu_renderer_create(hm_device);
+    if (hm_gpu_output) {
+        hm_gpu_commands = hm_gpu_scene_create();
+        hm_gpu_replay = hm_frame_replay_acquire();
+    }
+    if (!hm_gpu_output || !hm_gpu_commands || !hm_gpu_replay) {
+        hm_frame_replay_release(hm_gpu_replay);
+        hm_gpu_replay = NULL;
+        hm_gpu_scene_destroy(hm_gpu_commands);
+        hm_gpu_commands = NULL;
+        hm_gpu_renderer_destroy(hm_gpu_output);
+        hm_gpu_output = NULL;
+        fprintf(stderr, "GPU scene renderer unavailable; using software rendering\n");
+    }
+#endif
     hm_start = SDL_GetTicksNS();
     hm_host_reset_presentation();
     hm_timing_reset((hm_timing_host){NULL, hm_host_tick, NULL});
@@ -596,9 +736,22 @@ void hm_game_host_stop(void) {
 #ifdef HMBTN_ENH_INTERPOLATION
     hm_interpolation_enable(0);
 #endif
+#ifdef HMBTN_GPU_RASTER
+    hm_frame_replay_release(hm_gpu_replay);
+    hm_gpu_replay = NULL;
+    hm_gpu_scene_destroy(hm_gpu_commands);
+    hm_gpu_commands = NULL;
+    hm_gpu_cached = (hm_gpu_scene_data){0};
+    hm_gpu_cached_serial = 0;
+    hm_gpu_fallback_reported = 0;
+#endif
     hm_audio_output_stop();
     if (hm_device) {
         SDL_WaitForGPUIdle(hm_device);
+#ifdef HMBTN_GPU_RASTER
+        hm_gpu_renderer_destroy(hm_gpu_output);
+        hm_gpu_output = NULL;
+#endif
         if (hm_upload)
             SDL_ReleaseGPUTransferBuffer(hm_device, hm_upload);
         if (hm_texture)

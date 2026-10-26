@@ -4,8 +4,8 @@
 static const char *const hm_root_items[] = {"Resume", "Settings", "Exit Game"};
 static const char *const hm_settings_items[] = {"Graphics"};
 static const char *const hm_graphics_items[] = {
-    "Monitor",       "Window Mode", "Resolution", "Enhance Scaling", "Widescreen Mode",
-    "Anti-Aliasing", "Filtering",   "VSync",      "FPS Limit",       "Interpolation"};
+    "Monitor",   "Window Mode", "Resolution", "Enhance Scaling", "Widescreen Mode", "Anti-Aliasing",
+    "Filtering", "VSync",       "FPS Limit",  "Interpolation",   "Renderer"};
 
 void hm_pause_open(hm_pause_menu *menu) {
     menu->page = HM_PAUSE_ROOT;

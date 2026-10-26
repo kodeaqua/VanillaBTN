@@ -26,14 +26,15 @@ void hm_graphics_load(hm_graphics_options *o) {
         hm_json_integer(object, length, "height", &candidate.height);
         hm_json_integer(object, length, "bilinear", &candidate.linear);
         hm_json_integer(object, length, "vsync", &candidate.vsync);
+        hm_json_integer(object, length, "renderer", &candidate.renderer);
         hm_json_integer(object, length, "fps_numerator", &candidate.fps_numerator);
         hm_json_integer(object, length, "fps_denominator", &candidate.fps_denominator);
         if (candidate.monitor >= 0 && candidate.monitor < 64 && candidate.mode >= 0 &&
             candidate.mode <= 2 && candidate.width >= 320 && candidate.width <= 16384 &&
             candidate.height >= 240 && candidate.height <= 16384 && candidate.linear >= 0 &&
-            candidate.linear <= 1 && candidate.vsync >= 0 && candidate.vsync <= 1 &&
-            candidate.fps_numerator >= -1 && candidate.fps_denominator > 0 &&
-            candidate.fps_denominator <= 1000000 &&
+            candidate.linear <= 1 && candidate.renderer >= 0 && candidate.renderer <= 1 &&
+            candidate.vsync >= 0 && candidate.vsync <= 1 && candidate.fps_numerator >= -1 &&
+            candidate.fps_denominator > 0 && candidate.fps_denominator <= 1000000 &&
             (candidate.fps_numerator <= 0 ||
              (candidate.fps_numerator >= candidate.fps_denominator &&
               (u64)candidate.fps_numerator <= (u64)candidate.fps_denominator * 1000)))
@@ -62,9 +63,9 @@ int hm_graphics_save(const hm_graphics_options *o) {
     char json[256];
     SDL_snprintf(json, sizeof(json),
                  "{\"monitor\":%d,\"window_mode\":%d,\"width\":%d,\"height\":%d,\"bilinear\":%d,"
-                 "\"vsync\":%d,\"fps_numerator\":%d,\"fps_denominator\":%d}",
-                 o->monitor, o->mode, o->width, o->height, o->linear, o->vsync, o->fps_numerator,
-                 o->fps_denominator);
+                 "\"renderer\":%d,\"vsync\":%d,\"fps_numerator\":%d,\"fps_denominator\":%d}",
+                 o->monitor, o->mode, o->width, o->height, o->linear, o->renderer, o->vsync,
+                 o->fps_numerator, o->fps_denominator);
     int ok = hm_user_data_set_setting("graphics", json);
 #ifdef HMBTN_ENH_INTERPOLATION
     if (ok)
@@ -320,6 +321,10 @@ int hm_graphics_change(SDL_GPUDevice *device, SDL_Window *window, hm_graphics_op
             return 0;
     }
 #endif
+#ifdef HMBTN_GPU_RASTER
+    else if (item == 10)
+        candidate.renderer = !candidate.renderer;
+#endif
     else
         return 0; /* Renderer enhancements remain unavailable until implemented. */
     int window_changed = item >= 0 && item <= 2;
@@ -375,6 +380,11 @@ void hm_graphics_value(const hm_graphics_options *o, int item, char *text, size_
         SDL_snprintf(text, capacity, "%s", o->interpolation ? "On - world motion" : "Off");
     else if (item == 6)
         SDL_snprintf(text, capacity, "%s", o->linear ? "Bilinear" : "Nearest Neighbor");
+    else if (item == 10)
+        SDL_snprintf(text, capacity, "%s",
+                     o->renderer     ? "Software"
+                     : o->gpu_active ? "GPU - active"
+                                     : "GPU Auto - CPU fallback");
     else
         SDL_snprintf(text, capacity, "Off - not available yet");
 }
@@ -407,6 +417,8 @@ void hm_graphics_row_value(const hm_graphics_options *o, int item, char *text, s
         SDL_snprintf(text, capacity, "%s", o->interpolation ? "On" : "Off");
     else if (item == 6)
         SDL_snprintf(text, capacity, "%s", o->linear ? "Bilinear" : "Nearest");
+    else if (item == 10)
+        SDL_snprintf(text, capacity, "%s", o->renderer ? "Software" : "GPU Auto");
     else
         SDL_snprintf(text, capacity, "Off");
 }

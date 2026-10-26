@@ -1,0 +1,93 @@
+// Original PS1 command semantics, implemented for independent output pixels.
+// No game logic, native RAM or native VRAM is written by this kernel.
+ByteAddressBuffer scene : register(t0, space0);
+RWTexture2D<float4> output_image : register(u0, space1);
+uint load_word(uint index){return scene.Load(index*4);}
+uint word(uint p,uint i){return load_word(p+i);}
+uint vram(int x,int y){uint at=((uint(y)&511)*1024+(uint(x)&1023));
+    return (load_word(16+at/2)>>((at&1)*16))&65535;}
+int edge_i(int2 a,int2 b,int2 p){return (b.x-a.x)*(p.y-a.y)-(b.y-a.y)*(p.x-a.x);}
+float edge_f(float2 a,float2 b,float2 p){return (b.x-a.x)*(p.y-a.y)-(b.y-a.y)*(p.x-a.x);}
+bool top_left(int2 a,int2 b){return b.y<a.y||(b.y==a.y&&b.x>a.x);}
+bool top_left_f(float2 a,float2 b){return b.y<a.y||(b.y==a.y&&b.x>a.x);}
+uint3 rgb(uint c){return uint3(c&255,(c>>8)&255,(c>>16)&255);}
+uint2 uv(uint c){return uint2(c&255,(c>>8)&255);}
+int dither(int2 p){const int values[16]={-4,0,-3,1,2,-2,3,-1,-3,1,-4,0,3,-1,2,-2};
+    return values[((p.y&3)*4)+(p.x&3)];}
+uint texel(uint p,uint2 st){uint mx=(256-word(p,7))&248,my=(256-word(p,8))&248;
+    uint u=((st.x&~mx)|(word(p,5)&mx))&255,v=((st.y&~my)|(word(p,6)&my))&255;
+    uint page=word(p,2),depth=(page>>7)&3;int x=int((page&15)*64),y=int((page&16)*16);
+    if(depth==2)return vram(x+int(u),y+int(v));
+    uint index=depth==0?(vram(x+int(u/4),y+int(v))>>((u&3)*4))&15:
+        (vram(x+int(u/2),y+int(v))>>((u&1)*8))&255;
+    uint clut=word(p,3);return vram(int((clut&63)*16+index),int((clut>>6)&511));}
+uint interp_i(uint3 values,int3 w,int area){return (uint(w.x)*values.x+uint(w.y)*values.y+
+    uint(w.z)*values.z+uint(area/2))/uint(area);}
+uint interp_f(uint3 values,float3 w,float area){return uint(floor(dot(float3(values),w)/area+0.5));}
+[numthreads(8,8,1)]
+void main(uint3 id:SV_DispatchThreadID){
+    uint width=load_word(0),height=load_word(1);if(id.x>=width||id.y>=height)return;
+    int2 origin=int2(load_word(2),load_word(3));uint2 logical_size=uint2(load_word(4),load_word(5));
+    int2 local=int2(((2*id.xy+1)*logical_size)/(2*uint2(width,height)));
+    int2 logical=origin+local;
+    bool native=(width==logical_size.x&&height==logical_size.y);
+    uint color=vram(logical.x,logical.y);
+    uint bin=load_word(9)+uint((local.y/16)*int(load_word(6))+local.x/16)*257;
+    uint count=load_word(bin);
+    [loop]for(uint item=0;item<count;++item){
+        uint p=load_word(8)+load_word(bin+1+item)*40,op=word(p,1),flags=word(p,4);
+        int2 clip=int2(word(p,9),word(p,10)),clip_end=clip+int2(word(p,11),word(p,12));
+        if(any(logical<clip)||any(logical>=clip_end))continue;
+        int2 display=int2(word(p,13),word(p,14)),display_end=display+int2(word(p,15),word(p,16));
+        if(!(flags&2)&&word(p,17)&&all(logical>=display)&&all(logical<display_end))continue;
+        if((flags&8)&&(color&32768))continue;
+        uint3 light=rgb(word(p,24));uint2 st=uv(word(p,27));
+        bool textured=(op&4)!=0,raw=textured&&((op&1)!=0);
+        bool exact_native=native&&!(flags&32);
+        if(word(p,0)==0){
+            int2 a=int2(word(p,18),word(p,19)),b=int2(word(p,20),word(p,21)),c=int2(word(p,22),word(p,23));
+            int3 wi=0;float3 wf=0;int ai=0;float af=0;
+            if(exact_native){int2 center=2*logical+1;
+                int2 aa=2*a,bb=2*b,cc=2*c;
+                wi=int3(edge_i(bb,cc,center),edge_i(cc,aa,center),edge_i(aa,bb,center));ai=edge_i(aa,bb,cc);
+                if(ai<=0||any(wi<0)||(wi.x==0&&!top_left(b,c))||(wi.y==0&&!top_left(c,a))||(wi.z==0&&!top_left(a,b)))continue;
+            }else{float2 aa=float2(int2(word(p,34),word(p,35)))/256.0;
+                float2 bb=float2(int2(word(p,36),word(p,37)))/256.0;
+                float2 cc=float2(int2(word(p,38),word(p,39)))/256.0;
+                float2 center=float2(id.xy)+0.5;
+                wf=float3(edge_f(bb,cc,center),edge_f(cc,aa,center),edge_f(aa,bb,center));af=edge_f(aa,bb,cc);
+                if(af<=0||any(wf<0)||(wf.x==0&&!top_left_f(bb,cc))||(wf.y==0&&!top_left_f(cc,aa))||(wf.z==0&&!top_left_f(aa,bb)))continue;
+            }
+            uint3 r0=rgb(word(p,24)),r1=rgb(word(p,25)),r2=rgb(word(p,26));
+            uint2 t0=uv(word(p,27)),t1=uv(word(p,28)),t2=uv(word(p,29));
+            if(exact_native){if((op&16)&&!raw)light=uint3(interp_i(uint3(r0.x,r1.x,r2.x),wi,ai),interp_i(uint3(r0.y,r1.y,r2.y),wi,ai),interp_i(uint3(r0.z,r1.z,r2.z),wi,ai));
+                if(textured)st=uint2(interp_i(uint3(t0.x,t1.x,t2.x),wi,ai),interp_i(uint3(t0.y,t1.y,t2.y),wi,ai));}
+            else{if((op&16)&&!raw)light=uint3(interp_f(uint3(r0.x,r1.x,r2.x),wf,af),interp_f(uint3(r0.y,r1.y,r2.y),wf,af),interp_f(uint3(r0.z,r1.z,r2.z),wf,af));
+                if(textured)st=uint2(interp_f(uint3(t0.x,t1.x,t2.x),wf,af),interp_f(uint3(t0.y,t1.y,t2.y),wf,af));}
+        }else{int2 delta;
+            if(flags&32){float2 low=float2(int2(word(p,35),word(p,36)))/256.0;
+                float2 high=float2(int2(word(p,37),word(p,38)))/256.0,center=float2(id.xy)+0.5;
+                if(any(center<low)||any(center>=high))continue;
+                delta=int2(floor((center-low)*float2(logical_size)/float2(width,height)));
+            }else{delta=logical-int2(word(p,30),word(p,31));
+                if(any(delta<0)||delta.x>=int(word(p,32))||delta.y>=int(word(p,33)))continue;}
+            st+=uint2(delta);}
+        uint sample_color=textured?texel(p,st):0;if(textured&&sample_color==0)continue;
+        uint source=sample_color&32768;
+        if(raw)source=sample_color;
+        else{int3 value=int3(light);int3 tex=int3(sample_color&31,(sample_color>>5)&31,(sample_color>>10)&31);
+            if(word(p,0)==0){if(textured)value=value*tex/16;
+                if((flags&1)&&((op&16)||(textured&&!raw)))value+=dither(logical);
+                value=clamp(value,0,255)>>3;
+            }else{if(textured)value=min(tex*value/128,31);
+                else{if(word(p,34)&&(flags&1))value=clamp(value+dither(logical),0,255);value>>=3;}}
+            source|=uint(value.x|(value.y<<5)|(value.z<<10));}
+        if((op&2)&&(!textured||(sample_color&32768))){
+            int3 back=int3(color&31,(color>>5)&31,(color>>10)&31),front=int3(source&31,(source>>5)&31,(source>>10)&31);
+            uint mode=(word(p,2)>>5)&3;int3 mixed=mode==0?back/2+front/2:mode==1?back+front:mode==2?back-front:back+front/4;
+            mixed=clamp(mixed,0,31);source=(source&32768)|uint(mixed.x|(mixed.y<<5)|(mixed.z<<10));}
+        color=source|((flags&4)?32768:0);
+    }
+    uint3 c=uint3(color&31,(color>>5)&31,(color>>10)&31);c=(c<<3)|(c>>2);
+    output_image[id.xy]=float4(float3(c)/255.0,1.0);
+}

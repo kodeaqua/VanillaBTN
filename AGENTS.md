@@ -361,3 +361,12 @@ A change is done when:
 - Do not require network or game data for the port's unit tests/CI.
 - Do not write non-English or non-conventional commit messages.
 - Do not suppress sanitizer/UB findings without understanding them.
+
+## Current shared-GPU owner direction
+
+The owner requests shared GPU scene output for native and enhanced resolutions,
+not only scaling. graphics.renderer defaults to GPU Auto (0); Software (1)
+remains selectable. Keep native VRAM/readback compatibility and safe CPU
+fallback while coverage is validated. Synthetic offscreen GPU probes are
+technical checks; interactive gameplay testing remains with the owner. Never
+present partial GPU coverage as complete or remove the reference prematurely.

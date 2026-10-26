@@ -49,3 +49,8 @@ otherwise the entire connected mesh uses current geometry. This prevents the
 tested holes caused by mixing current and intermediate neighboring positions.
 It can reduce interpolation cadence when history changes. Actual farm gameplay
 confirmation remains with the owner.
+
+GPU Auto can consume fractional position metadata before native integer packing,
+so a half-PS1-pixel motion remains visible at enlarged resolutions (ADR-054).
+Only output coordinates change; native simulation, animation poses and CPU
+VRAM are retained. Software fallback keeps its original pixel quantization.

@@ -4,6 +4,7 @@
 #include <SDL3/SDL.h>
 typedef struct {
     int monitor, mode, width, height, linear, vsync, interpolation, scaling;
+    int renderer, gpu_active;           /* 0 = GPU Auto, 1 = Software; active is transient. */
     int fps_numerator, fps_denominator; /* 0 = Native (30); -1 = Off (Unlimited). */
 } hm_graphics_options;
 void hm_graphics_defaults(hm_graphics_options *options);

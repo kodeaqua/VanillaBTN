@@ -40,3 +40,10 @@ connected component current, avoiding cracks between mixed frame positions.
 Unconnected sprites retain independent interpolation. Fractional metadata can
 be consumed by an output backend while CPU reference scanout keeps its original
 pixel quantization. See ADR-053.
+
+Shared SDL_GPU execution lives in platform/gpu_renderer.c (ADR-054). GPU Auto
+handles native and viewport resolutions independently of scaling. Native pixel
+math is integer; optional fractional motion/enlarged coverage use fractional
+fields. SPIR-V/DXIL come from our HLSL under shaders/. Default builds use checked-in
+arrays; build-shaders.ps1 regenerates with pinned DXC. CMake rejects stale
+normalized source hashes. Unsupported cases retain software output.

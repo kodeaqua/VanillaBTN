@@ -527,3 +527,20 @@ against f93bb01 and passes with this guard. Real farm confirmation is pending.
 Shared gfx/frame_replay now owns capture independently of scaling; generic
 destination hooks support private geometry consumption and fractional motion.
 Portable packet and seam tests bring Windows release/sanitizer totals to 79.
+
+## Shared native/enhanced GPU output
+
+GPU Auto (graphics.renderer=0) now uses a portable tiled scene packet stream
+and platform SDL_GPU compute execution; Software (1) remains selectable.
+Native 1x output uses integer coverage/attribute math and matches synthetic CPU
+RGB readback exactly on Vulkan and D3D12. High-resolution/fractional coordinates
+use fixed-position fields with floating attribute interpolation. Fractional
+sprite movement is tested across a logical tile boundary. Native CPU VRAM
+remains authoritative, and normal output has no GPU readback/fence wait.
+
+The no-window probe also checks 2048 deterministic random primitives against
+CPU. Inline transfers, source feedback, offscreen dependencies, capacity limits
+and unsupported shader formats retain software output. Real gameplay/device
+coverage is not complete. Own HLSL and generated arrays are hash-checked; DXC
+is a pinned ignored developer tool, not a runtime dependency. Source game files
+and matching guards remain unchanged. See ADR-054 and THIRD_PARTY.md.

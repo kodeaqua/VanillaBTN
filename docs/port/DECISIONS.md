@@ -1369,3 +1369,54 @@ Portable GPU packet tests cover bounds, fallback, independent replay ownership
 and native state preservation. Windows integration passes 79 release and
 ASan/UBSan tests; these are not gameplay confirmation of the reported scene.
 No new matching source guard or third-party dependency is required for this layer.
+
+<a id="adr-054"></a>
+
+## ADR-054: Shared native/enhanced GPU compute scene output
+
+Date: 2026-10-26. Status: Vulkan/D3D12 readback passed; gameplay pending.
+
+The owner explicitly expands GPU acceleration to native output as well as
+Enhance Scaling. Use one SDL_GPU compute pipeline over portable scene packets
+(ADR-053). Each output pixel traverses its ordered logical tile list, keeping
+color/mask locally. This preserves PS1 ordering, four blend modes, CLUT/tpage
+sampling, texture windows and masks without cross-pixel write races or
+per-primitive feedback passes. Native 1x coverage/attributes use bounded integer
+math. Enlarged/fractional geometry uses fixed-position inputs and floating
+attribute interpolation; texture poses remain native.
+
+HMBTN_GPU_RASTER defaults ON. graphics.renderer=0 means GPU Auto (default),
+1 means Software. This backend is independent of enhance keys. Graphics adds
+Renderer as item 11 and reports active GPU or CPU fallback. Software releases
+its GPU capture reference; scaling may retain its own. Private geometry
+consumption avoids a second CPU output raster. Normal game execution still
+maintains low-resolution CPU VRAM for readback/transfer compatibility. Pause
+composition retains its small original-asset CPU canvas with GPU presentation.
+This does not claim all graphics CPU work has been removed.
+
+The platform backend supports SPIR-V/DXIL, using ByteAddressBuffer for SDL
+3.2.28's raw D3D12 storage-buffer view. Native output stays 4:3. Fractional
+motion metadata supplies subpixel triangle/sprite positions without simulation
+or GTE changes. Use native front history with interpolation OFF, interpolated
+current replay when eligible/ON. Cache unchanged scenes/output. GPU buffers and
+textures cycle for queued frames. Normal presentation neither waits for a
+compute fence nor reads pixels back. Existing fixed tick/presentation clocks
+and driver acquisition limits remain unchanged.
+
+Inline transfers, framebuffer texture/CLUT feedback, offscreen dependencies,
+exhausted capacity and direct/loading scanouts retain software output.
+Unsupported shader formats (including current Metal) also fall back.
+Conservative rejection may reduce GPU coverage; the menu exposes fallback.
+No full-game or cross-platform parity claim is made.
+
+Own HLSL is compiled into checked-in C arrays with normalized source hashes.
+Normal builds need no shader compiler. Developer regeneration uses pinned DXC
+v1.8.2505.1 in ignored host-tools, recorded in THIRD_PARTY.md. No compiler,
+game asset, SDK material or BIOS is shipped, and no linked dependency is added.
+
+Offscreen Radeon RX Vega probes compare native RGB bytes exactly to CPU on
+Vulkan/D3D12, including 2048 deterministic random primitives, texture depths/
+windows, masks, blends, clipping, lines and both framebuffer origins. Enlarged
+color allows one 5-bit step; fractional tile-boundary motion is checked
+separately. No window/game is started. Synthetic timing shows enlarged-output
+benefit and small 1x overhead; see PLATFORMS.md.

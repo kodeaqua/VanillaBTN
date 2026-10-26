@@ -13,7 +13,7 @@ The owner requested the native pause interface and graphics settings on
 | VSync | On (mailbox/FIFO) or supported immediate Off; device validation pending |
 | FPS limit | Native (30), Off (Unlimited), or monitor-derived rational caps; fixed 60 Hz game ticks; native images unless optional interpolation is enabled |
 | Visual interpolation | Optional private primitive replay for normal farm views; synthetic checks pass, owner gameplay validation pending |
-| Enhance Scaling | Optional viewport-resolution software primitive replay; default OFF, synthetic tests pass, owner device/gameplay checks pending |
+| Enhance Scaling | Optional viewport-resolution output through GPU Auto or Software; default OFF; gameplay checks pending |
 | Widescreen Mode | OFF path uses centered 4:3 and black bars; expanded camera/culling ON path pending |
 | FXAA/MSAA | OFF; renderer paths pending |
 
@@ -49,9 +49,8 @@ remain fully bright, and native VRAM is unchanged.
 Enhance Scaling now has a private viewport-resolution raster path (ADR-052).
 Windows -Game compiles HMBTN_ENH_SCALING; enhance.scaling defaults false. The
 initial implementation rerasterizes triangles/quads at viewport size, preserving
-original texture assets and 4:3 bars. The CPU target supports up to 4096 per axis
-with native fallback. Per-texture filtering and GPU scene rasterization remain
-pending; high FPS at high resolutions is not established. See
+original texture assets and 4:3 bars. Output supports up to 4096 per axis with software fallback. Per-texture
+filtering remains pending; high FPS in actual gameplay is not established. See
 port/enhance/scaling/README.md and the synthetic measurements in PLATFORMS.md.
 
 Interpolation now uses stable field-cell identities and a shared-vertex mesh
@@ -59,3 +58,9 @@ coherence guard (ADR-053). The owner confirmed the reported ground cuts disappea
 with Interpolation OFF. Synthetic reproductions for mismatched neighboring
 history and reordered field packets pass after the fix; owner farm confirmation
 is still pending. History changes may reduce interpolation cadence locally.
+
+Renderer > GPU Auto is now shared by native and enhanced output (ADR-054),
+independent of enhance.scaling. Software remains selectable. Native GPU pixel
+comparisons pass on Vulkan/D3D12; unsupported transfers/feedback and direct
+loading retain CPU fallback. The normal low-resolution VRAM compatibility path
+and pause canvas still use CPU. No complete GPU-offload or playthrough claim.
