@@ -962,3 +962,26 @@ its first actor member. A regression runs the original public helper updater
 twice with all seven helpers offscreen and clock ticking, checking each cue's
 start/play state, timer, position integration and unrelated field preservation.
 No helper is disabled or replaced with a success stub.
+
+<a id="adr-043"></a>
+
+## ADR-043: Keep storage slot and navigation access within native objects
+
+Date: 2026-10-26. Status: accepted for native array bounds.
+
+A local replay opens the original toolbox screen. Inspection of its input and
+transfer path finds two original array-subobject crossings: item_row_at indexes
+past player.held[2] to reach tools/items, and navigation indexes past the first
+marker's 12-byte next_cell field to reach subsequent markers. Modern bounds
+instrumentation cannot treat those distinct arrays as one object.
+
+Native branches select player.tools/items explicitly for bag slots 1..8 and
+the selected marker's own navigation field. Held and storage-grid routing stays
+unchanged; no out-of-bounds bag address is formed for grid slots. Matching
+branches retain the original flattened expressions. This preserves the exact
+logical slot mapping, without changing inventory rules or item data.
+
+The regression includes the original storage implementation and checks actual
+held, bag and all storage-row pointer destinations for toolbox/cabinet/icebox.
+It also asserts the 16-byte marker layout and four-byte navigation offset.
+Real menu transfer and subsequent tool-use replay coverage is in progress.
