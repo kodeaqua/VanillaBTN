@@ -69,6 +69,10 @@ int main(int argc, char **argv) {
     memset(initial, 0, sizeof(initial));
     CHECK(file && SDL_ReadIO(file, initial, sizeof(initial) - 1) == sizeof(custom) - 1);
     CHECK(SDL_CloseIO(file) && !strcmp(initial, custom));
+    CHECK(hm_user_data_set_setting("graphics", "{\"width\":1920}"));
+    char updated[256];
+    CHECK(hm_user_data_read_settings(updated, sizeof(updated)) > 0);
+    CHECK(strstr(updated, "\"owner_setting\":42") && strstr(updated, "\"width\":1920"));
     hm_user_data_stop();
     CHECK(SDL_RemovePath(settings));
     const char *names[] = {"saves/card1.hmc", "saves/card2.hmc", "saves", ".lock"};

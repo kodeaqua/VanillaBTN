@@ -105,7 +105,7 @@ int main(int argc, char **argv) {
     puts("Validated USA disc; entering compiled native game C");
     fflush(stdout);
 #ifdef HMBTN_SDL_HOST
-    if (!hm_game_host_start()) {
+    if (!hm_game_host_start(&disc)) {
         fprintf(stderr, "Cannot initialize native game window\n");
         hm_game_host_stop();
         hm_cd_detach();

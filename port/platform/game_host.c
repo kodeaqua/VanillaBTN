@@ -2,6 +2,11 @@
 #include "platform/audio_output.h"
 #include "platform/input_replay.h"
 #include "platform/user_data.h"
+#ifdef HMBTN_ENH_PAUSE_MENU
+#include "enhance/pause_menu/assets.h"
+#include "enhance/pause_menu/menu.h"
+#include "platform/graphics_options.h"
+#endif
 #include "psx/gpu_environment.h"
 #include "psx/pad.h"
 #include "psx/timing.h"
@@ -19,6 +24,13 @@ static Uint64 hm_start;
 static hm_input_replay hm_replay;
 static int hm_replay_enabled;
 static u64 hm_host_tick_limit;
+#ifdef HMBTN_ENH_PAUSE_MENU
+static hm_pause_assets hm_assets;
+static hm_graphics_options hm_options;
+static int hm_ignore_held;
+static int hm_pause_enabled;
+static u8 hm_pause_background[320 * 240 * 4];
+#endif
 enum { HM_SCAN_WIDTH = 1024, HM_SCAN_HEIGHT = 512, HM_SCAN_BYTES = 1024 * 512 * 4 };
 
 static void hm_host_fail(void) {
@@ -26,6 +38,155 @@ static void hm_host_fail(void) {
     hm_game_host_stop();
     exit(1);
 }
+
+static void hm_host_submit(u32 image_width, u32 image_height, int linear) {
+    SDL_GPUCommandBuffer *command = SDL_AcquireGPUCommandBuffer(hm_device);
+    if (!command)
+        hm_host_fail();
+    SDL_GPUCopyPass *copy = SDL_BeginGPUCopyPass(command);
+    SDL_GPUTextureTransferInfo source = {.transfer_buffer = hm_upload,
+                                         .pixels_per_row = image_width,
+                                         .rows_per_layer = image_height};
+    SDL_GPUTextureRegion region = {
+        .texture = hm_texture, .w = image_width, .h = image_height, .d = 1};
+    SDL_UploadToGPUTexture(copy, &source, &region, true);
+    SDL_EndGPUCopyPass(copy);
+    SDL_GPUTexture *swapchain = NULL;
+    Uint32 width, height;
+    if (!SDL_WaitAndAcquireGPUSwapchainTexture(command, hm_window, &swapchain, &width, &height))
+        hm_host_fail();
+    if (swapchain) {
+        Uint32 destination_width = width, destination_height = height;
+#ifdef HMBTN_ENH_PAUSE_MENU
+        if ((u64)width * 3 > (u64)height * 4)
+            destination_width = height * 4 / 3;
+        else
+            destination_height = width * 3 / 4;
+#endif
+        SDL_GPUBlitInfo blit = {
+            .source = {.texture = hm_texture, .w = image_width, .h = image_height},
+            .destination = {.texture = swapchain,
+                            .x = (width - destination_width) / 2,
+                            .y = (height - destination_height) / 2,
+                            .w = destination_width,
+                            .h = destination_height},
+            .load_op = SDL_GPU_LOADOP_CLEAR,
+            .clear_color = {0, 0, 0, 1},
+            .filter = linear ? SDL_GPU_FILTER_LINEAR : SDL_GPU_FILTER_NEAREST};
+        SDL_BlitGPUTexture(command, &blit);
+    }
+    if (!SDL_SubmitGPUCommandBuffer(command))
+        hm_host_fail();
+}
+
+#ifdef HMBTN_ENH_PAUSE_MENU
+static void hm_host_pause(void) {
+    hm_pause_menu menu;
+    hm_pause_open(&menu);
+    Uint64 before = SDL_GetTicksNS();
+    hm_audio_output_pause(1);
+    const hm_gpu_environment *state = hm_gpu_environment_state();
+    const RECT *area = &state->display.disp;
+    for (unsigned y = 0; y < 240; ++y)
+        for (unsigned x = 0; x < 320; ++x) {
+            u16 color = state->display_enabled && area->w > 0 && area->h > 0
+                            ? hm_vram_pixel((u32)area->x + x * (u32)area->w / 320,
+                                            (u32)area->y + y * (u32)area->h / 240)
+                            : 0;
+            u8 *out = hm_pause_background + (y * 320 + x) * 4;
+            for (unsigned k = 0; k < 3; ++k) {
+                unsigned value = (color >> (k * 5)) & 31;
+                out[k] = (u8)((value << 3) | (value >> 2));
+            }
+            out[3] = 255;
+        }
+    int running = 1;
+    const char *notice = "";
+    char value[128] = "";
+    char rows[7][32] = {{0}};
+    hm_pause_view view = {.detail = value};
+    for (int i = 0; i < 7; ++i)
+        view.values[i] = rows[i];
+    int value_dirty = 1;
+    while (running) {
+        SDL_Event event;
+        while (SDL_PollEvent(&event)) {
+            value_dirty = 1;
+            if (event.type == SDL_EVENT_QUIT) {
+                hm_game_host_stop();
+                exit(0);
+            }
+            if (event.type != SDL_EVENT_KEY_DOWN || event.key.repeat)
+                continue;
+            hm_pause_input input;
+            switch (event.key.key) {
+            case SDLK_ESCAPE:
+            case SDLK_D:
+                input = HM_PAUSE_BACK;
+                break;
+            case SDLK_RETURN:
+            case SDLK_X:
+                input = HM_PAUSE_CONFIRM;
+                break;
+            case SDLK_UP:
+                input = HM_PAUSE_UP;
+                break;
+            case SDLK_DOWN:
+                input = HM_PAUSE_DOWN;
+                break;
+            case SDLK_LEFT:
+                input = HM_PAUSE_LEFT;
+                break;
+            case SDLK_RIGHT:
+                input = HM_PAUSE_RIGHT;
+                break;
+            default:
+                continue;
+            }
+            hm_pause_action action = hm_pause_handle(&menu, input);
+            notice = "";
+            if (action == HM_PAUSE_RESUME) {
+                running = 0;
+                break;
+            }
+            if (action == HM_PAUSE_EXIT) {
+                hm_game_host_stop();
+                exit(0);
+            }
+            if (action == HM_PAUSE_CHANGE_GRAPHICS) {
+                if (hm_graphics_change(hm_window, &hm_options, menu.selected,
+                                       input == HM_PAUSE_LEFT ? -1 : 1))
+                    notice = hm_graphics_save(&hm_options) ? "" : "Cannot save settings";
+                else
+                    notice = "Option unavailable";
+            }
+        }
+        if (!running)
+            break;
+        u8 *pixels = SDL_MapGPUTransferBuffer(hm_device, hm_upload, true);
+        if (!pixels)
+            hm_host_fail();
+        SDL_memcpy(pixels, hm_pause_background, sizeof(hm_pause_background));
+        if (value_dirty) {
+            value[0] = 0;
+            if (menu.page == HM_PAUSE_GRAPHICS)
+                hm_graphics_value(&hm_options, menu.selected, value, sizeof(value));
+            if (menu.page == HM_PAUSE_GRAPHICS)
+                for (int i = 0; i < 7; ++i)
+                    hm_graphics_row_value(&hm_options, i, rows[i], sizeof(rows[i]));
+            value_dirty = 0;
+        }
+        view.notice = notice;
+        hm_pause_draw(&hm_assets, pixels, &menu, &view);
+        SDL_UnmapGPUTransferBuffer(hm_device, hm_upload);
+        hm_host_submit(320, 240, 0);
+        SDL_Delay(16);
+    }
+    hm_start += SDL_GetTicksNS() - before;
+    hm_ignore_held = 1;
+    hm_audio_output_pause(0);
+}
+#endif
 
 static void hm_host_tick(void *context, u64 tick) {
     (void)context;
@@ -40,6 +201,11 @@ static void hm_host_tick(void *context, u64 tick) {
             hm_game_host_stop();
             exit(0);
         }
+#ifdef HMBTN_ENH_PAUSE_MENU
+        if (hm_pause_enabled && event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat &&
+            event.key.key == SDLK_ESCAPE)
+            hm_host_pause();
+#endif
     }
     const bool *keys = SDL_GetKeyboardState(NULL);
     static const SDL_Scancode mapping[16] = {
@@ -53,6 +219,13 @@ static void hm_host_tick(void *context, u64 tick) {
             held |= (u16)(1u << i);
     if (hm_replay_enabled)
         held = hm_input_replay_sample(&hm_replay, tick);
+#ifdef HMBTN_ENH_PAUSE_MENU
+    if (hm_ignore_held) {
+        if (!held)
+            hm_ignore_held = 0;
+        held = 0;
+    }
+#endif
     hm_pad_sample(0, 1, held);
     Uint64 deadline = hm_start + tick * SDL_NS_PER_SECOND / 60;
     Uint64 now = SDL_GetTicksNS();
@@ -95,34 +268,17 @@ static void hm_host_tick(void *context, u64 tick) {
         SDL_DestroySurface(surface);
     }
     SDL_UnmapGPUTransferBuffer(hm_device, hm_upload);
-    SDL_GPUCommandBuffer *command = SDL_AcquireGPUCommandBuffer(hm_device);
-    if (!command)
-        hm_host_fail();
-    SDL_GPUCopyPass *copy = SDL_BeginGPUCopyPass(command);
-    SDL_GPUTextureTransferInfo source = {.transfer_buffer = hm_upload,
-                                         .pixels_per_row = (u32)area->w,
-                                         .rows_per_layer = (u32)area->h};
-    SDL_GPUTextureRegion region = {
-        .texture = hm_texture, .w = (u32)area->w, .h = (u32)area->h, .d = 1};
-    SDL_UploadToGPUTexture(copy, &source, &region, true);
-    SDL_EndGPUCopyPass(copy);
-    SDL_GPUTexture *swapchain = NULL;
-    Uint32 width, height;
-    if (!SDL_WaitAndAcquireGPUSwapchainTexture(command, hm_window, &swapchain, &width, &height))
-        hm_host_fail();
-    if (swapchain) {
-        SDL_GPUBlitInfo blit = {
-            .source = {.texture = hm_texture, .w = (u32)area->w, .h = (u32)area->h},
-            .destination = {.texture = swapchain, .w = width, .h = height},
-            .load_op = SDL_GPU_LOADOP_DONT_CARE,
-            .filter = SDL_GPU_FILTER_NEAREST};
-        SDL_BlitGPUTexture(command, &blit);
-    }
-    if (!SDL_SubmitGPUCommandBuffer(command))
-        hm_host_fail();
+#ifdef HMBTN_ENH_PAUSE_MENU
+    hm_host_submit((u32)area->w, (u32)area->h, hm_options.linear);
+#else
+    hm_host_submit((u32)area->w, (u32)area->h, 0);
+#endif
 }
 
-int hm_game_host_start(void) {
+int hm_game_host_start(hm_disc *disc) {
+#ifndef HMBTN_ENH_PAUSE_MENU
+    (void)disc;
+#endif
     const char *limit = SDL_getenv("HMBTN_BOOT_TICKS");
     if (limit) {
         char *end;
@@ -174,6 +330,21 @@ int hm_game_host_start(void) {
         fprintf(stderr, "Native audio: %s\n", SDL_GetError());
         return 0;
     }
+#ifdef HMBTN_ENH_PAUSE_MENU
+    hm_pause_enabled = hm_pause_config_enabled();
+    if (hm_pause_enabled && !hm_pause_assets_load(&hm_assets, disc)) {
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Back to Nature",
+                                 "Cannot load the original game font for the pause menu.",
+                                 hm_window);
+        return 0;
+    }
+    hm_graphics_load(&hm_options);
+    if (!hm_graphics_apply(hm_window, &hm_options)) {
+        hm_graphics_defaults(&hm_options);
+        if (!hm_graphics_apply(hm_window, &hm_options))
+            return 0;
+    }
+#endif
     hm_start = SDL_GetTicksNS();
     hm_timing_reset((hm_timing_host){NULL, hm_host_tick, NULL});
     printf("Native game window using SDL_GPU %s\n", SDL_GetGPUDeviceDriver(hm_device));

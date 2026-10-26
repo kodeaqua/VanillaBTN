@@ -1127,3 +1127,63 @@ separate integration unit registers both real inventories, alternates their
 selections six times and checks resident game state survives. No game loop,
 window, disc or interactive replay is started. Matching check remains unavailable
 on this native Windows host; matching-branch text reconstruction is separate.
+
+<a id="adr-048"></a>
+
+## ADR-048: Pause at the host boundary with private original-game UI resources
+
+Date: 2026-10-26. Status: initial interface implemented; advanced rendering pending.
+
+The owner requests an ESC interface across scenes with Resume, Settings >
+Graphics and Exit Game, using the game's own UI presentation. Complete the
+title/load reentry fix first, merge PR #1 as windows port init, remove old
+branches and create port/windows-pause-menu from the latest main. The new
+feature work is separate from that merged Windows foundation.
+
+Pause inside the SDL host VBlank boundary. Keep pumping OS events and drawing
+the private menu without returning to VSync, CD, SPU or the game callback.
+Pause/resume the audio device, retain its sample queue, and shift the pacing
+epoch by elapsed pause time. Suppress held confirm/pad input until released
+when returning to the game. The UI navigation state machine is data-free and
+does not touch the game's dialog state, current frame, ordering tables or RNG.
+
+Read the resident UI bank from A_FILE through the independently validated disc
+parser before game entry, decode with the original texture-pack function,
+cache its original 8x12 English font and text palette, and reset startup VRAM.
+The cache remains private across all overlay transitions. Draw the actual
+window_frame.c geometry through private pixel/line/gradient sinks. New labels
+use the game's glyph mapping. Do not bundle extracted assets or substitute a
+host font, generic UI toolkit or invented bitmap art.
+The original primitive builders consume packed 0xRRGGBB; do not follow the
+contradictory older 0xBBGGRR comment in window_frame.c. The owner reported a blue
+initial prototype, caused by reversed red/blue channels in the private canvas.
+Correct that conversion and retain the original cream gradient. Synthetic
+checks assert the expected cream RGB channels and a red glyph independently.
+Use compact centered root/settings panels and distinct Graphics header, aligned
+label/value rows, selection frame and detail footer. Asset-only previews are
+written under ignored build paths for visual inspection, never into git.
+
+SDL platform code enumerates monitor display modes, applies windowed/exclusive/
+borderless modes and offers nearest or bilinear final-frame filtering. Preserve
+4:3 in the active resolution with black bars. Borderless uses the desktop mode.
+The graphics object in settings.json is atomically replaced while preserving
+other root properties. Reject malformed JSON rather than overwrite it. The
+owned object stores monitor ordinal, window_mode, width, height and bilinear.
+Unavailable stored monitor/mode choices fall back to a valid display or default
+window. Multi-monitor hotplug and display switching still require owner testing.
+
+HMBTN_ENH_PAUSE_MENU remains OFF by default in CMake; Windows -Game enables it
+for the owner's explicitly requested globally available interface. Its runtime
+default is available, with enhance.pause_menu=false as an explicit OFF path.
+AGENTS.md records this narrow override. Native scene scaling, expanded camera/
+culling and FXAA/MSAA are separate pending render paths. Their menu entries
+remain OFF and unavailable. Bilinear final-frame presentation is not advertised
+as native higher-resolution rendering or per-texture filtering.
+
+Synthetic tests cover navigation, original dialog-frame geometry with synthetic
+glyphs, JSON editing/validation and preservation of unknown settings. A local
+asset-only probe decodes the owner's font and checks VRAM is reset, without
+opening a window or entering the game. The owner performs interactive pause,
+audio, fullscreen and gameplay validation. No new dependency or decomp source
+change is required for this initial interface. Performance budgets and rendering
+enhancement parity remain unverified.

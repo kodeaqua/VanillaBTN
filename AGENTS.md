@@ -25,6 +25,13 @@ override this one for their subtree.
   Store saves under saves/ and configuration at settings.json. Do not hardcode
   a username or use AppData for these files. This overrides the default pref-path
   location below for Windows.
+- The owner explicitly requests an ESC pause interface available across scenes,
+  using the original game's font and dialog presentation. Enable its compile
+  option in the Windows -Game script; its runtime default is available, with
+  enhance.pause_menu=false as the explicit OFF path. This requested interface
+  overrides section 9's runtime-OFF default for the pause interface only.
+  Graphics enhancements (scaling, widescreen, AA) still default OFF and must
+  never be advertised as working before their renderer paths are implemented.
 
 These explicit owner decisions override conflicting roadmap, CI skeleton,
 workflow, and definition-of-done requirements below.

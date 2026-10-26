@@ -288,8 +288,9 @@ All 33 A_FILE offsets (32 member ranges) are monotonic and inside the
 No assets were extracted or added to git. The subsequent native boot probe
 runs the original afile_init against the validated disc.
 
-There are 70 base CTests and one optional SDL filesystem test, all 71 passing
-in Windows release and ASan/UBSan builds with the native window enabled. New coverage
+There are 72 base CTests, one optional SDL filesystem test and one optional
+pause-frame test, all 74 passing in Windows release and ASan/UBSan builds with
+the native pause interface enabled. New coverage
 includes SHA-1 published vectors, malformed synthetic sectors/directories,
 cross-sector file reads, deterministic CD transfer/cancel/error behavior,
 VRAM transfers/masks/wrapping and the original texture-pack decoder. Tests need
@@ -454,6 +455,21 @@ Title and save/load now restore audited native object inventories on reentry
 (ADR-047). Unit tests cover actual private state, alternating both overlays and
 resident-state preservation. Other overlays continue to reject unsupported
 reentry; full lifecycle and save ABI parity remain unverified.
+The separate owner-requested pause branch reuses original window-frame C and
+disc font pixels through private UI resources. The initial UI, SDL display
+controls and JSON persistence require no further decomp guards. Actual expanded
+camera/render scaling and AA remain pending. No game loop or replay was run
+for this interface; technical checks are listed in ENHANCEMENTS.md.
+The owner saw the initial pause interface and reported a blue panel. The private
+renderer had reversed the primitive builders' actual RRGGBB color contract;
+the BBGGRR comment in window_frame.c is inaccurate and is left untouched in
+the matching source. The conversion is corrected and regression-tested. The
+rearranged root/Graphics UI has private asset-only previews, not game sessions.
+
+Known owner-reported issue: sleeping/saving still crashes with 0xC0000005
+(native exit -1073741819). This is queued after the pause layout work; no fix
+or confirmed faulting source line is claimed. Raw PS1 packing views and the
+in-game save ABI remain unaudited even though the native card backend tests pass.
 The port builds all 113 units and links a boot diagnostic and SDL game window.
 Local 39000-VBlank release/sanitizer replays complete the opening and verify
 house exit and free farm movement after the Thomas/Zack dialogue. Wider
