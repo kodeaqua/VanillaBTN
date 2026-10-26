@@ -4,7 +4,7 @@
 #include <SDL3/SDL.h>
 typedef struct {
     int monitor, mode, width, height, linear, vsync, interpolation;
-    int fps_numerator, fps_denominator; /* Zero numerator selects Native (30). */
+    int fps_numerator, fps_denominator; /* 0 = Native (30); -1 = Off (Unlimited). */
 } hm_graphics_options;
 void hm_graphics_defaults(hm_graphics_options *options);
 void hm_graphics_load(hm_graphics_options *options);

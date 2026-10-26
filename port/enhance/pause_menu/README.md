@@ -41,7 +41,7 @@ Normal presentation preserves 4:3 with black bars. Bilinear currently filters
 the final framebuffer, not each original primitive's texture samples.
 
 VSync offers synchronized On (mailbox/FIFO) or supported immediate Off. FPS
-Limit offers Native (30) and monitor refresh-derived rates, preserving rational
+Limit offers Native (30), Off (Unlimited), and monitor refresh-derived rates, preserving rational
 values such as 60000/1001 (shown as 59.94). Windowed/borderless choices use the
 desktop resolution; exclusive choices use the selected resolution. VSync can
 reduce achieved presentation to the active OS refresh. A cap does not switch
@@ -61,7 +61,7 @@ is represented as those features.
 The graphics object in Documents/BackToNature/settings.json stores monitor
 ordinal, window_mode (0 windowed, 1 exclusive, 2 borderless), width, height and
 bilinear (0 or 1), vsync (0 or 1), fps_numerator and fps_denominator. Zero FPS
-numerator selects Native. Defaults are VSync On and Native (30). Unknown root properties are preserved when replacing the
+numerator selects Native; -1 selects Off (Unlimited), with denominator 1. Defaults are VSync On and Native (30). Unknown root properties are preserved when replacing the
 owned graphics object. Malformed JSON is not overwritten. Writes use the
 existing temporary-file replacement and instance lock. Missing or invalid
 graphics fields fall back to windowed 640x480, nearest filtering, monitor 0.
@@ -73,3 +73,8 @@ Presentation-clock tests verify exact rational boundaries and unchanged native
 VBlank callback counts across caps; these do not run the actual game clock.
 Physical ESC behavior, audio pause/resume and display switching remain owner
 gameplay tests. No interactive session or replay is run by the agent.
+
+Off (Unlimited) removes the software presentation cap. VSync On still follows
+the active monitor refresh when available; choose VSync Off for uncapped
+submission if the driver supports immediate presentation. Simulation remains
+native regardless of presentation attempts. See ADR-051.

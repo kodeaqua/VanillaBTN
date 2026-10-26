@@ -3,11 +3,13 @@
 #include "compat/types.h"
 
 typedef struct {
+    /* 0/1 means no software presentation cap. */
     u32 numerator, denominator;
 } hm_present_rate;
 typedef struct {
     u64 next_ns, whole_ns;
     u32 remainder, phase, numerator;
+    int unlimited;
 } hm_present_clock;
 /* Absolute monotonic presentation deadlines. Never advances simulation time. */
 int hm_present_clock_init(hm_present_clock *clock, u64 now_ns, hm_present_rate rate);

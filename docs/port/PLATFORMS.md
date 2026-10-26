@@ -136,3 +136,12 @@ VRAM copy. Measured 0.0212 ms/render in one warm run. This is a lower-bound
 copy/replay cost, not representative of a game scene, full frame overhead or
 an optimization comparison. The previous OFF path performs no private replay;
 real GPU/CPU budget validation is still pending.
+
+The subsequent FPS Limit Off addition extends the existing clock regression:
+600000 uncapped visual attempts still give 600 ticks for 300 VSync(2) calls.
+Pause composition also verifies dimmed background RGB with full-bright dialog
+and glyphs. These changes keep the total at 76 tests; physical FPS and actual
+pause appearance remain owner checks. The active owner release process was
+left running, and the final release link was written separately to
+build/port/windows-pause-preview/hmbtn_native.exe because Windows locks its
+running executable. Rebuild after closing the game to update windows-release.

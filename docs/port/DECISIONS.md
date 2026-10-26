@@ -1267,3 +1267,24 @@ Full gameplay, native image parity, input latency and actual frame cost require
 owner validation. No new dependencies, assets, threads or matching guards.
 See port/enhance/interpolation/README.md for limits and PLATFORMS.md for the
 explicitly synthetic lower-bound replay measurement.
+
+<a id="adr-051"></a>
+
+## ADR-051: Unlimited presentation as an explicit FPS Limit choice
+
+Date: 2026-10-26. Status: implemented; owner device tests pending.
+
+The owner requests Off in FPS Limit. Keep Native (30) as the default and add
+Off (Unlimited) before monitor-derived rates. Persist graphics.fps_numerator=-1
+with fps_denominator=1; zero still means Native, so existing settings retain
+behavior. Presentation-clock rate 0/1 means no software deadline interval.
+When VSync is On and current refresh is known, use that refresh as the effective
+presentation rate. Off VSync plus Unlimited adds no software presentation cap;
+GPU availability and driver behavior still determine achieved submissions.
+
+The host checks the absolute hardware-tick deadline before each presentation
+and continues to run native simulation only at fixed 60 Hz, with VSync(2)
+normal game frames. Unlimited does not call gameplay/audio/RNG to fill frames.
+Synthetic tests perform 600000 visual attempts while 300 original VSync(2)
+calls still produce exactly 600 ticks/callbacks. No gameplay or device run is
+claimed. No decomp source edits, new dependency or threads are introduced.

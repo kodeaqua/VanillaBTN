@@ -29,9 +29,9 @@ void hm_graphics_load(hm_graphics_options *o) {
             candidate.mode <= 2 && candidate.width >= 320 && candidate.width <= 16384 &&
             candidate.height >= 240 && candidate.height <= 16384 && candidate.linear >= 0 &&
             candidate.linear <= 1 && candidate.vsync >= 0 && candidate.vsync <= 1 &&
-            candidate.fps_numerator >= 0 && candidate.fps_denominator > 0 &&
+            candidate.fps_numerator >= -1 && candidate.fps_denominator > 0 &&
             candidate.fps_denominator <= 1000000 &&
-            (!candidate.fps_numerator ||
+            (candidate.fps_numerator <= 0 ||
              (candidate.fps_numerator >= candidate.fps_denominator &&
               (u64)candidate.fps_numerator <= (u64)candidate.fps_denominator * 1000)))
             *o = candidate;
@@ -108,6 +108,8 @@ int hm_graphics_apply(SDL_Window *window, const hm_graphics_options *o) {
     return ok;
 }
 hm_present_rate hm_graphics_present_rate(const hm_graphics_options *o) {
+    if (o->fps_numerator == -1)
+        return (hm_present_rate){0, 1};
     return o->fps_numerator ? (hm_present_rate){(u32)o->fps_numerator, (u32)o->fps_denominator}
                             : (hm_present_rate){30, 1};
 }
@@ -148,7 +150,8 @@ hm_present_rate hm_graphics_effective_rate(SDL_Window *window, const hm_graphics
     hm_present_rate wanted = hm_graphics_present_rate(o), actual;
     if (o->vsync &&
         hm_refresh_rate(SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(window)), &actual) &&
-        (u64)actual.numerator * wanted.denominator < (u64)wanted.numerator * actual.denominator)
+        (!wanted.numerator ||
+         (u64)actual.numerator * wanted.denominator < (u64)wanted.numerator * actual.denominator))
         return actual;
     return wanted;
 }
@@ -170,7 +173,8 @@ static int hm_rates(const hm_graphics_options *o, hm_present_rate rates[256]) {
     int width = o->mode == 1 || !desktop ? o->width : desktop->w;
     int height = o->mode == 1 || !desktop ? o->height : desktop->h;
     rates[0] = (hm_present_rate){30, 1};
-    int used = 1, count = 0;
+    rates[1] = (hm_present_rate){0, 1}; /* Off (Unlimited). */
+    int used = 2, count = 0;
     SDL_DisplayMode **modes = SDL_GetFullscreenDisplayModes(display, &count);
     for (int i = 0; modes && i < count && used < 256; ++i) {
         hm_present_rate rate;
@@ -184,10 +188,10 @@ static int hm_rates(const hm_graphics_options *o, hm_present_rate rates[256]) {
             rates[used++] = rate;
     }
     SDL_free(modes);
-    for (int i = 2; i < used; ++i) {
+    for (int i = 3; i < used; ++i) {
         hm_present_rate rate = rates[i];
         int j = i;
-        while (j > 1 && (u64)rate.numerator * rates[j - 1].denominator <
+        while (j > 2 && (u64)rate.numerator * rates[j - 1].denominator <
                             (u64)rates[j - 1].numerator * rate.denominator) {
             rates[j] = rates[j - 1];
             --j;
@@ -204,12 +208,12 @@ static int hm_cycle_rate(hm_graphics_options *o, int step) {
             if (hm_present_rate_equal(hm_graphics_present_rate(o), rates[i]))
                 current = i;
     int next = (current + count + step) % count;
-    o->fps_numerator = next ? (int)rates[next].numerator : 0;
+    o->fps_numerator = next == 1 ? -1 : next ? (int)rates[next].numerator : 0;
     o->fps_denominator = next ? (int)rates[next].denominator : 1;
     return count > 1;
 }
 static void hm_validate_rate(hm_graphics_options *o) {
-    if (!o->fps_numerator) {
+    if (o->fps_numerator <= 0) {
         o->fps_denominator = 1;
         return;
     }
@@ -325,7 +329,9 @@ void hm_graphics_value(const hm_graphics_options *o, int item, char *text, size_
         SDL_snprintf(text, capacity, "%s",
                      o->vsync ? "On - synchronized display" : "Off - tearing possible");
     else if (item == 8) {
-        if (!o->fps_numerator)
+        if (o->fps_numerator == -1)
+            SDL_snprintf(text, capacity, "Off - Unlimited FPS");
+        else if (!o->fps_numerator)
             SDL_snprintf(text, capacity, "Native - 30 FPS");
         else {
             u64 scaled = ((u64)o->fps_numerator * 100 + (u32)o->fps_denominator / 2) /
@@ -354,7 +360,9 @@ void hm_graphics_row_value(const hm_graphics_options *o, int item, char *text, s
     else if (item == 7)
         SDL_snprintf(text, capacity, "%s", o->vsync ? "On" : "Off");
     else if (item == 8) {
-        if (!o->fps_numerator)
+        if (o->fps_numerator == -1)
+            SDL_snprintf(text, capacity, "Off");
+        else if (!o->fps_numerator)
             SDL_snprintf(text, capacity, "Native (30)");
         else {
             u64 scaled = ((u64)o->fps_numerator * 100 + (u32)o->fps_denominator / 2) /

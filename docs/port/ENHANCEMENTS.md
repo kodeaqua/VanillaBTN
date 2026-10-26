@@ -11,7 +11,7 @@ The owner requested the native pause interface and graphics settings on
 | Monitor/window mode/resolution | SDL display controls implemented; owner monitor/fullscreen test pending |
 | Filtering | Nearest/bilinear final-frame presentation; per-texture filtering is pending |
 | VSync | On (mailbox/FIFO) or supported immediate Off; device validation pending |
-| FPS limit | Native (30) or monitor-derived rational caps; fixed 60 Hz game ticks; native images unless optional interpolation is enabled |
+| FPS limit | Native (30), Off (Unlimited), or monitor-derived rational caps; fixed 60 Hz game ticks; native images unless optional interpolation is enabled |
 | Visual interpolation | Optional private primitive replay for normal farm views; synthetic checks pass, owner gameplay validation pending |
 | Enhance Scaling | OFF; native higher-resolution scene renderer pending |
 | Widescreen Mode | OFF path uses centered 4:3 and black bars; expanded camera/culling ON path pending |
@@ -39,3 +39,9 @@ interpolated through private GPU command replay, without extra game updates or
 image crossfading. Initial scope is normal farm views; unmatched primitives,
 loading, transitions and other contexts retain native cadence. See
 port/enhance/interpolation/README.md. Scaling, widescreen ON and AA remain pending.
+
+FPS Limit Off removes the software presentation cap (ADR-051). VSync On still
+synchronizes to the active monitor; Native remains the default. A synthetic
+regression verifies 600000 visual attempts do not add hardware/game ticks.
+The pause backdrop also receives a 40% black overlay; original dialog/text
+remain fully bright, and native VRAM is unchanged.
