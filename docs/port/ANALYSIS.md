@@ -288,7 +288,7 @@ All 33 A_FILE offsets (32 member ranges) are monotonic and inside the
 No assets were extracted or added to git. The subsequent native boot probe
 runs the original afile_init against the validated disc.
 
-There are 66 base CTests and one optional SDL filesystem test, all 67 passing
+There are 68 base CTests and one optional SDL filesystem test, all 69 passing
 in Windows release and ASan/UBSan builds with the native window enabled. New coverage
 includes SHA-1 published vectors, malformed synthetic sectors/directories,
 cross-sector file reads, deterministic CD transfer/cancel/error behavior,
@@ -383,8 +383,8 @@ and distinct-object C test check that capture semantics are retained.
 
 ## Port guards and validation
 
-Seventy-two `HMBTN_PORT` guard blocks have been introduced under ADR-008 through
-ADR-043 (workspace, GPU/GTE/CPU adapters, nested helpers, event/text pointers,
+Seventy-eight `HMBTN_PORT` guard blocks have been introduced under ADR-008 through
+ADR-046 (workspace, GPU/GTE/CPU adapters, nested helpers, event/text pointers,
 overlays, title copies, SEQ spans, animation table tails, estate queues and
 initial area selection):
 
@@ -433,13 +433,21 @@ initial area selection):
 | src/overlay/11_GF_FARM/event/event_request.c | Explicitly return the claimed request pointers (2 guards) |
 | src/overlay/11_GF_FARM/people/harvest_sprites.c | Pass the helper to its action dispatcher callback (1 additional guard) |
 | src/overlay/11_GF_FARM/menu/item_storage.c | Route native bag slots and marker navigation within their arrays (2 guards) |
+| src/overlay/15_saveload/saveload.c | Contiguous save workspace and VBlank yields in both asset-loading waits (3 guards) |
+| src/main/ui/bg_tile.c | Exactly typed native adapters for both background callbacks (3 guards) |
 
-For each of these twenty-eight files, selecting every matching `#else` branch and
+For each of these thirty files, selecting every matching `#else` branch and
 removing the new guard directives reconstructs the previous source text exactly,
 including its whitespace (line endings normalized for comparison). This check
 passed against baseline revision 9ace470. It does not establish byte-matching
 compiler output. Event staging callers preserve complete native addresses;
 additional pointer/layout hazards remain before full gameplay is safe.
+
+The current reconstruction covers 78 guards in 30 files. Following the owner's
+Load-menu hang report, an existing-process LLDB stack identified the tight
+CD-poll path. Synthetic regressions now cover both save/load asset waits,
+save workspace boundaries, original card polling and background callback types
+(ADR-045/046). These checks do not establish an in-game save/load pass.
 The port builds all 113 units and links a boot diagnostic and SDL game window.
 Local 39000-VBlank release/sanitizer replays complete the opening and verify
 house exit and free farm movement after the Thomas/Zack dialogue. Wider

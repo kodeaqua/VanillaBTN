@@ -1030,3 +1030,63 @@ input. An SDL filesystem test uses a unique build-local Unicode directory for
 actual file reopening and existing-settings preservation. The owner validates
 the real save/load menus; storage unit coverage does not establish that the
 entire original game serialization or overlay reentry works.
+
+<a id="adr-045"></a>
+
+## ADR-045: Yield during save/load asset waits and own the complete save image
+
+Date: 2026-10-26. Status: accepted for native save/load bring-up.
+
+The owner reports an unresponsive window after selecting Load at the title.
+Attaching LLDB to that existing process finds the game thread in CdReadSync,
+afile_read_bytes and load_screen_tick. Detach after collecting the stack;
+no gameplay input or new game/replay session is launched. Both save_load_payload
+and save_load_image_file poll asynchronous reads in tight loops without VSync.
+The native CD model advances only at deterministic VBlank points, which also
+pump the window host's events. Yield one VBlank only while each read is pending.
+Keep both original matching loops unchanged in their non-port branches.
+
+The same source declares a 0x80-byte header followed by three 0x80-byte icon
+frames, a 0x80-byte slot record and a payload ending at byte 0x9690. It reads,
+writes and clears the combined span through the header. Native globals need
+not be adjacent, and sanitizer redzones make that access invalid. Provide one
+native union containing the complete byte image and those same typed slices;
+assert total size and the 0x80, 0x200 and 0x280 offsets. Retain the original
+separate globals in the matching branch. This changes native workspace ownership,
+not the on-card file format or serialization rules.
+
+The overlay's save_card_poll explicitly expects command 1 from MemCardExist.
+Correct the native existence completion from its previous opaque value 2 to 1;
+otherwise the menu stays busy even after a successful existence query.
+
+An isolated test includes the original save/load implementation. Its bounded
+asynchronous asset fixture completes only after two real native VSync ticks,
+and fails quickly if the original busy polling returns. Rendering sinks capture
+the expected texture and five sprite bindings without parsing game assets.
+The test also runs save_reset_state, verifies the contiguous image slices,
+and exercises the original probe/poll helpers on both synthetic ordinary cards.
+Storage regressions verify the existence completion ID. No real save files,
+gameplay session or owner Documents directory is accessed by these tests.
+In-game confirmation remains with the owner. Matching check is unavailable on
+this native Windows host; text reconstruction of matching branches is separate.
+
+<a id="adr-046"></a>
+
+## ADR-046: Give menu background callbacks an exact native function type
+
+Date: 2026-10-26. Status: accepted for native indirect-call correctness.
+
+The shared menu background dispatcher calls a TileDrawFn taking s16 frame and
+s32 coordinates. Its two original callbacks instead declare int/short or
+short/short parameters. Earlier toolbox sanitizer diagnostics reported this
+incorrect indirect function type; save/load screens use the same dispatcher.
+Keep the original callbacks and use native adapters with the exact dispatcher
+signature, explicitly narrowing coordinates as the original callbacks do.
+Do not suppress function-type sanitization or change matching callback selection.
+
+A regression calls both original public background modes twice, including
+the fourth-call scroll increment. Capturing drawing sinks check all 165 tiles
+per call, frame sequence, negative coordinates, animation binding and current
+frame primitive-cursor pointers. No actual asset or window is used. The original
+matching branches reconstruct exactly; the matching compiler check itself
+remains unverified because its Linux toolchain is unavailable here.

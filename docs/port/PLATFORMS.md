@@ -8,8 +8,8 @@ Full playthrough and broader gameplay remain unverified; see WINDOWS_PLAYTEST.md
 | Target | Foundation preset | Validation |
 | --- | --- | --- |
 | Linux x86-64 | linux-release, linux-asan-ubsan | Deferred; requires a separate Linux host, no WSL |
-| Windows x86-64 | windows-release | All 113 original source units and native window build; tests passed (67/67 with -Game) |
-| Windows x86-64 sanitizers | windows-asan-ubsan | All source units and native window build; Clang 20.1.8 ASan/UBSan tests passed (67/67 with -Game); gameplay coverage remains limited |
+| Windows x86-64 | windows-release | All 113 original source units and native window build; tests passed (69/69 with -Game) |
+| Windows x86-64 sanitizers | windows-asan-ubsan | All source units and native window build; Clang 20.1.8 ASan/UBSan tests passed (69/69 with -Game); gameplay coverage remains limited |
 | macOS universal | macos-universal-release | Pending; no macOS host tested |
 | Android arm64 | Pending NDK and minSdk selection | No device/build validation |
 
@@ -20,9 +20,15 @@ only when missing (ADR-044). New isolated tests cover card persistence,
 failed-write preservation, slot isolation, capacity, invalid containers, actual
 Unicode filesystem paths and preserving existing settings. There are 66 base
 tests plus one SDL filesystem test when the native window option is enabled.
-Both release and sanitizer builds passed all 67 with that option. No gameplay
+Both release and sanitizer builds passed all 67 for the storage change. No gameplay
 was launched for this storage change; in-game save/load remains owner-validated
 work, not a proven result of the storage tests. Other platforms remain untested.
+The subsequent Load-menu hang fix adds two original-source regressions, bringing
+the base count to 68 and the native-window total to 69, all passing in release
+and ASan/UBSan. Tests cover deterministic progress during asynchronous asset
+waits, the combined save-image workspace, ordinary-card polling and background
+callback types. The existing hung owner process was inspected with LLDB and
+detached; no new gameplay or replay was run. Owner confirmation remains pending.
 Windows validation compiles all original translation units and links the native
 boot diagnostic. The full-tree syntax inventory passes 113/113; warnings remain
 visible and do not establish runtime safety. Strong game definitions have no

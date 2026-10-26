@@ -52,6 +52,14 @@ in-game save/load, closing/reopening a session and repeated save-menu activation
 still require owner testing. This build does not yet claim working full-session
 save/load or full-playthrough parity.
 
+The title-to-Load hang reported on 2026-10-26 was traced in the owner's existing
+process to an asynchronous asset-read busy loop. Native save/load reads now yield
+VBlank while pending, advancing CD work and pumping window events. The complete
+save-image workspace is one bounded native object; card-existence polling and
+shared menu-background callback types are corrected as well (ADR-045/046).
+Release and ASan/UBSan pass 69 isolated tests. No new gameplay was launched for
+this fix; the owner still needs to confirm the menu behavior interactively.
+
 | Keyboard | Original pad |
 | --- | --- |
 | Arrows | D-pad |
