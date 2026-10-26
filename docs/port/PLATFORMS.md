@@ -229,3 +229,33 @@ and enlarged tolerance comparisons with Nearest/Bilinear. Filtering-ON with
 scaling-OFF also compiles. No game was launched, no gameplay FPS measurement
 was made, and atlas behavior in actual gameplay remains owner-tested.
 No decomp-side source or matching guard changed.
+
+### Widescreen technical checks (2026-10-26)
+
+Expanded world/UI and full-screen fade synthetic readback pass on Vulkan and
+D3D12, including Nearest/Bilinear, native-height/enlarged output and y=0/240
+framebuffer origins. No window or gameplay was launched. OFF source guards
+reconstruct the original files exactly; matching binaries remain unverified
+because the Linux matching toolchain is unavailable and WSL is prohibited.
+
+Local Radeon RX Vega, Release, SDL_GetTicksNS, 25 serialized renders of a tiny
+synthetic wide scene (two textured sprites, one large flat triangle, UI and full
+screen fade), 1920x1080:
+
+| Driver | Filtering | CPU ms/render | GPU capture/upload/compute/fence ms/render |
+|---|---|---:|---:|
+| Vulkan | Nearest | 30.064 | 1.310 |
+| Vulkan | Bilinear | 31.202 | 1.322 |
+| D3D12 | Nearest | 30.126 | 1.397 |
+| D3D12 | Bilinear | 31.080 | 1.338 |
+
+These are synthetic output costs, not gameplay FPS or complete frame costs.
+Probe fences serialize GPU work; normal presentation adds no fence/readback.
+Different rows include timing noise; no filtering speedup is inferred. Owner
+playability, all-map coverage and weather/transition behavior remain unverified.
+
+Widescreen validation also passes 82/82 Release and 82/82 ASan/UBSan unit tests.
+A native CPU-only build with Widescreen ON, GPU/Scaling/Filtering OFF succeeds;
+a native build with Widescreen OFF also succeeds. The release game process was
+left running; a separate windows-wide-preview executable was linked for owner
+manual testing instead of replacing the locked release executable.

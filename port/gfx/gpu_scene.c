@@ -1,3 +1,6 @@
+#ifdef HMBTN_ENH_WIDESCREEN
+#include "enhance/widescreen/widescreen.h"
+#endif
 #include "gfx/gpu_scene.h"
 #include "psx/gpu_environment.h"
 #include "psx/vram.h"
@@ -8,7 +11,7 @@ struct hm_gpu_scene {
     u32 bins[HM_SCENE_BINS][HM_SCENE_BIN_WORDS];
     u32 packed[HM_SCENE_MAX_WORDS];
     u32 width, height, count, tiles_x, tiles_y;
-    RECT area;
+    RECT area, native;
     const char *failure;
     int begun, texture_linear;
     u64 revision;
@@ -53,9 +56,9 @@ static int hm_scene_material(hm_gpu_scene *s, u32 *p, u32 op, u32 page, u32 clut
             s->failure = "reserved texture depth";
             return 0;
         }
-        if (hm_scene_overlap((page & 15) * 64, (page & 16) * 16, 64 << depth, 256, &s->area) ||
+        if (hm_scene_overlap((page & 15) * 64, (page & 16) * 16, 64 << depth, 256, &s->native) ||
             (depth < 2 && hm_scene_overlap((clut & 63) * 16, (clut >> 6) & 511, depth ? 256 : 16, 1,
-                                           &s->area))) {
+                                           &s->native))) {
             s->failure = "framebuffer texture feedback";
             return 0;
         }
@@ -123,13 +126,24 @@ static void hm_scene_add(hm_gpu_scene *s, u32 *p, int x0, int y0, int x1, int y1
 static void hm_scene_begin_capture(void *context, const RECT *area) {
     hm_gpu_scene *s = context;
     s->begun = 0;
-    if (!s->width || !s->height || s->width > 4096 || s->height > 4096 || area->x < 0 ||
-        area->y < 0 || area->w <= 0 || area->h <= 0 || area->x + area->w > 1024 ||
+    int expanded = 0;
+#ifdef HMBTN_ENH_WIDESCREEN
+    RECT expected = hm_widescreen_area(hm_gpu_environment_state()->draw.clip);
+    expanded = area->x == expected.x && area->y == expected.y && area->w == expected.w &&
+               area->h == expected.h;
+#endif
+    if (!expanded && (area->x < 0 || area->x + area->w > 1024)) {
+        s->failure = "unsupported render dimensions";
+        return;
+    }
+    if (!s->width || !s->height || s->width > 4096 || s->height > 4096 || area->x < -352 ||
+        area->y < 0 || area->w <= 0 || area->w > 1024 || area->h <= 0 || area->x + area->w > 1376 ||
         area->y + area->h > 512) {
         s->failure = "unsupported render dimensions";
         return;
     }
     s->area = *area;
+    s->native = hm_gpu_environment_state()->draw.clip;
     s->tiles_x = ((u32)area->w + 15) / 16;
     s->tiles_y = ((u32)area->h + 15) / 16;
     for (u32 i = 0; i < s->tiles_x * s->tiles_y; ++i)
@@ -443,6 +457,8 @@ int hm_gpu_scene_end(hm_gpu_scene *s, hm_replay_sink previous, hm_gpu_scene_data
     s->packed[9] = bins;
     s->packed[10] = s->count;
     s->packed[11] = (u32)s->texture_linear;
+    s->packed[12] = s->native.x;
+    s->packed[13] = s->native.w;
     memcpy(s->packed + primitives, s->primitives, s->count * HM_SCENE_STRIDE * sizeof(u32));
     memcpy(s->packed + bins, s->bins, s->tiles_x * s->tiles_y * HM_SCENE_BIN_WORDS * sizeof(u32));
     *data = (hm_gpu_scene_data){s->packed, (size_t)total * sizeof(u32), ++s->revision, s->width,

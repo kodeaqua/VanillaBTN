@@ -12,6 +12,7 @@ typedef struct {
     hm_vram_context before;
     u32 words[HM_REPLAY_WORDS], used;
     int complete;
+    u32 group_offset[64], group_world[64], groups;
     u64 serial;
 } hm_captured_frame;
 struct hm_frame_replay {
@@ -33,11 +34,23 @@ static void hm_capture_begin(void *context, const hm_render_frame *meta) {
     hm_captured_frame *f = &s->frames[s->current];
     f->meta = *meta;
     f->env = *hm_gpu_environment_state();
-    f->used = 0;
+    f->used = f->groups = 0;
     f->complete = 0;
     f->serial = ++s->serial;
     hm_vram_snapshot(&f->before);
     s->capturing = 1;
+}
+static void hm_capture_group(void *context, int world) {
+    hm_frame_replay *s = context;
+    hm_captured_frame *f = &s->frames[s->current];
+    if (!s->capturing)
+        return;
+    if (f->groups == 64) {
+        s->capturing = 0;
+        return;
+    }
+    f->group_offset[f->groups] = f->used;
+    f->group_world[f->groups++] = !!world;
 }
 static void hm_capture_packet(void *context, const u32 *words, u32 count) {
     hm_frame_replay *s = context;
@@ -65,8 +78,9 @@ hm_frame_replay *hm_frame_replay_acquire(void) {
     hm_frame_replay *s = calloc(1, sizeof(*s));
     if (!s)
         return NULL;
-    if (!hm_render_subscribe((hm_render_observer){s, hm_capture_begin, NULL, hm_capture_packet,
-                                                  hm_capture_end, hm_capture_invalidate})) {
+    if (!hm_render_subscribe((hm_render_observer){s, hm_capture_begin, hm_capture_group,
+                                                  hm_capture_packet, hm_capture_end,
+                                                  hm_capture_invalidate})) {
         free(s);
         return NULL;
     }
@@ -110,7 +124,17 @@ int hm_frame_replay_draw(hm_frame_replay *s, const hm_render_frame *live) {
     hm_vram_context *vram = hm_vram_bind(&s->work);
     hm_gpu_environment *env = hm_gpu_environment_bind(&s->env);
     hm_replay_begin(&f->env.draw.clip);
-    hm_gpu_execute_words(f->words, f->used);
+    u32 at = 0;
+    for (u32 i = 0; i < f->groups; ++i) {
+        u32 end = f->group_offset[i];
+        if (end > at)
+            hm_gpu_execute_words(f->words + at, end - at);
+        hm_replay_group((int)f->group_world[i]);
+        at = end;
+    }
+    if (at < f->used)
+        hm_gpu_execute_words(f->words + at, f->used - at);
+    hm_replay_group(0);
     hm_gpu_environment_bind(env);
     hm_vram_bind(vram);
     return 1;

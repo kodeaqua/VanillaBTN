@@ -8,6 +8,19 @@ uint vram(int x,int y){uint at=((uint(y)&511)*1024+(uint(x)&1023));
     return (load_word(16+at/2)>>((at&1)*16))&65535;}
 int edge_i(int2 a,int2 b,int2 p){return (b.x-a.x)*(p.y-a.y)-(b.y-a.y)*(p.x-a.x);}
 float edge_f(float2 a,float2 b,float2 p){return (b.x-a.x)*(p.y-a.y)-(b.y-a.y)*(p.x-a.x);}
+// Exact Q8 edge sign near a floating-point cancellation boundary. Emulated
+// signed 64-bit products keep shader-int64 an optional device capability.
+uint2 hm_mul_u64(uint a,uint b){uint a0=a&65535,a1=a>>16,b0=b&65535,b1=b>>16;
+    uint low=a0*b0,middle=a1*b0+(low>>16),high=a1*b1+(middle>>16);
+    middle=(middle&65535)+a0*b1;high+=middle>>16;
+    return uint2((middle<<16)|(low&65535),high);}
+uint2 hm_mul_s64(int a,int b){uint2 p=hm_mul_u64(uint(abs(a)),uint(abs(b)));
+    if((a<0)!=(b<0)){p=~p;p.x+=1;if(p.x==0)p.y+=1;}return p;}
+int hm_edge_sign(int2 a,int2 b,int2 p,float approximate){
+    if(abs(approximate)>64.0)return approximate<0?-1:1;
+    uint2 left=hm_mul_s64(b.x-a.x,p.y-a.y),right=hm_mul_s64(b.y-a.y,p.x-a.x);
+    uint2 result=uint2(left.x-right.x,left.y-right.y-uint(left.x<right.x));
+    return int(result.y)<0?-1:(any(result!=0)?1:0);}
 bool top_left(int2 a,int2 b){return b.y<a.y||(b.y==a.y&&b.x>a.x);}
 bool top_left_f(float2 a,float2 b){return b.y<a.y||(b.y==a.y&&b.x>a.x);}
 uint3 rgb(uint c){return uint3(c&255,(c>>8)&255,(c>>16)&255);}
@@ -33,7 +46,7 @@ void main(uint3 id:SV_DispatchThreadID){
     int2 logical=origin+local;
     bool native=(width==logical_size.x&&height==logical_size.y);
     bool bilinear_enabled=load_word(11)!=0;
-    uint color=vram(logical.x,logical.y);
+    uint color=(logical.x<int(load_word(12))||logical.x>=int(load_word(12)+load_word(13)))?0:vram(logical.x,logical.y);
     uint bin=load_word(9)+uint((local.y/16)*int(load_word(6))+local.x/16)*257;
     uint count=load_word(bin);
     [loop]for(uint item=0;item<count;++item){
@@ -59,7 +72,11 @@ void main(uint3 id:SV_DispatchThreadID){
                 float2 cc=float2(int2(word(p,38),word(p,39)))/256.0;
                 float2 center=float2(id.xy)+0.5;
                 wf=float3(edge_f(bb,cc,center),edge_f(cc,aa,center),edge_f(aa,bb,center));af=edge_f(aa,bb,cc);
-                if(af<=0||any(wf<0)||(wf.x==0&&!top_left_f(bb,cc))||(wf.y==0&&!top_left_f(cc,aa))||(wf.z==0&&!top_left_f(aa,bb)))continue;
+                int2 qa=int2(word(p,34),word(p,35)),qb=int2(word(p,36),word(p,37)),qc=int2(word(p,38),word(p,39));
+                int2 sample_q8=int2(id.xy)*256+128;
+                int3 signs=int3(hm_edge_sign(qb,qc,sample_q8,wf.x),hm_edge_sign(qc,qa,sample_q8,wf.y),hm_edge_sign(qa,qb,sample_q8,wf.z));
+                if(af<=0||any(signs<0)||(signs.x==0&&!top_left_f(bb,cc))||(signs.y==0&&!top_left_f(cc,aa))||(signs.z==0&&!top_left_f(aa,bb)))continue;
+                wf=max(wf,0);
             }
             uint3 r0=rgb(word(p,24)),r1=rgb(word(p,25)),r2=rgb(word(p,26));
             uint2 t0=uv(word(p,27)),t1=uv(word(p,28)),t2=uv(word(p,29));

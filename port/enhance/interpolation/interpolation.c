@@ -211,6 +211,7 @@ static void hm_mesh_cohere(interpolation *s, frame *f, frame *previous) {
     }
     for (u32 i = 0; i < f->count; ++i) {
         command *c = &f->commands[i];
+        hm_replay_group(c->world);
         const u32 *words = f->words + c->offset;
         u32 op = words[0] >> 24;
         if (!c->world || op < 0x20 || op > 0x3f)
@@ -344,6 +345,7 @@ static int hm_interpolation_execute(u64 ns, const hm_render_frame *live,
         }
         hm_gpu_execute_words(words, c->length);
     }
+    hm_replay_group(0);
     hm_gpu_environment_bind(saved_env);
     hm_vram_bind(saved_vram);
     if (view)

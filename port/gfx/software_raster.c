@@ -1,3 +1,6 @@
+#ifdef HMBTN_ENH_WIDESCREEN
+#include "enhance/widescreen/widescreen.h"
+#endif
 #include "gfx/software_raster.h"
 #ifdef HMBTN_ENH_FILTERING
 #include "enhance/filtering/sample.h"
@@ -51,9 +54,17 @@ static void hm_software_put(hm_software_surface *s, int x, int y, u16 color, int
 static void hm_software_begin(void *context, const RECT *area) {
     hm_software_surface *s = context;
     s->begun = 0;
+    int expanded = 0;
+#ifdef HMBTN_ENH_WIDESCREEN
+    RECT expected = hm_widescreen_area(hm_gpu_environment_state()->draw.clip);
+    expanded = area->x == expected.x && area->y == expected.y && area->w == expected.w &&
+               area->h == expected.h;
+#endif
+    if (!expanded && (area->x < 0 || area->x + area->w > 1024))
+        return;
     if (!s->pixels || !s->width || !s->height || s->width > 4096 || s->height > 4096 ||
-        area->x < 0 || area->y < 0 || area->w <= 0 || area->h <= 0 || area->x + area->w > 1024 ||
-        area->y + area->h > 512)
+        area->x < -352 || area->y < 0 || area->w <= 0 || area->w > 1024 || area->h <= 0 ||
+        area->x + area->w > 1376 || area->y + area->h > 512)
         return;
     s->area = *area;
     ++s->revision;
@@ -63,10 +74,15 @@ static void hm_software_begin(void *context, const RECT *area) {
         s->logical_x[x] = area->x + (int)(((u64)(2 * x + 1) * (u32)area->w) / (2 * s->width));
     for (u32 y = 0; y < s->height; ++y)
         s->logical_y[y] = area->y + (int)(((u64)(2 * y + 1) * (u32)area->h) / (2 * s->height));
+    RECT native = hm_gpu_environment_state()->draw.clip;
     for (u32 y = 0; y < s->height; ++y)
         for (u32 x = 0; x < s->width; ++x)
-            s->pixels[(size_t)y * s->width + x] = hm_vram_pixel(
-                (u32)hm_software_logical_x(s, (int)x), (u32)hm_software_logical_y(s, (int)y));
+            s->pixels[(size_t)y * s->width + x] =
+                (hm_software_logical_x(s, (int)x) < native.x ||
+                 hm_software_logical_x(s, (int)x) >= native.x + native.w)
+                    ? 0
+                    : hm_vram_pixel((u32)hm_software_logical_x(s, (int)x),
+                                    (u32)hm_software_logical_y(s, (int)y));
     s->begun = 1;
 }
 static s64 hm_software_edge(hm_software_vertex a, hm_software_vertex b, s64 x, s64 y) {

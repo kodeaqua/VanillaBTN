@@ -40,7 +40,8 @@ override this one for their subtree.
 
 - The owner prioritizes requested graphics work before the pending sleep/save
   crash. Windows -Game also compiles Enhance Scaling; enhance.scaling defaults
-  OFF. Preserve the 4:3 viewport until a real widescreen camera path exists.
+  OFF. Widescreen now has an opt-in expanded farm world viewport (ADR-056);
+  OFF and non-world scenes retain 4:3. Gameplay coverage remains owner-tested.
   Report CPU raster performance and untested gameplay/device behavior plainly.
 
 These explicit owner decisions override conflicting roadmap, CI skeleton,

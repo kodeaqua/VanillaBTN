@@ -13,6 +13,7 @@ typedef struct {
 } hm_replay_sink;
 /* Only explicit private replay invokes these hooks, never normal DrawOTag. */
 hm_replay_sink hm_replay_bind(hm_replay_sink sink);
+void hm_replay_group(int world);
 void hm_replay_begin(const RECT *area);
 void hm_replay_command(const u32 *words, u32 available, int after);
 u32 hm_replay_consume(const u32 *words, u32 available);

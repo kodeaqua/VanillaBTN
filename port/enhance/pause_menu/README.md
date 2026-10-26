@@ -37,8 +37,8 @@ Implemented platform controls: monitor selection; Windowed, exclusive Fullscreen
 and Borderless Fullscreen; resolutions enumerated from SDL's driver display
 modes; nearest or bilinear final-frame presentation. Borderless follows the
 desktop resolution. These display operations require the owner's hardware test.
-Normal presentation preserves 4:3 with black bars. Bilinear currently filters
-the final framebuffer, not each original primitive's texture samples.
+Widescreen OFF preserves 4:3 with black bars. Optional texture Bilinear now
+works in GPU and Software output (ADR-055), alongside final presentation filtering.
 
 VSync offers synchronized On (mailbox/FIFO) or supported immediate Off. FPS
 Limit offers Native (30), Off (Unlimited), and monitor refresh-derived rates, preserving rational
@@ -53,11 +53,12 @@ native pictures unless optional Interpolation is enabled, without advancing
 game/RNG/audio faster. See ../interpolation/README.md for scope and limits. GPU/OS stalls and achieved FPS remain owner hardware tests.
 
 Enhance Scaling can rerasterize triangle geometry at the viewport resolution
-through the experimental software renderer; enhance.scaling defaults false.
+through GPU Auto or the software reference; enhance.scaling defaults false.
 See ../scaling/README.md for coverage, limits and measured costs. Widescreen
-Mode and Anti-Aliasing remain OFF and unavailable: expanded camera/culling and
-FXAA/MSAA are pending. Original textures and native line coverage are retained;
-final-frame bilinear filtering does not replace texture assets.
+Mode now expands the farm world viewport while keeping UI centered and native
+sized (ADR-056); enhance.widescreen defaults false. See ../widescreen/README.md
+for scope and owner validation. FXAA/MSAA remain unavailable. Original texture
+assets and native simulation are retained.
 
 The graphics object in Documents/BackToNature/settings.json stores monitor
 ordinal, window_mode (0 windowed, 1 exclusive, 2 borderless), width, height and

@@ -14,7 +14,7 @@ The owner requested the native pause interface and graphics settings on
 | FPS limit | Native (30), Off (Unlimited), or monitor-derived rational caps; fixed 60 Hz game ticks; native images unless optional interpolation is enabled |
 | Visual interpolation | Optional private primitive replay for normal farm views; synthetic checks pass, owner gameplay validation pending |
 | Enhance Scaling | Optional viewport-resolution output through GPU Auto or Software; default OFF; gameplay checks pending |
-| Widescreen Mode | OFF path uses centered 4:3 and black bars; expanded camera/culling ON path pending |
+| Widescreen Mode | Optional expanded farm world viewport with centered native UI (ADR-056); gameplay validation pending |
 | FXAA/MSAA | OFF; renderer paths pending |
 
 HMBTN_ENH_PAUSE_MENU defaults OFF in CMake; Windows build.ps1 -Game enables it.
@@ -38,7 +38,7 @@ Enable Interpolation and choose a higher FPS Limit in Graphics. Positions are
 interpolated through private GPU command replay, without extra game updates or
 image crossfading. Initial scope is normal farm views; unmatched primitives,
 loading, transitions and other contexts retain native cadence. See
-port/enhance/interpolation/README.md. Widescreen ON and AA remain pending.
+port/enhance/interpolation/README.md. Optional farm Widescreen ON is available (ADR-056); AA remains pending.
 
 FPS Limit Off removes the software presentation cap (ADR-051). VSync On still
 synchronizes to the active monitor; Native remains the default. A synthetic
@@ -70,3 +70,10 @@ false, with migration of an existing explicit graphics.bilinear setting.
 Nearest preserves the reference path. Transparent taps preserve the background;
 UV bounds prevent neighboring atlas samples. See enhance/filtering/README.md
 and ADR-055 for mask policy and limitations. Actual gameplay remains unverified.
+
+Widescreen (ADR-056) now expands horizontal world coverage on the farm normal
+view, including its UI overlays. HMBTN_ENH_WIDESCREEN gates compilation;
+enhance.widescreen defaults false. Windows -Game includes it. OFF and non-world
+scenes retain 4:3 bars. GPU Auto/Software, native/enhanced output and palette
+filtering share the path. Original UI size, GTE projection and game clocks stay
+native. See port/enhance/widescreen/README.md for current limits and owner checks.

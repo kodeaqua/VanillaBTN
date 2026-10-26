@@ -47,3 +47,11 @@ math is integer; optional fractional motion/enlarged coverage use fractional
 fields. SPIR-V/DXIL come from our HLSL under shaders/. Default builds use checked-in
 arrays; build-shaders.ps1 regenerates with pinned DXC. CMake rejects stale
 normalized source hashes. Unsupported cases retain software output.
+
+Optional widescreen (ADR-056) expands the private logical render area, not native
+VRAM or GTE state. Shared replay now preserves world/UI group boundaries;
+interpolation forwards each command's group. World clips expand while ordinary
+UI stays on its original canvas. Full-screen flat F4 fades/fills cover the wider
+output. GPU initial pixels outside native framebuffer bounds are black; feedback
+checks retain native bounds. Near-boundary enlarged triangle coverage uses exact
+Q8 edge signs via 32-bit word arithmetic. See enhance/widescreen/README.md.

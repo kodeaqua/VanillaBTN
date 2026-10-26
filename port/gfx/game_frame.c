@@ -1,6 +1,9 @@
-#include "gfx/game_frame.h"
+#ifdef HMBTN_ENH_WIDESCREEN
+#include "enhance/widescreen/widescreen.h"
+#endif
 #include "farm_main.h"
 #include "farm_state.h"
+#include "gfx/game_frame.h"
 #include "gfx/packet_identity.h"
 #include "loading_screen.h"
 #include "main.h"
@@ -17,6 +20,9 @@ hm_render_frame hm_game_render_frame(void) {
     frame.bypass = !main_put_env_enabled || loading_screen_is_active();
     frame.key = ((u64)(u16)main_scene << 48) | ((u64)(u16)farm_area.mode.area << 32) |
                 ((u64)(u16)farm_area.mode.place.value << 16) | (u16)farm_area.mode.place.location;
+    frame.world_view = main_put_env_enabled && scene_frame_handler == farm_enter_dispatch &&
+                       !loading_screen_is_active() && farm_area.mode.data &&
+                       farm_area.mode.view == FARM_VIEW_NORMAL;
     frame.eligible = main_put_env_enabled && scene_frame_handler == farm_enter_dispatch &&
                      !loading_screen_is_active() && farm_area.mode.data &&
                      farm_area.mode.view == FARM_VIEW_NORMAL &&
@@ -33,6 +39,10 @@ hm_render_frame hm_game_render_frame(void) {
 DRAWENV *hm_game_put_draw_env(DRAWENV *environment) {
     DRAWENV *result = PutDrawEnv(environment);
     hm_render_frame frame = hm_game_render_frame();
+#ifdef HMBTN_ENH_WIDESCREEN
+    hm_widescreen_scene(frame.world_view && environment->clip.w == 320 &&
+                        environment->clip.h == 240);
+#endif
     hm_render_begin(&frame);
     return result;
 }

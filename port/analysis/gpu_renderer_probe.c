@@ -1,8 +1,12 @@
+#ifdef HMBTN_ENH_WIDESCREEN
+#include "enhance/widescreen/widescreen.h"
+#endif
 /* Offscreen, synthetic GPU readback. Never opens a window or starts the game. */
 #include "platform/gpu_renderer.h"
 #include "psx/gpu_environment.h"
 #include "psx/gpu_raster.h"
 #include "psx/vram.h"
+#include <stdlib.h>
 #ifdef HM_SCALE_REFERENCE
 #include "gfx/software_raster.h"
 #endif
@@ -231,6 +235,134 @@ static int hm_probe_benchmark(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
     hm_vram_bind(old);
     return 0;
 }
+#ifdef HMBTN_ENH_WIDESCREEN
+static void hm_probe_wide_setup(int origin) {
+    setup();
+    DRAWENV draw;
+    SetDefDrawEnv(&draw, 0, (s16)origin, 320, 240);
+    draw.dtd = 0;
+    draw.dfe = 1;
+    PutDrawEnv(&draw);
+}
+static void hm_probe_wide_draw(void) {
+    u32 world[] = {0xe1000000 | 282, 0x65000000,   xy(-40, 20), 0,          xy(28, 28),
+                   0x65000000,       xy(330, 20),  0,           xy(28, 28), 0x200000ff,
+                   xy(-50, 100),     xy(360, 100), xy(160, 200)};
+    u32 ui[] = {0x6000ff00, xy(-40, 60), xy(28, 28), 0x6000ff00, xy(150, 10), xy(20, 20)};
+    hm_replay_group(1);
+    hm_gpu_execute_words(world, sizeof world / sizeof *world);
+    hm_replay_group(0);
+    hm_gpu_execute_words(ui, sizeof ui / sizeof *ui);
+    u32 fade[] = {0xe1000040, 0x2a101010, 0, 320, 240u << 16, 320u | (240u << 16)};
+    hm_gpu_execute_words(fade, sizeof fade / sizeof *fade);
+}
+static int hm_probe_wide_benchmark(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
+                                   hm_gpu_scene *builder) {
+    hm_widescreen_configure(1, 1920, 1080);
+    hm_widescreen_scene(1);
+    hm_probe_wide_setup(0);
+    saved_vram = *hm_vram_state();
+    hm_vram_context *original = hm_vram_bind(&work_vram);
+    RECT area = {0, 0, 320, 240};
+    for (int filter = 0; filter <
+#ifdef HM_FILTER_REFERENCE
+                         2
+#else
+                         1
+#endif
+         ;
+         ++filter) {
+        const int passes = 25;
+        hm_software_surface surface = {
+            .pixels = reference, .width = 1920, .height = 1080, .texture_linear = filter};
+        u64 start = SDL_GetTicksNS();
+        for (int i = 0; i < passes; ++i) {
+            work_vram = saved_vram;
+            hm_replay_sink previous = hm_replay_bind(hm_software_sink(&surface));
+            hm_replay_begin(&area);
+            hm_probe_wide_draw();
+            hm_replay_bind(previous);
+        }
+        printf("Wide CPU 1920x1080 filter=%d: %.3f ms/render\n", filter,
+               (double)(SDL_GetTicksNS() - start) / 1e6 / passes);
+        hm_gpu_scene_texture_filter(builder, filter);
+        start = SDL_GetTicksNS();
+        for (int i = 0; i < passes; ++i) {
+            work_vram = saved_vram;
+            hm_replay_sink previous = hm_gpu_scene_begin(builder, 1920, 1080);
+            hm_replay_begin(&area);
+            hm_probe_wide_draw();
+            hm_gpu_scene_data data;
+            CHECK(hm_gpu_scene_end(builder, previous, &data));
+            SDL_GPUCommandBuffer *command = SDL_AcquireGPUCommandBuffer(device);
+            CHECK(command);
+            CHECK(hm_gpu_renderer_encode(renderer, command, &data));
+            SDL_GPUFence *fence = SDL_SubmitGPUCommandBufferAndAcquireFence(command);
+            CHECK(fence);
+            CHECK(SDL_WaitForGPUFences(device, true, &fence, 1));
+            SDL_ReleaseGPUFence(device, fence);
+        }
+        printf("Wide GPU capture/upload/compute/fence 1920x1080 filter=%d: %.3f ms/render\n",
+               filter, (double)(SDL_GetTicksNS() - start) / 1e6 / passes);
+    }
+    hm_vram_bind(original);
+    hm_widescreen_configure(0, 1920, 1080);
+    hm_widescreen_scene(0);
+    return 0;
+}
+static int hm_probe_widescreen(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
+                               hm_gpu_scene *builder) {
+    hm_widescreen_configure(1, 1920, 1080);
+    hm_widescreen_scene(1);
+    const u32 sizes[][2] = {{428, 240}, {1280, 720}};
+    for (int origin = 0; origin <= 240; origin += 240)
+        for (int filter = 0; filter <
+#ifdef HM_FILTER_REFERENCE
+                             2
+#else
+                             1
+#endif
+             ;
+             ++filter)
+            for (int n = 0; n < 2; ++n) {
+                u32 width = sizes[n][0], height = sizes[n][1];
+                hm_probe_wide_setup(origin);
+                hm_gpu_scene_texture_filter(builder, filter);
+                hm_replay_sink previous = hm_gpu_scene_begin(builder, width, height);
+                RECT area = {0, (s16)origin, 320, 240};
+                hm_replay_begin(&area);
+                hm_probe_wide_draw();
+                hm_gpu_scene_data data;
+                CHECK(hm_gpu_scene_end(builder, previous, &data));
+                hm_probe_wide_setup(origin);
+                hm_software_surface surface = {.pixels = reference,
+                                               .width = width,
+                                               .height = height,
+                                               .texture_linear = filter};
+                previous = hm_replay_bind(hm_software_sink(&surface));
+                hm_replay_begin(&area);
+                hm_probe_wide_draw();
+                hm_replay_bind(previous);
+                CHECK(!readback(device, renderer, &data, actual));
+                for (u32 i = 0; i < width * height; ++i)
+                    for (u32 c = 0; c < 3; ++c) {
+                        int v = (reference[i] >> (c * 5)) & 31;
+                        int expected = (v << 3) | (v >> 2);
+                        if (abs(actual[i * 4 + c] - expected) > (n ? 9 : 0)) {
+                            fprintf(stderr,
+                                    "Widescreen mismatch origin=%d filter=%d size=%u pixel=%u "
+                                    "channel=%u expected=%d actual=%u\n",
+                                    origin, filter, width, i, c, expected, actual[i * 4 + c]);
+                            return 1;
+                        }
+                    }
+            }
+    hm_widescreen_configure(0, 1920, 1080);
+    hm_widescreen_scene(0);
+    puts("Expanded world/UI offscreen GPU comparisons passed");
+    return 0;
+}
+#endif
 int main(int argc, char **argv) {
     SDL_SetMainReady();
     CHECK(SDL_Init(SDL_INIT_VIDEO));
@@ -336,8 +468,15 @@ int main(int argc, char **argv) {
     CHECK(!fixture(device, renderer, builder, shapes, sizeof(shapes) / sizeof(*shapes), 1440, 1080,
                    9));
 #endif
-    if (argc > 2 && !SDL_strcmp(argv[2], "--benchmark"))
+#ifdef HMBTN_ENH_WIDESCREEN
+    CHECK(!hm_probe_widescreen(device, renderer, builder));
+#endif
+    if (argc > 2 && !SDL_strcmp(argv[2], "--benchmark")) {
         CHECK(!hm_probe_benchmark(device, renderer, builder));
+#ifdef HMBTN_ENH_WIDESCREEN
+        CHECK(!hm_probe_wide_benchmark(device, renderer, builder));
+#endif
+    }
     hm_gpu_scene_destroy(builder);
     SDL_WaitForGPUIdle(device);
     hm_gpu_renderer_destroy(renderer);

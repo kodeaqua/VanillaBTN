@@ -8,6 +8,7 @@ option(HMBTN_BUILD_NATIVE_WINDOW "Build the native game window bring-up target" 
 option(HMBTN_ENH_PAUSE_MENU "Build the owner-requested native pause menu" OFF)
 option(HMBTN_ENH_INTERPOLATION "Build opt-in visual world interpolation" OFF)
 option(HMBTN_ENH_SCALING "Build opt-in viewport-resolution rasterization" OFF)
+option(HMBTN_ENH_WIDESCREEN "Build opt-in expanded world viewport" OFF)
 option(HMBTN_ENH_FILTERING "Build opt-in per-texture bilinear filtering" OFF)
 option(HMBTN_GPU_RASTER "Build the shared native/enhanced GPU scene renderer" ON)
 
@@ -42,6 +43,14 @@ target_link_libraries(hmbtn_presentation_clock PUBLIC hmbtn_port_options)
 add_library(hmbtn_frame_events STATIC gfx/frame_events.c gfx/packet_identity.c)
 target_link_libraries(hmbtn_frame_events PUBLIC hmbtn_port_options)
 
+if(HMBTN_ENH_WIDESCREEN)
+    add_library(hmbtn_widescreen STATIC enhance/widescreen/widescreen.c)
+    target_link_libraries(hmbtn_widescreen PUBLIC hmbtn_port_options)
+    target_include_directories(hmbtn_widescreen PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/compat/psyq")
+    target_compile_definitions(hmbtn_widescreen PUBLIC HMBTN_ENH_WIDESCREEN=1)
+    target_link_libraries(hmbtn_frame_events PUBLIC hmbtn_widescreen)
+endif()
+
 add_library(hmbtn_overlay STATIC overlay/registry.c)
 target_link_libraries(hmbtn_overlay PUBLIC hmbtn_port_options hmbtn_frame_events)
 
@@ -67,12 +76,12 @@ target_compile_options(hmbtn_game_options INTERFACE
 target_compile_definitions(hmbtn_game_options INTERFACE HMBTN_PORT=1)
 
 file(GLOB_RECURSE hm_game_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../src/*.c")
-add_library(hmbtn_game_initial STATIC ${hm_game_sources} overlay/game_lifecycle.c gfx/game_frame.c gfx/field_identity.c)
+add_library(hmbtn_game_initial STATIC ${hm_game_sources} overlay/game_lifecycle.c gfx/game_frame.c gfx/field_identity.c enhance/widescreen/game_buffers.c)
 target_link_libraries(hmbtn_game_initial PUBLIC hmbtn_game_options hmbtn_work_memory hmbtn_overlay)
 # Keep the game's entry point separate from the host test runners. This source
 # is compiled into the archive only; no native game executable is linked yet.
 set_source_files_properties(../src/main/main.c PROPERTIES COMPILE_DEFINITIONS
-    "main=hm_game_main;PutDrawEnv=hm_game_put_draw_env;DrawOTag=hm_game_draw_ot;ClearOTagR=hm_game_clear_ot")
+    "main=hm_game_main;PutDrawEnv=hm_game_put_draw_env;DrawOTag=hm_game_draw_ot;ClearOTagR=hm_game_clear_ot;GsSetWorkBase=hm_game_set_work_base")
 set_source_files_properties(../src/overlay/11_GF_FARM/field/field.c PROPERTIES COMPILE_DEFINITIONS
     "estate_point_project=hm_field_point_project;anim_draw_sprt_cursor=hm_field_draw_sprt_cursor")
 
@@ -96,6 +105,14 @@ if(HMBTN_ENH_FILTERING)
 endif()
 add_library(hmbtn_software_raster STATIC gfx/software_raster.c gfx/software_output.c)
 target_link_libraries(hmbtn_software_raster PUBLIC hmbtn_psx_initial)
+if(HMBTN_ENH_WIDESCREEN AND BUILD_TESTING)
+    add_executable(hmbtn_widescreen_test tests/widescreen.c)
+    target_link_libraries(hmbtn_widescreen_test PRIVATE hmbtn_software_raster hmbtn_gpu_scene)
+    add_test(NAME enhance.widescreen COMMAND hmbtn_widescreen_test)
+    add_executable(hmbtn_widescreen_buffers_test tests/widescreen_buffers.c enhance/widescreen/game_buffers.c)
+    target_link_libraries(hmbtn_widescreen_buffers_test PRIVATE hmbtn_game_options hmbtn_widescreen)
+    add_test(NAME enhance.widescreen_buffers COMMAND hmbtn_widescreen_buffers_test)
+endif()
 if(HMBTN_ENH_FILTERING)
     target_compile_definitions(hmbtn_software_raster PRIVATE HMBTN_ENH_FILTERING=1)
     target_link_libraries(hmbtn_software_raster PUBLIC hmbtn_texture_filter)
@@ -194,6 +211,8 @@ if(HMBTN_BUILD_GPU_SPIKE OR HMBTN_BUILD_NATIVE_WINDOW)
         target_link_libraries(hmbtn_native PRIVATE hmbtn_presentation_clock)
         if(HMBTN_ENH_FILTERING)
             target_compile_definitions(hmbtn_native PRIVATE HMBTN_ENH_FILTERING=1)
+        endif()
+        if(HMBTN_ENH_FILTERING OR HMBTN_ENH_WIDESCREEN)
             target_link_libraries(hmbtn_native PRIVATE hmbtn_software_raster)
         endif()
         if(HMBTN_GPU_RASTER)

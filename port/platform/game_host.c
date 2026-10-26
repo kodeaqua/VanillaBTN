@@ -1,3 +1,8 @@
+#ifdef HMBTN_ENH_WIDESCREEN
+#include "enhance/widescreen/widescreen.h"
+#include "gfx/game_frame.h"
+#include "gfx/software_output.h"
+#endif
 #ifdef HMBTN_ENH_FILTERING
 #include "gfx/game_frame.h"
 #include "gfx/software_output.h"
@@ -60,8 +65,8 @@ static u64 hm_gpu_cached_serial;
 static int hm_gpu_fallback_reported;
 #endif
 
-#ifdef HMBTN_ENH_FILTERING
-static hm_software_output *hm_native_filter;
+#if defined(HMBTN_ENH_FILTERING) || defined(HMBTN_ENH_WIDESCREEN)
+static hm_software_output *hm_native_output;
 #endif
 enum { HM_SCAN_WIDTH = 1024, HM_SCAN_HEIGHT = 512 };
 
@@ -127,14 +132,12 @@ static void hm_host_scaling_unavailable(void) {
     hm_audio_output_pause(0);
 }
 #ifdef HMBTN_ENH_PAUSE_MENU
+static void hm_host_output_size(int *w, int *h);
 static int hm_host_scaling_prepare(void) {
     int w, h;
     if (!SDL_GetWindowSizeInPixels(hm_window, &w, &h) || w <= 0 || h <= 0)
         return 0;
-    if ((u64)w * 3 > (u64)h * 4)
-        w = h * 4 / 3;
-    else
-        h = w * 3 / 4;
+    hm_host_output_size(&w, &h);
 #ifdef HMBTN_ENH_FILTERING
     hm_scaling_filter(hm_options.linear);
 #endif
@@ -176,13 +179,30 @@ static void hm_host_display_event(Uint32 type) {
     (void)type;
 #endif
 }
+static int hm_host_wide_active(void) {
+#ifdef HMBTN_ENH_WIDESCREEN
+    return hm_widescreen_margin() != 0;
+#else
+    return 0;
+#endif
+}
+#if defined(HMBTN_ENH_SCALING) && defined(HMBTN_ENH_PAUSE_MENU)
+static void hm_host_output_size(int *w, int *h) {
+    if (hm_host_wide_active())
+        return;
+    if ((s64)*w * 3 > (s64)*h * 4)
+        *w = *h * 4 / 3;
+    else
+        *h = *w * 3 / 4;
+}
+#endif
 static void hm_host_blit(SDL_GPUCommandBuffer *command, SDL_GPUTexture *image, u32 image_width,
                          u32 image_height, SDL_GPUTexture *swapchain, Uint32 width, Uint32 height,
-                         int linear) {
+                         int linear, int wide) {
     Uint32 destination_width = width, destination_height = height;
-    if ((u64)width * 3 > (u64)height * 4)
+    if (!wide && (u64)width * 3 > (u64)height * 4)
         destination_width = height * 4 / 3;
-    else
+    else if (!wide)
         destination_height = width * 3 / 4;
     SDL_GPUBlitInfo blit = {.source = {.texture = image, .w = image_width, .h = image_height},
                             .destination = {.texture = swapchain,
@@ -195,7 +215,7 @@ static void hm_host_blit(SDL_GPUCommandBuffer *command, SDL_GPUTexture *image, u
                             .filter = linear ? SDL_GPU_FILTER_LINEAR : SDL_GPU_FILTER_NEAREST};
     SDL_BlitGPUTexture(command, &blit);
 }
-static int hm_host_submit(u32 image_width, u32 image_height, int linear) {
+static int hm_host_submit(u32 image_width, u32 image_height, int linear, int wide) {
     SDL_GPUCommandBuffer *command = SDL_AcquireGPUCommandBuffer(hm_device);
     if (!command)
         hm_host_fail();
@@ -219,7 +239,8 @@ static int hm_host_submit(u32 image_width, u32 image_height, int linear) {
         .texture = hm_texture, .w = image_width, .h = image_height, .d = 1};
     SDL_UploadToGPUTexture(copy, &source, &region, true);
     SDL_EndGPUCopyPass(copy);
-    hm_host_blit(command, hm_texture, image_width, image_height, swapchain, width, height, linear);
+    hm_host_blit(command, hm_texture, image_width, image_height, swapchain, width, height, linear,
+                 wide);
     if (!SDL_SubmitGPUCommandBuffer(command))
         hm_host_fail();
     return 1;
@@ -246,7 +267,11 @@ static int hm_host_gpu_present(const RECT *native_area) {
     /* Diagnostic capture deliberately uses the software reference. */
     if (SDL_getenv("HMBTN_CAPTURE_FRAME"))
         return 0;
-    u32 width = (u32)native_area->w, height = (u32)native_area->h;
+    RECT output_area = *native_area;
+#ifdef HMBTN_ENH_WIDESCREEN
+    output_area = hm_widescreen_area(output_area);
+#endif
+    u32 width = (u32)output_area.w, height = (u32)output_area.h;
 #if defined(HMBTN_ENH_SCALING) && defined(HMBTN_ENH_PAUSE_MENU)
     if (hm_options.scaling) {
         if (!hm_host_scaling_prepare())
@@ -254,10 +279,7 @@ static int hm_host_gpu_present(const RECT *native_area) {
         int w, h;
         if (!SDL_GetWindowSizeInPixels(hm_window, &w, &h) || w <= 0 || h <= 0)
             return 0;
-        if ((u64)w * 3 > (u64)h * 4)
-            w = h * 4 / 3;
-        else
-            h = w * 3 / 4;
+        hm_host_output_size(&w, &h);
         width = (u32)w;
         height = (u32)h;
     }
@@ -323,7 +345,8 @@ static int hm_host_gpu_present(const RECT *native_area) {
 #ifdef HMBTN_ENH_PAUSE_MENU
     linear = hm_options.linear;
 #endif
-    hm_host_blit(command, image, width, height, swapchain, window_width, window_height, linear);
+    hm_host_blit(command, image, width, height, swapchain, window_width, window_height, linear,
+                 hm_host_wide_active());
     if (!SDL_SubmitGPUCommandBuffer(command))
         hm_host_fail();
     return 1;
@@ -449,7 +472,7 @@ static void hm_host_pause(void) {
             view.notice = notice;
             hm_pause_draw(&hm_assets, pixels, &menu, &view);
             SDL_UnmapGPUTransferBuffer(hm_device, hm_upload);
-            hm_host_submit(320, 240, 0);
+            hm_host_submit(320, 240, 0, 0);
         }
         Uint64 now = SDL_GetTicksNS();
         if (hm_presentation.next_ns > now) {
@@ -467,17 +490,28 @@ static void hm_host_pause(void) {
 static void hm_host_present_scanout(u64 tick) {
     const hm_gpu_environment *state = hm_gpu_environment_state();
     const RECT *area = &state->display.disp;
-#if defined(HMBTN_ENH_FILTERING) && defined(HMBTN_ENH_PAUSE_MENU)
-    if (hm_options.linear && !hm_native_filter) {
-        hm_native_filter = hm_software_output_create();
-        if (!hm_native_filter) {
+#if (defined(HMBTN_ENH_FILTERING) || defined(HMBTN_ENH_WIDESCREEN)) && defined(HMBTN_ENH_PAUSE_MENU)
+    int private_output = 0;
+#ifdef HMBTN_ENH_FILTERING
+    private_output |= hm_options.linear;
+#endif
+#ifdef HMBTN_ENH_WIDESCREEN
+    private_output |= hm_widescreen_margin() != 0;
+#endif
+    if (private_output && !hm_native_output) {
+        hm_native_output = hm_software_output_create();
+        if (!hm_native_output) {
             hm_options.linear = 0;
-            fprintf(stderr, "Texture filtering unavailable; using nearest output\n");
+#ifdef HMBTN_ENH_WIDESCREEN
+            hm_options.widescreen = 0;
+            hm_widescreen_configure(0, 0, 0);
+#endif
+            fprintf(stderr, "Private rendering unavailable; using native output\n");
         }
     }
-    if (!hm_options.linear && hm_native_filter) {
-        hm_software_output_destroy(hm_native_filter);
-        hm_native_filter = NULL;
+    if (!private_output && hm_native_output) {
+        hm_software_output_destroy(hm_native_output);
+        hm_native_output = NULL;
     }
 #endif
 
@@ -492,7 +526,8 @@ static void hm_host_present_scanout(u64 tick) {
         return;
     }
 #endif
-#if defined(HMBTN_ENH_SCALING) || defined(HMBTN_ENH_INTERPOLATION) || defined(HMBTN_ENH_FILTERING)
+#if defined(HMBTN_ENH_SCALING) || defined(HMBTN_ENH_INTERPOLATION) ||                              \
+    defined(HMBTN_ENH_FILTERING) || defined(HMBTN_ENH_WIDESCREEN)
     hm_render_frame live = hm_game_render_frame();
 #endif
 #ifdef HMBTN_ENH_SCALING
@@ -505,27 +540,39 @@ static void hm_host_present_scanout(u64 tick) {
     if (scaling_active)
         previous_sink = hm_scaling_begin();
 #endif
-#ifdef HMBTN_ENH_FILTERING
+#if defined(HMBTN_ENH_FILTERING) || defined(HMBTN_ENH_WIDESCREEN)
     hm_software_view native_filtered = {0};
     int native_filter_active = 0;
     hm_replay_sink native_previous = {0};
-    if (state->display_enabled && hm_native_filter && area->w > 0 && area->h > 0
+    if (state->display_enabled && hm_native_output && area->w > 0 && area->h > 0
 #ifdef HMBTN_ENH_SCALING
         && !scaling_active
 #endif
     ) {
-        hm_software_output_filter(hm_native_filter, 1);
+        int filter = 0;
+#if defined(HMBTN_ENH_FILTERING) && defined(HMBTN_ENH_PAUSE_MENU)
+        filter = hm_options.linear;
+#endif
+        hm_software_output_filter(hm_native_output, filter);
+        RECT output_area = *area;
+#ifdef HMBTN_ENH_WIDESCREEN
+        output_area = hm_widescreen_area(output_area);
+#endif
         native_filter_active =
-            hm_software_output_prepare(hm_native_filter, (u32)area->w, (u32)area->h);
+            hm_software_output_prepare(hm_native_output, (u32)output_area.w, (u32)output_area.h);
         if (native_filter_active)
-            native_previous = hm_software_output_begin(hm_native_filter);
+            native_previous = hm_software_output_begin(hm_native_output);
         else {
-            hm_software_output_destroy(hm_native_filter);
-            hm_native_filter = NULL;
+            hm_software_output_destroy(hm_native_output);
+            hm_native_output = NULL;
 #ifdef HMBTN_ENH_PAUSE_MENU
             hm_options.linear = 0;
+#ifdef HMBTN_ENH_WIDESCREEN
+            hm_options.widescreen = 0;
+            hm_widescreen_configure(0, 0, 0);
 #endif
-            fprintf(stderr, "Texture filter output allocation failed; using nearest output\n");
+#endif
+            fprintf(stderr, "Private output allocation failed; using native output\n");
         }
     }
 #endif
@@ -544,13 +591,13 @@ static void hm_host_present_scanout(u64 tick) {
         hm_scaling_end(previous_sink, &scaled);
     }
 #endif
-#ifdef HMBTN_ENH_FILTERING
+#if defined(HMBTN_ENH_FILTERING) || defined(HMBTN_ENH_WIDESCREEN)
     if (native_filter_active) {
 #ifdef HMBTN_ENH_INTERPOLATION
         if (!interpolated.pixels)
 #endif
-            hm_software_output_replay(hm_native_filter, &live);
-        hm_software_output_end(hm_native_filter, native_previous, &native_filtered);
+            hm_software_output_replay(hm_native_output, &live);
+        hm_software_output_end(hm_native_output, native_previous, &native_filtered);
     }
 #endif
     if (SDL_getenv("HMBTN_TRACE_SCANOUT") && tick % 60 == 0) {
@@ -571,7 +618,7 @@ static void hm_host_present_scanout(u64 tick) {
         output_height = scaled.height;
     }
 #endif
-#ifdef HMBTN_ENH_FILTERING
+#if defined(HMBTN_ENH_FILTERING) || defined(HMBTN_ENH_WIDESCREEN)
     if (native_filtered.pixels) {
         output_width = native_filtered.width;
         output_height = native_filtered.height;
@@ -600,7 +647,7 @@ static void hm_host_present_scanout(u64 tick) {
                 color = scaled.pixels[(size_t)y * output_width + x];
             else
 #endif
-#ifdef HMBTN_ENH_FILTERING
+#if defined(HMBTN_ENH_FILTERING) || defined(HMBTN_ENH_WIDESCREEN)
                 if (native_filtered.pixels)
                 color = native_filtered.pixels[(size_t)y * output_width + x];
             else
@@ -612,7 +659,7 @@ static void hm_host_present_scanout(u64 tick) {
 #ifdef HMBTN_ENH_SCALING
                 && !scaled.pixels
 #endif
-#ifdef HMBTN_ENH_FILTERING
+#if defined(HMBTN_ENH_FILTERING) || defined(HMBTN_ENH_WIDESCREEN)
                 && !native_filtered.pixels
 #endif
             )
@@ -637,13 +684,26 @@ static void hm_host_present_scanout(u64 tick) {
     }
     SDL_UnmapGPUTransferBuffer(hm_device, hm_upload);
 #ifdef HMBTN_ENH_PAUSE_MENU
-    hm_host_submit(output_width, output_height, hm_options.linear);
+    hm_host_submit(output_width, output_height, hm_options.linear,
+#if defined(HMBTN_ENH_FILTERING) || defined(HMBTN_ENH_WIDESCREEN)
+                   native_filtered.pixels ? hm_host_wide_active() :
+#endif
+#ifdef HMBTN_ENH_SCALING
+                   scaled.pixels ? hm_host_wide_active()
+                                 :
+#endif
+                                 0);
 #else
-    hm_host_submit(output_width, output_height, 0);
+    hm_host_submit(output_width, output_height, 0, 0);
 #endif
 }
 
 static void hm_host_events(void) {
+#if defined(HMBTN_ENH_WIDESCREEN) && defined(HMBTN_ENH_PAUSE_MENU)
+    int output_w, output_h;
+    if (SDL_GetWindowSizeInPixels(hm_window, &output_w, &output_h))
+        hm_widescreen_configure(hm_options.widescreen, output_w, output_h);
+#endif
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         if (event.type == SDL_EVENT_QUIT) {
@@ -807,9 +867,9 @@ int hm_game_host_start(hm_disc *disc) {
 }
 
 void hm_game_host_stop(void) {
-#ifdef HMBTN_ENH_FILTERING
-    hm_software_output_destroy(hm_native_filter);
-    hm_native_filter = NULL;
+#if defined(HMBTN_ENH_FILTERING) || defined(HMBTN_ENH_WIDESCREEN)
+    hm_software_output_destroy(hm_native_output);
+    hm_native_output = NULL;
 #endif
 #ifdef HMBTN_ENH_SCALING
     hm_scaling_enable(0);

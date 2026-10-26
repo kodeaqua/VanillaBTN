@@ -6,7 +6,8 @@
 typedef struct {
     u64 tick, key;
     int eligible;
-    int bypass; /* Direct/loading presentation cannot replay an older OT. */
+    int world_view; /* Farm world view, including its UI overlays. */
+    int bypass;     /* Direct/loading presentation cannot replay an older OT. */
     const void *arena[2];
     size_t arena_bytes[2];
 } hm_render_frame;

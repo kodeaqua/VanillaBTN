@@ -19,6 +19,11 @@ hm_gpu_environment *hm_gpu_environment_bind(hm_gpu_environment *environment) {
     return previous;
 }
 
+RECT hm_gpu_environment_set_clip(RECT clip) {
+    RECT previous = hm_environment.draw.clip;
+    hm_environment.draw.clip = clip;
+    return previous;
+}
 static s16 hm_gpu_signed11(u32 value) {
     value &= 2047;
     return (s16)(value < 1024 ? (s32)value : (s32)value - 2048);

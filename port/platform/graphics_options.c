@@ -67,6 +67,14 @@ void hm_graphics_load(hm_graphics_options *o) {
             o->linear = 0;
     }
 #endif
+#ifdef HMBTN_ENH_WIDESCREEN
+    const char *wide_value;
+    size_t wide_length;
+    if (bytes >= 0 && hm_json_property(text, (size_t)bytes, "enhance", &object, &length) == 1 &&
+        hm_json_property(object, length, "widescreen", &wide_value, &wide_length) == 1 &&
+        wide_length == 4 && !SDL_memcmp(wide_value, "true", 4))
+        o->widescreen = 1;
+#endif
     SDL_free(text);
     hm_validate_rate(o);
 }
@@ -90,6 +98,11 @@ int hm_graphics_save(const hm_graphics_options *o) {
 #ifdef HMBTN_ENH_FILTERING
     if (ok)
         ok = hm_user_data_set_nested_setting("enhance", "filtering", o->linear ? "true" : "false");
+#endif
+#ifdef HMBTN_ENH_WIDESCREEN
+    if (ok)
+        ok = hm_user_data_set_nested_setting("enhance", "widescreen",
+                                             o->widescreen ? "true" : "false");
 #endif
     return ok;
 }
@@ -336,6 +349,10 @@ int hm_graphics_change(SDL_GPUDevice *device, SDL_Window *window, hm_graphics_op
             return 0;
     }
 #endif
+#ifdef HMBTN_ENH_WIDESCREEN
+    else if (item == 4)
+        candidate.widescreen = !candidate.widescreen;
+#endif
 #ifdef HMBTN_GPU_RASTER
     else if (item == 10)
         candidate.renderer = !candidate.renderer;
@@ -374,6 +391,9 @@ void hm_graphics_value(const hm_graphics_options *o, int item, char *text, size_
     } else if (item == 3)
         SDL_snprintf(text, capacity, "%s",
                      o->scaling ? "On - viewport resolution" : "Off - PS1 resolution");
+    else if (item == 4)
+        SDL_snprintf(text, capacity, "%s",
+                     o->widescreen ? "On - farm world viewport" : "Off - original 4:3");
     else if (item == 7)
         SDL_snprintf(text, capacity, "%s",
                      o->vsync ? "On - synchronized display" : "Off - tearing possible");
@@ -420,6 +440,8 @@ void hm_graphics_row_value(const hm_graphics_options *o, int item, char *text, s
         hm_graphics_value(o, item, text, capacity);
     else if (item == 3)
         SDL_snprintf(text, capacity, "%s", o->scaling ? "On" : "Off");
+    else if (item == 4)
+        SDL_snprintf(text, capacity, "%s", o->widescreen ? "On" : "Off");
     else if (item == 7)
         SDL_snprintf(text, capacity, "%s", o->vsync ? "On" : "Off");
     else if (item == 8) {
