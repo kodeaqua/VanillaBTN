@@ -1,7 +1,8 @@
 # Windows native playtest
 
 This is a development build of the original compiled game C. It can complete
-the opening and respond to player movement in the house. Full playthrough,
+the opening, exit the house, decline the tour, finish Zack's introduction and
+respond to free player movement in the farm. Full playthrough,
 save persistence, overlay reentry and hardware parity are not established.
 Use the owner's original USA SLUS_011.15 BIN; it is validated at startup and
 is never copied into git. No WSL, Docker or CI is required.
@@ -43,6 +44,15 @@ have identical SHA-256:
 808c2ce6346e216d6792297f6d5d919e49d4e60328065034e0abe7f66d4dd37b
 
 This compares these two native runs, not an original-hardware golden frame.
+
+The longer new_game_farm.replay completes 39000 VBlanks in release and optimized
+ASan/UBSan, including house exit, declining Thomas's tour and Zack's shipping
+dialogue. With scripting/paused state cleared, down input moves the player
+from (-4257, 0, 3959) to (-4257, 0, 1663); right input then moves him to
+(-1838, 0, 1663). The final scene is the farm, with its HUD showing 7:00 AM.
+Both runs exit zero and their final BMP SHA-256 is:
+
+dbe06cf4b46a8cce8e2814f7f03af3058e1f20cd4a84b5462b3ceb321905d044
 Physical keyboard focus/input was not automated successfully; the replay feeds
 the same native pad samples used by the window host. A separate Vulkan window
 test completed 6000 VBlanks and rendered farm terrain, player and HUD. No

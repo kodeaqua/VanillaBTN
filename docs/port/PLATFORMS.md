@@ -1,7 +1,8 @@
 # Platform status
 
 As of 2026-10-26, native Windows replays complete the opening and validate free
-player movement inside the house. Title/menu, farm, flashback and house render.
+player movement inside the house and in the farm after the Thomas/Zack dialogue.
+Title/menu, farm, flashback, house and parts of the town render.
 Full playthrough and broader gameplay remain unverified; see WINDOWS_PLAYTEST.md.
 
 | Target | Foundation preset | Validation |
@@ -31,8 +32,10 @@ returns explained the earlier release/sanitizer opening-script difference
 Source-disc XA decoding/mixing has synthetic coverage (ADR-041). The 31000-tick
 release and optimized sanitizer replays both complete the opening, respond to
 right/down input and produce byte-identical final house BMP captures. This
-does not establish original-hardware parity. Later scene changes and broader
-gameplay still need validation. Memory/scheduling regressions are
+does not establish original-hardware parity. A 39000-tick replay also completes
+house exit, declines the tour, finishes Zack's dialogue and walks in the farm;
+release/sanitizer final captures are identical (WINDOWS_PLAYTEST.md). Broader
+gameplay still needs validation. Memory/scheduling regressions are
 tracked through ADR-041. Unfinished SDK calls fail by
 name, not fake
 success paths. Native overlay reentry also aborts until state reset is supported.
