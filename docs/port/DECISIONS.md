@@ -1566,3 +1566,103 @@ Synthetic dialogue workload timings are recorded in PLATFORMS.md. Owner actual
 logo/title/save/load, all-map and dialog/transition validation remains pending.
 No additional decomp source guard or external dependency is added. FXAA/MSAA
 remain deferred; save/load crash fixes follow after merging this graphics PR.
+
+## ADR-058: Native animal scans during overnight processing
+
+Date: 2026-10-26
+
+Context: The owner reports sleeping without saving also crashes. Windows
+Application Error 1000 for the current release reports access violation at
+RVA 0x1e1573, farm_action_pick_slot+0x53 (build 19f2994). Disassembly shows a
+record flag read through a sign-extended 32-bit address. An isolated empty-table
+ASan fixture reproduces the invalid read in farm_pick_random_slot.
+
+Decision: Under HMBTN_PORT, form animal record addresses with byte-pointer
+arithmetic and native sizeof strides. Explicitly return the picked slot from
+the wrapper whose callers consume that result; its old C fall-through does
+not provide defined host behavior. Clear sizeof(FarmAction), including native
+animation-pointer tails, rather than the PS1-sized 0xB0 prefix. The original
+else branches remain exact. Candidate filtering, table order, held/event/place
+rules and random-call cadence stay unchanged.
+
+Validation: The original synthetic empty-table call crashes; the repaired call
+passes ASan/UBSan. Tests cover no candidates/no RNG advance, the final livestock
+and chicken slots, held/event/location exclusions and full action clearing.
+Actual sleeping/overnight gameplay remains owner-tested. Matching check cannot
+run on this host: its Linux toolchain is unavailable and WSL is prohibited.
+
+## ADR-059: Fixed save payload independent of native object layout
+
+Date: 2026-10-26
+
+Context: The original packer overlays PS1-address-shaped structs on FarmState.
+Native pointers move the fields, including run16/run18. A synthetic valid native
+state with registered estate tables still crashes in the old packer when it
+reads run16 from a poisoned old offset. Native FarmAnimals also grows beyond its
+0x1F34 wire extent. SaveImage contains native pointer fields among raw blocks.
+A pointer-cast repair alone would therefore leave corrupted saves/loads.
+
+Decision: Add compat/save_codec with a fixed 0x6378 unshifted byte schema and
+asserted wire offsets. Encode/decode persistent named native fields; handle
+actor, animation, player, toy and helper records explicitly at their original
+wire strides. Copy only verified pointer-free scalar spans. Never store host
+addresses. Runtime table/script/asset bindings stay native instead of importing
+saved addresses; chickens/livestock clear sprite.source for normal rebinding,
+and extra chicken records retain the original packer's zeroing rule. Validate
+payload length and estate run availability/capacities before changing output or
+live state. Native source pack/unpack entry points call this codec under narrow
+HMBTN_PORT guards; the exact original implementations remain in else branches.
+
+Keep the original 0x8000-byte card file, slot metadata, byte-shift algorithm and
+block checksums. Do not version a host memory dump or store sizeof(FarmState).
+The existing native card container and Documents/BackToNature paths do not
+change. Reserved runtime-address slots encode as zero; load does not overwrite
+owned native bindings from them. Original-PS1 interchange is not claimed until
+validated against owner data. Livestock-transfer raw views remain unaudited.
+
+Validation: The old packer crashes in an isolated synthetic fixture at its
+run16 copy. The new fixture checks original shift/checksum encode/decode,
+tamper detection, a 32 KiB card write/reopen/read in memory, persistent field
+restoration, native binding preservation, canonical re-encoding and rejected
+short/unbound inputs. No disc or real saves are used. These do not establish
+interactive save/load or full overnight gameplay parity. Original matching
+branches reconstruct exactly with the new guards disabled; matching binaries
+remain unverified because the Linux toolchain is unavailable (no WSL).
+
+## ADR-060: Native dialogue argument and overnight loader progress
+
+Date: 2026-10-27
+
+Context: The reported ordinary-dialogue access violation at RVA 0x1158f9 in
+release timestamp 0x6adf6b53 maps to player_advance_state reading its missing
+player argument. Separately, the overnight sound-fader busy wait polls the CD
+loader without advancing deterministic VBlank callbacks. Windows also records
+an application hang during the owner's day transition, but no hang stack was
+available to establish that this wait was the observed hang.
+
+Decision: Use narrow HMBTN_PORT guards to pass the player argument and replace
+the overnight wait with compat/async_wait. That helper polls the existing loader
+and advances VSync(0), one hardware tick, until ready. No background game thread,
+host-time logic step or arbitrary timeout is introduced. Original else branches
+remain exact. These add one player guard and two clock_events guards.
+
+Validation: Dialogue fixture covers confirmation, no confirmation and blocked
+targets. Loader fixture requires three hardware ticks and verifies that an
+already-ready loader advances none. Interactive dialogue and overnight completion
+remain owner-tested. Matching check could not run without the Linux toolchain;
+the owner excludes WSL.
+
+## ADR-061: Explicit SDK coverage instead of success stubs
+
+Date: 2026-10-27
+
+Decision: Implement mathematical ratan2 and Q12 csqrt in the existing runtime,
+without SDK code/tables. Complete unsupported PocketStation requests with actual
+NoCard/Invalid results through the existing asynchronous card controller. Do not
+claim PocketStation support or fabricate output. Preserve explicit debug-font
+failures until a real renderer exists. See API_COVERAGE.md for remaining callers,
+mathematical parity limits and the pending-inventory regression check.
+
+Validation: Windows Release and ASan/UBSan builds each pass all 89 tests, including
+six new runtime fixtures and the inventory check. No new dependency or game data
+is used. Gameplay coverage remains with the owner.

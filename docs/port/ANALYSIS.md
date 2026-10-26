@@ -589,3 +589,46 @@ instead of oversized draw clips or full texture pages. Genuine offscreen writes,
 feedback, unsupported transfers/capacities still fall back. Auto fallback retries
 at native internal resolution, retaining full-size software only when explicitly
 selected. Owner real-world aspect/dialogue observations still need revalidation.
+
+### Runtime sleep/save/load corrections (ADR-058/059)
+
+Windows crash RVA 0x1e1573 in release 19f2994 maps to the animal selection scan
+used during overnight processing. Both animal base pointers were truncated to
+s32. An isolated original call reproduces the ASan access violation. Native
+byte-pointer arithmetic, explicit result forwarding and complete action-record
+clearing now cover this path. This is separate from save serialization.
+
+New matching-source guards:
+- src/overlay/11_GF_FARM/animals/animal_actions.c: native action clear size,
+  explicit slot result, and the two animal record address expressions (4 guards).
+- src/overlay/15_saveload/saveload.c: codec include and native pack/unpack routing
+  (3 additional guards). Original else implementations remain exact.
+
+compat/save_codec writes a fixed 0x6378 payload, independent of native pointer
+width and struct growth. Animal/player/helper wire fields use explicit strides;
+runtime pointers are omitted and existing native bindings are preserved on load
+(with original animal source invalidation). The card file remains 0x8000 bytes
+with original shifts/checksums. The old packer reproduces an invalid run16 read
+through its obsolete FarmState offset; the new synthetic fixture passes.
+Livestock-transfer SaveFile/SaveImage casts are not covered by this codec audit.
+
+The disabled new guards reconstruct both prior source files exactly after line
+ending normalization. This does not replace the unavailable Linux matching check.
+Full sleep, overnight events, menu save/load and PS1 interchange still need owner
+validation; no gameplay or replay was used by these technical regression tests.
+
+### Follow-up dialogue, overnight wait and SDK audit (2026-10-27)
+
+Additional source guards under ADR-060:
+- src/overlay/11_GF_FARM/people/player.c: forward the required player argument
+  rather than invoking player_advance_state through a zero-argument cast (1).
+- src/overlay/11_GF_FARM/world/clock_events.c: native helper include and
+  deterministic VBlank/CD progress in the overnight sound-fader wait (2).
+
+The owner confirms saving now succeeds, but reports a later day-transition hang,
+ordinary-dialogue access violation and missing ratan2 on entry to Yodel Ranch.
+The dialogue fault maps to the missing argument. The overnight helper addresses
+a reproduced progress requirement; the reported hang itself has no captured stack.
+ADR-061 and API_COVERAGE.md document implemented math, unsupported PocketStation
+completion and all nine remaining debug-font traps. Release and ASan/UBSan each
+pass 89 tests; these are technical checks, not a complete gameplay pass.

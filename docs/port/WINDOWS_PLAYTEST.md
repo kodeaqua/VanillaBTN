@@ -155,3 +155,27 @@ the disc, screenshots or other extracted data to git.
 Matching check remains unverified because this Windows host lacks the separate
 Linux toolchain and the owner excludes WSL. Source-branch reconstruction is a
 separate textual check and does not establish matching compiler output.
+
+### Runtime-fixes branch: sleeping and save payload
+
+The reported sleep-without-save access violation maps to the animal record scan,
+where native pointers were truncated to 32 bits. ADR-058 fixes that scan and its
+native action record clearing. ADR-059 separately replaces PS1-offset state
+packing with explicit fixed-width save spans. Original checksums, shifts, card
+file size and Documents/BackToNature storage remain unchanged.
+
+Isolated regressions reproduce both old faults and pass after the fixes. The
+codec fixture writes/reopens/reads a synthetic in-memory card and restores named
+persistent state. It never accesses the owner's saves. This is not a gameplay
+pass: the owner still needs to try sleeping without saving, overnight events,
+sleep-and-save, returning to title and loading the saved slot. Other runtime
+faults may only become reachable after these blocking faults are removed.
+
+2026-10-27 follow-up: the owner confirms saving succeeds, but reports a later
+day-transition hang, ordinary dialogue crash and ratan2 abort entering Yodel
+Ranch. The branch now passes the required player argument, progresses VBlank
+inside the overnight audio wait, implements runtime math and rejects unsupported
+PocketStation operations through proper asynchronous results. All 89 Release
+and ASan/UBSan tests pass. Re-test those three gameplay triggers with the newly
+built release. The exact day-transition hang cause remains unconfirmed without
+a hang stack. See API_COVERAGE.md for remaining explicit font failures.

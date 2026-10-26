@@ -292,3 +292,19 @@ readback. CPU fallback preserves the current native VRAM path; performance
 profiling of actual game logic, pacing/waits and GPU work remains for the
 follow-up runtime-fixes branch. Aggregate CPU/GPU usage alone is not a measure
 of available game-thread headroom.
+
+### Runtime sleep/save regressions (2026-10-26)
+
+The Windows Application Error location for the owner's sleeping crash maps to
+farm_action_pick_slot in the release executable. ASan/UBSan synthetic tests
+reproduce the original truncated pointer scan and the old save packer's invalid
+run16 read. Updated scans and fixed-wire codec pass their isolated regressions.
+The codec test uses an in-memory card only. Interactive gameplay is owner-tested;
+matching binaries are unverified because the Linux toolchain is unavailable.
+
+### Runtime follow-up validation (2026-10-27)
+
+Windows Release and ASan/UBSan builds pass 89/89 tests after dialogue argument,
+overnight loader progress, runtime math and ordinary-card PocketStation handling
+changes. No gameplay automation or performance claim accompanies these checks.
+Interactive overnight/dialogue/Yodel Ranch validation remains with the owner.
