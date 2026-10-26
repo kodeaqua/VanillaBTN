@@ -8,8 +8,8 @@ Full playthrough and broader gameplay remain unverified; see WINDOWS_PLAYTEST.md
 | Target | Foundation preset | Validation |
 | --- | --- | --- |
 | Linux x86-64 | linux-release, linux-asan-ubsan | Deferred; requires a separate Linux host, no WSL |
-| Windows x86-64 | windows-release | All 113 original source units and native window build; tests passed (75/75 with -Game) |
-| Windows x86-64 sanitizers | windows-asan-ubsan | All source units and native window build; Clang 20.1.8 ASan/UBSan tests passed (75/75 with pause enabled); gameplay coverage remains limited |
+| Windows x86-64 | windows-release | All 113 original source units and native window build; tests passed (76/76 with -Game) |
+| Windows x86-64 sanitizers | windows-asan-ubsan | All source units and native window build; Clang 20.1.8 ASan/UBSan tests passed (76/76 with pause and interpolation compiled); gameplay coverage remains limited |
 | macOS universal | macos-universal-release | Pending; no macOS host tested |
 | Android arm64 | Pending NDK and minSdk selection | No device/build validation |
 
@@ -119,3 +119,20 @@ work are outside the measurement. There is no valid previous native rendering
 baseline for a before/after comparison; no optimization or frame-budget claim
 is made. Full playthrough/device profiling is still needed to validate the
 65536-live-tag registry capacity and its actual game cost.
+
+## Experimental visual interpolation validation
+
+Date: 2026-10-26. Release and ASan/UBSan pass all 76 isolated tests with pause
+and interpolation compiled. The native executable also builds with both compile
+options OFF. No gameplay/window/replay was launched for this change. Tests
+exercise private midpoint rasterization, current UI, history rejection and
+byte-exact native VRAM/environment/packet preservation, with unchanged ticks.
+Physical smoothness, scene coverage and achieved FPS remain owner checks.
+
+Host: AMD Ryzen 5 4500, Windows x86-64, Clang 20.1.8 release (-O2, x86-64-v2).
+Tool: hmbtn_interpolation_test --benchmark, C clock(), 10000 private replays.
+The 320x240 synthetic fixture has only two small rectangles and a 1 MB private
+VRAM copy. Measured 0.0212 ms/render in one warm run. This is a lower-bound
+copy/replay cost, not representative of a game scene, full frame overhead or
+an optimization comparison. The previous OFF path performs no private replay;
+real GPU/CPU budget validation is still pending.

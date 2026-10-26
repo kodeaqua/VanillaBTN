@@ -79,12 +79,12 @@ int main(int argc, char **argv) {
         for (size_t i = 0; i < sizeof(hm_preview); ++i)
             hm_preview[i] = 0;
         menu.page = HM_PAUSE_GRAPHICS;
-        menu.selected = 8;
-        menu.first_visible = 2;
+        menu.selected = 9;
+        menu.first_visible = 3;
         /* Visual layout fixture values, not a live monitor or game session. */
         const hm_pause_view view = {.values = {"1", "Windowed", "1920 x 1080", "Off", "Off", "Off",
-                       "Nearest", "On", "59.94"},
-            .detail = "59.94 FPS limit"};
+                                               "Nearest", "On", "59.94", "On"},
+                                    .detail = "On - world motion"};
         hm_pause_draw(&assets, hm_preview, &menu, &view);
         if (!hm_preview_write(argv[3]))
             return 1;

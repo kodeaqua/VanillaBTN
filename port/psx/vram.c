@@ -3,9 +3,23 @@
 #include <libgpu.h>
 #include <string.h>
 
-static u16 hm_vram[HM_VRAM_HEIGHT][HM_VRAM_WIDTH];
-static u64 hm_dirty[HM_VRAM_HEIGHT / 16];
-static u16 hm_set_mask, hm_check_mask;
+static hm_vram_context hm_default_vram;
+static hm_vram_context *hm_context = &hm_default_vram;
+#define hm_vram (hm_context->pixels)
+#define hm_dirty (hm_context->dirty)
+#define hm_set_mask (hm_context->set_mask)
+#define hm_check_mask (hm_context->check_mask)
+
+hm_vram_context *hm_vram_bind(hm_vram_context *context) {
+    hm_vram_context *previous = hm_context;
+    hm_context = context ? context : &hm_default_vram;
+    return previous;
+}
+void hm_vram_snapshot(hm_vram_context *destination) {
+    if (!destination)
+        hm_runtime_error("hm_vram_snapshot", "null destination");
+    memcpy(destination, hm_context, sizeof(*destination));
+}
 
 void hm_vram_reset(void) {
     memset(hm_vram, 0, sizeof(hm_vram));

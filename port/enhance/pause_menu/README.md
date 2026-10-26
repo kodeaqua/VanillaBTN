@@ -40,12 +40,12 @@ Limit offers Native (30) and monitor refresh-derived rates, preserving rational
 values such as 60000/1001 (shown as 59.94). Windowed/borderless choices use the
 desktop resolution; exclusive choices use the selected resolution. VSync can
 reduce achieved presentation to the active OS refresh. A cap does not switch
-desktop refresh. The nine-item list scrolls through seven visible rows.
+desktop refresh. The ten-item list scrolls through seven visible rows.
 
 Presentation deadlines are independent of the fixed 60 Hz hardware ticks.
 Original normal game updates remain 30 Hz through VSync(2). Higher caps repeat
-native pictures, without advancing game/RNG/audio faster. Interpolated motion
-is not implemented. GPU/OS stalls and achieved FPS remain owner hardware tests.
+native pictures unless optional Interpolation is enabled, without advancing
+game/RNG/audio faster. See ../interpolation/README.md for scope and limits. GPU/OS stalls and achieved FPS remain owner hardware tests.
 
 The Graphics menu lists Enhance Scaling, Widescreen Mode and Anti-Aliasing as
 OFF with renderer support pending. They cannot be enabled yet. Native higher

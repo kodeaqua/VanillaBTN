@@ -6,6 +6,7 @@ option(HMBTN_SANITIZERS "Enable address and undefined-behavior sanitizers" OFF)
 option(HMBTN_BUILD_GPU_SPIKE "Build the local SDL_GPU presentation validation" OFF)
 option(HMBTN_BUILD_NATIVE_WINDOW "Build the native game window bring-up target" OFF)
 option(HMBTN_ENH_PAUSE_MENU "Build the owner-requested native pause menu" OFF)
+option(HMBTN_ENH_INTERPOLATION "Build opt-in visual world interpolation" OFF)
 
 if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(FATAL_ERROR "Only 64-bit native targets are supported")
@@ -35,9 +36,11 @@ add_library(hmbtn_settings_json STATIC platform/settings_json.c)
 target_link_libraries(hmbtn_settings_json PUBLIC hmbtn_port_options)
 add_library(hmbtn_presentation_clock STATIC platform/presentation_clock.c)
 target_link_libraries(hmbtn_presentation_clock PUBLIC hmbtn_port_options)
+add_library(hmbtn_frame_events STATIC gfx/frame_events.c)
+target_link_libraries(hmbtn_frame_events PUBLIC hmbtn_port_options)
 
 add_library(hmbtn_overlay STATIC overlay/registry.c)
-target_link_libraries(hmbtn_overlay PUBLIC hmbtn_port_options)
+target_link_libraries(hmbtn_overlay PUBLIC hmbtn_port_options hmbtn_frame_events)
 
 # Compile original translation units with port-only compatibility hooks.
 add_library(hmbtn_game_options INTERFACE)
@@ -61,23 +64,33 @@ target_compile_options(hmbtn_game_options INTERFACE
 target_compile_definitions(hmbtn_game_options INTERFACE HMBTN_PORT=1)
 
 file(GLOB_RECURSE hm_game_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../src/*.c")
-add_library(hmbtn_game_initial STATIC ${hm_game_sources} overlay/game_lifecycle.c)
+add_library(hmbtn_game_initial STATIC ${hm_game_sources} overlay/game_lifecycle.c gfx/game_frame.c)
 target_link_libraries(hmbtn_game_initial PUBLIC hmbtn_game_options hmbtn_work_memory hmbtn_overlay)
 # Keep the game's entry point separate from the host test runners. This source
 # is compiled into the archive only; no native game executable is linked yet.
-set_source_files_properties(../src/main/main.c PROPERTIES COMPILE_DEFINITIONS main=hm_game_main)
+set_source_files_properties(../src/main/main.c PROPERTIES COMPILE_DEFINITIONS
+    "main=hm_game_main;PutDrawEnv=hm_game_put_draw_env;DrawOTag=hm_game_draw_ot")
 
 add_library(hmbtn_psx_initial STATIC
     psx/xa_decode.c psx/card_store.c
     psx/gte_rotation.c
     psx/unimplemented.c psx/gte_vectors.c psx/gte_runtime.c psx/gs_lighting.c psx/trig.c psx/timing.c psx/sound_control.c psx/spu_decode.c psx/spu_voice.c psx/cd_position.c psx/cd_runtime.c
     psx/gpu_links.c psx/gpu_ot.c psx/gpu_packets.c psx/gpu_environment.c psx/gpu_commands.c psx/gpu_polygon.c psx/gpu_line.c psx/vram.c psx/card.c psx/pad.c psx/sound_bank.c psx/sequence.c psx/sound_voice.c psx/reverb.c)
-target_link_libraries(hmbtn_psx_initial PUBLIC hmbtn_port_options)
+target_link_libraries(hmbtn_psx_initial PUBLIC hmbtn_port_options hmbtn_frame_events)
 target_include_directories(hmbtn_psx_initial PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/compat/psyq")
 
 add_library(hmbtn_disc STATIC psx/disc.c psx/sha1.c)
 target_link_libraries(hmbtn_disc PUBLIC hmbtn_port_options)
 target_link_libraries(hmbtn_psx_initial PUBLIC hmbtn_disc)
+if(HMBTN_ENH_INTERPOLATION)
+    add_library(hmbtn_interpolation STATIC enhance/interpolation/interpolation.c)
+    target_link_libraries(hmbtn_interpolation PUBLIC hmbtn_psx_initial)
+    if(BUILD_TESTING)
+        add_executable(hmbtn_interpolation_test tests/interpolation.c)
+        target_link_libraries(hmbtn_interpolation_test PRIVATE hmbtn_interpolation)
+        add_test(NAME enhance.interpolation COMMAND hmbtn_interpolation_test)
+    endif()
+endif()
 add_executable(hmbtn_disc_probe platform/disc_probe.c)
 target_link_libraries(hmbtn_disc_probe PRIVATE hmbtn_psx_initial)
 
@@ -111,6 +124,10 @@ if(HMBTN_BUILD_GPU_SPIKE OR HMBTN_BUILD_NATIVE_WINDOW)
         target_link_libraries(hmbtn_native PRIVATE hmbtn_game_initial hmbtn_psx_pending SDL3::SDL3)
         target_link_libraries(hmbtn_native PRIVATE hmbtn_settings_json)
         target_link_libraries(hmbtn_native PRIVATE hmbtn_presentation_clock)
+        if(HMBTN_ENH_INTERPOLATION)
+            target_compile_definitions(hmbtn_native PRIVATE HMBTN_ENH_INTERPOLATION=1)
+            target_link_libraries(hmbtn_native PRIVATE hmbtn_interpolation)
+        endif()
         if(HMBTN_ENH_PAUSE_MENU)
             add_library(hmbtn_pause_art STATIC enhance/pause_menu/assets.c enhance/pause_menu/draw.c)
             target_link_libraries(hmbtn_pause_art PUBLIC hmbtn_pause_menu hmbtn_game_initial hmbtn_psx_pending)

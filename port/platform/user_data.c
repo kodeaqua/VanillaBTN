@@ -144,6 +144,19 @@ int hm_user_data_read_settings(char *text, size_t capacity) {
     SDL_free(data);
     return (int)bytes;
 }
+int hm_user_data_set_nested_setting(const char *parent, const char *key, const char *json_value) {
+    char *text = SDL_malloc(65537), *nested = SDL_malloc(66561);
+    int bytes = text && nested ? hm_user_data_read_settings(text, 65537) : -1;
+    const char *object = "{}";
+    size_t length = 2;
+    int found = bytes >= 0 ? hm_json_property(text, (size_t)bytes, parent, &object, &length) : -1;
+    int ok = found >= 0 && hm_json_replace(object, length, key, json_value, nested, 66561);
+    if (ok)
+        ok = hm_user_data_set_setting(parent, nested);
+    SDL_free(nested);
+    SDL_free(text);
+    return ok;
+}
 int hm_user_data_set_setting(const char *key, const char *json_value) {
     char *text = SDL_malloc(65537), *output = SDL_malloc(66561);
     int bytes = text && output ? hm_user_data_read_settings(text, 65537) : -1;

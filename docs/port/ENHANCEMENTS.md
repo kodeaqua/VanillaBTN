@@ -11,7 +11,8 @@ The owner requested the native pause interface and graphics settings on
 | Monitor/window mode/resolution | SDL display controls implemented; owner monitor/fullscreen test pending |
 | Filtering | Nearest/bilinear final-frame presentation; per-texture filtering is pending |
 | VSync | On (mailbox/FIFO) or supported immediate Off; device validation pending |
-| FPS limit | Native (30) or monitor-derived rational caps; fixed 60 Hz game ticks; repeated native images without interpolation |
+| FPS limit | Native (30) or monitor-derived rational caps; fixed 60 Hz game ticks; native images unless optional interpolation is enabled |
+| Visual interpolation | Optional private primitive replay for normal farm views; synthetic checks pass, owner gameplay validation pending |
 | Enhance Scaling | OFF; native higher-resolution scene renderer pending |
 | Widescreen Mode | OFF path uses centered 4:3 and black bars; expanded camera/culling ON path pending |
 | FXAA/MSAA | OFF; renderer paths pending |
@@ -30,3 +31,11 @@ SDK material or BIOS is included in the repository. See ADR-048 and
 port/enhance/pause_menu/README.md for controls, schema and current limits.
 VSync/FPS controls follow ADR-049. Presentation counts do not advance game time.
 Achieved FPS, physical VSync and gameplay time remain owner tests.
+
+The owner subsequently requested visual interpolation (ADR-050). Windows -Game
+builds HMBTN_ENH_INTERPOLATION; runtime enhance.interpolation defaults false.
+Enable Interpolation and choose a higher FPS Limit in Graphics. Positions are
+interpolated through private GPU command replay, without extra game updates or
+image crossfading. Initial scope is normal farm views; unmatched primitives,
+loading, transitions and other contexts retain native cadence. See
+port/enhance/interpolation/README.md. Scaling, widescreen ON and AA remain pending.

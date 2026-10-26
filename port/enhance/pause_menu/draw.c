@@ -1,5 +1,6 @@
 #include "enhance/pause_menu/assets.h"
 #include "enhance/pause_menu/menu.h"
+#include <stdio.h>
 
 /* Execute the game's actual frame geometry with private canvas sinks. This
  * preserves its bevel, corners and gradient; no replacement UI art is authored. */
@@ -106,10 +107,10 @@ void hm_pause_draw(const hm_pause_assets *assets, u8 *rgba, const hm_pause_menu 
     if (menu->page == HM_PAUSE_GRAPHICS) {
         hm_pause_original_frame(NULL, 12, 8, 296, 28);
         hm_center(assets, "Settings - Graphics", 16);
-        char range[] = {'(', (char)('1' + menu->first_visible),
-                        '-', (char)('0' + menu->first_visible + HM_PAUSE_VISIBLE_ROWS),
-                        ')', 0};
-        hm_text(assets, range, 264, 16);
+        char range[16];
+        snprintf(range, sizeof(range), "(%d-%d)", menu->first_visible + 1,
+                 menu->first_visible + HM_PAUSE_VISIBLE_ROWS);
+        hm_text(assets, range, 256, 16);
         hm_pause_original_frame(NULL, 12, 40, 296, 156);
         int first = menu->first_visible;
         hm_pause_original_frame(NULL, 20, 45 + (menu->selected - first) * 20, 280, 20);

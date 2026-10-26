@@ -1,5 +1,9 @@
-#include "platform/game_host.h"
+#ifdef HMBTN_ENH_INTERPOLATION
+#include "enhance/interpolation/interpolation.h"
+#include "gfx/game_frame.h"
+#endif
 #include "platform/audio_output.h"
+#include "platform/game_host.h"
 #include "platform/input_replay.h"
 #include "platform/presentation_clock.h"
 #include "platform/user_data.h"
@@ -129,12 +133,25 @@ static void hm_host_pause(void) {
     hm_host_reset_presentation();
     const hm_gpu_environment *state = hm_gpu_environment_state();
     const RECT *area = &state->display.disp;
+#ifdef HMBTN_ENH_INTERPOLATION
+    hm_interpolated_view interpolated = {0};
+    hm_render_frame live = hm_game_render_frame();
+    if (state->display_enabled &&
+        hm_interpolation_render(SDL_GetTicksNS() - hm_start, &live, &interpolated))
+        area = &interpolated.area;
+#endif
     for (unsigned y = 0; y < 240; ++y)
         for (unsigned x = 0; x < 320; ++x) {
             u16 color = state->display_enabled && area->w > 0 && area->h > 0
                             ? hm_vram_pixel((u32)area->x + x * (u32)area->w / 320,
                                             (u32)area->y + y * (u32)area->h / 240)
                             : 0;
+#ifdef HMBTN_ENH_INTERPOLATION
+            if (interpolated.pixels)
+                color = interpolated
+                            .pixels[((u32)area->y + y * (u32)area->h / 240) * interpolated.stride +
+                                    (u32)area->x + x * (u32)area->w / 320];
+#endif
             u8 *out = hm_pause_background + (y * 320 + x) * 4;
             for (unsigned k = 0; k < 3; ++k) {
                 unsigned value = (color >> (k * 5)) & 31;
@@ -242,6 +259,13 @@ static void hm_host_pause(void) {
 static void hm_host_present_scanout(u64 tick) {
     const hm_gpu_environment *state = hm_gpu_environment_state();
     const RECT *area = &state->display.disp;
+#ifdef HMBTN_ENH_INTERPOLATION
+    hm_interpolated_view interpolated = {0};
+    hm_render_frame live = hm_game_render_frame();
+    if (state->display_enabled &&
+        hm_interpolation_render(SDL_GetTicksNS() - hm_start, &live, &interpolated))
+        area = &interpolated.area;
+#endif
     if (SDL_getenv("HMBTN_TRACE_SCANOUT") && tick % 60 == 0) {
         fprintf(stderr, "Scanout tick %llu: enabled=%d area=%d,%d %dx%d\n",
                 (unsigned long long)tick, state->display_enabled, area->x, area->y, area->w,
@@ -260,6 +284,11 @@ static void hm_host_present_scanout(u64 tick) {
         for (u32 x = 0; x < (u32)area->w; ++x) {
             u16 color =
                 state->display_enabled ? hm_vram_pixel((u32)area->x + x, (u32)area->y + y) : 0;
+#ifdef HMBTN_ENH_INTERPOLATION
+            if (interpolated.pixels)
+                color = interpolated
+                            .pixels[((u32)area->y + y) * interpolated.stride + (u32)area->x + x];
+#endif
             u8 *out = pixels + (y * (u32)area->w + x) * 4;
             for (u32 channel = 0; channel < 3; ++channel) {
                 u32 component = (color >> (channel * 5)) & 31;
@@ -419,6 +448,12 @@ int hm_game_host_start(hm_disc *disc) {
             return 0;
     }
 #endif
+#if defined(HMBTN_ENH_INTERPOLATION) && defined(HMBTN_ENH_PAUSE_MENU)
+    if (!hm_interpolation_enable(hm_options.interpolation)) {
+        SDL_SetError("Cannot allocate visual interpolation buffers");
+        return 0;
+    }
+#endif
     hm_start = SDL_GetTicksNS();
     hm_host_reset_presentation();
     hm_timing_reset((hm_timing_host){NULL, hm_host_tick, NULL});
@@ -428,6 +463,9 @@ int hm_game_host_start(hm_disc *disc) {
 }
 
 void hm_game_host_stop(void) {
+#ifdef HMBTN_ENH_INTERPOLATION
+    hm_interpolation_enable(0);
+#endif
     hm_audio_output_stop();
     if (hm_device) {
         SDL_WaitForGPUIdle(hm_device);

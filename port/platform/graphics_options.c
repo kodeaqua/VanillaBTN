@@ -1,6 +1,9 @@
 #include "platform/graphics_options.h"
 #include "platform/settings_json.h"
 #include "platform/user_data.h"
+#ifdef HMBTN_ENH_INTERPOLATION
+#include "enhance/interpolation/interpolation.h"
+#endif
 static void hm_validate_rate(hm_graphics_options *options);
 
 void hm_graphics_defaults(hm_graphics_options *o) {
@@ -33,6 +36,14 @@ void hm_graphics_load(hm_graphics_options *o) {
               (u64)candidate.fps_numerator <= (u64)candidate.fps_denominator * 1000)))
             *o = candidate;
     }
+#ifdef HMBTN_ENH_INTERPOLATION
+    const char *value;
+    size_t value_length;
+    if (bytes >= 0 && hm_json_property(text, (size_t)bytes, "enhance", &object, &length) == 1 &&
+        hm_json_property(object, length, "interpolation", &value, &value_length) == 1 &&
+        value_length == 4 && !SDL_memcmp(value, "true", 4))
+        o->interpolation = 1;
+#endif
     SDL_free(text);
     hm_validate_rate(o);
 }
@@ -43,7 +54,9 @@ int hm_graphics_save(const hm_graphics_options *o) {
                  "\"vsync\":%d,\"fps_numerator\":%d,\"fps_denominator\":%d}",
                  o->monitor, o->mode, o->width, o->height, o->linear, o->vsync, o->fps_numerator,
                  o->fps_denominator);
-    return hm_user_data_set_setting("graphics", json);
+    return hm_user_data_set_setting("graphics", json) &&
+           hm_user_data_set_nested_setting("enhance", "interpolation",
+                                           o->interpolation ? "true" : "false");
 }
 int hm_pause_config_enabled(void) {
     int enabled = 1; /* The owner requests ESC throughout the native game. */
@@ -100,7 +113,7 @@ hm_present_rate hm_graphics_present_rate(const hm_graphics_options *o) {
 }
 int hm_graphics_swapchain(SDL_GPUDevice *device, SDL_Window *window, const hm_graphics_options *o) {
     SDL_GPUPresentMode mode = o->vsync ? SDL_GPU_PRESENTMODE_VSYNC : SDL_GPU_PRESENTMODE_IMMEDIATE;
-    if (o->vsync && SDL_WindowSupportsGPUPresentMode(device,window,SDL_GPU_PRESENTMODE_MAILBOX))
+    if (o->vsync && SDL_WindowSupportsGPUPresentMode(device, window, SDL_GPU_PRESENTMODE_MAILBOX))
         mode = SDL_GPU_PRESENTMODE_MAILBOX;
     return SDL_WindowSupportsGPUPresentMode(device, window, mode) &&
            SDL_SetGPUSwapchainParameters(device, window, SDL_GPU_SWAPCHAINCOMPOSITION_SDR, mode);
@@ -133,7 +146,8 @@ static int hm_refresh_rate(const SDL_DisplayMode *mode, hm_present_rate *rate) {
 }
 hm_present_rate hm_graphics_effective_rate(SDL_Window *window, const hm_graphics_options *o) {
     hm_present_rate wanted = hm_graphics_present_rate(o), actual;
-    if (o->vsync && hm_refresh_rate(SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(window)), &actual) &&
+    if (o->vsync &&
+        hm_refresh_rate(SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(window)), &actual) &&
         (u64)actual.numerator * wanted.denominator < (u64)wanted.numerator * actual.denominator)
         return actual;
     return wanted;
@@ -143,7 +157,10 @@ void hm_graphics_sync_monitor(SDL_Window *window, hm_graphics_options *o) {
     int count = 0;
     SDL_DisplayID *displays = SDL_GetDisplays(&count);
     for (int i = 0; displays && i < count; ++i)
-        if (displays[i] == current) { o->monitor = i; break; }
+        if (displays[i] == current) {
+            o->monitor = i;
+            break;
+        }
     SDL_free(displays);
     hm_validate_rate(o);
 }
@@ -265,7 +282,15 @@ int hm_graphics_change(SDL_GPUDevice *device, SDL_Window *window, hm_graphics_op
         current = current < 0 ? (step < 0 ? unique - 1 : 0) : (current + unique + step) % unique;
         candidate.width = widths[current];
         candidate.height = heights[current];
-    } else
+    }
+#ifdef HMBTN_ENH_INTERPOLATION
+    else if (item == 9) {
+        candidate.interpolation = !candidate.interpolation;
+        if (!hm_interpolation_enable(candidate.interpolation))
+            return 0;
+    }
+#endif
+    else
         return 0; /* Renderer enhancements remain unavailable until implemented. */
     int window_changed = item >= 0 && item <= 2;
     if (window_changed && !hm_graphics_apply(window, &candidate)) {
@@ -311,7 +336,9 @@ void hm_graphics_value(const hm_graphics_options *o, int item, char *text, size_
             else
                 SDL_snprintf(text, capacity, "%u FPS limit", (u32)(scaled / 100));
         }
-    } else if (item == 6)
+    } else if (item == 9)
+        SDL_snprintf(text, capacity, "%s", o->interpolation ? "On - world motion" : "Off");
+    else if (item == 6)
         SDL_snprintf(text, capacity, "%s", o->linear ? "Bilinear" : "Nearest Neighbor");
     else
         SDL_snprintf(text, capacity, "Off - not available yet");
@@ -337,7 +364,9 @@ void hm_graphics_row_value(const hm_graphics_options *o, int item, char *text, s
             else
                 SDL_snprintf(text, capacity, "%u", (u32)(scaled / 100));
         }
-    } else if (item == 6)
+    } else if (item == 9)
+        SDL_snprintf(text, capacity, "%s", o->interpolation ? "On" : "Off");
+    else if (item == 6)
         SDL_snprintf(text, capacity, "%s", o->linear ? "Bilinear" : "Nearest");
     else
         SDL_snprintf(text, capacity, "Off");

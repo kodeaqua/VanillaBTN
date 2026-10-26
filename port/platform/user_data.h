@@ -11,5 +11,6 @@ const char *hm_user_data_root(void);
 /* Return byte length or -1; preserve unknown root settings on edits. */
 int hm_user_data_read_settings(char *text, size_t capacity);
 int hm_user_data_set_setting(const char *key, const char *json_value);
+int hm_user_data_set_nested_setting(const char *parent, const char *key, const char *json_value);
 
 #endif

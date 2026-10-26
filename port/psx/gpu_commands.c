@@ -1,3 +1,4 @@
+#include "gfx/frame_events.h"
 #include "psx/error.h"
 #include "psx/gpu_environment.h"
 #include "psx/gpu_links.h"
@@ -149,14 +150,23 @@ static u32 hm_gpu_command(const u32 *words, u32 available) {
     hm_runtime_error("DrawOTag", detail);
 }
 
+void hm_gpu_execute_words(const u32 *words, u32 count) {
+    if (!words && count)
+        hm_runtime_error("hm_gpu_execute_words", "null command array");
+    for (u32 at = 0; at < count;)
+        at += hm_gpu_command(words + at, count - at);
+}
 void DrawOTag(u32 *table) {
     if (!table || ((uintptr_t)table & 3))
         hm_runtime_error("DrawOTag", "null or unaligned OT");
     const u32 *packet = table;
     for (u32 visited = 0; packet && visited < HM_GPU_LINK_CAPACITY; ++visited) {
         u32 tag = packet[0], count = tag >> 24;
-        for (u32 at = 0; at < count;)
-            at += hm_gpu_command(packet + 1 + at, count - at);
+        for (u32 at = 0; at < count;) {
+            u32 length = hm_gpu_command(packet + 1 + at, count - at);
+            hm_render_packet(packet + 1 + at, length);
+            at += length;
+        }
         packet = hm_gpu_link_decode(tag);
         if (!packet)
             return;

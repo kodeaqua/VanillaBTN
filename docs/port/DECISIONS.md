@@ -1230,3 +1230,40 @@ rate and verifies 300 real native VSync(2) calls still give 600 VBlank callbacks
 at 30, 59, 60, 75, 144, 240 and 60000/1001 caps. Late dropping, menu scrolling
 and decimal composition are covered. These are technical checks, not gameplay
 time or physical VSync tests. No dependency or matching-source edit is added.
+
+<a id="adr-050"></a>
+
+## ADR-050: Opt-in private primitive replay for visual interpolation
+
+Date: 2026-10-26. Status: synthetic validation passed; owner gameplay pending.
+
+The owner explicitly requests smoother world movement above native FPS without
+altering game time. Keep original VSync(2), fixed 60 Hz timing, logic, RNG and
+audio unchanged. Add HMBTN_ENH_INTERPOLATION, OFF by default, compiled by the
+Windows -Game script, and runtime enhance.interpolation, default false. Graphics
+adds Interpolation as the tenth item, retaining seven visible rows.
+
+Introduce generic frame observers and bindable VRAM/GPU environments. Native
+CMake remaps only main.c's PutDrawEnv/DrawOTag call sites to port adapters; no
+matching source edits. Capture two bounded native command histories and replay
+screen-coordinate interpolation into private VRAM. Restore native contexts
+before returning to simulation. Packet keys normalize double-buffer arena
+addresses and require unique, compatible primitive/material records. Keep
+current texture poses and secondary UI positions; do not crossfade images.
+
+Use the native back-buffer lead to interpolate previous to current coordinates
+over two ticks. Present the private draw rectangle. Never extrapolate or update
+actors during presentations. Reject incompatible histories, duplicate keys,
+material changes and large motion. Invalidate on overlay/context transitions.
+Limit initial eligibility to normal farm views without loading, transition,
+pause or menu flags. Unmatched primitives keep current geometry, so coverage
+and cadence depend on stable native command allocation. This is an experimental
+screen-space heuristic, not persistent actor/world-space interpolation.
+
+The OFF path has no capture allocation or packet changes. Synthetic tests cover
+midpoint geometry, current UI, context restoration and history rejection;
+release and ASan/UBSan pass. Compile-time OFF still links the native executable.
+Full gameplay, native image parity, input latency and actual frame cost require
+owner validation. No new dependencies, assets, threads or matching guards.
+See port/enhance/interpolation/README.md for limits and PLATFORMS.md for the
+explicitly synthetic lower-bound replay measurement.

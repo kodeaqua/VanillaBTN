@@ -473,8 +473,12 @@ in-game save ABI remain unaudited even though the native card backend tests pass
 VSync/FPS settings use a separate rational presentation clock (ADR-049). The
 original VSync(2) game loop and fixed 60 Hz tick runtime are untouched. Synthetic
 tests verify invariant native callback counts across presentation caps. Extra
-presentations duplicate the native image; interpolation and physical/gameplay
-validation remain pending. No further matching guard is required.
+presentations duplicate the native image unless enhance.interpolation is enabled.
+The requested experimental interpolation module uses private VRAM/environment
+replay and generic observers at native-only main.c SDK call aliases (ADR-050).
+Normal farm geometry can interpolate; other contexts retain native scanout.
+All 76 release/sanitizer units pass; physical/gameplay validation remains pending.
+No additional matching source edits or guards are required.
 The port builds all 113 units and links a boot diagnostic and SDL game window.
 Local 39000-VBlank release/sanitizer replays complete the opening and verify
 house exit and free farm movement after the Thomas/Zack dialogue. Wider

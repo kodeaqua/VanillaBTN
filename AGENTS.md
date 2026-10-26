@@ -33,6 +33,11 @@ override this one for their subtree.
   Graphics enhancements (scaling, widescreen, AA) still default OFF and must
   never be advertised as working before their renderer paths are implemented.
 
+- The owner also requests VSync/FPS caps and visual interpolation while keeping
+  game logic/time native. Windows -Game compiles interpolation; its runtime
+  enhance.interpolation defaults OFF. This does not authorize accelerating
+  simulation or claiming pending renderer enhancements are complete.
+
 These explicit owner decisions override conflicting roadmap, CI skeleton,
 workflow, and definition-of-done requirements below.
 
