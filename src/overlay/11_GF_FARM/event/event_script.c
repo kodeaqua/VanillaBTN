@@ -1768,6 +1768,10 @@ static void event_actors_load_sprites(FarmEventBlock *block)
 }
 
 /* Entering and leaving an event: the villagers and actors it binds, and their pairs. */
+#ifdef HMBTN_PORT
+/* PORT: native animation records - see docs/port/DECISIONS.md#adr-064 */
+#include "compat/villager_sprites.h"
+#endif
 
 #define PENDING_RESULT_NONE -1
 #define PENDING_RESULT_COUNT 5
@@ -1782,6 +1786,10 @@ typedef struct FarmCopyRecord {
 /* Copy each villager's sprite80 over its sprite, and call villager_load_request for
  * each one when the request is 0x82. */
 void villager_sprites_copy(void) {
+#ifdef HMBTN_PORT
+    /* PORT: preserve full pointer fields and native stride - see docs/port/DECISIONS.md#adr-064 */
+    hm_villager_sprites_copy(&game_state);
+#else
     FarmCopyRecord *destination;
     FarmCopyRecord *source;
     FarmCopyWords *source_words;
@@ -1799,6 +1807,7 @@ void villager_sprites_copy(void) {
         }
         index++;
     } while (index < CHARACTER_COUNT);
+#endif
 }
 
 /* Bind file to the first free staging sprite, and record result as its item id. */

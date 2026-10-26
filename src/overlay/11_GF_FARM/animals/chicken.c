@@ -337,7 +337,12 @@ s32 farm_actor_dispatch_state(FarmActor *object, s32 state) {
 }
 
 void chicken_clear(FarmChicken *p) {
+#ifdef HMBTN_PORT
+    /* PORT: clear native animation pointer tails - see docs/port/DECISIONS.md#adr-064 */
+    memset(p, 0, sizeof(*p));
+#else
     memset(p, 0, 0xB4);
+#endif
     p->actor.kind = 0;
 }
 
