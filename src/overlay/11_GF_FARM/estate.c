@@ -200,6 +200,17 @@ s32 estate_pending_op_start(void) {
 
 /* Clear the message queues and forget the notices seen. */
 void estate_queues_clear(void) {
+#ifdef HMBTN_PORT
+    /* PORT: native state fields move when pointers widen; preserve the exact
+     * queue-byte writes - see docs/port/DECISIONS.md#adr-029. */
+    s32 queue;
+    s32 slot;
+    for (queue = 0; queue < MESSAGE_QUEUES; queue++) {
+        for (slot = 0; slot < MESSAGE_QUEUE_LEN; slot++) {
+            game_state.progress.estate.queues[queue][slot].kind = -1;
+        }
+    }
+#else
     s32 empty = -1;
     u8 *p = (u8 *)&game_state;
     s32 i;
@@ -208,6 +219,7 @@ void estate_queues_clear(void) {
         p[0x4A36] = empty;
         p += 4;
     }
+#endif
     game_state.progress.estate.noticesSeen = 0;
 }
 
@@ -1519,8 +1531,16 @@ static KindValues estate_kind_values[4] = {
 };
 
 /* Set the item of each record from its state flags, using the kind's three values. */
+#ifdef HMBTN_PORT
+/* PORT: Clang requires file-scoped helpers -- see docs/port/DECISIONS.md#adr-013 */
+#include "compat/nested/estate.inc"
+#else
+#endif
 static void estate_record_ids_update(s16 kind, s16 count, FarmEstateRecord *records) {
     /* Pick the item value for the record's state flags, or 0 when none is set. */
+#ifdef HMBTN_PORT
+    /* PORT: helper is file-scoped in the native adapter -- see docs/port/DECISIONS.md#adr-013 */
+#else
     s32 estate_kind_value_for_flags(u16 flags, s16 valueWhenBit13, s16 valueWhenBit11, s16 valueWhenBit12)
     {
         if (flags & 0x2000) return valueWhenBit13;
@@ -1528,6 +1548,7 @@ static void estate_record_ids_update(s16 kind, s16 count, FarmEstateRecord *reco
         if (flags & 0x1000) return valueWhenBit12;
         return 0;
     }
+#endif
 
     s32 i;
     s32 itemId;

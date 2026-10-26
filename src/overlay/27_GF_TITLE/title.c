@@ -2690,7 +2690,19 @@ static void title_state_show_image(void) {
     if (title_load_sprite_file() != 0) {
         image = (TitleImage *)&loading_data;
         images = title_image_ptrs;
+#ifdef HMBTN_PORT
+        /* PORT: copy the complete picture without crossing its array boundary
+         * into unrelated native globals — see docs/port/DECISIONS.md#adr-020. */
+        {
+            static const size_t picture_sizes[3] = {
+                sizeof(title_image_0), sizeof(title_image_1), sizeof(title_image_2)
+            };
+            s32 picture = rand_range(3);
+            memcpy(image, images[picture], picture_sizes[picture]);
+        }
+#else
         *image = *images[rand_range(3)];
+#endif
         if (title_saved_flags & GLOBAL_FLAG_CONTINUE) {
             title_load_state = TITLE_LOAD_MUSIC;
             game_state.progress.entryStep++;
@@ -3723,3 +3735,9 @@ static void title_copy_new_game_toolbox(void) {
         src++;
     } while (i < 5U);
 }
+#ifdef HMBTN_PORT
+/* PORT: restore native overlay state on reentry -
+ * see docs/port/DECISIONS.md#adr-047. */
+#include "compat/title_overlay_state.inc"
+#else
+#endif

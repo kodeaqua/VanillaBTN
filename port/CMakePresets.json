@@ -1,0 +1,32 @@
+{
+  "version": 5,
+  "cmakeMinimumRequired": { "major": 3, "minor": 24, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/../build/port/${presetName}",
+      "cacheVariables": { "CMAKE_C_COMPILER": "clang", "CMAKE_BUILD_TYPE": "Release", "BUILD_TESTING": "ON" }
+    },
+    { "name": "linux-release", "inherits": "base", "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" } },
+    { "name": "linux-asan-ubsan", "inherits": "linux-release", "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "HMBTN_SANITIZERS": "ON" } },
+    { "name": "windows-release", "inherits": "base", "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }, "cacheVariables": { "CMAKE_C_COMPILER": "${sourceDir}/../build/host-tools/llvm-mingw-20250709-ucrt-x86_64/bin/clang.exe", "CMAKE_C_FLAGS": "-march=x86-64-v2", "CMAKE_EXE_LINKER_FLAGS": "-static" } },
+    { "name": "windows-asan-ubsan", "inherits": "windows-release", "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "HMBTN_SANITIZERS": "ON", "CMAKE_EXE_LINKER_FLAGS": "" } },
+    { "name": "macos-universal-release", "inherits": "base", "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin" }, "cacheVariables": { "CMAKE_OSX_ARCHITECTURES": "arm64;x86_64" } }
+  ],
+  "buildPresets": [
+    { "name": "linux-release", "configurePreset": "linux-release" },
+    { "name": "linux-asan-ubsan", "configurePreset": "linux-asan-ubsan" },
+    { "name": "windows-release", "configurePreset": "windows-release" },
+    { "name": "windows-asan-ubsan", "configurePreset": "windows-asan-ubsan" },
+    { "name": "macos-universal-release", "configurePreset": "macos-universal-release" }
+  ],
+  "testPresets": [
+    { "name": "linux-release", "configurePreset": "linux-release", "output": { "outputOnFailure": true }, "execution": { "noTestsAction": "error" } },
+    { "name": "linux-asan-ubsan", "configurePreset": "linux-asan-ubsan", "output": { "outputOnFailure": true }, "execution": { "noTestsAction": "error" } },
+    { "name": "windows-release", "configurePreset": "windows-release", "output": { "outputOnFailure": true }, "execution": { "noTestsAction": "error" } },
+    { "name": "windows-asan-ubsan", "configurePreset": "windows-asan-ubsan", "output": { "outputOnFailure": true }, "execution": { "noTestsAction": "error" } },
+    { "name": "macos-universal-release", "configurePreset": "macos-universal-release", "output": { "outputOnFailure": true }, "execution": { "noTestsAction": "error" } }
+  ]
+}

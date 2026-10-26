@@ -14,15 +14,31 @@ typedef void (*TileDrawFn)(u_long *ot, AnimState *sprite, s16 frame, s32 x, s32 
 static void bg_tile_screen(u_long *ot, void *drawArg);
 static void bg_tile_draw_sprite(u_long *ot, struct AnimState *sprite, int frame, short x, short y);
 static void bg_tile_draw_cursor(u_long *ot, struct AnimState *sprite, signed short frame, signed short x, signed short y);
+#ifdef HMBTN_PORT
+/* PORT: adapt callbacks to the native dispatcher signature -
+ * see docs/port/DECISIONS.md#adr-046. */
+#include "compat/bg_tile.inc"
+#else
+#endif
 
 /* Tile the screen with plain sprites of the staging sprite. */
 void bg_tile_mode_sprite(u_long *arg) {
+#ifdef HMBTN_PORT
+    /* PORT: use an exactly typed callback - see docs/port/DECISIONS.md#adr-046. */
+    bg_tile_screen(arg, hm_bg_tile_sprite);
+#else
     bg_tile_screen(arg, bg_tile_draw_sprite);
+#endif
 }
 
 /* Tile the screen with the staging sprite drawn through the frame's primitive cursor. */
 void bg_tile_mode_cursor(u_long *arg) {
+#ifdef HMBTN_PORT
+    /* PORT: use an exactly typed callback - see docs/port/DECISIONS.md#adr-046. */
+    bg_tile_screen(arg, hm_bg_tile_cursor);
+#else
     bg_tile_screen(arg, bg_tile_draw_cursor);
+#endif
 }
 
 static u32 bg_scroll_frames = 0;

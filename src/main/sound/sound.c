@@ -628,6 +628,12 @@ s32 sound_load_step(void) {
         seq_offsets[seq_slot] = SOUND_OFFSET(1);
         sound_seq_bytes = SOUND_OFFSET(2) - SOUND_OFFSET(0);
         memcpy(sound_write_ptr, sound_read_ptr, sound_seq_bytes);
+#ifdef HMBTN_PORT
+        /* PORT: retain the exact asset bounds for the native SEQ parser
+         * — see docs/port/DECISIONS.md#adr-022. */
+        hm_sound_sequence_register(sound_write_ptr, sound_seq_bytes);
+#else
+#endif
         sound_load_state = SOUND_LOAD_IDLE;
         seq_data[seq_slot] = sound_write_ptr;
         seq_vabs[seq_slot] = vab_ids[entry_args[current_entry]];

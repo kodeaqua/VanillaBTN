@@ -216,11 +216,19 @@ static s32 ground_xyz_in_clip(long *first, long *second) {
 
 /* Return 0 when a primitive of `object` is under *ground_pos (the hit is in
  * ground_hit_prim_ptr), 1 when none is. */
+#ifdef HMBTN_PORT
+/* PORT: Clang requires file-scoped helpers -- see docs/port/DECISIONS.md#adr-013 */
+#include "compat/nested/ground.inc"
+#else
+#endif
 static s32 ground_primitive_under(TmdObject *table, TmdObject *object) {
     s32 count;
     SVECTOR *vertices;
     u8 *primitives;
 
+#ifdef HMBTN_PORT
+    /* PORT: helper is file-scoped in the native adapter -- see docs/port/DECISIONS.md#adr-013 */
+#else
     s32 ground_triangle_under(SVECTOR *a, SVECTOR *b, SVECTOR *c) {
         VECTOR *pos;
 
@@ -245,7 +253,11 @@ static s32 ground_primitive_under(TmdObject *table, TmdObject *object) {
         ground_triangle[2] = c;
         return 0;
     }
+#endif
 
+#ifdef HMBTN_PORT
+    /* PORT: helper is file-scoped in the native adapter -- see docs/port/DECISIONS.md#adr-013 */
+#else
     s32 ground_quad_under(s32 a, s32 b, s32 c, s32 d) {
         if (a == b || a == c) {
             return ground_triangle_under(&ground_vertices[c], &ground_vertices[b], &ground_vertices[d]);
@@ -258,6 +270,7 @@ static s32 ground_primitive_under(TmdObject *table, TmdObject *object) {
         }
         return ground_triangle_under(&ground_vertices[d], &ground_vertices[c], &ground_vertices[b]);
     }
+#endif
 
     count = object->n_primitive;
     /* TMD tables hold offsets from the model base. */

@@ -323,7 +323,12 @@ extern s32 vram_chunk_offsets[];
 /* Checksums of the uploaded block's 50 chunks, and the address of the block's tail copy. */
 extern s32 chunk_checksums[50];
 extern RECT vram_stash_rect;
+#ifdef HMBTN_PORT
+/* PORT: native staging address -- see docs/port/DECISIONS.md#adr-016 */
+extern uintptr_t vram_stash_tail;
+#else
 extern u32 vram_stash_tail;
+#endif
 /* The ten staging sprites of the event actors. */
 extern struct AnimState event_staging_sprites[10];
 /* Sprite offsets for the event's sprites. */

@@ -963,6 +963,17 @@ static FarmStoredItem *item_row_at(s32 col, s32 row) {
 
     offset = row * 8 - 9;
     index = offset + col;
+#ifdef HMBTN_PORT
+    /* PORT: select native bag fields instead of indexing across held[2] -
+     * see docs/port/DECISIONS.md#adr-043. */
+    if (item_result_state == ITEM_RESULT_LIST_TOOLBOX) {
+        table = game_state.player.held;
+        value = (col > 0 && col < 9) ? &game_state.player.tools[col - 1] : 0;
+    } else {
+        table = &game_state.player.held[1];
+        value = (col > 0 && col < 9) ? &game_state.player.items[col - 1] : 0;
+    }
+#else
     if (item_result_state == ITEM_RESULT_LIST_TOOLBOX) {
         table = game_state.player.held;
         value = &game_state.player.held[1 + col];
@@ -970,6 +981,7 @@ static FarmStoredItem *item_row_at(s32 col, s32 row) {
         table = &game_state.player.held[1];
         value = &game_state.player.held[9 + col];
     }
+#endif
     result = item_slot_category(col);
     switch (result) {
     case ITEM_SLOT_HELD:
@@ -1046,7 +1058,13 @@ static void item_cursor_move(s32 count) {
             }
             if (item_held_list == ITEM_NOT_HELD) {
                 /* The marker to the left or right of the cursor in the marker table. */
+#ifdef HMBTN_PORT
+                /* PORT: index the selected marker's own navigation bytes -
+                 * see docs/port/DECISIONS.md#adr-043. */
+                item_cursor_x = item_markers[item_cursor_x].next_cell[game_state.player.rucksackLevel + dir * 3];
+#else
                 item_cursor_x = item_markers[0].next_cell[game_state.player.rucksackLevel + dir * 3 + item_cursor_x * 16];
+#endif
                 sound_play(SOUND_MENU_CURSOR);
             }
         }

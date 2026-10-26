@@ -734,12 +734,26 @@ static void player_build_result(FarmPlayer *player)
     index = player->facing38 << 2;
     values.vx = player->position.vx;
     values.vz = player->position.vz;
+#ifdef HMBTN_PORT
+    /* PORT: stay within the selected reach row - see ADR-035. */
+    table = facing_reach[player->facing38];
+#else
     table = facing_reach[0] + index / 2;
+#endif
     values.vx += table[0];
     values.vz += table[1];
     farm_settle_on_ground(&values, 0);
     status_word = &player_status_word;
+#ifdef HMBTN_PORT
+    /* PORT: no ground primitive has no terrain flags; do not read native
+     * address zero - see docs/port/DECISIONS.md#adr-039. */
+    {
+        const void *primitive = ground_hit_primitive();
+        result_value = primitive ? hm_asset_s32le(primitive) : 0;
+    }
+#else
     result_value = *(s32 *)ground_hit_primitive();
+#endif
     *status_word = result_value;
     if (!(result_value & 0xFFFF0000))
     {
@@ -4377,7 +4391,16 @@ void player_update_position(void)
     {
         player_slide_on_bump();
     }
+#ifdef HMBTN_PORT
+    /* PORT: preserve an empty terrain result without reading native address
+     * zero - see docs/port/DECISIONS.md#adr-039. */
+    {
+        const void *primitive = ground_hit_primitive();
+        player_status_word = primitive ? (u32)hm_asset_s32le(primitive) : 0;
+    }
+#else
     player_status_word = *(u32 *)ground_hit_primitive();
+#endif
     pos = player->position;
     if (player->stateFlags & PLAYER_FLAG_AIRBORNE)
     {
@@ -4592,7 +4615,13 @@ static s16 player_probe_target(FarmPlayer *player, VECTOR *pos, s32 kind_arg)
     found = 0;
     target = 0;
     probe.vy = pos->vy;
+#ifdef HMBTN_PORT
+    /* PORT: select the original adjacent table explicitly on native hosts -
+     * see docs/port/DECISIONS.md#adr-035. */
+    offset = hm_player_probe_step(kind, player->facing38, move_steps_small, move_steps_large, facing_reach);
+#else
     offset = &move_steps_small[kind + player->facing38 * 2];
+#endif
     probe.vx = pos->vx + offset[0];
     probe.vz = pos->vz + offset[1];
     player->stateFlags &= ~PLAYER_FLAG_BIT18;
@@ -6285,7 +6314,12 @@ s32 player_init_toys(FarmPlayer *player)
     file_offset = ANIM_PACK_START(entry, 0);
     do
     {
+#ifdef HMBTN_PORT
+        /* PORT: preserve the native asset base - see docs/port/DECISIONS.md#adr-028. */
+        anim_bind_file(&player->toys[i].sprite, (void *)(file_base + file_offset));
+#else
         anim_bind_file(&player->toys[i].sprite, (void *)(file_offset + (s32)file_base));
+#endif
         i++;
     } while (i < PLAYER_TOYS);
 

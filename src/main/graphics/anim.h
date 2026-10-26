@@ -124,12 +124,23 @@ typedef struct VramPlace {
  * packs carry one more word, start[count + 1], the start of a second texture pack. */
 typedef struct AnimPackToc {
     s32 count;
+#ifdef HMBTN_PORT
+    /* PORT: Clang retains initialized flexible tails, whereas a zero-length
+     * array discards their words - see docs/port/DECISIONS.md#adr-028. */
+    s32 start[];
+#else
     s32 start[0];
+#endif
 } AnimPackToc;
 
 /* The count and the offsets are one run of words, so the k-th start is reached by
  * index, not by a struct field. */
+#ifdef HMBTN_PORT
+/* PORT: read the variable tail as bytes - see docs/port/DECISIONS.md#adr-028. */
+#include "compat/anim_pack.inc"
+#else
 #define ANIM_PACK_START(toc, k) ((&(toc)->count)[(k) + 1])
+#endif
 
 void anim_bind_file(AnimState *state, AnimFile *file);
 void anim_draw_sprt(u_long *ot, SPRT **sprites, DR_MODE **modes, AnimState *sprite, u8 anim, u8 frame, s16 x, s16 y);

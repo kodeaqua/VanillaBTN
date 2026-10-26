@@ -44,9 +44,15 @@ typedef union PrimCursor {
 /* Link the primitive `p`, a `type`, into the ordering table `ot`: its tag takes
  * the next link in the low 24 bits and the packet's length in words after the
  * tag in the top byte, and the table entry takes the primitive. */
+#ifdef HMBTN_PORT
+/* PORT: encode full native pointers as handles — see docs/port/DECISIONS.md#adr-009 */
+#include "psx/gpu_links.h"
+#define LINK_PRIM(ot, p, type) hm_gpu_link_prim((ot), (p), (u8)(sizeof(type) / 4 - 1))
+#else
 #define LINK_PRIM(ot, p, type)                                                  \
     (*(u32 *)(p) = ((u32)(sizeof(type) / 4 - 1) << 24) | (*(ot) & 0xFFFFFF),   \
      *(ot) = (u32)(p) & 0xFFFFFF)
+#endif
 
 void prim_add_pixel(u_long *ot, s16 x, s16 y, s32 color, s16 semi_trans);
 void prim_add_line(u_long *ot, s16 x0, s16 y0, s16 x1, s16 y1, s32 color, s16 semi_trans);

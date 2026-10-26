@@ -6,6 +6,29 @@ override this one for their subtree.
 
 ## 0. Mission
 
+### Current owner overrides (2026-10-25 and 2026-10-26)
+
+- Prioritize Windows x86-64 native bring-up before Linux, macOS, and Android.
+  Phase 1 targets Windows; retain the portable architecture for the other targets.
+- Do not add, modify, run, or provision workflows/CI for the current work.
+  Existing workflow files remain untouched. CI requirements elsewhere in this
+  document are deferred until the owner explicitly requests CI work.
+- Use native Windows tools only for the current port work. Do not install,
+  invoke, or require WSL. Matching `check` uses a separate Linux toolchain;
+  defer that validation when unavailable and report it as unverified, without
+  blocking Windows port work or asking the owner to enable WSL.
+- The owner performs interactive gameplay testing. Agents handle implementation,
+  builds and isolated technical/unit checks; do not launch gameplay or replay
+  sessions unless the owner explicitly requests them.
+- Windows user data belongs in the active user's Documents/BackToNature folder,
+  resolved through the OS user-folder API (including redirected Documents).
+  Store saves under saves/ and configuration at settings.json. Do not hardcode
+  a username or use AppData for these files. This overrides the default pref-path
+  location below for Windows.
+
+These explicit owner decisions override conflicting roadmap, CI skeleton,
+workflow, and definition-of-done requirements below.
+
 This repo is a **matching decompilation** of *Harvest Moon: Back to Nature*
 (PlayStation, USA, `SLUS_011.15`). Goal of this effort:
 
@@ -222,8 +245,8 @@ Work through phases in order; do not start enhancements before Phase 6 unless th
 The upstream README only documents a Docker flow, so the native steps must be derived, not guessed:
 1. Read `Dockerfile`, `cmake/`, `tools/`, and `.github/workflows/` to list exactly which tools and versions the matching build needs
    (cross-compiler/PSY-Q toolchain, Python version and packages, Ninja, CMake, any helper binaries) and where they come from.
-2. Write the result to `docs/port/NATIVE_BUILD.md` and automate it with an idempotent script (`tools/setup-native.sh`; a PowerShell/WSL equivalent only if needed). Pin versions and verify checksums.
-3. The old PSY-Q-era toolchain is likely **Linux x86-64 only**. If so, the matching `check` is supported on Linux (and WSL on Windows) only; say that plainly in the doc.
+2. Write the result to `docs/port/NATIVE_BUILD.md` and automate it with an idempotent script (`tools/setup-native.sh`; a native PowerShell equivalent only if needed). Pin versions and verify checksums. Do not use WSL.
+3. The old PSY-Q-era toolchain is likely **Linux x86-64 only**. If so, the matching `check` is supported on a separate Linux host only; say that plainly in the doc. Do not make it a prerequisite for current Windows port work when that host is unavailable.
    The **port itself must build natively on all four platforms** and must never require the matching toolchain.
 4. Keep the PSY-Q SDK and the original toolchain files **out of git** (Section 4); the setup script takes them from the owner's local copy or the official download location, never from this repo.
 

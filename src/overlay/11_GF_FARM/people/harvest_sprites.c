@@ -375,7 +375,13 @@ static s32 harvest_helper_timer_tick(FarmHelper *helper) {
     actions = harvest_helper_tick_handlers;
     action = actions[action_id];
     if (action != 0) {
+#ifdef HMBTN_PORT
+        /* PORT: pass the helper explicitly instead of relying on the PS1
+         * argument register remaining live - see ADR-042. */
+        action(helper);
+#else
         action();
+#endif
     }
     if (!(helper->actor.flags & ACTOR_FLAG_CUE_RUNNING) && helper->actor.interruptTime >= HELPER_TASK_INTERVAL) {
         harvest_helper_seasonal_task(helper);
@@ -1277,12 +1283,20 @@ static s32 harvest_obj_move_action_tick(FarmHelper *helper) {
  * to, in PLACE_5 it hands over and fetches, in PLACE_4 it fetches and claims. While
  * it runs, its task is saved to be restored later. When it stops it plays action 7
  * and returns 1. */
+#ifdef HMBTN_PORT
+/* PORT: make the helper capture explicit -- see docs/port/DECISIONS.md#adr-013 */
+#include "compat/nested/harvest.inc"
+#else
+#endif
 static s32 harvest_obj_carry_tick(FarmHelper *object) {
     FarmHelper *self;
     s32 running;
     s32 result;
     VECTOR pos;
 
+#ifdef HMBTN_PORT
+    /* PORT: file-scoped helper receives object explicitly -- see docs/port/DECISIONS.md#adr-013 */
+#else
     void harvest_helper_arrive_or_wait(FarmHelper *o, s16 kind, u32 mask) {
         if (o->actor.place.location == kind) {
             o->targetAnimal = SLOT_NONE;
@@ -1294,6 +1308,7 @@ static s32 harvest_obj_carry_tick(FarmHelper *object) {
             harvest_obj_wait_walk(object, HARVEST_NEAR_PROXIMITY);
         }
     }
+#endif
 
     self = object;
     running = 1;
@@ -1399,6 +1414,11 @@ static s32 harvest_obj_carry_tick(FarmHelper *object) {
     return result;
 }
 
+#ifdef HMBTN_PORT
+/* PORT: keep the capture adapter local to its caller -- see docs/port/DECISIONS.md#adr-013 */
+#undef harvest_helper_arrive_or_wait
+#else
+#endif
 /* The steps of the place script. */
 enum HelperPlace {
     HELPER_PLACE_ENTER = 0,

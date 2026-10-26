@@ -6,15 +6,35 @@ your own copy of the disc, the whole disc image.
 
 ## Building
 
+The native port currently targets Windows first. To build and test its Phase 0
+foundation and initial source subset locally (not a playable game yet):
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File port/packaging/windows/build.ps1
+```
+
+This provisions project-local tools and requires no WSL or PSX SDK. No workflow/CI
+changes are included. See [port status](docs/port/ANALYSIS.md).
+
+For the original matching binaries:
+
+Build directly on a separate Linux x86-64 host, without containers.
+See [native setup and prerequisites](docs/port/NATIVE_BUILD.md). Supply your own
+PSY-Q 4.7 archive; SDK files and game data must remain outside version control.
+
 ```sh
-docker build -t hmbtn-build .
-docker run --rm --user "$(id -u):$(id -g)" -v "$PWD":/src:ro -v /tmp/hmbtn-build:/build \
-    -v /path/to/disc:/disc:ro hmbtn-build bash -c 'cmake -S /src -B /build -G Ninja \
-    -DORIGINAL_DISC=/disc/disc.bin && cmake --build /build --target check'
+PSYQ_ARCHIVE=/path/to/runtime-4.7.zip bash tools/setup-native.sh
+cmake -S . -B build/match -G Ninja
+cmake --build build/match --target check
 ```
 
 `check` compares every output with the original's SHA-1. Without `-DORIGINAL_DISC` it
 builds and checks only the 14 code binaries, which needs no game data.
+
+The separate native port is in Phase 0. Its presets live in `port/` and currently
+build the compatibility layer and eleven source units, including the archived game
+entry point and A_FILE reader. No playable game executable is linked yet. See
+[reconnaissance and outstanding gates](docs/port/ANALYSIS.md).
 
 ## Exceptions
 

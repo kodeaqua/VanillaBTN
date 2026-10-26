@@ -37,7 +37,12 @@ void anim_bind_file(AnimState *state, AnimFile *file) {
     u32 caller;
 
     SAVE_RETURN_ADDRESS(&caller);
+#ifdef HMBTN_PORT
+    /* PORT: check alignment without pointer truncation — see docs/port/DECISIONS.md#adr-010 */
+    if (((uintptr_t)file & 3) != 0) {
+#else
     if ((u32)file != ((u32)file >> 2) << 2) {
+#endif
         ANI_FAIL();
     }
     if (file->magic != ANI_MAGIC) {

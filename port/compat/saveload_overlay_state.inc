@@ -1,0 +1,52 @@
+/* Complete writable file-scope state inventory for this overlay.
+ * Audited with Clang AST; no function-local statics are present.
+ * Copy real objects individually so ASan global redzones stay enabled. */
+#include "overlay/registry.h"
+void hm_saveload_overlay_capture(void) {
+    static const hm_overlay_span spans[] = {
+        {&save_step, sizeof(save_step)},
+        {&save_step_prev, sizeof(save_step_prev)},
+        {&save_retry_flag, sizeof(save_retry_flag)},
+        {&save_confirm_cursor, sizeof(save_confirm_cursor)},
+        {&save_confirm_flag, sizeof(save_confirm_flag)},
+        {&save_card_index, sizeof(save_card_index)},
+        {&save_probe_result, sizeof(save_probe_result)},
+        {&save_slot, sizeof(save_slot)},
+        {&saveload_unused_80137590, sizeof(saveload_unused_80137590)},
+        {&save_card_status, sizeof(save_card_status)},
+        {&save_retry_count, sizeof(save_retry_count)},
+        {&save_menu_index, sizeof(save_menu_index)},
+        {&save_format_state, sizeof(save_format_state)},
+        {&save_panel_row, sizeof(save_panel_row)},
+        {&save_first_row, sizeof(save_first_row)},
+        {&save_cursor_row, sizeof(save_cursor_row)},
+        {&save_transfer_count, sizeof(save_transfer_count)},
+        {&save_slot_digits, sizeof(save_slot_digits)},
+        {&save_icon_offsets, sizeof(save_icon_offsets)},
+        {&save_slot_row_starts, sizeof(save_slot_row_starts)},
+        {&save_page_positions, sizeof(save_page_positions)},
+        {&save_cursor_frames, sizeof(save_cursor_frames)},
+        {&save_date_text, sizeof(save_date_text)},
+        {&save_slot_text, sizeof(save_slot_text)},
+        {&save_block_text, sizeof(save_block_text)},
+        {&save_image, sizeof(save_image)},
+        {&save_slot_records, sizeof(save_slot_records)},
+        {&saveload_unused_801377A0, sizeof(saveload_unused_801377A0)},
+        {&save_slot_status, sizeof(save_slot_status)},
+        {&save_icon_base, sizeof(save_icon_base)},
+        {&save_file_name_buf, sizeof(save_file_name_buf)},
+        {&save_name_line, sizeof(save_name_line)},
+        {&save_header, sizeof(save_header)},
+        {&save_entries, sizeof(save_entries)},
+        {&save_work_table, sizeof(save_work_table)},
+        {&save_out_buffer, sizeof(save_out_buffer)},
+        {&save_sheet, sizeof(save_sheet)},
+        {&save_sprites, sizeof(save_sprites)},
+        {&saveload_unused_80145760, sizeof(saveload_unused_80145760)},
+        {&save_season_names, sizeof(save_season_names)},
+        {&save_sprite_offsets, sizeof(save_sprite_offsets)},
+        {&save_card_file_names, sizeof(save_card_file_names)},
+        {&hm_save_workspace, sizeof(hm_save_workspace)},
+    };
+    hm_overlay_capture(15, spans, sizeof(spans) / sizeof(spans[0]));
+}

@@ -974,8 +974,16 @@ static void farm_roll_stray_dogs(void) {
 /* Is a dead farm item of a kind `kind` selects? `kind` bit 1 matches items that died of age, bit 2
  * the others. `mode` picks the tables: bit 4 the chickens, and bits 1 and 2 the livestock (bit 2
  * for records with ACTOR_FLAG_BIT16, bit 1 for the rest). */
+#ifdef HMBTN_PORT
+/* PORT: Clang requires file-scoped helpers -- see docs/port/DECISIONS.md#adr-013 */
+#include "compat/nested/animals.inc"
+#else
+#endif
 s32 farm_kind_selected(s32 mode, u32 kind)
 {
+#ifdef HMBTN_PORT
+    /* PORT: helper is file-scoped in the native adapter -- see docs/port/DECISIONS.md#adr-013 */
+#else
     s32 farm_kind_matches_flags(FarmActor *object, u32 kind)
     {
         u32 flags;
@@ -993,6 +1001,7 @@ s32 farm_kind_selected(s32 mode, u32 kind)
         }
         return 0;
     }
+#endif
 
     s32 i;
 
@@ -1309,6 +1318,9 @@ static u16 farm_move_compare_table[10] = {
 /* Compare both coordinate pairs three ways and look the pair up in the table. */
 static u16 farm_move_table_lookup(FarmActor *state)
 {
+#ifdef HMBTN_PORT
+    /* PORT: helper is file-scoped in the native adapter -- see docs/port/DECISIONS.md#adr-013 */
+#else
     s32 farm_move_compare(s32 a, s32 b)
     {
         if (a == b) {
@@ -1319,6 +1331,7 @@ static u16 farm_move_table_lookup(FarmActor *state)
         }
         return 2;
     }
+#endif
 
     s32 first;
     s32 second;
@@ -1968,6 +1981,9 @@ static u16 farm_heading_table[10] = {
  * both axes, clear ACTOR_FLAG_APPROACHING_PLAYER (0x2000) and report 0 instead. */
 static u16 farm_heading_classify(FarmActor *state)
 {
+#ifdef HMBTN_PORT
+    /* PORT: helper is file-scoped in the native adapter -- see docs/port/DECISIONS.md#adr-013 */
+#else
     s32 farm_heading_compare(s32 a, s32 b)
     {
         if (a == b) {
@@ -1978,6 +1994,7 @@ static u16 farm_heading_classify(FarmActor *state)
         }
         return 2;
     }
+#endif
 
     s32 x1;
     s32 y1;

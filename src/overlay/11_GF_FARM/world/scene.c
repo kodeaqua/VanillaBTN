@@ -288,7 +288,13 @@ s32 scene_resolve_selection(s32 selection)
     {
         selection = game_state.progress.estate.barnLevel * 4 + game_state.progress.clock.date.season + BARN_SCENE_BASE;
     }
+#ifdef HMBTN_PORT
+    /* PORT: no previous area exists on first entry; native address zero is
+     * unmapped - see docs/port/DECISIONS.md#adr-031. */
+    if (farm_area.mode.data && farm_area.mode.data->head.place.value == PLACE_MINE_43)
+#else
     if (farm_area.mode.data->head.place.value == PLACE_MINE_43)
+#endif
     {
         if (event_flag_get(EVENT_FLAG_MINE_NEXT_LAYER) == 0 && farm_area.mode.data->head.place.location == PLACE_44)
         {
@@ -299,7 +305,12 @@ s32 scene_resolve_selection(s32 selection)
             selection = game_state.progress.clock.date.season + MINE_43_SCENE_BASE;
         }
     }
+#ifdef HMBTN_PORT
+    /* PORT: retain the loaded-area path without reading address zero. */
+    if (farm_area.mode.data && farm_area.mode.data->head.place.value == PLACE_MINE)
+#else
     if (farm_area.mode.data->head.place.value == PLACE_MINE)
+#endif
     {
         if (event_flag_get(EVENT_FLAG_MINE_NEXT_LAYER) == 0 && farm_area.mode.data->head.place.location == PLACE_38)
         {
@@ -856,11 +867,19 @@ static void scene_assign_slots(void)
 /* Pass the hidden flag around the three slot entries. The first stage waits until
  * the item is shipped; then each slot counts up to its limit and hands the flag on.
  * The last stage clears the shipped flag when it completes. */
+#ifdef HMBTN_PORT
+/* PORT: Clang requires file-scoped helpers -- see docs/port/DECISIONS.md#adr-013 */
+#include "compat/nested/scene.inc"
+#else
+#endif
 static void scene_flag_stage_tick(void)
 {
     /* Count one step on `owner`'s counter; when it reaches its limit, reset both
      * counters, hide `owner`, show `other`, record `nextStage` as the next stage and
      * return 1. */
+#ifdef HMBTN_PORT
+    /* PORT: helper is file-scoped in the native adapter -- see docs/port/DECISIONS.md#adr-013 */
+#else
     s32 scene_slot_handoff_step(FarmSceneModel * owner, FarmSceneModel * other, s32 nextStage)
     {
         FarmMorph *counter;
@@ -878,6 +897,7 @@ static void scene_flag_stage_tick(void)
         scene_flag_stage = nextStage;
         return 1;
     }
+#endif
 
     FarmSceneModel *slot0 = scene_slot_entries[0];
     u32 stage;
@@ -1262,8 +1282,17 @@ static void scene_slot_flag_move(void)
             }
         }
     }
+#ifdef HMBTN_PORT
+    /* PORT: areas without spouse markers have no objects to update; do not
+     * write to native address zero - see docs/port/DECISIONS.md#adr-032. */
+    if (scene_marked_entries[0])
+        scene_marked_entries[0]->flags &= ~SCENE_ENTRY_HIDDEN;
+    if (scene_marked_entries[1])
+        scene_marked_entries[1]->flags |= SCENE_ENTRY_HIDDEN;
+#else
     scene_marked_entries[0]->flags &= ~SCENE_ENTRY_HIDDEN;
     scene_marked_entries[1]->flags |= SCENE_ENTRY_HIDDEN;
+#endif
 }
 
 /* Show the marked entry for the spouse's place: entry 1 when the spouse is at home,
