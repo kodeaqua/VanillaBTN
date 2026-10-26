@@ -5,6 +5,10 @@
 #include "types.h"
 #include "anim.h"
 #include "texture_pack.h"
+#ifdef HMBTN_PORT
+/* PORT: native asset diagnostics - see docs/port/DECISIONS.md#adr-067 */
+#include "psx/error.h"
+#endif
 
 static void texture_pack_upload(void *pack, s16 x, s16 y, s16 altX, s16 altY, s32 mode);
 
@@ -195,6 +199,11 @@ static void texture_pack_upload(void *pack, s16 x, s16 y, s16 altX, s16 altY, s3
  * control byte -n copies n literal bytes, a positive n repeats the next byte n
  * times. Returns 0 when `bank` is not an image bank. */
 s32 image_bank_upload(void *bank, u8 *buffer, u16 index, s16 x, s16 y) {
+#ifdef HMBTN_PORT
+    /* PORT: reject missing image data explicitly - see docs/port/DECISIONS.md#adr-067 */
+    if (!bank)
+        hm_runtime_error("image_bank_upload", "null image bank");
+#endif
     ImageBank *header = bank;
     BankImage *image;
     RECT rect;
@@ -217,6 +226,11 @@ s32 image_bank_upload(void *bank, u8 *buffer, u16 index, s16 x, s16 y) {
     if (header->type != 0xD) {
         return 0;
     }
+#ifdef HMBTN_PORT
+    /* PORT: prevent an uninitialized rectangle for an absent image - see docs/port/DECISIONS.md#adr-067 */
+    if (index >= header->count)
+        hm_runtime_error("image_bank_upload", "image index outside bank");
+#endif
     count = header->count;
     bank = header->images;
     for (i = 0; i < count; i++) {
