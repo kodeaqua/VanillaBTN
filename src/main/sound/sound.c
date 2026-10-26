@@ -426,7 +426,12 @@ s32 sound_update(void) {
 
     sentinel = -1;
     for (i = 0; i < 6; i++) {
+#ifdef HMBTN_PORT
+        /* PORT: compare full native pointers - see docs/port/DECISIONS.md#adr-067 */
+        if (seq_data[i] != SOUND_BUFFER_NONE && *(s32 *)&seq_slots[i] == sentinel) {
+#else
         if ((s32)seq_data[i] != sentinel && *(s32 *)&seq_slots[i] == sentinel) {
+#endif
             *(s32 *)&seq_slots[i] = SsSeqOpen((u_long *)seq_data[i], seq_vabs[i]);
         }
     }
