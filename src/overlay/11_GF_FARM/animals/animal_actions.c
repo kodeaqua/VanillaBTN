@@ -180,13 +180,23 @@ void farm_action_set_countdown(s32 step, s32 start_value) {
 
 /* Zero an actor record, which frees its slot. */
 void farm_action_clear(void *arg) {
+#ifdef HMBTN_PORT
+    /* PORT: full native action size - see docs/port/DECISIONS.md#adr-058 */
+    memset(arg, 0, sizeof(FarmAction));
+#else
     memset(arg, 0, 0xB0);
+#endif
     *(s16 *)arg = 0;
 }
 
 /* Pick a random slot and discard it. */
 s32 farm_action_pick_slot(u16 arg) {
+#ifdef HMBTN_PORT
+    /* PORT: retain the callee result - see docs/port/DECISIONS.md#adr-058 */
+    return farm_pick_random_slot(arg);
+#else
     farm_pick_random_slot(arg);
+#endif
 }
 
 /* Event 0x15B: when clock_is_pending reports 1, estateFlags has ESTATE_FLAG_DOG_WALK and
@@ -672,12 +682,22 @@ static s32 farm_pick_random_slot(u16 mode)
         large_offset = 0;
         do {
             if (mode == 0) {
+#ifdef HMBTN_PORT
+                /* PORT: native pointer width - see docs/port/DECISIONS.md#adr-058 */
+                record = (FarmRecordHead *)((u8 *)large + large_offset);
+#else
                 record = (FarmRecordHead *)(large_offset + (s32)large);
+#endif
                 if ((record->flags & mask) != 0 || record->location != wanted) {
                     goto next;
                 }
             } else {
+#ifdef HMBTN_PORT
+                /* PORT: native pointer width - see docs/port/DECISIONS.md#adr-058 */
+                record = (FarmRecordHead *)((u8 *)small + small_offset);
+#else
                 record = (FarmRecordHead *)(small_offset + (s32)small);
+#endif
                 if ((record->flags & mask) != 0 || record->location != wanted) {
                     goto next;
                 }

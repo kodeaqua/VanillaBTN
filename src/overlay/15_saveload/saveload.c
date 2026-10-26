@@ -1,3 +1,8 @@
+#ifdef HMBTN_PORT
+/* PORT: fixed-width save payload - see docs/port/DECISIONS.md#adr-059 */
+#include "compat/save_codec.h"
+#include "psx/error.h"
+#endif
 /* The save/load screens: choosing a slot, saving and loading the farm to the memory card. */
 
 #include <sys/types.h>
@@ -3619,6 +3624,12 @@ static void save_slot_record_fill(s16 slot)
  * image at save_image_data. */
 static void save_pack_farm_state(void)
 {
+#ifdef HMBTN_PORT
+    /* PORT: named native fields, fixed wire spans - see docs/port/DECISIONS.md#adr-059 */
+    save_image = save_image_data;
+    if (!hm_save_encode(save_image_data, sizeof(save_image_data), &game_state))
+        hm_runtime_error("save_pack_farm_state", "invalid save payload or unbound estate records");
+#else
     s32 i;
 
     save_image = save_image_data;
@@ -3675,6 +3686,7 @@ static void save_pack_farm_state(void)
         SAVE_FILE->slots.livestock[i].actor.sprite.source = 0;
     }
     memset(SAVE_FILE->slots.extraChickens, 0, sizeof(SAVE_FILE->slots.extraChickens));
+#endif
 }
 #undef SAVE_FILE
 #undef PACK_800742EC
@@ -3697,6 +3709,12 @@ static void save_pack_farm_state(void)
 /* Copy the loaded save image into the live game state and the saved-progress block. */
 static void save_unpack_farm_state(void)
 {
+#ifdef HMBTN_PORT
+    /* PORT: named native fields, fixed wire spans - see docs/port/DECISIONS.md#adr-059 */
+    save_image = save_image_data;
+    if (!hm_save_decode(save_image_data, sizeof(save_image_data), &game_state))
+        hm_runtime_error("save_unpack_farm_state", "invalid save payload or unbound estate records");
+#else
     s32 i;
 
     save_image = save_image_data;
@@ -3744,6 +3762,7 @@ static void save_unpack_farm_state(void)
     *(Block34 *)&game_state.family.addressMode = SAVE_IMAGE->family;
     *(BlockC *)&game_state.ending.route = SAVE_IMAGE->ending.endingHead;
     *(BlockC *)&game_state.ending.tracks = SAVE_IMAGE->ending.endingTracks;
+#endif
 }
 #undef SAVE_IMAGE
 #undef SAVED_PROGRESS

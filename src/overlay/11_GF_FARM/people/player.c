@@ -3417,7 +3417,12 @@ static s32 player_confirm_action(FarmPlayer *player, s32 buttons)
     {
         return 0;
     }
+#ifdef HMBTN_PORT
+    /* PORT: forward the native player argument - see docs/port/DECISIONS.md#adr-060 */
+    if (player_advance_state(player))
+#else
     if (((s32 (*)())player_advance_state)())
+#endif
     {
         return 1;
     }
