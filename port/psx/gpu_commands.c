@@ -1,4 +1,5 @@
 #include "gfx/frame_events.h"
+#include "gfx/replay_sink.h"
 #include "psx/error.h"
 #include "psx/gpu_environment.h"
 #include "psx/gpu_links.h"
@@ -153,8 +154,12 @@ static u32 hm_gpu_command(const u32 *words, u32 available) {
 void hm_gpu_execute_words(const u32 *words, u32 count) {
     if (!words && count)
         hm_runtime_error("hm_gpu_execute_words", "null command array");
-    for (u32 at = 0; at < count;)
-        at += hm_gpu_command(words + at, count - at);
+    for (u32 at = 0; at < count;) {
+        hm_replay_command(words + at, count - at, 0);
+        u32 length = hm_gpu_command(words + at, count - at);
+        hm_replay_command(words + at, length, 1);
+        at += length;
+    }
 }
 void DrawOTag(u32 *table) {
     if (!table || ((uintptr_t)table & 3))

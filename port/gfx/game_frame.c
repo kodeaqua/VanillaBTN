@@ -13,6 +13,7 @@ hm_render_frame hm_game_render_frame(void) {
     if (!current_frame)
         return frame;
     frame.tick = hm_timing_ticks();
+    frame.bypass = !main_put_env_enabled || loading_screen_is_active();
     frame.key = ((u64)(u16)main_scene << 48) | ((u64)(u16)farm_area.mode.area << 32) |
                 ((u64)(u16)farm_area.mode.place.value << 16) | (u16)farm_area.mode.place.location;
     frame.eligible = main_put_env_enabled && scene_frame_handler == farm_enter_dispatch &&

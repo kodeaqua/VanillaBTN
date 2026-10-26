@@ -13,7 +13,7 @@ The owner requested the native pause interface and graphics settings on
 | VSync | On (mailbox/FIFO) or supported immediate Off; device validation pending |
 | FPS limit | Native (30), Off (Unlimited), or monitor-derived rational caps; fixed 60 Hz game ticks; native images unless optional interpolation is enabled |
 | Visual interpolation | Optional private primitive replay for normal farm views; synthetic checks pass, owner gameplay validation pending |
-| Enhance Scaling | OFF; native higher-resolution scene renderer pending |
+| Enhance Scaling | Optional viewport-resolution software primitive replay; default OFF, synthetic tests pass, owner device/gameplay checks pending |
 | Widescreen Mode | OFF path uses centered 4:3 and black bars; expanded camera/culling ON path pending |
 | FXAA/MSAA | OFF; renderer paths pending |
 
@@ -38,10 +38,18 @@ Enable Interpolation and choose a higher FPS Limit in Graphics. Positions are
 interpolated through private GPU command replay, without extra game updates or
 image crossfading. Initial scope is normal farm views; unmatched primitives,
 loading, transitions and other contexts retain native cadence. See
-port/enhance/interpolation/README.md. Scaling, widescreen ON and AA remain pending.
+port/enhance/interpolation/README.md. Widescreen ON and AA remain pending.
 
 FPS Limit Off removes the software presentation cap (ADR-051). VSync On still
 synchronizes to the active monitor; Native remains the default. A synthetic
 regression verifies 600000 visual attempts do not add hardware/game ticks.
 The pause backdrop also receives a 40% black overlay; original dialog/text
 remain fully bright, and native VRAM is unchanged.
+
+Enhance Scaling now has a private viewport-resolution raster path (ADR-052).
+Windows -Game compiles HMBTN_ENH_SCALING; enhance.scaling defaults false. The
+initial implementation rerasterizes triangles/quads at viewport size, preserving
+original texture assets and 4:3 bars. The CPU target supports up to 4096 per axis
+with native fallback. Per-texture filtering and GPU scene rasterization remain
+pending; high FPS at high resolutions is not established. See
+port/enhance/scaling/README.md and the synthetic measurements in PLATFORMS.md.

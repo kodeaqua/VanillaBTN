@@ -17,6 +17,7 @@ try {
         $configureArgs += '-DHMBTN_BUILD_NATIVE_WINDOW=ON'
         $configureArgs += '-DHMBTN_ENH_PAUSE_MENU=ON'
         $configureArgs += '-DHMBTN_ENH_INTERPOLATION=ON'
+        $configureArgs += '-DHMBTN_ENH_SCALING=ON'
     }
     & cmake @configureArgs
     if ($LASTEXITCODE -ne 0) { throw 'Windows configure failed' }

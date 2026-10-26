@@ -13,6 +13,7 @@ typedef struct {
  * context. NULL selects the normal native VRAM. */
 hm_vram_context *hm_vram_bind(hm_vram_context *context);
 void hm_vram_snapshot(hm_vram_context *destination);
+const hm_vram_context *hm_vram_state(void);
 void hm_vram_reset(void);
 u16 hm_vram_pixel(u32 x, u32 y);
 void hm_vram_draw_pixel(u32 x, u32 y, u16 value);

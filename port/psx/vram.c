@@ -5,6 +5,7 @@
 
 static hm_vram_context hm_default_vram;
 static hm_vram_context *hm_context = &hm_default_vram;
+const hm_vram_context *hm_vram_state(void) { return hm_context; }
 #define hm_vram (hm_context->pixels)
 #define hm_dirty (hm_context->dirty)
 #define hm_set_mask (hm_context->set_mask)

@@ -7,6 +7,7 @@ option(HMBTN_BUILD_GPU_SPIKE "Build the local SDL_GPU presentation validation" O
 option(HMBTN_BUILD_NATIVE_WINDOW "Build the native game window bring-up target" OFF)
 option(HMBTN_ENH_PAUSE_MENU "Build the owner-requested native pause menu" OFF)
 option(HMBTN_ENH_INTERPOLATION "Build opt-in visual world interpolation" OFF)
+option(HMBTN_ENH_SCALING "Build opt-in viewport-resolution rasterization" OFF)
 
 if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(FATAL_ERROR "Only 64-bit native targets are supported")
@@ -72,6 +73,7 @@ set_source_files_properties(../src/main/main.c PROPERTIES COMPILE_DEFINITIONS
     "main=hm_game_main;PutDrawEnv=hm_game_put_draw_env;DrawOTag=hm_game_draw_ot")
 
 add_library(hmbtn_psx_initial STATIC
+    gfx/replay_sink.c
     psx/xa_decode.c psx/card_store.c
     psx/gte_rotation.c
     psx/unimplemented.c psx/gte_vectors.c psx/gte_runtime.c psx/gs_lighting.c psx/trig.c psx/timing.c psx/sound_control.c psx/spu_decode.c psx/spu_voice.c psx/cd_position.c psx/cd_runtime.c
@@ -82,6 +84,19 @@ target_include_directories(hmbtn_psx_initial PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}
 add_library(hmbtn_disc STATIC psx/disc.c psx/sha1.c)
 target_link_libraries(hmbtn_disc PUBLIC hmbtn_port_options)
 target_link_libraries(hmbtn_psx_initial PUBLIC hmbtn_disc)
+if(HMBTN_ENH_SCALING)
+    add_library(hmbtn_scaling STATIC enhance/scaling/scaling.c enhance/scaling/raster.c)
+    target_link_libraries(hmbtn_scaling PUBLIC hmbtn_psx_initial)
+    if(BUILD_TESTING)
+        add_executable(hmbtn_scaling_test tests/scaling.c)
+        target_link_libraries(hmbtn_scaling_test PRIVATE hmbtn_scaling)
+        if(HMBTN_ENH_INTERPOLATION)
+            target_link_libraries(hmbtn_scaling_test PRIVATE hmbtn_interpolation)
+            target_compile_definitions(hmbtn_scaling_test PRIVATE TEST_INTERPOLATION=1)
+        endif()
+        add_test(NAME enhance.scaling COMMAND hmbtn_scaling_test)
+    endif()
+endif()
 if(HMBTN_ENH_INTERPOLATION)
     add_library(hmbtn_interpolation STATIC enhance/interpolation/interpolation.c)
     target_link_libraries(hmbtn_interpolation PUBLIC hmbtn_psx_initial)
@@ -124,6 +139,10 @@ if(HMBTN_BUILD_GPU_SPIKE OR HMBTN_BUILD_NATIVE_WINDOW)
         target_link_libraries(hmbtn_native PRIVATE hmbtn_game_initial hmbtn_psx_pending SDL3::SDL3)
         target_link_libraries(hmbtn_native PRIVATE hmbtn_settings_json)
         target_link_libraries(hmbtn_native PRIVATE hmbtn_presentation_clock)
+        if(HMBTN_ENH_SCALING)
+            target_compile_definitions(hmbtn_native PRIVATE HMBTN_ENH_SCALING=1)
+            target_link_libraries(hmbtn_native PRIVATE hmbtn_scaling)
+        endif()
         if(HMBTN_ENH_INTERPOLATION)
             target_compile_definitions(hmbtn_native PRIVATE HMBTN_ENH_INTERPOLATION=1)
             target_link_libraries(hmbtn_native PRIVATE hmbtn_interpolation)

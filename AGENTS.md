@@ -38,6 +38,11 @@ override this one for their subtree.
   enhance.interpolation defaults OFF. This does not authorize accelerating
   simulation or claiming pending renderer enhancements are complete.
 
+- The owner prioritizes requested graphics work before the pending sleep/save
+  crash. Windows -Game also compiles Enhance Scaling; enhance.scaling defaults
+  OFF. Preserve the 4:3 viewport until a real widescreen camera path exists.
+  Report CPU raster performance and untested gameplay/device behavior plainly.
+
 These explicit owner decisions override conflicting roadmap, CI skeleton,
 workflow, and definition-of-done requirements below.
 

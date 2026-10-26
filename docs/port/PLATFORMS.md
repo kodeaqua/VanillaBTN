@@ -8,8 +8,8 @@ Full playthrough and broader gameplay remain unverified; see WINDOWS_PLAYTEST.md
 | Target | Foundation preset | Validation |
 | --- | --- | --- |
 | Linux x86-64 | linux-release, linux-asan-ubsan | Deferred; requires a separate Linux host, no WSL |
-| Windows x86-64 | windows-release | All 113 original source units and native window build; tests passed (76/76 with -Game) |
-| Windows x86-64 sanitizers | windows-asan-ubsan | All source units and native window build; Clang 20.1.8 ASan/UBSan tests passed (76/76 with pause and interpolation compiled); gameplay coverage remains limited |
+| Windows x86-64 | windows-release | All 113 original source units and native window build; tests passed (77/77 with -Game) |
+| Windows x86-64 sanitizers | windows-asan-ubsan | All source units and native window build; Clang 20.1.8 ASan/UBSan tests passed (77/77 with pause, interpolation and scaling compiled); gameplay coverage remains limited |
 | macOS universal | macos-universal-release | Pending; no macOS host tested |
 | Android arm64 | Pending NDK and minSdk selection | No device/build validation |
 
@@ -145,3 +145,34 @@ pause appearance remain owner checks. The active owner release process was
 left running, and the final release link was written separately to
 build/port/windows-pause-preview/hmbtn_native.exe because Windows locks its
 running executable. Rebuild after closing the game to update windows-release.
+
+## Viewport-resolution scaling validation
+
+Date: 2026-10-26. Release and ASan/UBSan pass 77/77 isolated tests with scaling,
+interpolation and pause compiled. The release executable was rebuilt after the
+owner closed the previous process; the earlier locked-executable note is
+historical. Feature-OFF and scaling-ON/interpolation-OFF native targets also
+link. No game/window/replay was launched. Other platforms and actual display
+resource replacement remain untested. The software target is capped at 4096
+per axis; allocation failure visibly falls back to native rendering.
+
+Host: AMD Ryzen 5 4500, Windows x86-64, Clang 20.1.8 release (-O2, x86-64-v2).
+Tool: hmbtn_scaling_test --benchmark, C clock(), 50 warm passes per size.
+One flat triangle spans much of a synthetic 16x16 logical area transformed to
+the output dimensions. Private native command execution is included, but this
+is not a game scene, textured workload, GPU frame or full port overhead.
+
+| Output | Initial implementation | After mapping/flat-color changes, three runs |
+| --- | --- | --- |
+| 320x240 | 1.080 ms | 0.280 / 0.300 / 0.300 ms |
+| 640x480 | 4.340 ms | 1.140 / 1.140 / 1.160 ms |
+| 1440x1080 | 22.000 ms | 5.800 / 5.860 / 5.780 ms |
+
+The initial measurements exposed repeated per-pixel coordinate division and
+constant-color interpolation. Mapping tables and a constant-color branch avoid
+that work; supported 1x raster comparisons remain exact. These coarse warm
+measurements show only this synthetic cost reduction, not achieved gameplay FPS
+or representative headroom. Texturing, overdraw and interpolation can cost
+substantially more. Repeated non-interpolated scanouts are cached. A GPU scene
+raster path remains the next performance step before claiming high-resolution
+high-FPS support.

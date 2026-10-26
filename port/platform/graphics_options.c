@@ -1,3 +1,6 @@
+#ifdef HMBTN_ENH_SCALING
+#include "enhance/scaling/scaling.h"
+#endif
 #include "platform/graphics_options.h"
 #include "platform/settings_json.h"
 #include "platform/user_data.h"
@@ -44,6 +47,14 @@ void hm_graphics_load(hm_graphics_options *o) {
         value_length == 4 && !SDL_memcmp(value, "true", 4))
         o->interpolation = 1;
 #endif
+#ifdef HMBTN_ENH_SCALING
+    const char *scale_value;
+    size_t scale_length;
+    if (bytes >= 0 && hm_json_property(text, (size_t)bytes, "enhance", &object, &length) == 1 &&
+        hm_json_property(object, length, "scaling", &scale_value, &scale_length) == 1 &&
+        scale_length == 4 && !SDL_memcmp(scale_value, "true", 4))
+        o->scaling = 1;
+#endif
     SDL_free(text);
     hm_validate_rate(o);
 }
@@ -54,9 +65,17 @@ int hm_graphics_save(const hm_graphics_options *o) {
                  "\"vsync\":%d,\"fps_numerator\":%d,\"fps_denominator\":%d}",
                  o->monitor, o->mode, o->width, o->height, o->linear, o->vsync, o->fps_numerator,
                  o->fps_denominator);
-    return hm_user_data_set_setting("graphics", json) &&
-           hm_user_data_set_nested_setting("enhance", "interpolation",
-                                           o->interpolation ? "true" : "false");
+    int ok = hm_user_data_set_setting("graphics", json);
+#ifdef HMBTN_ENH_INTERPOLATION
+    if (ok)
+        ok = hm_user_data_set_nested_setting("enhance", "interpolation",
+                                             o->interpolation ? "true" : "false");
+#endif
+#ifdef HMBTN_ENH_SCALING
+    if (ok)
+        ok = hm_user_data_set_nested_setting("enhance", "scaling", o->scaling ? "true" : "false");
+#endif
+    return ok;
 }
 int hm_pause_config_enabled(void) {
     int enabled = 1; /* The owner requests ESC throughout the native game. */
@@ -287,6 +306,13 @@ int hm_graphics_change(SDL_GPUDevice *device, SDL_Window *window, hm_graphics_op
         candidate.width = widths[current];
         candidate.height = heights[current];
     }
+#ifdef HMBTN_ENH_SCALING
+    else if (item == 3) {
+        candidate.scaling = !candidate.scaling;
+        if (!hm_scaling_enable(candidate.scaling))
+            return 0;
+    }
+#endif
 #ifdef HMBTN_ENH_INTERPOLATION
     else if (item == 9) {
         candidate.interpolation = !candidate.interpolation;
@@ -325,7 +351,10 @@ void hm_graphics_value(const hm_graphics_options *o, int item, char *text, size_
         const SDL_DisplayMode *desktop = SDL_GetDesktopDisplayMode(hm_display(o->monitor));
         SDL_snprintf(text, capacity, "%d x %d", o->mode == 2 && desktop ? desktop->w : o->width,
                      o->mode == 2 && desktop ? desktop->h : o->height);
-    } else if (item == 7)
+    } else if (item == 3)
+        SDL_snprintf(text, capacity, "%s",
+                     o->scaling ? "On - viewport resolution" : "Off - PS1 resolution");
+    else if (item == 7)
         SDL_snprintf(text, capacity, "%s",
                      o->vsync ? "On - synchronized display" : "Off - tearing possible");
     else if (item == 8) {
@@ -357,6 +386,8 @@ void hm_graphics_row_value(const hm_graphics_options *o, int item, char *text, s
         SDL_snprintf(text, capacity, "%s", names[o->mode]);
     } else if (item == 2)
         hm_graphics_value(o, item, text, capacity);
+    else if (item == 3)
+        SDL_snprintf(text, capacity, "%s", o->scaling ? "On" : "Off");
     else if (item == 7)
         SDL_snprintf(text, capacity, "%s", o->vsync ? "On" : "Off");
     else if (item == 8) {

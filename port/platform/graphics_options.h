@@ -3,7 +3,7 @@
 #include "platform/presentation_clock.h"
 #include <SDL3/SDL.h>
 typedef struct {
-    int monitor, mode, width, height, linear, vsync, interpolation;
+    int monitor, mode, width, height, linear, vsync, interpolation, scaling;
     int fps_numerator, fps_denominator; /* 0 = Native (30); -1 = Off (Unlimited). */
 } hm_graphics_options;
 void hm_graphics_defaults(hm_graphics_options *options);

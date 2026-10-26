@@ -1,3 +1,7 @@
+#ifdef HMBTN_ENH_SCALING
+#include "enhance/scaling/scaling.h"
+#include "gfx/game_frame.h"
+#endif
 #ifdef HMBTN_ENH_INTERPOLATION
 #include "enhance/interpolation/interpolation.h"
 #include "gfx/game_frame.h"
@@ -25,6 +29,7 @@ static SDL_Window *hm_window;
 static SDL_GPUDevice *hm_device;
 static SDL_GPUTexture *hm_texture;
 static SDL_GPUTransferBuffer *hm_upload;
+static u32 hm_image_width, hm_image_height, hm_upload_bytes;
 static Uint64 hm_start;
 static hm_input_replay hm_replay;
 static int hm_replay_enabled;
@@ -37,13 +42,85 @@ static int hm_ignore_held;
 static int hm_pause_enabled;
 static u8 hm_pause_background[320 * 240 * 4];
 #endif
-enum { HM_SCAN_WIDTH = 1024, HM_SCAN_HEIGHT = 512, HM_SCAN_BYTES = 1024 * 512 * 4 };
+enum { HM_SCAN_WIDTH = 1024, HM_SCAN_HEIGHT = 512 };
 
 static void hm_host_fail(void) {
     fprintf(stderr, "Native window: %s\n", SDL_GetError());
     hm_game_host_stop();
     exit(1);
 }
+
+/* Texture bounds match the image so linear sampling cannot bleed from a stale
+ * border. Transfer capacity only grows; SDL defers released queued resources. */
+static int hm_host_image_size(u32 width, u32 height) {
+    if (hm_texture && width == hm_image_width && height == hm_image_height)
+        return 1;
+    if (!width || !height || width > 4096 || height > 4096)
+        return 0;
+    SDL_GPUTextureCreateInfo texture = {.type = SDL_GPU_TEXTURETYPE_2D,
+                                        .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
+                                        .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER,
+                                        .width = width,
+                                        .height = height,
+                                        .layer_count_or_depth = 1,
+                                        .num_levels = 1};
+    SDL_GPUTexture *image = SDL_CreateGPUTexture(hm_device, &texture);
+    if (!image)
+        return 0;
+    u32 bytes = width * height * 4;
+    SDL_GPUTransferBuffer *upload = hm_upload;
+    if (!upload || bytes > hm_upload_bytes) {
+        SDL_GPUTransferBufferCreateInfo transfer = {.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
+                                                    .size = bytes};
+        upload = SDL_CreateGPUTransferBuffer(hm_device, &transfer);
+        if (!upload) {
+            SDL_ReleaseGPUTexture(hm_device, image);
+            return 0;
+        }
+    }
+    if (hm_texture)
+        SDL_ReleaseGPUTexture(hm_device, hm_texture);
+    if (hm_upload && upload != hm_upload)
+        SDL_ReleaseGPUTransferBuffer(hm_device, hm_upload);
+    hm_texture = image;
+    hm_upload = upload;
+    hm_image_width = width;
+    hm_image_height = height;
+    if (bytes > hm_upload_bytes)
+        hm_upload_bytes = bytes;
+    return 1;
+}
+#ifdef HMBTN_ENH_SCALING
+static void hm_host_scaling_unavailable(void) {
+#ifdef HMBTN_ENH_PAUSE_MENU
+    hm_options.scaling = 0;
+#endif
+    hm_scaling_enable(0);
+    Uint64 before = SDL_GetTicksNS();
+    hm_audio_output_pause(1);
+    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Back to Nature",
+                             "Enhance Scaling could not allocate the render size (maximum 4096 per "
+                             "axis). Native rendering remains active.",
+                             hm_window);
+    hm_start += SDL_GetTicksNS() - before;
+    hm_audio_output_pause(0);
+}
+#ifdef HMBTN_ENH_PAUSE_MENU
+static int hm_host_scaling_prepare(void) {
+    int w, h;
+    if (!SDL_GetWindowSizeInPixels(hm_window, &w, &h) || w <= 0 || h <= 0)
+        return 0;
+    if ((u64)w * 3 > (u64)h * 4)
+        w = h * 4 / 3;
+    else
+        h = w * 3 / 4;
+    if (hm_scaling_prepare((u32)w, (u32)h))
+        return 1;
+    hm_host_scaling_unavailable();
+    return 0;
+}
+#endif
+#endif
 
 static hm_present_rate hm_host_present_rate(void) {
 #ifdef HMBTN_ENH_PAUSE_MENU
@@ -159,6 +236,8 @@ static void hm_host_pause(void) {
             }
             out[3] = 255;
         }
+    if (!hm_host_image_size(320, 240))
+        hm_host_fail();
     int running = 1;
     const char *notice = "";
     char value[128] = "";
@@ -259,12 +338,33 @@ static void hm_host_pause(void) {
 static void hm_host_present_scanout(u64 tick) {
     const hm_gpu_environment *state = hm_gpu_environment_state();
     const RECT *area = &state->display.disp;
+#if defined(HMBTN_ENH_SCALING) || defined(HMBTN_ENH_INTERPOLATION)
+    hm_render_frame live = hm_game_render_frame();
+#endif
+#ifdef HMBTN_ENH_SCALING
+    hm_scaled_view scaled = {0};
+    int scaling_active = 0;
+    hm_replay_sink previous_sink = {0};
+#if defined(HMBTN_ENH_PAUSE_MENU)
+    scaling_active = state->display_enabled && hm_options.scaling && hm_host_scaling_prepare();
+#endif
+    if (scaling_active)
+        previous_sink = hm_scaling_begin();
+#endif
 #ifdef HMBTN_ENH_INTERPOLATION
     hm_interpolated_view interpolated = {0};
-    hm_render_frame live = hm_game_render_frame();
     if (state->display_enabled &&
         hm_interpolation_render(SDL_GetTicksNS() - hm_start, &live, &interpolated))
         area = &interpolated.area;
+#endif
+#ifdef HMBTN_ENH_SCALING
+    if (scaling_active) {
+#ifdef HMBTN_ENH_INTERPOLATION
+        if (!interpolated.pixels)
+#endif
+            hm_scaling_replay(&live);
+        hm_scaling_end(previous_sink, &scaled);
+    }
 #endif
     if (SDL_getenv("HMBTN_TRACE_SCANOUT") && tick % 60 == 0) {
         fprintf(stderr, "Scanout tick %llu: enabled=%d area=%d,%d %dx%d\n",
@@ -277,19 +377,48 @@ static void hm_host_present_scanout(u64 tick) {
         SDL_SetError("unsupported display dimensions");
         hm_host_fail();
     }
+    u32 output_width = (u32)area->w, output_height = (u32)area->h;
+#ifdef HMBTN_ENH_SCALING
+    if (scaled.pixels) {
+        output_width = scaled.width;
+        output_height = scaled.height;
+    }
+#endif
+    if (!hm_host_image_size(output_width, output_height)) {
+#ifdef HMBTN_ENH_SCALING
+        if (scaled.pixels) {
+            hm_host_scaling_unavailable();
+            scaled = (hm_scaled_view){0};
+            output_width = (u32)area->w;
+            output_height = (u32)area->h;
+        }
+#endif
+        if (!hm_host_image_size(output_width, output_height))
+            hm_host_fail();
+    }
     u8 *pixels = SDL_MapGPUTransferBuffer(hm_device, hm_upload, true);
     if (!pixels)
         hm_host_fail();
-    for (u32 y = 0; y < (u32)area->h; ++y)
-        for (u32 x = 0; x < (u32)area->w; ++x) {
-            u16 color =
-                state->display_enabled ? hm_vram_pixel((u32)area->x + x, (u32)area->y + y) : 0;
+    for (u32 y = 0; y < output_height; ++y)
+        for (u32 x = 0; x < output_width; ++x) {
+            u16 color = 0;
+#ifdef HMBTN_ENH_SCALING
+            if (scaled.pixels)
+                color = scaled.pixels[(size_t)y * output_width + x];
+            else
+#endif
+                color =
+                    state->display_enabled ? hm_vram_pixel((u32)area->x + x, (u32)area->y + y) : 0;
 #ifdef HMBTN_ENH_INTERPOLATION
-            if (interpolated.pixels)
+            if (interpolated.pixels
+#ifdef HMBTN_ENH_SCALING
+                && !scaled.pixels
+#endif
+            )
                 color = interpolated
                             .pixels[((u32)area->y + y) * interpolated.stride + (u32)area->x + x];
 #endif
-            u8 *out = pixels + (y * (u32)area->w + x) * 4;
+            u8 *out = pixels + (y * output_width + x) * 4;
             for (u32 channel = 0; channel < 3; ++channel) {
                 u32 component = (color >> (channel * 5)) & 31;
                 out[channel] = (u8)((component << 3) | (component >> 2));
@@ -299,16 +428,17 @@ static void hm_host_present_scanout(u64 tick) {
     const char *capture = SDL_getenv("HMBTN_CAPTURE_FRAME");
     if (capture) {
         SDL_Surface *surface =
-            SDL_CreateSurfaceFrom(area->w, area->h, SDL_PIXELFORMAT_RGBA32, pixels, area->w * 4);
+            SDL_CreateSurfaceFrom((int)output_width, (int)output_height, SDL_PIXELFORMAT_RGBA32,
+                                  pixels, (int)output_width * 4);
         if (!surface || !SDL_SaveBMP(surface, capture))
             hm_host_fail();
         SDL_DestroySurface(surface);
     }
     SDL_UnmapGPUTransferBuffer(hm_device, hm_upload);
 #ifdef HMBTN_ENH_PAUSE_MENU
-    hm_host_submit((u32)area->w, (u32)area->h, hm_options.linear);
+    hm_host_submit(output_width, output_height, hm_options.linear);
 #else
-    hm_host_submit((u32)area->w, (u32)area->h, 0);
+    hm_host_submit(output_width, output_height, 0);
 #endif
 }
 
@@ -345,6 +475,8 @@ static void hm_host_tick(void *context, u64 tick) {
         if (hm_present_clock_due(&hm_presentation, now))
             hm_host_present_scanout(tick);
         now = SDL_GetTicksNS();
+        /* A recoverable display error can exclude modal time from the epoch. */
+        deadline = hm_start + tick * SDL_NS_PER_SECOND / 60;
         if (now >= deadline)
             break;
         Uint64 wake = hm_presentation.next_ns < deadline ? hm_presentation.next_ns : deadline;
@@ -411,18 +543,7 @@ int hm_game_host_start(hm_disc *disc) {
     if (!hm_window || !hm_device || !SDL_ClaimWindowForGPUDevice(hm_device, hm_window) ||
         !SDL_SetGPUAllowedFramesInFlight(hm_device, 2))
         return 0;
-    SDL_GPUTextureCreateInfo texture = {.type = SDL_GPU_TEXTURETYPE_2D,
-                                        .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
-                                        .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER,
-                                        .width = HM_SCAN_WIDTH,
-                                        .height = HM_SCAN_HEIGHT,
-                                        .layer_count_or_depth = 1,
-                                        .num_levels = 1};
-    hm_texture = SDL_CreateGPUTexture(hm_device, &texture);
-    SDL_GPUTransferBufferCreateInfo transfer = {.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
-                                                .size = HM_SCAN_BYTES};
-    hm_upload = SDL_CreateGPUTransferBuffer(hm_device, &transfer);
-    if (!hm_texture || !hm_upload)
+    if (!hm_host_image_size(HM_SCAN_WIDTH, HM_SCAN_HEIGHT))
         return 0;
     if (!hm_audio_output_start()) {
         fprintf(stderr, "Native audio: %s\n", SDL_GetError());
@@ -454,6 +575,12 @@ int hm_game_host_start(hm_disc *disc) {
         return 0;
     }
 #endif
+#if defined(HMBTN_ENH_SCALING) && defined(HMBTN_ENH_PAUSE_MENU)
+    if (!hm_scaling_enable(hm_options.scaling)) {
+        SDL_SetError("Cannot allocate scaling history");
+        return 0;
+    }
+#endif
     hm_start = SDL_GetTicksNS();
     hm_host_reset_presentation();
     hm_timing_reset((hm_timing_host){NULL, hm_host_tick, NULL});
@@ -463,6 +590,9 @@ int hm_game_host_start(hm_disc *disc) {
 }
 
 void hm_game_host_stop(void) {
+#ifdef HMBTN_ENH_SCALING
+    hm_scaling_enable(0);
+#endif
 #ifdef HMBTN_ENH_INTERPOLATION
     hm_interpolation_enable(0);
 #endif
@@ -483,6 +613,7 @@ void hm_game_host_stop(void) {
     hm_window = NULL;
     hm_upload = NULL;
     hm_texture = NULL;
+    hm_image_width = hm_image_height = hm_upload_bytes = 0;
     hm_user_data_stop();
     SDL_Quit();
 }

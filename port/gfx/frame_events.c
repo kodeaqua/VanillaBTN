@@ -1,23 +1,48 @@
 #include "gfx/frame_events.h"
-static hm_render_observer hm_observer;
-void hm_render_subscribe(hm_render_observer observer) { hm_observer = observer; }
+enum { OBSERVERS = 4 };
+static hm_render_observer observers[OBSERVERS];
+int hm_render_subscribe(hm_render_observer observer) {
+    if (!observer.context)
+        return 0;
+    for (int i = 0; i < OBSERVERS; ++i)
+        if (observers[i].context == observer.context) {
+            observers[i] = observer;
+            return 1;
+        }
+    for (int i = 0; i < OBSERVERS; ++i)
+        if (!observers[i].context) {
+            observers[i] = observer;
+            return 1;
+        }
+    return 0;
+}
+void hm_render_unsubscribe(void *context) {
+    for (int i = 0; i < OBSERVERS; ++i)
+        if (observers[i].context == context)
+            observers[i] = (hm_render_observer){0};
+}
 void hm_render_begin(const hm_render_frame *frame) {
-    if (hm_observer.begin)
-        hm_observer.begin(hm_observer.context, frame);
+    for (int i = 0; i < OBSERVERS; ++i)
+        if (observers[i].begin)
+            observers[i].begin(observers[i].context, frame);
 }
 void hm_render_group(int world) {
-    if (hm_observer.group)
-        hm_observer.group(hm_observer.context, world);
+    for (int i = 0; i < OBSERVERS; ++i)
+        if (observers[i].group)
+            observers[i].group(observers[i].context, world);
 }
 void hm_render_packet(const u32 *words, u32 count) {
-    if (hm_observer.packet)
-        hm_observer.packet(hm_observer.context, words, count);
+    for (int i = 0; i < OBSERVERS; ++i)
+        if (observers[i].packet)
+            observers[i].packet(observers[i].context, words, count);
 }
 void hm_render_end(void) {
-    if (hm_observer.end)
-        hm_observer.end(hm_observer.context);
+    for (int i = 0; i < OBSERVERS; ++i)
+        if (observers[i].end)
+            observers[i].end(observers[i].context);
 }
 void hm_render_invalidate(void) {
-    if (hm_observer.invalidate)
-        hm_observer.invalidate(hm_observer.context);
+    for (int i = 0; i < OBSERVERS; ++i)
+        if (observers[i].invalidate)
+            observers[i].invalidate(observers[i].context);
 }

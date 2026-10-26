@@ -52,11 +52,12 @@ Original normal game updates remain 30 Hz through VSync(2). Higher caps repeat
 native pictures unless optional Interpolation is enabled, without advancing
 game/RNG/audio faster. See ../interpolation/README.md for scope and limits. GPU/OS stalls and achieved FPS remain owner hardware tests.
 
-The Graphics menu lists Enhance Scaling, Widescreen Mode and Anti-Aliasing as
-OFF with renderer support pending. They cannot be enabled yet. Native higher
-resolution scene rendering, extended camera/frustum/culling and FXAA/MSAA need
-separate renderer implementations; neither stretching nor final-frame filtering
-is represented as those features.
+Enhance Scaling can rerasterize triangle geometry at the viewport resolution
+through the experimental software renderer; enhance.scaling defaults false.
+See ../scaling/README.md for coverage, limits and measured costs. Widescreen
+Mode and Anti-Aliasing remain OFF and unavailable: expanded camera/culling and
+FXAA/MSAA are pending. Original textures and native line coverage are retained;
+final-frame bilinear filtering does not replace texture assets.
 
 The graphics object in Documents/BackToNature/settings.json stores monitor
 ordinal, window_mode (0 windowed, 1 exclusive, 2 borderless), width, height and

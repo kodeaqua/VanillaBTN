@@ -1288,3 +1288,45 @@ normal game frames. Unlimited does not call gameplay/audio/RNG to fill frames.
 Synthetic tests perform 600000 visual attempts while 300 original VSync(2)
 calls still produce exactly 600 ticks/callbacks. No gameplay or device run is
 claimed. No decomp source edits, new dependency or threads are introduced.
+
+<a id="adr-052"></a>
+
+## ADR-052: Private viewport-resolution software command replay
+
+Date: 2026-10-26. Status: synthetic validation passed; owner gameplay pending.
+
+The owner prioritizes graphics and previously requested Enhance Scaling at the
+active resolution. Extend the existing CPU raster/replay architecture with a
+private high-resolution command sink, keeping SDL_GPU presentation and the
+native PS1 VRAM path. Do not label a framebuffer enlargement as higher-resolution
+scene rasterization. Add HMBTN_ENH_SCALING, OFF by default; Windows -Game compiles
+the requested option. Runtime enhance.scaling defaults false.
+
+Generalize frame observation to four independent subscribers, and add a scoped
+private-replay sink. The scaling module captures two bounded native streams
+and replays the displayed one into a viewport-sized 15-bit surface. Interpolated
+replay can feed the same sink. Unsubscribe each feature by context so toggling
+one never removes the other. Loading/direct scanouts and invalid/missing
+histories retain native presentation. Overlay changes invalidate both histories.
+
+Preserve the current 4:3 viewport and original texture data. Triangles/quads use
+output-pixel coverage and attribute interpolation; sprites sample original
+texels, and lines retain logical-cell coverage. Preserve native masks, blending,
+clip/environment commands and inline image uploads/fills. Execute native GPU
+commands in private VRAM too for texture feedback semantics. Native state,
+timing, GTE and RNG remain unchanged. Cache repeated non-interpolated scanouts;
+allocate only when enabling or changing output dimensions. Limit this initial
+CPU target to 4096 per axis with visible, recoverable native fallback on failure.
+
+SDL textures match output bounds to avoid stale border sampling. Transfer
+capacity only grows; resource replacement follows SDL's deferred release
+contract. Pause remains a logical 320x240 UI over its frozen background.
+
+The software path gives a bounded, testable first implementation without new
+dependencies or shaders. It does not guarantee high FPS: a synthetic 1440x1080
+single-triangle pass costs about 5.8 ms after removing repeated coordinate-map
+division and constant-color interpolation. Real scenes and overdraw cost more.
+GPU scene rasterization, per-texture filtering, FXAA/MSAA and widescreen camera
+remain separate pending work. See PLATFORMS.md for full measurement limits.
+Release/ASan/UBSan pass 77 isolated tests. Native builds also link with features
+OFF and with scaling ON / interpolation OFF. No matching source/guard is changed.

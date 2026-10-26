@@ -497,3 +497,21 @@ Remaining Phase 0 gates: native matching baseline, complete SDK and layout
 inventory, compiled overlay symbol collision map, broader sanitizer coverage, and reproducible
 matching host-tool pins. The owner prioritizes Windows and excludes workflow/CI
 work for now. Existing workflows remain unchanged.
+
+## Requested viewport-resolution graphics path
+
+Enhance Scaling uses bounded native command capture and a private software
+raster target at actual 4:3 viewport dimensions (ADR-052). Generic private replay
+hooks allow interpolation to share the target. Frame observation now supports
+independent subscribers; overlay changes invalidate each history. Native VRAM,
+GPU environment and fixed game timing are restored/retained. Repeat native
+scanouts reuse their rendered surface; loading/direct paths fall back to native.
+
+The optional rasterizer implements polygon coverage, original texture sampling,
+sprites/rectangles, native line-cell coverage, clipping, masks, semi-transparency
+and inline transfers/fills. It has 1x comparisons against native rendering and
+synthetic higher-resolution coverage/state-preservation checks. All 77 Windows
+release and sanitizer tests pass. The native executable also links with scaling
+ON / interpolation OFF and with enhancements OFF. No new matching guard/source
+edit, dependency or game data is introduced. High-FPS gameplay, framebuffer
+feedback quality, GPU resource changes and real-device output remain unverified.

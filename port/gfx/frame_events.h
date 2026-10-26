@@ -6,6 +6,7 @@
 typedef struct {
     u64 tick, key;
     int eligible;
+    int bypass; /* Direct/loading presentation cannot replay an older OT. */
     const void *arena[2];
     size_t arena_bytes[2];
 } hm_render_frame;
@@ -18,7 +19,8 @@ typedef struct {
     void (*invalidate)(void *context);
 } hm_render_observer;
 /* Single game-thread, read-only observation of native command execution. */
-void hm_render_subscribe(hm_render_observer observer);
+int hm_render_subscribe(hm_render_observer observer);
+void hm_render_unsubscribe(void *context);
 void hm_render_begin(const hm_render_frame *frame);
 void hm_render_group(int world);
 void hm_render_packet(const u32 *words, u32 count);

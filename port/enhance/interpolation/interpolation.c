@@ -1,4 +1,5 @@
 #include "enhance/interpolation/interpolation.h"
+#include "gfx/replay_sink.h"
 #include "psx/gpu_environment.h"
 #include "psx/gpu_raster.h"
 #include "psx/vram.h"
@@ -190,7 +191,7 @@ static void end(void *opaque) {
 }
 int hm_interpolation_enable(int enabled) {
     if (!enabled) {
-        hm_render_subscribe((hm_render_observer){0});
+        hm_render_unsubscribe(state);
         free(state);
         state = NULL;
         return 1;
@@ -200,7 +201,11 @@ int hm_interpolation_enable(int enabled) {
     state = calloc(1, sizeof(*state));
     if (!state)
         return 0;
-    hm_render_subscribe((hm_render_observer){state, begin, group, packet, end, invalidate});
+    if (!hm_render_subscribe((hm_render_observer){state, begin, group, packet, end, invalidate})) {
+        free(state);
+        state = NULL;
+        return 0;
+    }
     return 1;
 }
 int hm_interpolation_render(u64 ns, const hm_render_frame *live, hm_interpolated_view *view) {
@@ -223,6 +228,7 @@ int hm_interpolation_render(u64 ns, const hm_render_frame *live, hm_interpolated
     s->environment = f->env;
     hm_vram_context *saved_vram = hm_vram_bind(&s->work);
     hm_gpu_environment *saved_env = hm_gpu_environment_bind(&s->environment);
+    hm_replay_begin(&area);
     for (u32 i = 0; i < f->count; ++i) {
         command *c = &f->commands[i];
         const u32 *words = f->words + c->offset;
