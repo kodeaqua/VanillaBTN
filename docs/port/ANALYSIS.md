@@ -288,8 +288,9 @@ All 33 A_FILE offsets (32 member ranges) are monotonic and inside the
 No assets were extracted or added to git. The subsequent native boot probe
 runs the original afile_init against the validated disc.
 
-There are 70 base CTests and one optional SDL filesystem test, all 71 passing
-in Windows release and ASan/UBSan builds with the native window enabled. New coverage
+There are 73 base CTests, one optional SDL filesystem test and one optional
+pause-frame test, all 75 passing in Windows release and ASan/UBSan builds with
+the native pause interface enabled. New coverage
 includes SHA-1 published vectors, malformed synthetic sectors/directories,
 cross-sector file reads, deterministic CD transfer/cancel/error behavior,
 VRAM transfers/masks/wrapping and the original texture-pack decoder. Tests need
@@ -454,6 +455,30 @@ Title and save/load now restore audited native object inventories on reentry
 (ADR-047). Unit tests cover actual private state, alternating both overlays and
 resident-state preservation. Other overlays continue to reject unsupported
 reentry; full lifecycle and save ABI parity remain unverified.
+The separate owner-requested pause branch reuses original window-frame C and
+disc font pixels through private UI resources. The initial UI, SDL display
+controls and JSON persistence require no further decomp guards. Actual expanded
+camera/render scaling and AA remain pending. No game loop or replay was run
+for this interface; technical checks are listed in ENHANCEMENTS.md.
+The owner saw the initial pause interface and reported a blue panel. The private
+renderer had reversed the primitive builders' actual RRGGBB color contract;
+the BBGGRR comment in window_frame.c is inaccurate and is left untouched in
+the matching source. The conversion is corrected and regression-tested. The
+rearranged root/Graphics UI has private asset-only previews, not game sessions.
+
+Known owner-reported issue: sleeping/saving still crashes with 0xC0000005
+(native exit -1073741819). This is queued after the pause layout work; no fix
+or confirmed faulting source line is claimed. Raw PS1 packing views and the
+in-game save ABI remain unaudited even though the native card backend tests pass.
+VSync/FPS settings use a separate rational presentation clock (ADR-049). The
+original VSync(2) game loop and fixed 60 Hz tick runtime are untouched. Synthetic
+tests verify invariant native callback counts across presentation caps. Extra
+presentations duplicate the native image unless enhance.interpolation is enabled.
+The requested experimental interpolation module uses private VRAM/environment
+replay and generic observers at native-only main.c SDK call aliases (ADR-050).
+Normal farm geometry can interpolate; other contexts retain native scanout.
+All 76 release/sanitizer units pass; physical/gameplay validation remains pending.
+No additional matching source edits or guards are required.
 The port builds all 113 units and links a boot diagnostic and SDL game window.
 Local 39000-VBlank release/sanitizer replays complete the opening and verify
 house exit and free farm movement after the Thomas/Zack dialogue. Wider
@@ -472,3 +497,95 @@ Remaining Phase 0 gates: native matching baseline, complete SDK and layout
 inventory, compiled overlay symbol collision map, broader sanitizer coverage, and reproducible
 matching host-tool pins. The owner prioritizes Windows and excludes workflow/CI
 work for now. Existing workflows remain unchanged.
+
+## Requested viewport-resolution graphics path
+
+Enhance Scaling uses bounded native command capture and a private software
+raster target at actual 4:3 viewport dimensions (ADR-052). Generic private replay
+hooks allow interpolation to share the target. Frame observation now supports
+independent subscribers; overlay changes invalidate each history. Native VRAM,
+GPU environment and fixed game timing are restored/retained. Repeat native
+scanouts reuse their rendered surface; loading/direct paths fall back to native.
+
+The optional rasterizer implements polygon coverage, original texture sampling,
+sprites/rectangles, native line-cell coverage, clipping, masks, semi-transparency
+and inline transfers/fills. It has 1x comparisons against native rendering and
+synthetic higher-resolution coverage/state-preservation checks. All 77 Windows
+release and sanitizer tests pass. The native executable also links with scaling
+ON / interpolation OFF and with enhancements OFF. No new matching guard/source
+edit, dependency or game data is introduced. High-FPS gameplay, framebuffer
+feedback quality, GPU resource changes and real-device output remain unverified.
+
+The owner subsequently isolated black farm-ground cuts to Interpolation ON.
+Field cells use anim_draw_sprt_cursor with shared AnimState records and mutable
+GS allocation offsets. Native-only port adapters now tag constructed field
+packets by world cell and packet part. main.c's native ClearOTagR call sites
+reset the bounded registry. Source files and matching guards are unchanged.
+Connected polygons also require consistent previous shared-vertex coordinates;
+otherwise the component uses current positions. A two-quad regression fails
+against f93bb01 and passes with this guard. Real farm confirmation is pending.
+Shared gfx/frame_replay now owns capture independently of scaling; generic
+destination hooks support private geometry consumption and fractional motion.
+Portable packet and seam tests bring Windows release/sanitizer totals to 79.
+
+## Shared native/enhanced GPU output
+
+GPU Auto (graphics.renderer=0) now uses a portable tiled scene packet stream
+and platform SDL_GPU compute execution; Software (1) remains selectable.
+Native 1x output uses integer coverage/attribute math and matches synthetic CPU
+RGB readback exactly on Vulkan and D3D12. High-resolution/fractional coordinates
+use fixed-position fields with floating attribute interpolation. Fractional
+sprite movement is tested across a logical tile boundary. Native CPU VRAM
+remains authoritative, and normal output has no GPU readback/fence wait.
+
+The no-window probe also checks 2048 deterministic random primitives against
+CPU. Inline transfers, source feedback, offscreen dependencies, capacity limits
+and unsupported shader formats retain software output. Real gameplay/device
+coverage is not complete. Own HLSL and generated arrays are hash-checked; DXC
+is a pinned ignored developer tool, not a runtime dependency. Source game files
+and matching guards remain unchanged. See ADR-054 and THIRD_PARTY.md.
+
+### Optional texture filtering (2026-10-26)
+
+ADR-055 adds palette-aware bilinear in GPU and private software output, independent
+of scaling. Native VRAM and game clocks remain authoritative and unchanged.
+Release/ASan/UBSan: 80/80 tests. Offscreen Vulkan and D3D12 pass native exact
+and enlarged tolerance comparisons with Nearest/Bilinear. Filtering-ON with
+scaling-OFF also compiles. No game was launched, no gameplay FPS measurement
+was made, and atlas behavior in actual gameplay remains owner-tested.
+No decomp-side source or matching guard changed.
+
+### Widescreen source guards and renderer (ADR-056, 2026-10-26)
+
+New guards all require HMBTN_PORT && HMBTN_ENH_WIDESCREEN:
+- src/main/geometry/model.c: enhancement include, near_x/wide_x clip bands,
+  horizontal camera_frustum_setup angles, and eight primitive-pass arena-reserve
+  checks in model_draw_tmd_object.
+- src/overlay/11_GF_FARM/estate.c: enhancement include and estate_point_on_screen
+  horizontal sprite/weather drawing box. The sole external caller is weather
+  drawing; particle stepping/respawn and RNG remain outside the visibility test.
+- src/overlay/11_GF_FARM/field/field.c: enhancement include and the two opposite
+  corners in field_square_cells (rendering-only grid coverage).
+
+The original else branches/disabled source reconstruct HEAD exactly in a local
+mechanical comparison. This is not a matching binary check: that requires the
+unavailable Linux matching toolchain; WSL remains prohibited. No SDK/GAP changes.
+Source projection/depth remain native. Wider CPU culling feeds existing OTs;
+private replay expands world clipping while UI remains native. Original
+primitive/overlay backup buffers are unchanged; private GS work arenas are
+restored on OFF/scene exit. See ADR-056 for visibility/capacity limitations.
+
+### All-screen viewport and fallback correction (ADR-057)
+
+Widescreen eligibility no longer depends on farm view/dialogue state. Native
+320x240 replay uses a stable expanded domain across scenes; direct/native/pause
+presentation fills extra horizontal background from original edge columns.
+The title.c-only animation adapter tags existing 0x25 tiled-background packet
+spans; packet observation preserves these as background/world groups without
+changing source commands, animation progression or RNG. No new src/ edits.
+
+GPU rejection now uses clipped actual primitive bounds and sampled UV footprints
+instead of oversized draw clips or full texture pages. Genuine offscreen writes,
+feedback, unsupported transfers/capacities still fall back. Auto fallback retries
+at native internal resolution, retaining full-size software only when explicitly
+selected. Owner real-world aspect/dialogue observations still need revalidation.

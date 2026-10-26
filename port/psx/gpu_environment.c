@@ -5,13 +5,25 @@
 #include <libgs.h>
 #include <string.h>
 
-static hm_gpu_environment hm_environment;
+static hm_gpu_environment hm_default_environment;
+static hm_gpu_environment *hm_environment_current = &hm_default_environment;
+#define hm_environment (*hm_environment_current)
 static void *hm_gs_work;
 static s32 hm_gs_x, hm_gs_y;
 static s16 hm_gs_buffers[2][2];
 
 const hm_gpu_environment *hm_gpu_environment_state(void) { return &hm_environment; }
+hm_gpu_environment *hm_gpu_environment_bind(hm_gpu_environment *environment) {
+    hm_gpu_environment *previous = hm_environment_current;
+    hm_environment_current = environment ? environment : &hm_default_environment;
+    return previous;
+}
 
+RECT hm_gpu_environment_set_clip(RECT clip) {
+    RECT previous = hm_environment.draw.clip;
+    hm_environment.draw.clip = clip;
+    return previous;
+}
 static s16 hm_gpu_signed11(u32 value) {
     value &= 2047;
     return (s16)(value < 1024 ? (s32)value : (s32)value - 2048);

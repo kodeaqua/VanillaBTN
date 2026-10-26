@@ -10,6 +10,8 @@ typedef struct {
     int display_enabled;
 } hm_gpu_environment;
 const hm_gpu_environment *hm_gpu_environment_state(void);
+hm_gpu_environment *hm_gpu_environment_bind(hm_gpu_environment *environment);
+RECT hm_gpu_environment_set_clip(RECT clip);
 void hm_gpu_environment_command(u32 word);
 
 #endif

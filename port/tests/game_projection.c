@@ -29,5 +29,18 @@ int main(void) {
         fprintf(stderr, "Original projection accepted a vertex behind the camera\n");
         return 1;
     }
+#ifdef HMBTN_ENH_WIDESCREEN
+    hm_widescreen_scene(1);
+    hm_widescreen_configure(0, 1920, 1080);
+    if (near_x(-20) || !near_x(-19) || !near_x(319) || near_x(320))
+        return 1;
+    hm_widescreen_configure(1, 1920, 1080);
+    if (!near_x(-54) || !near_x(373) || near_x(374) || !wide_x(453) || wide_x(454))
+        return 1;
+    vertex = (SVECTOR){100, -50, 1000, 0};
+    if (gte_project_vertex(&screen, &vertex) != 250 || screen.x != 260 || screen.y != 70)
+        return 1;
+    hm_widescreen_configure(0, 1920, 1080);
+#endif
     return 0;
 }

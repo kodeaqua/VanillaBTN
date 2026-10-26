@@ -48,3 +48,18 @@ from https://psx-spx.consoledev.net/cdromformat/. The sector decoder, bounded
 transport ring and mixing integration are original port code. The public
 reference notes interpolation-rounding uncertainty; no SDK or emulator source
 was imported. This adds no linked third-party dependency.
+
+## Developer-only shader compiler
+
+DirectXShaderCompiler v1.8.2505.1 (Windows binaries 1.8.2505.32), official release:
+https://github.com/microsoft/DirectXShaderCompiler/releases/tag/v1.8.2505.1.
+Source components use MIT/NCSA; the downloaded package also retains separate
+LICENSE-MS terms for its validation components. The package stays in ignored
+build/host-tools and is neither linked nor redistributed with the game.
+
+packaging/windows/build-shaders.ps1 pins official dxc_2025_07_14.zip SHA-256:
+9ad895a6b039e3a8f8c22a1009f866800b840a74b50db9218d13319e215ea8a4.
+This digest was computed from the official release download, not independently
+verified against a signed publisher manifest. Regeneration compiles only our
+CC0 HLSL. Normal builds use checked-in SPIR-V/DXIL C arrays and require no DXC
+installation/download. No new runtime dependency or compiler DLL is bundled.

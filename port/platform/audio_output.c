@@ -42,3 +42,11 @@ void hm_audio_output_stop(void) {
                 (unsigned long long)hm_audio.dropped);
     }
 }
+void hm_audio_output_pause(int paused) {
+    if (hm_audio_device) {
+        if (paused)
+            SDL_PauseAudioDevice(hm_audio_device);
+        else
+            SDL_ResumeAudioDevice(hm_audio_device);
+    }
+}

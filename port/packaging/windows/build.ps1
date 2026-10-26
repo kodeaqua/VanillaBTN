@@ -13,7 +13,14 @@ try {
     # A compiler upgrade can make CMake discard cached preset options mid-configure.
     # Start from the preset so sanitizer/release options cannot silently disappear.
     $configureArgs = @('--fresh', '--preset', $Preset)
-    if ($Game) { $configureArgs += '-DHMBTN_BUILD_NATIVE_WINDOW=ON' }
+    if ($Game) {
+        $configureArgs += '-DHMBTN_BUILD_NATIVE_WINDOW=ON'
+        $configureArgs += '-DHMBTN_ENH_PAUSE_MENU=ON'
+        $configureArgs += '-DHMBTN_ENH_INTERPOLATION=ON'
+        $configureArgs += '-DHMBTN_ENH_SCALING=ON'
+        $configureArgs += '-DHMBTN_ENH_FILTERING=ON'
+        $configureArgs += '-DHMBTN_ENH_WIDESCREEN=ON'
+    }
     & cmake @configureArgs
     if ($LASTEXITCODE -ne 0) { throw 'Windows configure failed' }
     & cmake --build --preset $Preset

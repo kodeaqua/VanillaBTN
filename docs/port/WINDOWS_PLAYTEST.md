@@ -66,6 +66,48 @@ complete audited writable native object state on activation (ADR-047). Other
 overlays still reject unsupported reentry. Release and sanitizer builds pass
 71 technical tests; no game loop or interactive replay was run for this change.
 
+## Pause branch
+
+On port/windows-pause-menu, build.ps1 -Game now enables the initial native ESC
+interface. Use arrows to navigate, Enter/X to confirm, and ESC/D to go back;
+ESC at the root resumes. Settings > Graphics offers monitor/window mode/
+driver-enumerated resolution and nearest/bilinear final-frame presentation.
+Graphics changes are persisted in settings.json. Borderless follows desktop
+resolution; normal presentation preserves 4:3 with black bars.
+
+The UI uses the game's runtime disc font and actual dialog-frame drawing code,
+with private resources that survive overlay switches. The implementation holds
+game/CD/SPU ticks, pauses the audio device and excludes paused time from pacing.
+These interaction/audio/display behaviors still require owner testing; no game
+was launched by the agent. Release and ASan/UBSan pass 74 technical tests.
+Set enhance.pause_menu=false in the enhance object of settings.json to disable
+ESC, or build with HMBTN_ENH_PAUSE_MENU=OFF for the compile-time OFF path.
+
+Enhance Scaling, Widescreen Mode ON and FXAA/MSAA remain unavailable pending
+their actual scene-renderer implementations. The menu states that explicitly;
+framebuffer stretching/filtering is not substituted for those features.
+
+The owner reported the first pause panel was blue. Its private canvas had
+reversed red/blue relative to the original primitive builders. This is now
+corrected to the original cream palette. Root/Settings use compact centered
+panels; Graphics has separate header, aligned label/value rows and a detail
+footer. Synthetic RGB/layout checks and private asset-only previews cover the
+change, without entering the game. Confirm the appearance on the updated build.
+
+Known issue: the owner reports a crash when sleeping/saving, with native exit
+-1073741819 (0xC0000005). This remains open. Card persistence tests do not prove
+the original in-game serialization and sleep/save lifecycle work.
+
+Graphics also offers VSync and FPS Limit. Up/down scrolls the nine-item list;
+left/right changes the selected value. Native is a 30 FPS presentation cap.
+Other rates come from the monitor's modes; fractional rates retain their exact
+ratio in settings.json. VSync On is synchronized; unsupported Off is refused.
+The selected cap does not change desktop refresh, and VSync can limit output
+to the active display rate. Game hardware ticks remain fixed at 60 Hz and the
+normal original loop still uses VSync(2). High caps repeat native images;
+interpolated scene motion is not implemented. Release and ASan/UBSan pass 75
+technical tests. The owner validates physical VSync, FPS and gameplay timing.
+
 | Keyboard | Original pad |
 | --- | --- |
 | Arrows | D-pad |

@@ -1127,3 +1127,442 @@ separate integration unit registers both real inventories, alternates their
 selections six times and checks resident game state survives. No game loop,
 window, disc or interactive replay is started. Matching check remains unavailable
 on this native Windows host; matching-branch text reconstruction is separate.
+
+<a id="adr-048"></a>
+
+## ADR-048: Pause at the host boundary with private original-game UI resources
+
+Date: 2026-10-26. Status: initial interface implemented; advanced rendering pending.
+
+The owner requests an ESC interface across scenes with Resume, Settings >
+Graphics and Exit Game, using the game's own UI presentation. Complete the
+title/load reentry fix first, merge PR #1 as windows port init, remove old
+branches and create port/windows-pause-menu from the latest main. The new
+feature work is separate from that merged Windows foundation.
+
+Pause inside the SDL host VBlank boundary. Keep pumping OS events and drawing
+the private menu without returning to VSync, CD, SPU or the game callback.
+Pause/resume the audio device, retain its sample queue, and shift the pacing
+epoch by elapsed pause time. Suppress held confirm/pad input until released
+when returning to the game. The UI navigation state machine is data-free and
+does not touch the game's dialog state, current frame, ordering tables or RNG.
+
+Read the resident UI bank from A_FILE through the independently validated disc
+parser before game entry, decode with the original texture-pack function,
+cache its original 8x12 English font and text palette, and reset startup VRAM.
+The cache remains private across all overlay transitions. Draw the actual
+window_frame.c geometry through private pixel/line/gradient sinks. New labels
+use the game's glyph mapping. Do not bundle extracted assets or substitute a
+host font, generic UI toolkit or invented bitmap art.
+The original primitive builders consume packed 0xRRGGBB; do not follow the
+contradictory older 0xBBGGRR comment in window_frame.c. The owner reported a blue
+initial prototype, caused by reversed red/blue channels in the private canvas.
+Correct that conversion and retain the original cream gradient. Synthetic
+checks assert the expected cream RGB channels and a red glyph independently.
+Use compact centered root/settings panels and distinct Graphics header, aligned
+label/value rows, selection frame and detail footer. Asset-only previews are
+written under ignored build paths for visual inspection, never into git.
+
+SDL platform code enumerates monitor display modes, applies windowed/exclusive/
+borderless modes and offers nearest or bilinear final-frame filtering. Preserve
+4:3 in the active resolution with black bars. Borderless uses the desktop mode.
+The graphics object in settings.json is atomically replaced while preserving
+other root properties. Reject malformed JSON rather than overwrite it. The
+owned object stores monitor ordinal, window_mode, width, height and bilinear.
+Unavailable stored monitor/mode choices fall back to a valid display or default
+window. Multi-monitor hotplug and display switching still require owner testing.
+
+HMBTN_ENH_PAUSE_MENU remains OFF by default in CMake; Windows -Game enables it
+for the owner's explicitly requested globally available interface. Its runtime
+default is available, with enhance.pause_menu=false as an explicit OFF path.
+AGENTS.md records this narrow override. Native scene scaling, expanded camera/
+culling and FXAA/MSAA are separate pending render paths. Their menu entries
+remain OFF and unavailable. Bilinear final-frame presentation is not advertised
+as native higher-resolution rendering or per-texture filtering.
+
+Synthetic tests cover navigation, original dialog-frame geometry with synthetic
+glyphs, JSON editing/validation and preservation of unknown settings. A local
+asset-only probe decodes the owner's font and checks VRAM is reset, without
+opening a window or entering the game. The owner performs interactive pause,
+audio, fullscreen and gameplay validation. No new dependency or decomp source
+change is required for this initial interface. Performance budgets and rendering
+enhancement parity remain unverified.
+
+<a id="adr-049"></a>
+
+## ADR-049: Independent rational presentation limits and VSync control
+
+Date: 2026-10-26. Status: implemented; owner device/gameplay tests pending.
+
+The owner requests VSync On/Off and Native or monitor-derived FPS limits without
+changing game time. Original main_run_frame uses VSync(2): 30 normal updates
+at the port's fixed 60 Hz hardware tick. Keep this source, psx/timing.c, CD,
+SPU, RNG and game callbacks unchanged. During each host tick wait, service a
+separate presentation clock and pump OS events. Sample input at the tick
+boundary. No new game-logic thread or variable simulation step is introduced.
+
+Accumulate absolute rational nanosecond deadlines, preserving 60000/1001 rather
+than truncating to 59 or 60. Drop overdue presentations instead of submitting
+catch-up bursts. Display settings reset only presentation scheduling; paused
+wall time remains excluded from the game epoch. Native caps presentation at 30.
+Other choices come from the monitor's desktop-resolution modes when windowed/
+borderless, or selected resolution when exclusive. Persist fps_numerator and
+fps_denominator in graphics; zero numerator means Native. Unsupported saved
+rates revert to Native. An FPS cap does not itself change desktop refresh.
+
+On uses synchronized mailbox if available, otherwise FIFO. Off requires
+supported immediate presentation; reject unsupported changes and retain the
+effective setting. An unavailable stored Off setting falls back to On. Bound
+VSync-On presentation by the current physical refresh and recompute on display
+changes. Acquire through SDL's non-waiting frame-fence path; cancel when no
+swapchain image is available and retain two frames in flight. SDL 3.2.28 Vulkan
+WSI acquisition can still wait internally, so no zero-driver-stall guarantee
+is made. Hardware stalls and achieved FPS remain owner device checks.
+
+Higher caps repeat the latest native image. They add no game update, animation
+advance, RNG call or audio generation. They do not provide 75 unique scene
+frames or interpolation. Graphics now has nine items with seven visible rows
+and scrolling. Decimal rates use the original narrow dot glyph, verified from
+a private asset-only atlas; no extracted font is committed.
+
+A synthetic regression checks 200000 rational presentation boundaries per
+rate and verifies 300 real native VSync(2) calls still give 600 VBlank callbacks
+at 30, 59, 60, 75, 144, 240 and 60000/1001 caps. Late dropping, menu scrolling
+and decimal composition are covered. These are technical checks, not gameplay
+time or physical VSync tests. No dependency or matching-source edit is added.
+
+<a id="adr-050"></a>
+
+## ADR-050: Opt-in private primitive replay for visual interpolation
+
+Date: 2026-10-26. Status: synthetic validation passed; owner gameplay pending.
+
+The owner explicitly requests smoother world movement above native FPS without
+altering game time. Keep original VSync(2), fixed 60 Hz timing, logic, RNG and
+audio unchanged. Add HMBTN_ENH_INTERPOLATION, OFF by default, compiled by the
+Windows -Game script, and runtime enhance.interpolation, default false. Graphics
+adds Interpolation as the tenth item, retaining seven visible rows.
+
+Introduce generic frame observers and bindable VRAM/GPU environments. Native
+CMake remaps only main.c's PutDrawEnv/DrawOTag call sites to port adapters; no
+matching source edits. Capture two bounded native command histories and replay
+screen-coordinate interpolation into private VRAM. Restore native contexts
+before returning to simulation. Packet keys normalize double-buffer arena
+addresses and require unique, compatible primitive/material records. Keep
+current texture poses and secondary UI positions; do not crossfade images.
+
+Use the native back-buffer lead to interpolate previous to current coordinates
+over two ticks. Present the private draw rectangle. Never extrapolate or update
+actors during presentations. Reject incompatible histories, duplicate keys,
+material changes and large motion. Invalidate on overlay/context transitions.
+Limit initial eligibility to normal farm views without loading, transition,
+pause or menu flags. Unmatched primitives keep current geometry, so coverage
+and cadence depend on stable native command allocation. This is an experimental
+screen-space heuristic, not persistent actor/world-space interpolation.
+
+The OFF path has no capture allocation or packet changes. Synthetic tests cover
+midpoint geometry, current UI, context restoration and history rejection;
+release and ASan/UBSan pass. Compile-time OFF still links the native executable.
+Full gameplay, native image parity, input latency and actual frame cost require
+owner validation. No new dependencies, assets, threads or matching guards.
+See port/enhance/interpolation/README.md for limits and PLATFORMS.md for the
+explicitly synthetic lower-bound replay measurement.
+
+<a id="adr-051"></a>
+
+## ADR-051: Unlimited presentation as an explicit FPS Limit choice
+
+Date: 2026-10-26. Status: implemented; owner device tests pending.
+
+The owner requests Off in FPS Limit. Keep Native (30) as the default and add
+Off (Unlimited) before monitor-derived rates. Persist graphics.fps_numerator=-1
+with fps_denominator=1; zero still means Native, so existing settings retain
+behavior. Presentation-clock rate 0/1 means no software deadline interval.
+When VSync is On and current refresh is known, use that refresh as the effective
+presentation rate. Off VSync plus Unlimited adds no software presentation cap;
+GPU availability and driver behavior still determine achieved submissions.
+
+The host checks the absolute hardware-tick deadline before each presentation
+and continues to run native simulation only at fixed 60 Hz, with VSync(2)
+normal game frames. Unlimited does not call gameplay/audio/RNG to fill frames.
+Synthetic tests perform 600000 visual attempts while 300 original VSync(2)
+calls still produce exactly 600 ticks/callbacks. No gameplay or device run is
+claimed. No decomp source edits, new dependency or threads are introduced.
+
+<a id="adr-052"></a>
+
+## ADR-052: Private viewport-resolution software command replay
+
+Date: 2026-10-26. Status: synthetic validation passed; owner gameplay pending.
+
+The owner prioritizes graphics and previously requested Enhance Scaling at the
+active resolution. Extend the existing CPU raster/replay architecture with a
+private high-resolution command sink, keeping SDL_GPU presentation and the
+native PS1 VRAM path. Do not label a framebuffer enlargement as higher-resolution
+scene rasterization. Add HMBTN_ENH_SCALING, OFF by default; Windows -Game compiles
+the requested option. Runtime enhance.scaling defaults false.
+
+Generalize frame observation to four independent subscribers, and add a scoped
+private-replay sink. The scaling module captures two bounded native streams
+and replays the displayed one into a viewport-sized 15-bit surface. Interpolated
+replay can feed the same sink. Unsubscribe each feature by context so toggling
+one never removes the other. Loading/direct scanouts and invalid/missing
+histories retain native presentation. Overlay changes invalidate both histories.
+
+Preserve the current 4:3 viewport and original texture data. Triangles/quads use
+output-pixel coverage and attribute interpolation; sprites sample original
+texels, and lines retain logical-cell coverage. Preserve native masks, blending,
+clip/environment commands and inline image uploads/fills. Execute native GPU
+commands in private VRAM too for texture feedback semantics. Native state,
+timing, GTE and RNG remain unchanged. Cache repeated non-interpolated scanouts;
+allocate only when enabling or changing output dimensions. Limit this initial
+CPU target to 4096 per axis with visible, recoverable native fallback on failure.
+
+SDL textures match output bounds to avoid stale border sampling. Transfer
+capacity only grows; resource replacement follows SDL's deferred release
+contract. Pause remains a logical 320x240 UI over its frozen background.
+
+The software path gives a bounded, testable first implementation without new
+dependencies or shaders. It does not guarantee high FPS: a synthetic 1440x1080
+single-triangle pass costs about 5.8 ms after removing repeated coordinate-map
+division and constant-color interpolation. Real scenes and overdraw cost more.
+GPU scene rasterization, per-texture filtering, FXAA/MSAA and widescreen camera
+remain separate pending work. See PLATFORMS.md for full measurement limits.
+Release/ASan/UBSan pass 77 isolated tests. Native builds also link with features
+OFF and with scaling ON / interpolation OFF. No matching source/guard is changed.
+
+<a id="adr-053"></a>
+
+## ADR-053: Shared replay ownership and coherent interpolation identity
+
+Date: 2026-10-26. Status: technical regressions pass; owner gameplay pending.
+
+The owner requests a GPU output path shared by native resolution and scaling,
+and reports black cuts across farm ground which disappear with Interpolation
+OFF. Inspection shows field cells are sprite draws from shared animation
+records, while packet addresses depend on prior work-buffer allocation. Packet
+offsets alone are not stable identities. Independently falling back neighboring
+polygons can also open a hole between current and interpolated positions.
+
+Extract bounded frame capture into reference-counted gfx/frame_replay so output
+backends do not depend on enhance.scaling. Each replay restores native VRAM and
+GPU environments. Generic destination hooks can consume private geometry and
+fractional motion metadata without a redundant CPU output raster. The normal
+game's CPU VRAM still supplies authoritative readback/transfer semantics; no
+logic, timing, RNG or GTE changes are introduced.
+
+Add bounded construction identities for field sprites, keyed by the original
+world-cell SVECTOR and part offset. CMake remaps field.c projection/sprite calls
+to read-only port adapters, and main.c's ClearOTagR resets the registry. Actual
+source files remain unchanged. Invalid/nonmonotonic spans fail closed.
+
+Group world polygons sharing normalized screen vertices. If any member lacks
+compatible history, or a shared vertex has conflicting previous coordinates,
+render that connected component at current positions. This trades some local
+interpolation cadence for a closed mesh. Separate sprites are unaffected.
+Fractional destination metadata retains original current texture poses.
+
+A synthetic two-quad reproduction fails against f93bb01 (black gap at x=8..9)
+and passes with the coherence guard. Other checks cover conflicting history,
+stable cell identities despite inserted packets and output-backend motion.
+Portable GPU packet tests cover bounds, fallback, independent replay ownership
+and native state preservation. Windows integration passes 79 release and
+ASan/UBSan tests; these are not gameplay confirmation of the reported scene.
+No new matching source guard or third-party dependency is required for this layer.
+
+<a id="adr-054"></a>
+
+## ADR-054: Shared native/enhanced GPU compute scene output
+
+Date: 2026-10-26. Status: Vulkan/D3D12 readback passed; gameplay pending.
+
+The owner explicitly expands GPU acceleration to native output as well as
+Enhance Scaling. Use one SDL_GPU compute pipeline over portable scene packets
+(ADR-053). Each output pixel traverses its ordered logical tile list, keeping
+color/mask locally. This preserves PS1 ordering, four blend modes, CLUT/tpage
+sampling, texture windows and masks without cross-pixel write races or
+per-primitive feedback passes. Native 1x coverage/attributes use bounded integer
+math. Enlarged/fractional geometry uses fixed-position inputs and floating
+attribute interpolation; texture poses remain native.
+
+HMBTN_GPU_RASTER defaults ON. graphics.renderer=0 means GPU Auto (default),
+1 means Software. This backend is independent of enhance keys. Graphics adds
+Renderer as item 11 and reports active GPU or CPU fallback. Software releases
+its GPU capture reference; scaling may retain its own. Private geometry
+consumption avoids a second CPU output raster. Normal game execution still
+maintains low-resolution CPU VRAM for readback/transfer compatibility. Pause
+composition retains its small original-asset CPU canvas with GPU presentation.
+This does not claim all graphics CPU work has been removed.
+
+The platform backend supports SPIR-V/DXIL, using ByteAddressBuffer for SDL
+3.2.28's raw D3D12 storage-buffer view. Native output stays 4:3. Fractional
+motion metadata supplies subpixel triangle/sprite positions without simulation
+or GTE changes. Use native front history with interpolation OFF, interpolated
+current replay when eligible/ON. Cache unchanged scenes/output. GPU buffers and
+textures cycle for queued frames. Normal presentation neither waits for a
+compute fence nor reads pixels back. Existing fixed tick/presentation clocks
+and driver acquisition limits remain unchanged.
+
+Inline transfers, framebuffer texture/CLUT feedback, offscreen dependencies,
+exhausted capacity and direct/loading scanouts retain software output.
+Unsupported shader formats (including current Metal) also fall back.
+Conservative rejection may reduce GPU coverage; the menu exposes fallback.
+No full-game or cross-platform parity claim is made.
+
+Own HLSL is compiled into checked-in C arrays with normalized source hashes.
+Normal builds need no shader compiler. Developer regeneration uses pinned DXC
+v1.8.2505.1 in ignored host-tools, recorded in THIRD_PARTY.md. No compiler,
+game asset, SDK material or BIOS is shipped, and no linked dependency is added.
+
+Offscreen Radeon RX Vega probes compare native RGB bytes exactly to CPU on
+Vulkan/D3D12, including 2048 deterministic random primitives, texture depths/
+windows, masks, blends, clipping, lines and both framebuffer origins. Enlarged
+color allows one 5-bit step; fractional tile-boundary motion is checked
+separately. No window/game is started. Synthetic timing shows enlarged-output
+benefit and small 1x overhead; see PLATFORMS.md.
+
+## ADR-055: Optional palette-aware texture filtering
+
+Date: 2026-10-26
+
+Context: The owner requests Bilinear/Nearest texture filtering. Previous
+Bilinear only filtered final presentation. It must also work without scaling,
+without changing native VRAM or simulation, and preserve transparent edges.
+
+Decision: Add enhance/filtering, gated by HMBTN_ENH_FILTERING (CMake default
+OFF; Windows -Game enables compilation). Runtime enhance.filtering defaults
+false. An existing explicit graphics.bilinear choice migrates when the new key
+is absent; an explicit new key wins. The existing Filtering row selects it.
+GPU scene header word 11 carries the choice; Nearest retains its old branch.
+CPU output raster/replay helpers move to gfx so filtering does not depend on
+Enhance Scaling. Unsupported GPU scenes retain the software reference.
+
+Sample four CLUT-decoded texels with Q8 weights. Clamp to each primitive's UV
+bounds before texture-window/page addressing, avoiding adjacent atlas texels.
+Shade and PS1 semi-blend each covered tap against the original destination;
+transparent taps contribute that destination, avoiding black halos. Use the
+highest-weight covered tap's mask bit (first wins ties); apply force-mask only
+when covered. Interpolation and simulation remain independent. Native source
+assets are unchanged; bilinear does not create higher-detail textures.
+
+Consequences: Optional replay adds output work and CPU fallback can be costly.
+Primitive-local clamping can expose differing filtering at shared UV bounds.
+Final presentation filtering remains for window scaling. Generated shaders
+hash both scene.hlsl and the filtering include. No new linked dependency.
+Release and ASan/UBSan pass 80 tests. Offscreen Vulkan/D3D12 comparisons cover
+Nearest and Bilinear, CLUT depths, texture windows, masks/blends, deterministic
+random primitives, native and enlarged outputs. Native comparisons are exact;
+enlarged color tolerance is 9/255. These do not establish gameplay performance
+or full-game atlas compatibility; owner gameplay validation remains pending.
+
+## ADR-056: Expanded horizontal world viewport with native UI
+
+Date: 2026-10-26
+
+Context: The owner requests Widescreen Mode that reveals additional world, with
+OFF retaining original 4:3 bars. Stretching the framebuffer cannot reveal it.
+The main OT already identifies world packets separately from UI layer OTs.
+Original model/sprite/field CPU culling otherwise discards the extra geometry.
+
+Decision: HMBTN_ENH_WIDESCREEN defaults OFF in CMake; Windows -Game compiles it.
+Runtime enhance.widescreen defaults false. The existing Graphics row toggles it.
+Keep the original GTE projection, screen coordinates, camera eye/target, depth,
+simulation ticks and RNG. Expand the private output's logical horizontal domain
+symmetrically around its original center. At 16:9 this is [-54,374) x [0,240),
+rounded to even 428 logical pixels; 21:9 and 32:9 follow the active pixel aspect.
+Logical width is bounded to 1024; portrait/4:3 retain the native view.
+
+Record OT world/UI group boundaries in shared replay and forward them through
+interpolation. Widen only full-width world clips; ordinary UI stays centered at
+native coordinates and native size. Exact untextured full-screen F4 fade/fill
+packets cover the expanded view. Clear the added sides to black instead of
+sampling adjacent/wrapped native VRAM. Texture feedback checks still use the
+native framebuffer rectangle, not virtual sides. GPU and software support both
+native-height and enhanced output. Unsupported/direct/loading scanouts retain
+4:3 fallback. Title/menu-only scenes and minigames retain 4:3; this first world
+camera implementation targets the farm normal-view renderer, including UI overlays.
+The ESC pause canvas itself retains its original centered 4:3 backdrop.
+
+Narrow guarded source changes are required for the static model clip bands,
+horizontal frustum angles, estate sprite visibility and field draw radius.
+Each uses HMBTN_PORT && HMBTN_ENH_WIDESCREEN and preserves the exact original
+#else (or absence of the added guard). Guard locations are listed in ANALYSIS.
+Only rendering coverage changes. Keep original primitive arenas/sizes and overlay
+backup memory intact; stop model submission with an 8 KiB UI reserve when the
+original arena is exhausted. Dense scenes can therefore omit excess geometry.
+Use two private 256 KiB GS work arenas while wide world drawing is active;
+restore original pointers/sizes on OFF or leaving the world. The main.c-only
+GsSetWorkBase adapter preserves ordinary cursor advancement.
+
+An enlarged synthetic triangle exposed floating edge cancellation at the new
+aspect. Use exact Q8 signed 64-bit edge signs near the boundary, implemented
+with 32-bit word arithmetic so shader-int64 support is not required. Nearest
+native shader coverage remains on its existing integer path.
+
+Consequences: Extra authored world is submitted and rendered, without stretching
+original UI or changing the game camera's simulation state. This does not create
+new level geometry, enlarge weather particle pools, or change their RNG. Some
+assets/actors have additional original visibility rules; all locations, weather,
+dense scenes, transitions and gameplay still need owner validation. CPU fallback
+at 1080p can be expensive. No full-game parity or high-FPS claim is made.
+
+Validation: Release and ASan/UBSan unit suites; Vulkan/D3D12 offscreen world/UI,
+texture-filtering, fade and both framebuffer-origin comparisons. Exact native
+comparisons and 9/255 enlarged color tolerance. GS cursor/OFF arena preservation
+and unchanged native projection are covered by unit tests. A mechanical check
+removing only the new guards reconstructs each original source file exactly.
+Matching check could not run: the matching Linux toolchain is unavailable on
+this Windows host and the owner prohibits WSL. No matching result is claimed.
+
+## ADR-057: Stable widescreen presentation across every screen and fallback
+
+Date: 2026-10-26
+
+Context: The owner requires widescreen from the Natsume logo through title,
+load/save, gameplay and pause, preserving proportional logos/text and extending
+background from original assets. They report aspect switching depending on
+whether a dialogue is visible, plus dialogue lag with Enhance Scaling. This
+supersedes ADR-056's world-only/pause/non-world presentation restriction.
+
+Decision: Separate the persistent full-window presentation setting from replay
+availability and world interpolation eligibility. Every 320x240 frame can use
+the expanded private canvas, including 2D views and minigames. Camera culling
+continues to use original coordinates and only expands horizontal visibility.
+Do not gate the viewport on farm normal-view or dialogue state. Initialize the
+setting before the first logo and refresh it during pause/display changes.
+
+The title's existing animation 0x25 tiled background is marked at construction
+through a title.c-only CMake adapter. Generic packet span metadata changes its
+replay group, widening its clip to expose existing background tiles. Other
+logo/text/cursor packets retain original positioning and scale. Full-screen
+flat backgrounds/fades already cover the canvas. Extra canvas initialization
+uses clamped native edge/background pixels rather than neighboring VRAM. For
+direct/loading/native fallback or the pause canvas, the shared SDL compositor
+fills side regions from original edge columns and places original content at
+its proportional centered size. Original black background remains black; no
+invented scenery or replacement assets are introduced.
+
+Two synthetic reproductions confirm excessive GPU fallback: a draw clip that
+extends below the viewport although visible glyphs stay inside, and an atlas
+page that intersects the framebuffer while the sampled UV rows do not. Test
+actual primitive bounds after clipping for offscreen writes; retain rejection
+when writes really leave the output. Bound texture feedback by the sampled UV
+footprint after wrap/window remapping, plus conservative CLUT checks, rather
+than the entire page. Genuine framebuffer feedback remains unsupported.
+
+GPU Auto retries unsupported scenes at native internal resolution, followed by
+GPU presentation. It never retries a viewport-sized CPU raster while pacing
+simulation. Explicit Renderer > Software retains full-resolution CPU reference
+output. Supported Auto scenes still render at the requested enhanced resolution.
+Do not allocate a full-resolution software surface just to prepare GPU output.
+The viewport and UI proportions remain consistent when output paths change;
+unsupported-frame fallback can temporarily reduce detail. This is a quality/
+latency tradeoff, not complete GPU coverage or a gameplay performance guarantee.
+
+Validation: 82/82 Release and ASan/UBSan tests. Offscreen Vulkan/D3D12 verify
+world/UI, title-style background metadata, clip/UV feedback regressions, fades,
+and full-window presentation alternating GPU/native output with OFF parity.
+Synthetic dialogue workload timings are recorded in PLATFORMS.md. Owner actual
+logo/title/save/load, all-map and dialog/transition validation remains pending.
+No additional decomp source guard or external dependency is added. FXAA/MSAA
+remain deferred; save/load crash fixes follow after merging this graphics PR.

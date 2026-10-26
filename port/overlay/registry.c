@@ -1,4 +1,5 @@
 #include "overlay/registry.h"
+#include "gfx/frame_events.h"
 #include "psx/error.h"
 #include <stdlib.h>
 #include <string.h>
@@ -71,6 +72,7 @@ s32 hm_overlay_select(s32 member, s32 region) {
         }
         hm_loaded[i] = 1;
         hm_active[region] = member;
+        hm_render_invalidate();
         return 0;
     }
     hm_runtime_error("hm_overlay_select", "unknown overlay member");

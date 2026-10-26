@@ -8,8 +8,8 @@ Full playthrough and broader gameplay remain unverified; see WINDOWS_PLAYTEST.md
 | Target | Foundation preset | Validation |
 | --- | --- | --- |
 | Linux x86-64 | linux-release, linux-asan-ubsan | Deferred; requires a separate Linux host, no WSL |
-| Windows x86-64 | windows-release | All 113 original source units and native window build; tests passed (71/71 with -Game) |
-| Windows x86-64 sanitizers | windows-asan-ubsan | All source units and native window build; Clang 20.1.8 ASan/UBSan tests passed (71/71 with -Game); gameplay coverage remains limited |
+| Windows x86-64 | windows-release | All 113 original source units and native window build; tests passed (79/79 with -Game) |
+| Windows x86-64 sanitizers | windows-asan-ubsan | All source units and native window build; Clang 20.1.8 ASan/UBSan tests passed (79/79 with shared GPU output, pause, interpolation and scaling compiled); gameplay coverage remains limited |
 | macOS universal | macos-universal-release | Pending; no macOS host tested |
 | Android arm64 | Pending NDK and minSdk selection | No device/build validation |
 
@@ -35,6 +35,18 @@ actual-object and integration units bring the count to 71 with the SDL test
 (70 without it), all passing in release and ASan/UBSan. These are technical
 checks, not an interactive title/load/return gameplay run. Remaining overlays
 retain explicit unsupported-reentry failures.
+On the subsequent pause branch, navigation, settings JSON and synthetic original
+dialog-frame composition bring the count to 74 with the native pause build.
+Release and ASan/UBSan pass those tests. An asset-only probe also decodes the
+real English font (5645 nonzero pixels) and verifies startup VRAM is zeroed;
+it runs no game loop or window. Physical ESC, audio pause/resume, monitor/mode
+changes and visual presentation remain owner checks. Advanced renderer options
+are explicitly pending; see ENHANCEMENTS.md and ADR-048.
+VSync/FPS controls add a rational presentation-clock regression, bringing the
+total to 75 in both Windows builds. It checks exact deadlines and unchanged
+VBlank counts without starting gameplay. Native presentation caps at 30; the
+original hardware tick stays 60 Hz. Higher caps duplicate images. Physical
+VSync, achieved FPS and in-game time remain owner checks; see ADR-049.
 Windows validation compiles all original translation units and links the native
 boot diagnostic. The full-tree syntax inventory passes 113/113; warnings remain
 visible and do not establish runtime safety. Strong game definitions have no
@@ -107,3 +119,176 @@ work are outside the measurement. There is no valid previous native rendering
 baseline for a before/after comparison; no optimization or frame-budget claim
 is made. Full playthrough/device profiling is still needed to validate the
 65536-live-tag registry capacity and its actual game cost.
+
+## Experimental visual interpolation validation
+
+Date: 2026-10-26. Release and ASan/UBSan pass all 76 isolated tests with pause
+and interpolation compiled. The native executable also builds with both compile
+options OFF. No gameplay/window/replay was launched for this change. Tests
+exercise private midpoint rasterization, current UI, history rejection and
+byte-exact native VRAM/environment/packet preservation, with unchanged ticks.
+Physical smoothness, scene coverage and achieved FPS remain owner checks.
+
+Host: AMD Ryzen 5 4500, Windows x86-64, Clang 20.1.8 release (-O2, x86-64-v2).
+Tool: hmbtn_interpolation_test --benchmark, C clock(), 10000 private replays.
+The 320x240 synthetic fixture has only two small rectangles and a 1 MB private
+VRAM copy. Measured 0.0212 ms/render in one warm run. This is a lower-bound
+copy/replay cost, not representative of a game scene, full frame overhead or
+an optimization comparison. The previous OFF path performs no private replay;
+real GPU/CPU budget validation is still pending.
+
+The subsequent FPS Limit Off addition extends the existing clock regression:
+600000 uncapped visual attempts still give 600 ticks for 300 VSync(2) calls.
+Pause composition also verifies dimmed background RGB with full-bright dialog
+and glyphs. These changes keep the total at 76 tests; physical FPS and actual
+pause appearance remain owner checks. The active owner release process was
+left running, and the final release link was written separately to
+build/port/windows-pause-preview/hmbtn_native.exe because Windows locks its
+running executable. Rebuild after closing the game to update windows-release.
+
+## Viewport-resolution scaling validation
+
+Date: 2026-10-26. Release and ASan/UBSan pass 77/77 isolated tests with scaling,
+interpolation and pause compiled. The release executable was rebuilt after the
+owner closed the previous process; the earlier locked-executable note is
+historical. Feature-OFF and scaling-ON/interpolation-OFF native targets also
+link. No game/window/replay was launched. Other platforms and actual display
+resource replacement remain untested. The software target is capped at 4096
+per axis; allocation failure visibly falls back to native rendering.
+
+Host: AMD Ryzen 5 4500, Windows x86-64, Clang 20.1.8 release (-O2, x86-64-v2).
+Tool: hmbtn_scaling_test --benchmark, C clock(), 50 warm passes per size.
+One flat triangle spans much of a synthetic 16x16 logical area transformed to
+the output dimensions. Private native command execution is included, but this
+is not a game scene, textured workload, GPU frame or full port overhead.
+
+| Output | Initial implementation | After mapping/flat-color changes, three runs |
+| --- | --- | --- |
+| 320x240 | 1.080 ms | 0.280 / 0.300 / 0.300 ms |
+| 640x480 | 4.340 ms | 1.140 / 1.140 / 1.160 ms |
+| 1440x1080 | 22.000 ms | 5.800 / 5.860 / 5.780 ms |
+
+The initial measurements exposed repeated per-pixel coordinate division and
+constant-color interpolation. Mapping tables and a constant-color branch avoid
+that work; supported 1x raster comparisons remain exact. These coarse warm
+measurements show only this synthetic cost reduction, not achieved gameplay FPS
+or representative headroom. Texturing, overdraw and interpolation can cost
+substantially more. Repeated non-interpolated scanouts are cached. A GPU scene
+raster path remains the next performance step before claiming high-resolution
+high-FPS support.
+
+## Shared replay and ground-seam regression
+
+Date: 2026-10-26. Integration builds pass 79/79 release and ASan/UBSan tests.
+Portable packet tests verify reference-counted replay capture, native-context
+preservation and bounded output rejection. A connected-mesh regression against
+the f93bb01 interpolation object fails at a visible black gap; the corrected
+implementation passes. Stable field-cell identities survive inserted work
+packets. The owner isolated actual farm cuts to Interpolation ON, but has not
+yet confirmed this correction in gameplay. No game session/replay was launched.
+
+## Shared GPU output, offscreen validation
+
+Date: 2026-10-26. Host: Ryzen 5 4500 / Radeon RX Vega, driver 31.0.21925.1001.
+Clang 20.1.8 release (-O2, x86-64-v2); SDL 3.2.28. Offscreen compute probes pass
+on Vulkan and D3D12. No window, disc, game loop or input replay is used. Native
+RGB is byte-exact against the software reference for fixed fixtures and 2048
+deterministic random primitives. Tests cover masks, blending, texture depths/
+windows, clipping, lines, display-write control and both framebuffer origins.
+High-resolution comparisons allow up to 9/255 per color channel (one 5-bit step);
+fractional sprite motion across a tile boundary has a separate exact check.
+Game scene coverage and full playthrough remain owner validation.
+
+Timing tool: hmbtn_gpu_renderer_probe <driver> --benchmark, SDL_GetTicksNS,
+50 passes per size, one large flat triangle over a synthetic 32x32 logical area.
+CPU includes private VRAM restore, output seeding and reference raster. GPU
+includes restore, packet creation, upload, compute and a fence wait. No output
+readback, presentation, game logic, audio or full-scene overdraw is timed. Normal
+runtime does not perform this benchmark fence wait.
+
+| Output | CPU / Vulkan-run | GPU / Vulkan | CPU / D3D12-run | GPU / D3D12 |
+| --- | --- | --- | --- | --- |
+| 320x240 | 0.344 ms | 0.484 ms | 0.382 ms | 0.566 ms |
+| 640x480 | 1.246 ms | 0.569 ms | 1.324 ms | 0.616 ms |
+| 1440x1080 | 6.198 ms | 0.644 ms | 6.360 ms | 0.882 ms |
+
+These warm single-run synthetic numbers show a high-resolution benefit and
+small native-resolution overhead. They are not achieved gameplay FPS or a port
+overhead guarantee. Native CPU VRAM compatibility is still maintained. GPU Auto
+conservatively falls back on unsupported dependencies/transfers or capacity.
+The owner's active windows-release executable remains untouched; a separately
+linked windows-gpu-preview executable contains the latest changes while that
+process is open. Owner gameplay confirmation of the field-seam fix is pending.
+
+### Optional texture filtering (2026-10-26)
+
+ADR-055 adds palette-aware bilinear in GPU and private software output, independent
+of scaling. Native VRAM and game clocks remain authoritative and unchanged.
+Release/ASan/UBSan: 80/80 tests. Offscreen Vulkan and D3D12 pass native exact
+and enlarged tolerance comparisons with Nearest/Bilinear. Filtering-ON with
+scaling-OFF also compiles. No game was launched, no gameplay FPS measurement
+was made, and atlas behavior in actual gameplay remains owner-tested.
+No decomp-side source or matching guard changed.
+
+### Widescreen technical checks (2026-10-26)
+
+Expanded world/UI and full-screen fade synthetic readback pass on Vulkan and
+D3D12, including Nearest/Bilinear, native-height/enlarged output and y=0/240
+framebuffer origins. No window or gameplay was launched. OFF source guards
+reconstruct the original files exactly; matching binaries remain unverified
+because the Linux matching toolchain is unavailable and WSL is prohibited.
+
+Local Radeon RX Vega, Release, SDL_GetTicksNS, 25 serialized renders of a tiny
+synthetic wide scene (two textured sprites, one large flat triangle, UI and full
+screen fade), 1920x1080:
+
+| Driver | Filtering | CPU ms/render | GPU capture/upload/compute/fence ms/render |
+|---|---|---:|---:|
+| Vulkan | Nearest | 30.064 | 1.310 |
+| Vulkan | Bilinear | 31.202 | 1.322 |
+| D3D12 | Nearest | 30.126 | 1.397 |
+| D3D12 | Bilinear | 31.080 | 1.338 |
+
+These are synthetic output costs, not gameplay FPS or complete frame costs.
+Probe fences serialize GPU work; normal presentation adds no fence/readback.
+Different rows include timing noise; no filtering speedup is inferred. Owner
+playability, all-map coverage and weather/transition behavior remain unverified.
+
+Widescreen validation also passes 82/82 Release and 82/82 ASan/UBSan unit tests.
+A native CPU-only build with Widescreen ON, GPU/Scaling/Filtering OFF succeeds;
+a native build with Widescreen OFF also succeeds. The release game process was
+left running; a separate windows-wide-preview executable was linked for owner
+manual testing instead of replacing the locked release executable.
+
+### All-screen widescreen and dialogue fallback (2026-10-26)
+
+ADR-057 removes the world-only viewport decision and preserves full-window
+presentation across 2D/loading/pause/native fallback. Title background tile
+spans expose existing assets; logos and text keep their native proportional
+canvas. Offscreen Vulkan/D3D12 compare presentation alternating expanded GPU,
+native fallback and Widescreen OFF. No gameplay was launched for these checks.
+
+Before the fix, a synthetic oversized text clip fails GPU scene construction
+at gpu_scene.c's new regression assertion. The same clip with visible glyphs
+now succeeds; genuinely offscreen writes/texture feedback still reject. Sampled
+UV rows outside a framebuffer now succeed even when their enclosing page
+intersects it. This proves the technical triggers, not the owner's exact trace.
+
+Release, Radeon RX Vega, SDL_GetTicksNS, 25 serialized output renders. Workload:
+two textured sprites, a flat world triangle, UI/fade, 40 synthetic 8x12 glyphs,
+an oversized dialogue clip and restored native clipping. Native retry is the
+new Auto fallback policy; viewport-sized CPU retry is the previous policy:
+
+| Driver | Filter | Previous CPU retry 1920x1080 ms | Native CPU retry 428x240 ms | GPU capture/upload/compute/fence 1920x1080 ms |
+|---|---|---:|---:|---:|
+| Vulkan | Nearest | 31.145 | 3.676 | 1.304 |
+| Vulkan | Bilinear | 36.373 | 4.035 | 1.314 |
+| D3D12 | Nearest | 31.458 | 3.666 | 1.376 |
+| D3D12 | Bilinear | 36.201 | 4.031 | 1.319 |
+
+These are isolated synthetic output costs, not gameplay frame rates or complete
+frame budgets. Probe fences serialize work; normal rendering uses no fence or
+readback. CPU fallback preserves the current native VRAM path; performance
+profiling of actual game logic, pacing/waits and GPU work remains for the
+follow-up runtime-fixes branch. Aggregate CPU/GPU usage alone is not a measure
+of available game-thread headroom.

@@ -25,6 +25,25 @@ override this one for their subtree.
   Store saves under saves/ and configuration at settings.json. Do not hardcode
   a username or use AppData for these files. This overrides the default pref-path
   location below for Windows.
+- The owner explicitly requests an ESC pause interface available across scenes,
+  using the original game's font and dialog presentation. Enable its compile
+  option in the Windows -Game script; its runtime default is available, with
+  enhance.pause_menu=false as the explicit OFF path. This requested interface
+  overrides section 9's runtime-OFF default for the pause interface only.
+  Graphics enhancements (scaling, widescreen, AA) still default OFF and must
+  never be advertised as working before their renderer paths are implemented.
+
+- The owner also requests VSync/FPS caps and visual interpolation while keeping
+  game logic/time native. Windows -Game compiles interpolation; its runtime
+  enhance.interpolation defaults OFF. This does not authorize accelerating
+  simulation or claiming pending renderer enhancements are complete.
+
+- The owner prioritizes requested graphics work before the pending sleep/save
+  crash. Windows -Game also compiles Enhance Scaling; enhance.scaling defaults
+  OFF. Widescreen now has an opt-in expanded farm world viewport (ADR-056);
+  OFF retains 4:3. ADR-057 extends ON presentation to all screens and keeps
+  native/CPU fallback aspect stable. Gameplay coverage remains owner-tested.
+  Report CPU raster performance and untested gameplay/device behavior plainly.
 
 These explicit owner decisions override conflicting roadmap, CI skeleton,
 workflow, and definition-of-done requirements below.
@@ -344,3 +363,20 @@ A change is done when:
 - Do not require network or game data for the port's unit tests/CI.
 - Do not write non-English or non-conventional commit messages.
 - Do not suppress sanitizer/UB findings without understanding them.
+
+## Current shared-GPU owner direction
+
+The owner requests shared GPU scene output for native and enhanced resolutions,
+not only scaling. graphics.renderer defaults to GPU Auto (0); Software (1)
+remains selectable. Keep native VRAM/readback compatibility and safe CPU
+fallback while coverage is validated. Synthetic offscreen GPU probes are
+technical checks; interactive gameplay testing remains with the owner. Never
+present partial GPU coverage as complete or remove the reference prematurely.
+
+## Current owner follow-up (2026-10-26)
+
+Finish all-screen widescreen and its aspect/dialogue-fallback corrections, then
+open a PR and merge to main. Create a new branch from latest main for save/load,
+performance and other runtime fixes. FXAA/MSAA are explicitly deferred. Profile
+actual timing and waits before attributing low aggregate CPU/GPU use to a cause;
+interactive gameplay testing stays with the owner.

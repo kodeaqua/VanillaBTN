@@ -1,4 +1,5 @@
 #include "platform/user_data.h"
+#include "platform/settings_json.h"
 #include "psx/card.h"
 #include <SDL3/SDL.h>
 #ifdef _WIN32
@@ -123,5 +124,48 @@ int hm_user_data_start(void) {
         return 0;
     int ok = hm_user_data_start_at(root);
     SDL_free(root);
+    return ok;
+}
+int hm_user_data_read_settings(char *text, size_t capacity) {
+    if (!hm_root || !text || !capacity)
+        return -1;
+    char *path = NULL;
+    if (SDL_asprintf(&path, "%s/settings.json", hm_root) < 0)
+        return -1;
+    size_t bytes = 0;
+    void *data = SDL_LoadFile(path, &bytes);
+    SDL_free(path);
+    if (!data || bytes >= capacity || bytes > 65536) {
+        SDL_free(data);
+        return -1;
+    }
+    SDL_memcpy(text, data, bytes);
+    text[bytes] = 0;
+    SDL_free(data);
+    return (int)bytes;
+}
+int hm_user_data_set_nested_setting(const char *parent, const char *key, const char *json_value) {
+    char *text = SDL_malloc(65537), *nested = SDL_malloc(66561);
+    int bytes = text && nested ? hm_user_data_read_settings(text, 65537) : -1;
+    const char *object = "{}";
+    size_t length = 2;
+    int found = bytes >= 0 ? hm_json_property(text, (size_t)bytes, parent, &object, &length) : -1;
+    int ok = found >= 0 && hm_json_replace(object, length, key, json_value, nested, 66561);
+    if (ok)
+        ok = hm_user_data_set_setting(parent, nested);
+    SDL_free(nested);
+    SDL_free(text);
+    return ok;
+}
+int hm_user_data_set_setting(const char *key, const char *json_value) {
+    char *text = SDL_malloc(65537), *output = SDL_malloc(66561);
+    int bytes = text && output ? hm_user_data_read_settings(text, 65537) : -1;
+    int ok = bytes >= 0 && hm_json_replace(text, (size_t)bytes, key, json_value, output, 66561);
+    if (ok) {
+        size_t length = SDL_strlen(output);
+        ok = length <= 65536 && hm_replace(hm_root, "settings.json", output, length) == 1;
+    }
+    SDL_free(output);
+    SDL_free(text);
     return ok;
 }
