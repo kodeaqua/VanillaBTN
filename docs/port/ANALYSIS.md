@@ -288,13 +288,22 @@ All 33 A_FILE offsets (32 member ranges) are monotonic and inside the
 No assets were extracted or added to git. The subsequent native boot probe
 runs the original afile_init against the validated disc.
 
-There are 65 CTests, all passing in Windows release and ASan/UBSan. New coverage
+There are 66 base CTests and one optional SDL filesystem test, all 67 passing
+in Windows release and ASan/UBSan builds with the native window enabled. New coverage
 includes SHA-1 published vectors, malformed synthetic sectors/directories,
 cross-sector file reads, deterministic CD transfer/cancel/error behavior,
 VRAM transfers/masks/wrapping and the original texture-pack decoder. Tests need
 no disc. The separate local disc probe also passed under ASan/UBSan.
 Digital pad replies, disconnected-card completion, analytic fixed-point trig,
 OT command execution and streamed VAB ownership now have additional coverage.
+Persistent native memory-card containers and the Documents/BackToNature host
+store are implemented without decomp edits (ADR-044). Tests exercise complete
+32768-byte files, reopening serialized data, capacity, directory queries,
+slot isolation, malformed mounts and failed writes preserving previous data.
+The SDL test uses unique build-local Unicode paths and preserves existing
+settings. This is storage API coverage; actual save/load menu behavior and
+game-state serialization still require owner gameplay testing. Automated
+gameplay is deferred at the owner's request.
 SPU tests cover literal ADPCM predictor/shift/saturation vectors, ADSR phase
 transitions/frozen rates, Gaussian impulse values, loop/end behavior, native
 key status/release, sparse tone/sample lookup, SEQ/NRPN timing, reverb impulses,

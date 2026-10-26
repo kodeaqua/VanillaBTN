@@ -21,6 +21,37 @@ keyboard focus. Enter is Start; use arrows to select New Game and X to confirm.
 X selects name characters and Enter accepts a completed name. Progress opening
 dialogue with X.
 
+## User data and manual validation
+
+The owner performs interactive gameplay validation. Development checks use
+isolated unit tests; no automated gameplay is run without a new owner request.
+
+Native Windows builds now initialize the active user's Documents/BackToNature
+directory through SDL's user-folder API. Redirected Documents (including OneDrive)
+is respected. The directory contains:
+
+```
+BackToNature/
+  saves/
+    card1.hmc
+    card2.hmc
+  settings.json
+  .lock
+```
+
+The cards are native containers for the original game's save-file bytes, not
+raw PS1 card images. Back them up together when the game is closed. The game
+must be closed before another instance can use this directory. Write/permission
+errors are reported rather than claiming a successful save. Invalid existing
+cards are not automatically replaced; an explicit format erases the selected
+card. settings.json is initialized with a schema version and preserved if it
+already exists; settings loading/application is not implemented yet.
+
+The storage backend has unit coverage for writes and reopening data. Actual
+in-game save/load, closing/reopening a session and repeated save-menu activation
+still require owner testing. This build does not yet claim working full-session
+save/load or full-playthrough parity.
+
 | Keyboard | Original pad |
 | --- | --- |
 | Arrows | D-pad |

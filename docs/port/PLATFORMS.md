@@ -8,12 +8,21 @@ Full playthrough and broader gameplay remain unverified; see WINDOWS_PLAYTEST.md
 | Target | Foundation preset | Validation |
 | --- | --- | --- |
 | Linux x86-64 | linux-release, linux-asan-ubsan | Deferred; requires a separate Linux host, no WSL |
-| Windows x86-64 | windows-release | All 113 original source units compile; local tests passed (65/65) |
-| Windows x86-64 sanitizers | windows-asan-ubsan | All source units compile; Clang 20.1.8 ASan/UBSan tests passed (65/65); execution coverage remains limited |
+| Windows x86-64 | windows-release | All 113 original source units and native window build; tests passed (67/67 with -Game) |
+| Windows x86-64 sanitizers | windows-asan-ubsan | All source units and native window build; Clang 20.1.8 ASan/UBSan tests passed (67/67 with -Game); gameplay coverage remains limited |
 | macOS universal | macos-universal-release | Pending; no macOS host tested |
 | Android arm64 | Pending NDK and minSdk selection | No device/build validation |
 
 The owner prioritizes Windows. No workflow/CI changes are included or requested.
+The owner now performs interactive gameplay testing. The Windows host stores
+native card containers in Documents/BackToNature/saves and creates settings.json
+only when missing (ADR-044). New isolated tests cover card persistence,
+failed-write preservation, slot isolation, capacity, invalid containers, actual
+Unicode filesystem paths and preserving existing settings. There are 66 base
+tests plus one SDL filesystem test when the native window option is enabled.
+Both release and sanitizer builds passed all 67 with that option. No gameplay
+was launched for this storage change; in-game save/load remains owner-validated
+work, not a proven result of the storage tests. Other platforms remain untested.
 Windows validation compiles all original translation units and links the native
 boot diagnostic. The full-tree syntax inventory passes 113/113; warnings remain
 visible and do not establish runtime safety. Strong game definitions have no

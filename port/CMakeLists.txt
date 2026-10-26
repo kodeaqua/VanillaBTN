@@ -60,7 +60,7 @@ target_link_libraries(hmbtn_game_initial PUBLIC hmbtn_game_options hmbtn_work_me
 set_source_files_properties(../src/main/main.c PROPERTIES COMPILE_DEFINITIONS main=hm_game_main)
 
 add_library(hmbtn_psx_initial STATIC
-    psx/xa_decode.c
+    psx/xa_decode.c psx/card_store.c
     psx/gte_rotation.c
     psx/unimplemented.c psx/gte_vectors.c psx/gte_runtime.c psx/gs_lighting.c psx/trig.c psx/timing.c psx/sound_control.c psx/spu_decode.c psx/spu_voice.c psx/cd_position.c psx/cd_runtime.c
     psx/gpu_links.c psx/gpu_ot.c psx/gpu_packets.c psx/gpu_environment.c psx/gpu_commands.c psx/gpu_polygon.c psx/gpu_line.c psx/vram.c psx/card.c psx/pad.c psx/sound_bank.c psx/sequence.c psx/sound_voice.c psx/reverb.c)
@@ -98,9 +98,15 @@ if(HMBTN_BUILD_GPU_SPIKE OR HMBTN_BUILD_NATIVE_WINDOW)
     endif()
     if(HMBTN_BUILD_NATIVE_WINDOW)
         add_executable(hmbtn_native platform/boot_probe.c platform/game_host.c platform/input_replay.c
-            platform/audio_output.c platform/audio_ring.c)
+            platform/audio_output.c platform/audio_ring.c platform/user_data.c)
         target_compile_definitions(hmbtn_native PRIVATE SDL_MAIN_HANDLED HMBTN_SDL_HOST=1)
         target_link_libraries(hmbtn_native PRIVATE hmbtn_game_initial hmbtn_psx_pending SDL3::SDL3)
+        if(BUILD_TESTING)
+            add_executable(hmbtn_user_data_test tests/user_data.c platform/user_data.c)
+            target_link_libraries(hmbtn_user_data_test PRIVATE hmbtn_psx_initial SDL3::SDL3)
+            add_test(NAME platform.documents_storage COMMAND hmbtn_user_data_test
+                "${CMAKE_CURRENT_BINARY_DIR}/user-data-test")
+        endif()
     endif()
 endif()
 
@@ -108,6 +114,9 @@ add_executable(hmbtn_ot_bench EXCLUDE_FROM_ALL analysis/ot_bench.c)
 target_link_libraries(hmbtn_ot_bench PRIVATE hmbtn_psx_initial)
 
 if(BUILD_TESTING)
+    add_executable(hmbtn_card_storage_test tests/card_storage.c)
+    target_link_libraries(hmbtn_card_storage_test PRIVATE hmbtn_psx_initial)
+    add_test(NAME card.persistent_storage COMMAND hmbtn_card_storage_test)
     add_executable(hmbtn_storage_slots_test tests/storage_slots.c)
     target_link_libraries(hmbtn_storage_slots_test PRIVATE hmbtn_game_initial hmbtn_psx_pending)
     add_test(NAME game.storage_native_slots COMMAND hmbtn_storage_slots_test)

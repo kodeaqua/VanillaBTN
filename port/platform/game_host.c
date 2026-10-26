@@ -1,6 +1,7 @@
 #include "platform/game_host.h"
 #include "platform/audio_output.h"
 #include "platform/input_replay.h"
+#include "platform/user_data.h"
 #include "psx/gpu_environment.h"
 #include "psx/pad.h"
 #include "psx/timing.h"
@@ -142,6 +143,13 @@ int hm_game_host_start(void) {
     SDL_SetMainReady();
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD | SDL_INIT_AUDIO))
         return 0;
+    if (!hm_user_data_start()) {
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Back to Nature",
+                                 "Cannot open Documents/BackToNature. Check folder permissions and "
+                                 "close any other game instance.",
+                                 NULL);
+        return 0;
+    }
     hm_window = SDL_CreateWindow("Harvest Moon: Back to Nature - native bring-up", 640, 480, 0);
     hm_device = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL |
                                         SDL_GPU_SHADERFORMAT_MSL,
@@ -191,5 +199,6 @@ void hm_game_host_stop(void) {
     hm_window = NULL;
     hm_upload = NULL;
     hm_texture = NULL;
+    hm_user_data_stop();
     SDL_Quit();
 }

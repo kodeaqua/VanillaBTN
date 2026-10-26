@@ -168,52 +168,6 @@ s32 McxWriteDev(s32 port, s32 device, const u8 *fixed, const u8 *data) {
     hm_unimplemented("McxWriteDev");
 }
 
-s32 MemCardCreateFile(s32 port, const char *name, s32 blocks) {
-    (void)port;
-    (void)name;
-    (void)blocks;
-    hm_unimplemented("MemCardCreateFile");
-}
-
-s32 MemCardFormat(s32 port) {
-    (void)port;
-    hm_unimplemented("MemCardFormat");
-}
-
-s32 MemCardGetDirentry(s32 port, const char *pattern, struct DIRENTRY *entries, s32 *count,
-                       s32 offset, s32 maximum) {
-    (void)port;
-    (void)pattern;
-    (void)entries;
-    (void)count;
-    (void)offset;
-    (void)maximum;
-    hm_unimplemented("MemCardGetDirentry");
-}
-
-s32 MemCardReadFile(s32 port, const char *name, void *buffer, s32 offset, s32 bytes) {
-    (void)port;
-    (void)name;
-    (void)buffer;
-    (void)offset;
-    (void)bytes;
-    hm_unimplemented("MemCardReadFile");
-}
-
-s32 MemCardUnformat(s32 port) {
-    (void)port;
-    hm_unimplemented("MemCardUnformat");
-}
-
-s32 MemCardWriteFile(s32 port, const char *name, const void *buffer, s32 offset, s32 bytes) {
-    (void)port;
-    (void)name;
-    (void)buffer;
-    (void)offset;
-    (void)bytes;
-    hm_unimplemented("MemCardWriteFile");
-}
-
 void SetDumpFnt(s32 stream) {
     (void)stream;
     hm_unimplemented("SetDumpFnt");

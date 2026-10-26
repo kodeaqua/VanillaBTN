@@ -6,7 +6,7 @@ override this one for their subtree.
 
 ## 0. Mission
 
-### Current owner overrides (2026-10-25)
+### Current owner overrides (2026-10-25 and 2026-10-26)
 
 - Prioritize Windows x86-64 native bring-up before Linux, macOS, and Android.
   Phase 1 targets Windows; retain the portable architecture for the other targets.
@@ -17,6 +17,14 @@ override this one for their subtree.
   invoke, or require WSL. Matching `check` uses a separate Linux toolchain;
   defer that validation when unavailable and report it as unverified, without
   blocking Windows port work or asking the owner to enable WSL.
+- The owner performs interactive gameplay testing. Agents handle implementation,
+  builds and isolated technical/unit checks; do not launch gameplay or replay
+  sessions unless the owner explicitly requests them.
+- Windows user data belongs in the active user's Documents/BackToNature folder,
+  resolved through the OS user-folder API (including redirected Documents).
+  Store saves under saves/ and configuration at settings.json. Do not hardcode
+  a username or use AppData for these files. This overrides the default pref-path
+  location below for Windows.
 
 These explicit owner decisions override conflicting roadmap, CI skeleton,
 workflow, and definition-of-done requirements below.

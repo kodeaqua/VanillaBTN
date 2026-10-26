@@ -985,3 +985,48 @@ The regression includes the original storage implementation and checks actual
 held, bag and all storage-row pointer destinations for toolbox/cabinet/icebox.
 It also asserts the 16-byte marker layout and four-byte navigation offset.
 Real menu transfer and subsequent tool-use replay coverage is in progress.
+
+<a id="adr-044"></a>
+
+## ADR-044: Documents storage and persistent native memory cards
+
+Date: 2026-10-26. Status: accepted by explicit owner storage request.
+
+The owner chooses Documents/BackToNature/{saves/,settings.json} instead of the
+default application-pref directory, and performs interactive gameplay tests.
+Resolve Documents through SDL_GetUserFolder, respecting Windows folder
+redirection and Unicode names. Never hardcode C:/Users/User or the local owner
+account. The native window initializes storage; headless diagnostics remain
+disconnected unless explicitly given a storage backend by a unit test.
+
+Implement both ordinary memory-card slots using a native, versioned container
+(saves/card1.hmc and card2.hmc), not a raw PS1 image. The container has an explicit
+512-byte little-endian directory/header and fifteen 8192-byte data blocks.
+Each 32-byte directory record holds a zero-terminated 20-byte maximum name,
+block count and starting block. Preserve the game's original file payloads,
+allocation limit and read/write offsets. The original overlay requires read
+completion ID 3 and write ID 4; complete requests deterministically on the game
+thread. Ordinary cards report McxErrInvalid to PocketStation type queries, so
+the original game selects its ordinary-card path.
+
+The platform writes a sibling temporary file, flushes/closes it and renames
+it over the destination. Failed writes leave the old container and committed
+RAM state intact. This reduces partial-write risk; power-loss durability has
+not been established. Validate header/version, names, sizes, allocation bounds,
+duplicate names and overlapping block ranges on mount. Corrupt or unreadable
+existing cards are reported as invalid and never automatically reformatted.
+Explicit in-game format/unformat requests replace only the selected card.
+Windows holds an exclusive file handle on .lock for the session to prevent
+concurrent writers. Additional platform locking remains future platform work.
+
+Create settings.json with schema_version 1 only if missing. Preserve an existing
+file byte-for-byte; reading/applying settings is a separate pending capability.
+No game option or enhancement is introduced here. All SDL and Windows filesystem
+APIs remain in platform/. No decomp source or new dependency is changed.
+
+Tests cover native card capacity, slots, directory patterns, range errors,
+completion IDs, reopening serialized bytes, failed-write preservation and corrupt
+input. An SDL filesystem test uses a unique build-local Unicode directory for
+actual file reopening and existing-settings preservation. The owner validates
+the real save/load menus; storage unit coverage does not establish that the
+entire original game serialization or overlay reentry works.
