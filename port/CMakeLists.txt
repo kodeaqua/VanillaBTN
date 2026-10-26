@@ -313,6 +313,22 @@ if(BUILD_TESTING)
     add_executable(hmbtn_gift_reactions_test tests/gift_reactions.c)
     target_link_libraries(hmbtn_gift_reactions_test PRIVATE hmbtn_game_initial hmbtn_psx_pending)
     add_test(NAME game.native_gift_reactions COMMAND hmbtn_gift_reactions_test)
+    add_executable(hmbtn_family_names_test tests/family_names.c)
+    target_link_libraries(hmbtn_family_names_test PRIVATE hmbtn_game_initial hmbtn_psx_pending)
+    add_test(NAME game.original_family_names COMMAND hmbtn_family_names_test)
+    add_executable(hmbtn_shop_dispatch_test tests/shop_dispatch.c)
+    target_link_libraries(hmbtn_shop_dispatch_test PRIVATE hmbtn_game_initial hmbtn_psx_pending)
+    add_test(NAME game.native_shop_dispatch COMMAND hmbtn_shop_dispatch_test)
+    foreach(rejection negative upper)
+        add_test(NAME game.shop_reject.${rejection}
+            COMMAND "${CMAKE_COMMAND}" "-DPROGRAM=$<TARGET_FILE:hmbtn_shop_dispatch_test>"
+                "-DCASE=${rejection}" "-DCONTEXT=shop_request_dispatch"
+                "-DDETAIL=invalid shop request id"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_runtime_error.cmake")
+    endforeach()
+    add_executable(hmbtn_save_transfer_test tests/save_transfer.c)
+    target_link_libraries(hmbtn_save_transfer_test PRIVATE hmbtn_game_initial hmbtn_psx_pending)
+    add_test(NAME game.native_save_transfer COMMAND hmbtn_save_transfer_test)
     add_executable(hmbtn_pocket_absence_test tests/pocket_absence.c)
     target_link_libraries(hmbtn_pocket_absence_test PRIVATE hmbtn_psx_initial)
     add_test(NAME card.pocketstation_absence COMMAND hmbtn_pocket_absence_test)

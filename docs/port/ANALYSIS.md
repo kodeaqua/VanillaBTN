@@ -663,3 +663,26 @@ asset-poll aliases, adding no matching-source guards. SOURCE_AUDIT.md records al
 repairs and unresolved findings. The old sprite copy fails its synthetic fixture;
 Release and ASan/UBSan each pass 94 tests after the repairs. Saibara dialogue and
 two-sleep camera behavior remain owner-validation items.
+
+### Follow-up audit: shop, family text and animal exchange (2026-10-27)
+
+ADR-065 resolves the original adjacent shop vectors explicitly and corrects the
+family-name pointer return type using strings read from the owner's validated
+archive. New guards: shop_dialogues.c includes runtime errors, validates request
+IDs, selects the adjacent-vector equivalent and forwards the basket result (4);
+people/family.c returns loaded native text (1); people/family.h preserves the
+full-width return type (1). All are under src/overlay/11_GF_FARM/.
+
+ADR-066 adds 15 guards in src/overlay/15_saveload/saveload.c for native partner
+view/stash storage, decode/encode, farm identity, foreign capacities and names,
+count/free-slot routing, list views, typed restoration and complete buffer reset.
+The partner view is included in compat/saveload_overlay_state.inc. Original
+SaveFile/SaveImage wire casts remain only in disabled original alternatives on
+these transfer paths. They are not host object layouts.
+
+The old 928-byte stash reproduces a global-buffer-overflow on a 224-byte write.
+New transfer fixtures cover five native cows/chickens and preserve all non-animal
+payload bytes. The family text loader passes synthetic fixtures and an isolated
+read-only check with the validated owner BIN. Release and ASan/UBSan pass 99 tests;
+targeted Clang analysis of seven touched units reports no core/unix/security
+findings. Gameplay and matching compiler output remain unverified.

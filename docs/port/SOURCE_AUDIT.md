@@ -51,10 +51,10 @@ can also occur at camera clamp boundaries and is not itself proof of corruption.
 
 | Finding | Classification / next evidence needed |
 | --- | --- |
-| family_table_lookup returns raw PS1 addresses used as status text | High priority: resolve the real original text assets; do not invent strings or dereference these host addresses |
-| shop_screen_start_handlers has one declared entry but is indexed by request id | High priority: determine original callback/data extent; analyzer finds an out-of-bounds path; do not fill unknown handlers with success |
-| shop_basket_step and MG1/PdaSamp non-void fall-through | Review caller/result and original behavior before choosing a value |
-| Livestock-transfer raw SaveFile/SaveImage views | Outside the new farm save codec; layout audit and fixtures needed |
+| family_table_lookup returns raw PS1 addresses used as status text | Resolved by ADR-065: validated original-disc text and full-width native return |
+| shop_screen_start_handlers has one declared entry but is indexed by request id | Resolved by ADR-065: verified original vector adjacency and explicit native indexing |
+| shop_basket_step and MG1/PdaSamp non-void fall-through | Basket now forwards pending/completed state (ADR-065); MG1/PdaSamp still need caller review |
+| Livestock-transfer raw SaveFile/SaveImage views | Resolved by ADR-066 native partner view and bounded stash; interactive failure/abort/retry still unverified |
 | Additional incompatible callback casts in main/minigames | Some pass ignored extra arguments; review individually, not blanket suppression |
 | sound_update pointer-to-s32 sentinel comparison | No dereference through the truncated value, but native sentinel comparison should be reviewed |
 | cue_history scriptOffset uses subtraction of truncated pointers | Stored result is an offset inside one loaded asset, not a host address; verify bounds before changing |
@@ -67,7 +67,14 @@ can also occur at camera clamp boundaries and is not itself proof of corruption.
 The matching check cannot run on this Windows host: the Linux matching toolchain
 is unavailable and the owner excludes WSL. New HMBTN_PORT branches retain exact
 original alternatives; textual reconstruction is not a matching compiler check.
-Release and ASan/UBSan currently pass 94/94 tests without disc data.
+Release and ASan/UBSan now pass 99/99 tests without disc data. ADR-065/066 close
+the first batch's shop/family/transfer layout findings. Seven changed translation
+units passed targeted follow-up analysis without core/unix/security findings.
+An additional read-only fixture loaded all five family names from the validated
+owner BIN; it did not run gameplay or access saves. The original 928-byte transfer
+stash was separately reproduced as an ASan global-buffer-overflow.
+Remaining rows below still need individual caller/layout evidence; this batch
+does not establish complete gameplay coverage.
 
 ## Per-file automated coverage
 

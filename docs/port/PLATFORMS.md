@@ -308,3 +308,13 @@ Windows Release and ASan/UBSan builds pass 89/89 tests after dialogue argument,
 overnight loader progress, runtime math and ordinary-card PocketStation handling
 changes. No gameplay automation or performance claim accompanies these checks.
 Interactive overnight/dialogue/Yodel Ranch validation remains with the owner.
+
+### Second source-audit validation (2026-10-27)
+
+Native Windows commands: cmake --build build/port/windows-release and ctest
+--test-dir build/port/windows-release --output-on-failure; equivalent commands
+for windows-asan-ubsan. Both builds and all 99 tests pass. A separate ASan family
+name fixture reads the SHA-1-validated owner disc without executing gameplay.
+Seven touched translation units pass targeted Clang analysis without selected
+core/unix/security diagnostics. No performance improvement or other-device result
+is claimed. Matching check is unavailable without the separate Linux toolchain.

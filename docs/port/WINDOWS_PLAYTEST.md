@@ -211,3 +211,17 @@ its synthetic fixture. Current Release and ASan/UBSan each pass 94/94 tests.
 Try the same NPC interaction, repeated sleeps, pause and transitions again. No
 interactive success is claimed until the owner verifies them. SOURCE_AUDIT.md
 lists static coverage and remaining issues, including shop/status/transfer paths.
+
+### Second audit batch (2026-10-27)
+
+Shop request initialization no longer depends on neighboring C objects. Family
+status text is loaded from the validated original archive and returned as native
+pointers. Animal exchange decodes a native partner view and uses a five-record
+native stash; its old buffer reproduces an ASan overflow. See ADR-065/066.
+
+Windows Release and ASan/UBSan pass 99/99 tests. A read-only asset check resolves
+all five original spouse names from the owner's validated BIN. These checks do
+not open owner save files or run gameplay. Still owner-tested: shop dialogue
+lifecycles, married status UI, interactive animal exchange and card failure/retry,
+plus the earlier Saibara and repeated-sleep camera reports. No new gameplay launch
+was performed during this batch.

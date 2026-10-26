@@ -1756,3 +1756,71 @@ coverage, open findings and the limits of static analysis. The reported NPC and
 camera behavior still need owner testing. Matching check is unavailable because
 the Linux toolchain is absent and WSL is prohibited; disabled new source branches
 are checked textually instead.
+
+## ADR-065: Explicit shop callback indexing and original family text
+
+Date: 2026-10-27
+
+Context: shop_request_dispatch indexes a one-element null table with request IDs
+up to 28. Read-only inspection of the owner's validated USA overlay finds a
+contiguous 29-entry vector at 0x800BB2BC: the null entry followed by the existing
+28 phase-complete handlers, with null entries at 0 and 21 and the shared default
+at 4..10. Native C objects cannot rely on that adjacency. family_table_lookup
+also returns one of five PS1 addresses as s32 for the status page's text pointer.
+
+Decision: Dispatch request 0 without an initializer, and request n through
+shop_phase_complete_handlers[n-1]. Reject IDs outside 0..28 explicitly. Keep the
+original mapping and null slots, not invented successful handlers. Forward the
+basket callback's pending/completed result explicitly rather than native C
+fall-through. Original source alternatives are preserved under HMBTN_PORT.
+
+For family text, resolve the existing address metadata against the original low
+overlay base (0x800B7E20), member 11 of A_FILE.BIN. Read the member range from
+A_FILE.HDT using the validated disc parser at launcher initialization, outside
+simulated CD/game ticks. Validate member/extent boundaries and a terminator within
+nine glyph words. Cache only those five strings in native storage. Return a full
+u16 pointer through a guarded family.h signature and function body. No glyph
+strings, disc content or SDK material are copied into source control. Missing or
+malformed text fails initialization clearly; invalid wife indices fail explicitly.
+
+Validation: Synthetic ISO fixtures check all five native pointers, terminators,
+range/I/O/malformed-data failures and lookup through the game entry point. An
+isolated read-only check also loaded all five names from the owner's SHA-1-validated
+BIN; it did not execute gameplay. Shop tests exercise the highest request, the
+null slot, the shared initializer, zero request, invalid ID rejection and basket
+pending/completed behavior. Matching check is unavailable on this Windows host
+without the Linux toolchain; WSL is excluded. Disabled new guards reconstruct the
+original sources exactly. No other platform/device or married-status gameplay
+claim follows from these checks.
+
+## ADR-066: Separate partner save bytes from native transfer records
+
+Date: 2026-10-27
+
+Context: Livestock exchange still casts unshifted save bytes to FarmAnimals and
+SaveFile/SaveImage with native pointers. A five-animal stash also uses the old
+928-byte buffer although native livestock records are 224 bytes on this build.
+Restoration copies only the old PS1 prefix. An isolated old-buffer reproduction
+fails ASan with a 224-byte write beyond save_out_buffer.
+
+Decision: Extend the fixed-width save codec with a typed partner view containing
+native animals, pointer-free estate metadata and the eight-byte farm identity.
+Decode only after checksum/slot validation and byte-unshifting. Route transfer
+counts, free slots, names, capacities and UI through that view. Stash and restore
+complete native records in an aligned buffer sized for five maximum-sized animal
+records. Clear the complete buffer. Before the existing shift/checksum/write,
+encode only the original 0x1F34 animal extent, clearing reserved runtime-address
+words and preserving every subsequent partner payload byte. Native view state
+joins the save overlay's reset inventory. Keep original source alternatives.
+
+Validation: Real source staging/restoration fixtures exchange five cows and five
+chickens using synthetic farms and an in-memory payload. They cover final record
+slots, stash capacity/reset, full native tail restoration, metadata/identity,
+short-input rejection, unchanged non-animal bytes and original shift/checksum
+round trips. No owner saves are opened or written. Release and ASan/UBSan each
+pass 99/99 tests; seven changed translation units pass targeted Clang analysis
+without core/unix/security findings. These checks do not establish interactive
+card failure/abort/retry behavior, original-PS1 interchange or full-game parity.
+The original exchange transaction/error policy is unchanged; no atomic-write or
+rollback guarantee is introduced. Matching check remains unavailable (no Linux
+toolchain, no WSL); textual source reconstruction is a separate check.

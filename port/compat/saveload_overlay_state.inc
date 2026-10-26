@@ -40,6 +40,7 @@ void hm_saveload_overlay_capture(void) {
         {&save_entries, sizeof(save_entries)},
         {&save_work_table, sizeof(save_work_table)},
         {&save_out_buffer, sizeof(save_out_buffer)},
+        {&hm_save_partner_state, sizeof(hm_save_partner_state)},
         {&save_sheet, sizeof(save_sheet)},
         {&save_sprites, sizeof(save_sprites)},
         {&saveload_unused_80145760, sizeof(saveload_unused_80145760)},

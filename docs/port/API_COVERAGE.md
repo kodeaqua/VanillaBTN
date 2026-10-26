@@ -35,6 +35,7 @@ outside this audited list. It does not detect a new call inside an already
 listed file, dynamic calls or unrelated runtime errors. Runtime trig and card
 tests cover the newly implemented calls without disc data.
 
-Other known gaps include livestock-transfer raw save views, original-PS1 save
-interchange, and full interactive overnight/event/area coverage. Link success
+Livestock transfer now uses a native partner view and bounded stash (ADR-066).
+Other known gaps include original-PS1 save interchange, interactive transfer
+failure/retry behavior, and full overnight/event/area coverage. Link success
 and passing synthetic tests do not prove these paths safe.
