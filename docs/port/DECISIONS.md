@@ -942,3 +942,23 @@ mixing, muting and cancellation. Real-disc continuation remains under test.
 References: https://psx-spx.consoledev.net/cdromformat/ (XA headers, predictors,
 interpolation coefficients) and public CD command descriptions. No SDK or other
 PSX implementation code is copied.
+
+<a id="adr-042"></a>
+
+## ADR-042: Pass the harvest helper to its action callback
+
+Date: 2026-10-26. Status: accepted for native calling-convention correctness.
+
+After Zack's introduction, the first unpaused field ticks run the harvest
+helpers. ASan catches a write into read-only storage in farm_cue_step_run,
+called through harvest_helper_timer_tick. That dispatcher calls action() with
+no argument although the cue/work callbacks require the helper/actor pointer.
+The original code relies on an argument register staying live; native code
+cannot rely on it, and the wrong pointer reaches cue state writes.
+
+Pass helper explicitly only in the native branch. Keep the original no-argument
+call in the matching branch. All action-table entries consume the helper or
+its first actor member. A regression runs the original public helper updater
+twice with all seven helpers offscreen and clock ticking, checking each cue's
+start/play state, timer, position integration and unrelated field preservation.
+No helper is disabled or replaced with a success stub.
