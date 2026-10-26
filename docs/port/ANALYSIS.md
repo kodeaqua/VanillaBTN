@@ -643,3 +643,23 @@ Background ranges merge when adjoining and include both sprite and mode arrays.
 Only CMake adapters/port code change; no additional matching guards are added.
 Release and ASan/UBSan each pass 90 tests. The owner-reported camera displacement
 after two sleeps remains unresolved; opt-in host coordinate logging is available.
+
+### Pause canvas and source audit (ADR-063/064, 2026-10-27)
+
+Pause now reconstructs a full logical wide frame once and keeps the original
+menu proportional at the centre. Unavailable private transition frames use
+proportional native output/black sides instead of fabricated edge-column strips.
+See ADR-063 for logical-resolution and resize limitations.
+
+New HMBTN_PORT guards under ADR-064:
+- event/event_script.c: native helper include and villager sprite-copy routing (2).
+- picture_cells.c: full-width gift table addressing and typed callback calls (2).
+- animals/chicken.c: sizeof-native record clearing (1).
+- farm_init.c: async-wait include and farm re-entry loader progress (2).
+
+All paths are under src/overlay/11_GF_FARM/. Five minigame overlays use only CMake
+asset-poll aliases, adding no matching-source guards. SOURCE_AUDIT.md records all
+113 game C files and 68 native implementation units initially analyzed, confirmed
+repairs and unresolved findings. The old sprite copy fails its synthetic fixture;
+Release and ASan/UBSan each pass 94 tests after the repairs. Saibara dialogue and
+two-sleep camera behavior remain owner-validation items.

@@ -195,3 +195,19 @@ view/event state and flags every 120 hardware ticks on stderr. No positions are
 changed. The diagnostic is disabled by default; never commit owner screenshots,
 save data or captured gameplay logs. The current local diagnostic launch writes
 build/port/camera-play.stderr.log. Do not claim the camera issue fixed yet.
+
+### Pause, transitions and source audit (2026-10-27)
+
+The owner supplied a pause view with smeared horizontal side strips, also seen
+before/after cutscenes and area transitions. ADR-063 freezes genuine wide side
+pixels for pause, centres the original menu and removes edge-column stretching
+from all fallback presentation. Unsupported wide transition snapshots may use
+black sidebars; this is not full transition reconstruction.
+
+A later outside-blacksmith NPC crash maps to sprite_draw_frame+0x26 in timestamp
+0x6adfcd97. ADR-064 repairs a confirmed PS1-sized villager animation copy that
+corrupts native fields, plus other source-audit findings. The old copier fails
+its synthetic fixture. Current Release and ASan/UBSan each pass 94/94 tests.
+Try the same NPC interaction, repeated sleeps, pause and transitions again. No
+interactive success is claimed until the owner verifies them. SOURCE_AUDIT.md
+lists static coverage and remaining issues, including shop/status/transfer paths.

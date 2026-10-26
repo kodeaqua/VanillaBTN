@@ -1,4 +1,5 @@
 #include "animal_actions.h"
+#include "chicken.h"
 #include "farm_state.h"
 #include "screen_fade.h"
 #include <stdio.h>
@@ -36,6 +37,12 @@ int main(void) {
     farm_action_clear(&game_state.animals.actions[5]);
     const u8 *bytes = (const u8 *)&game_state.animals.actions[5];
     for (size_t i = 0; i < sizeof(FarmAction); ++i)
+        CHECK(bytes[i] == 0);
+    FarmChicken *last = &game_state.animals.chickens[9];
+    memset(last, 0xa5, sizeof(*last));
+    chicken_clear(last);
+    bytes = (const u8 *)last;
+    for (size_t i = 0; i < sizeof(*last); ++i)
         CHECK(bytes[i] == 0);
     puts("Native animal scans preserve empty/held/location rules, last slots and action clearing");
     return 0;

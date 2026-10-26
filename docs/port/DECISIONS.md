@@ -1699,3 +1699,60 @@ confirms the reported view, but no camera/player state was captured before the
 process closed. An opt-in HMBTN_TRACE_CAMERA host diagnostic logs only game
 coordinates/flags every 120 hardware ticks. It does not alter simulation and is
 OFF unless explicitly set. Root cause and a camera fix remain pending evidence.
+
+## ADR-063: Freeze the complete pause canvas and preserve fallback aspect
+
+Date: 2026-10-27
+
+Context: The owner supplies pause/transitions with horizontally smeared sides.
+Pause freezes a 320x240 native scanout; presentation extends its edge columns to
+fill widescreen. The same presenter invents side pixels while transitions bypass
+private frame replay. This is visible stretching rather than additional scene.
+
+Decision: Reconstruct one frozen logical widescreen canvas at pause entry using
+the existing private output, taking interpolation when applicable. Draw the
+original 320x240 menu in the centre, with the same 40% scrim across the full
+canvas. Retain real side pixels instead of repeating columns. Keep a proportional
+native fallback with black sidebars when a valid wide replay is unavailable.
+Remove edge-column extension from the common presenter. No camera, game state,
+RNG or game ticks are modified by pause reconstruction. The pause snapshot is at
+logical resolution; it does not promise a full-resolution GPU screenshot. Window
+aspect changes while already paused do not regenerate the frozen projection.
+
+Validation: The canvas fixture covers 320, 428, odd 571 and maximum 1024 widths,
+all rows, centre extraction, original OFF output and single scrim application.
+Interactive pause/transition validation remains with the owner. Missing wide
+transition captures may temporarily show black sidebars; full transition world
+reconstruction is not claimed.
+
+## ADR-064: Native event animation copy and source-audit corrections
+
+Date: 2026-10-27
+
+Context: The new NPC crash occurs reading an animation range. Whole-tree native
+compiler/analyzer passes and manual review find villager_sprites_copy still using
+PS1 sprite size (0x30) and villager stride (0x1D4). On a native state this copies
+wrong fields and leaves broken pointer tails. Gift reaction lookup also truncates
+pictureCodes; chicken_clear zeros only the old record prefix. Farm re-entry and
+minigame startup waits lack hardware progress. Two item callbacks are called
+through incompatible function types.
+
+Decision: Copy complete named native animation records through compat/villager_sprites,
+retaining the existing event-0x82 reload order. Index native gift tables, clear
+sizeof(FarmChicken), reuse the existing audio wait helper for farm re-entry and
+call the two special item callbacks through their actual signatures. Function
+pointer conversions are used only for identity comparison. Preserve exact original
+source branches under HMBTN_PORT. For the five minigame overlays only, a CMake
+adapter adds VSync(0) after an unfinished afile poll; initial/completed reads and
+all ordinary game asynchronous reads keep their timing. No fake assets, callback
+results or broad source reformatting are introduced.
+
+Validation: The old villager copier fails the new fixture; the fixed helper
+preserves all fields outside the copied animations across 37 records and checks
+the conditional reload path. Tests cover all gift bit positions/rows and remapped
+reaction classes, native chicken tails, coin/berry use and bounded pending asset
+polls. Release and ASan/UBSan each pass 94 tests. See SOURCE_AUDIT.md for exact
+coverage, open findings and the limits of static analysis. The reported NPC and
+camera behavior still need owner testing. Matching check is unavailable because
+the Linux toolchain is absent and WSL is prohibited; disabled new source branches
+are checked textually instead.
