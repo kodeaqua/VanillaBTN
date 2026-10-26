@@ -4,7 +4,7 @@
 #include "psx/gpu_raster.h"
 #include "psx/vram.h"
 #ifdef HM_SCALE_REFERENCE
-#include "enhance/scaling/raster.h"
+#include "gfx/software_raster.h"
 #endif
 #include <SDL3/SDL_main.h>
 #include <stdio.h>
@@ -17,7 +17,7 @@
     } while (0)
 static u8 actual[4096 * 2160 * 4];
 static u16 reference[4096 * 2160];
-static int origin_y, display_test;
+static int origin_y, display_test, texture_linear;
 static hm_vram_context saved_vram, work_vram;
 static u32 xy(int x, int y) { return (u16)x | ((u32)(u16)y << 16); }
 static void setup(void) {
@@ -78,6 +78,7 @@ static int readback(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
 static int fixture(SDL_GPUDevice *device, hm_gpu_renderer *renderer, hm_gpu_scene *builder,
                    const u32 *words, u32 count, u32 width, u32 height, int tolerance) {
     setup();
+    hm_gpu_scene_texture_filter(builder, texture_linear);
     hm_replay_sink previous = hm_gpu_scene_begin(builder, width, height);
     RECT area = {0, (s16)origin_y, 32, 32};
     hm_replay_begin(&area);
@@ -86,7 +87,7 @@ static int fixture(SDL_GPUDevice *device, hm_gpu_renderer *renderer, hm_gpu_scen
     CHECK(hm_gpu_scene_end(builder, previous, &scene));
     setup();
     hm_gpu_execute_words(words, count);
-    if (width == 32 && height == 32) {
+    if (width == 32 && height == 32 && !texture_linear) {
         for (u32 y = 0; y < 32; ++y)
             for (u32 x = 0; x < 32; ++x)
                 reference[y * 32 + x] = hm_vram_pixel(x, y + (u32)origin_y);
@@ -94,8 +95,11 @@ static int fixture(SDL_GPUDevice *device, hm_gpu_renderer *renderer, hm_gpu_scen
 #ifdef HM_SCALE_REFERENCE
     else {
         setup();
-        hm_scaled_surface surface = {.pixels = reference, .width = width, .height = height};
-        previous = hm_replay_bind(hm_scaled_sink(&surface));
+        hm_software_surface surface = {.pixels = reference,
+                                       .width = width,
+                                       .height = height,
+                                       .texture_linear = texture_linear};
+        previous = hm_replay_bind(hm_software_sink(&surface));
         hm_replay_begin(&area);
         hm_gpu_execute_words(words, count);
         hm_replay_bind(previous);
@@ -195,9 +199,9 @@ static int hm_probe_benchmark(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
         u64 start = SDL_GetTicksNS();
         for (int frame = 0; frame < iterations; ++frame) {
             work_vram = saved_vram;
-            hm_scaled_surface surface = {
+            hm_software_surface surface = {
                 .pixels = reference, .width = sizes[size][0], .height = sizes[size][1]};
-            hm_replay_sink previous = hm_replay_bind(hm_scaled_sink(&surface));
+            hm_replay_sink previous = hm_replay_bind(hm_software_sink(&surface));
             hm_replay_begin(&area);
             hm_gpu_execute_words(triangle, 4);
             hm_replay_bind(previous);
@@ -282,26 +286,50 @@ int main(int argc, char **argv) {
                       xy(0, 30)};
     CHECK(!fixture(device, renderer, builder, clipping, sizeof(clipping) / sizeof(*clipping), 32,
                    32, 0));
-    for (u32 depth = 0; depth < 3; ++depth)
-        for (u32 mode = 0; mode < 4; ++mode) {
-            u32 page = 26 | (depth << 7) | (mode << 5), clut = (252 << 6) | 56;
-            u32 textures[] = {0xe1000000 | page,
-                              0xe2000000 | 1 | (3 << 5) | (4 << 10) | (5 << 15),
-                              0x660000ff,
-                              xy(1, 1),
-                              (clut << 16),
-                              xy(24, 24),
-                              0x27808080,
-                              xy(2, 2),
-                              (clut << 16),
-                              xy(28, 3),
-                              (page << 16) | 60,
-                              xy(3, 28),
-                              0x3c00};
-            CHECK(!fixture(device, renderer, builder, textures,
-                           sizeof(textures) / sizeof(*textures), 32, 32, 0));
-        }
+    for (int filtering = 0; filtering <
+#ifdef HM_FILTER_REFERENCE
+                            2
+#else
+                            1
+#endif
+         ;
+         ++filtering) {
+        texture_linear = filtering;
+        for (u32 depth = 0; depth < 3; ++depth)
+            for (u32 mode = 0; mode < 4; ++mode) {
+                u32 page = 26 | (depth << 7) | (mode << 5), clut = (252 << 6) | 56;
+                u32 textures[] = {0xe1000000 | page,
+                                  0xe2000000 | 1 | (3 << 5) | (4 << 10) | (5 << 15),
+                                  0x660000ff,
+                                  xy(1, 1),
+                                  (clut << 16),
+                                  xy(24, 24),
+                                  0x27808080,
+                                  xy(2, 2),
+                                  (clut << 16),
+                                  xy(28, 3),
+                                  (page << 16) | 60,
+                                  xy(3, 28),
+                                  0x3c00};
+                CHECK(!fixture(device, renderer, builder, textures,
+                               sizeof(textures) / sizeof(*textures), 32, 32, 0));
+#ifdef HM_FILTER_REFERENCE
+                if (filtering) {
+                    CHECK(!fixture(device, renderer, builder, textures,
+                                   sizeof(textures) / sizeof(*textures), 64, 64, 9));
+                    CHECK(!fixture(device, renderer, builder, textures,
+                                   sizeof(textures) / sizeof(*textures), 1440, 1080, 9));
+                }
+#endif
+            }
+    }
+    texture_linear = 0;
     CHECK(!hm_probe_random_cases(device, renderer, builder));
+#ifdef HM_FILTER_REFERENCE
+    texture_linear = 1;
+    CHECK(!hm_probe_random_cases(device, renderer, builder));
+    texture_linear = 0;
+#endif
     CHECK(!hm_probe_motion(device, renderer, builder));
 #ifdef HM_SCALE_REFERENCE
     CHECK(!fixture(device, renderer, builder, shapes, sizeof(shapes) / sizeof(*shapes), 64, 64, 0));

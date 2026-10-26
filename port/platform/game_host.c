@@ -1,3 +1,7 @@
+#ifdef HMBTN_ENH_FILTERING
+#include "gfx/game_frame.h"
+#include "gfx/software_output.h"
+#endif
 #ifdef HMBTN_GPU_RASTER
 #include "gfx/frame_replay.h"
 #include "gfx/game_frame.h"
@@ -56,6 +60,9 @@ static u64 hm_gpu_cached_serial;
 static int hm_gpu_fallback_reported;
 #endif
 
+#ifdef HMBTN_ENH_FILTERING
+static hm_software_output *hm_native_filter;
+#endif
 enum { HM_SCAN_WIDTH = 1024, HM_SCAN_HEIGHT = 512 };
 
 static void hm_host_fail(void) {
@@ -128,6 +135,9 @@ static int hm_host_scaling_prepare(void) {
         w = h * 4 / 3;
     else
         h = w * 3 / 4;
+#ifdef HMBTN_ENH_FILTERING
+    hm_scaling_filter(hm_options.linear);
+#endif
     if (hm_scaling_prepare((u32)w, (u32)h))
         return 1;
     hm_host_scaling_unavailable();
@@ -258,11 +268,17 @@ static int hm_host_gpu_present(const RECT *native_area) {
 #if defined(HMBTN_ENH_INTERPOLATION) && defined(HMBTN_ENH_PAUSE_MENU)
     interpolate = hm_options.interpolation && live.eligible;
 #endif
+    u32 texture_filter = 0;
+#if defined(HMBTN_ENH_FILTERING) && defined(HMBTN_ENH_PAUSE_MENU)
+    texture_filter = (u32)hm_options.linear;
+#endif
     u64 cache_serial = interpolate ? 0 : serial;
     if (!cache_serial || hm_gpu_cached_serial != cache_serial || hm_gpu_cached.width != width ||
-        hm_gpu_cached.height != height) {
+        hm_gpu_cached.height != height ||
+        (hm_gpu_cached.words && hm_gpu_cached.words[11] != texture_filter)) {
         hm_gpu_cached_serial = 0;
         hm_gpu_cached = (hm_gpu_scene_data){0};
+        hm_gpu_scene_texture_filter(hm_gpu_commands, texture_filter);
         hm_replay_sink previous = hm_gpu_scene_begin(hm_gpu_commands, width, height);
         int replayed = 0;
 #ifdef HMBTN_ENH_INTERPOLATION
@@ -451,6 +467,20 @@ static void hm_host_pause(void) {
 static void hm_host_present_scanout(u64 tick) {
     const hm_gpu_environment *state = hm_gpu_environment_state();
     const RECT *area = &state->display.disp;
+#if defined(HMBTN_ENH_FILTERING) && defined(HMBTN_ENH_PAUSE_MENU)
+    if (hm_options.linear && !hm_native_filter) {
+        hm_native_filter = hm_software_output_create();
+        if (!hm_native_filter) {
+            hm_options.linear = 0;
+            fprintf(stderr, "Texture filtering unavailable; using nearest output\n");
+        }
+    }
+    if (!hm_options.linear && hm_native_filter) {
+        hm_software_output_destroy(hm_native_filter);
+        hm_native_filter = NULL;
+    }
+#endif
+
 #ifdef HMBTN_ENH_PAUSE_MENU
     hm_options.gpu_active = 0;
 #endif
@@ -462,7 +492,7 @@ static void hm_host_present_scanout(u64 tick) {
         return;
     }
 #endif
-#if defined(HMBTN_ENH_SCALING) || defined(HMBTN_ENH_INTERPOLATION)
+#if defined(HMBTN_ENH_SCALING) || defined(HMBTN_ENH_INTERPOLATION) || defined(HMBTN_ENH_FILTERING)
     hm_render_frame live = hm_game_render_frame();
 #endif
 #ifdef HMBTN_ENH_SCALING
@@ -474,6 +504,30 @@ static void hm_host_present_scanout(u64 tick) {
 #endif
     if (scaling_active)
         previous_sink = hm_scaling_begin();
+#endif
+#ifdef HMBTN_ENH_FILTERING
+    hm_software_view native_filtered = {0};
+    int native_filter_active = 0;
+    hm_replay_sink native_previous = {0};
+    if (state->display_enabled && hm_native_filter && area->w > 0 && area->h > 0
+#ifdef HMBTN_ENH_SCALING
+        && !scaling_active
+#endif
+    ) {
+        hm_software_output_filter(hm_native_filter, 1);
+        native_filter_active =
+            hm_software_output_prepare(hm_native_filter, (u32)area->w, (u32)area->h);
+        if (native_filter_active)
+            native_previous = hm_software_output_begin(hm_native_filter);
+        else {
+            hm_software_output_destroy(hm_native_filter);
+            hm_native_filter = NULL;
+#ifdef HMBTN_ENH_PAUSE_MENU
+            hm_options.linear = 0;
+#endif
+            fprintf(stderr, "Texture filter output allocation failed; using nearest output\n");
+        }
+    }
 #endif
 #ifdef HMBTN_ENH_INTERPOLATION
     hm_interpolated_view interpolated = {0};
@@ -488,6 +542,15 @@ static void hm_host_present_scanout(u64 tick) {
 #endif
             hm_scaling_replay(&live);
         hm_scaling_end(previous_sink, &scaled);
+    }
+#endif
+#ifdef HMBTN_ENH_FILTERING
+    if (native_filter_active) {
+#ifdef HMBTN_ENH_INTERPOLATION
+        if (!interpolated.pixels)
+#endif
+            hm_software_output_replay(hm_native_filter, &live);
+        hm_software_output_end(hm_native_filter, native_previous, &native_filtered);
     }
 #endif
     if (SDL_getenv("HMBTN_TRACE_SCANOUT") && tick % 60 == 0) {
@@ -506,6 +569,12 @@ static void hm_host_present_scanout(u64 tick) {
     if (scaled.pixels) {
         output_width = scaled.width;
         output_height = scaled.height;
+    }
+#endif
+#ifdef HMBTN_ENH_FILTERING
+    if (native_filtered.pixels) {
+        output_width = native_filtered.width;
+        output_height = native_filtered.height;
     }
 #endif
     if (!hm_host_image_size(output_width, output_height)) {
@@ -531,12 +600,20 @@ static void hm_host_present_scanout(u64 tick) {
                 color = scaled.pixels[(size_t)y * output_width + x];
             else
 #endif
+#ifdef HMBTN_ENH_FILTERING
+                if (native_filtered.pixels)
+                color = native_filtered.pixels[(size_t)y * output_width + x];
+            else
+#endif
                 color =
                     state->display_enabled ? hm_vram_pixel((u32)area->x + x, (u32)area->y + y) : 0;
 #ifdef HMBTN_ENH_INTERPOLATION
             if (interpolated.pixels
 #ifdef HMBTN_ENH_SCALING
                 && !scaled.pixels
+#endif
+#ifdef HMBTN_ENH_FILTERING
+                && !native_filtered.pixels
 #endif
             )
                 color = interpolated
@@ -730,6 +807,10 @@ int hm_game_host_start(hm_disc *disc) {
 }
 
 void hm_game_host_stop(void) {
+#ifdef HMBTN_ENH_FILTERING
+    hm_software_output_destroy(hm_native_filter);
+    hm_native_filter = NULL;
+#endif
 #ifdef HMBTN_ENH_SCALING
     hm_scaling_enable(0);
 #endif

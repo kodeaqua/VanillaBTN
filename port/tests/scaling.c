@@ -1,5 +1,5 @@
 #include "enhance/scaling/scaling.h"
-#include "enhance/scaling/raster.h"
+#include "gfx/software_raster.h"
 #ifdef TEST_INTERPOLATION
 #include "enhance/interpolation/interpolation.h"
 #endif
@@ -32,9 +32,9 @@ static void setup(void) {
         for (u32 x = 0; x < 16; ++x)
             hm_vram_draw_pixel(640 + x, 256 + y, (u16)(1 + ((x + y * 3) % 31)));
 }
-static hm_scaled_surface raster(const u32 *words, u32 count, u32 width, u32 height) {
-    hm_scaled_surface surface = {.pixels = pixels, .width = width, .height = height};
-    hm_replay_sink previous = hm_replay_bind(hm_scaled_sink(&surface));
+static hm_software_surface raster(const u32 *words, u32 count, u32 width, u32 height) {
+    hm_software_surface surface = {.pixels = pixels, .width = width, .height = height};
+    hm_replay_sink previous = hm_replay_bind(hm_software_sink(&surface));
     RECT area = {0, 0, 16, 16};
     hm_replay_begin(&area);
     hm_gpu_execute_words(words, count);
@@ -43,7 +43,7 @@ static hm_scaled_surface raster(const u32 *words, u32 count, u32 width, u32 heig
 }
 static int parity(const u32 *words, u32 count) {
     setup();
-    hm_scaled_surface surface = raster(words, count, 16, 16);
+    hm_software_surface surface = raster(words, count, 16, 16);
     if (!surface.begun)
         return 0;
     for (u32 y = 0; y < 16; ++y)
@@ -88,7 +88,7 @@ int main(int argc, char **argv) {
     fixture[13] = xy(2, 12);
     fixture[16] = xy(10, 10);
     setup();
-    hm_scaled_surface surface = raster(fixture, sizeof(fixture) / sizeof(*fixture), 16, 16);
+    hm_software_surface surface = raster(fixture, sizeof(fixture) / sizeof(*fixture), 16, 16);
     CHECK(surface.begun);
     for (int y = 0; y < 16; ++y)
         for (int x = 0; x < 16; ++x)
@@ -127,8 +127,8 @@ int main(int argc, char **argv) {
     tiny.dtd = 0;
     tiny.dfe = 1;
     PutDrawEnv(&tiny);
-    hm_scaled_surface extreme = {.pixels = pixels, .width = 4096, .height = 128};
-    hm_replay_sink saved_sink = hm_replay_bind(hm_scaled_sink(&extreme));
+    hm_software_surface extreme = {.pixels = pixels, .width = 4096, .height = 128};
+    hm_replay_sink saved_sink = hm_replay_bind(hm_software_sink(&extreme));
     RECT tiny_area = {0, 0, 1, 1};
     hm_replay_begin(&tiny_area);
     u32 large[] = {0x300000ff, xy(0, 0), 0x0000ff00, xy(1023, 0), 0x00ff0000, xy(0, 511)};

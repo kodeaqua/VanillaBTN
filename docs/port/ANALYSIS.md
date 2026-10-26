@@ -544,3 +544,13 @@ and unsupported shader formats retain software output. Real gameplay/device
 coverage is not complete. Own HLSL and generated arrays are hash-checked; DXC
 is a pinned ignored developer tool, not a runtime dependency. Source game files
 and matching guards remain unchanged. See ADR-054 and THIRD_PARTY.md.
+
+### Optional texture filtering (2026-10-26)
+
+ADR-055 adds palette-aware bilinear in GPU and private software output, independent
+of scaling. Native VRAM and game clocks remain authoritative and unchanged.
+Release/ASan/UBSan: 80/80 tests. Offscreen Vulkan and D3D12 pass native exact
+and enlarged tolerance comparisons with Nearest/Bilinear. Filtering-ON with
+scaling-OFF also compiles. No game was launched, no gameplay FPS measurement
+was made, and atlas behavior in actual gameplay remains owner-tested.
+No decomp-side source or matching guard changed.

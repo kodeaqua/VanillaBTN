@@ -1420,3 +1420,37 @@ windows, masks, blends, clipping, lines and both framebuffer origins. Enlarged
 color allows one 5-bit step; fractional tile-boundary motion is checked
 separately. No window/game is started. Synthetic timing shows enlarged-output
 benefit and small 1x overhead; see PLATFORMS.md.
+
+## ADR-055: Optional palette-aware texture filtering
+
+Date: 2026-10-26
+
+Context: The owner requests Bilinear/Nearest texture filtering. Previous
+Bilinear only filtered final presentation. It must also work without scaling,
+without changing native VRAM or simulation, and preserve transparent edges.
+
+Decision: Add enhance/filtering, gated by HMBTN_ENH_FILTERING (CMake default
+OFF; Windows -Game enables compilation). Runtime enhance.filtering defaults
+false. An existing explicit graphics.bilinear choice migrates when the new key
+is absent; an explicit new key wins. The existing Filtering row selects it.
+GPU scene header word 11 carries the choice; Nearest retains its old branch.
+CPU output raster/replay helpers move to gfx so filtering does not depend on
+Enhance Scaling. Unsupported GPU scenes retain the software reference.
+
+Sample four CLUT-decoded texels with Q8 weights. Clamp to each primitive's UV
+bounds before texture-window/page addressing, avoiding adjacent atlas texels.
+Shade and PS1 semi-blend each covered tap against the original destination;
+transparent taps contribute that destination, avoiding black halos. Use the
+highest-weight covered tap's mask bit (first wins ties); apply force-mask only
+when covered. Interpolation and simulation remain independent. Native source
+assets are unchanged; bilinear does not create higher-detail textures.
+
+Consequences: Optional replay adds output work and CPU fallback can be costly.
+Primitive-local clamping can expose differing filtering at shared UV bounds.
+Final presentation filtering remains for window scaling. Generated shaders
+hash both scene.hlsl and the filtering include. No new linked dependency.
+Release and ASan/UBSan pass 80 tests. Offscreen Vulkan/D3D12 comparisons cover
+Nearest and Bilinear, CLUT depths, texture windows, masks/blends, deterministic
+random primitives, native and enlarged outputs. Native comparisons are exact;
+enlarged color tolerance is 9/255. These do not establish gameplay performance
+or full-game atlas compatibility; owner gameplay validation remains pending.

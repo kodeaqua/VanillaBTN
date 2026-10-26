@@ -9,7 +9,7 @@ The owner requested the native pause interface and graphics settings on
 | ESC pause, Resume, Settings > Graphics, Exit Game | Host interface implemented; owner interactive test pending |
 | Original dialog presentation/font | Original window-frame C and runtime disc glyph cache; synthetic composition and local asset decoding checks pass |
 | Monitor/window mode/resolution | SDL display controls implemented; owner monitor/fullscreen test pending |
-| Filtering | Nearest/bilinear final-frame presentation; per-texture filtering is pending |
+| Filtering | Optional palette-aware texture bilinear plus final-frame presentation (ADR-055) |
 | VSync | On (mailbox/FIFO) or supported immediate Off; device validation pending |
 | FPS limit | Native (30), Off (Unlimited), or monitor-derived rational caps; fixed 60 Hz game ticks; native images unless optional interpolation is enabled |
 | Visual interpolation | Optional private primitive replay for normal farm views; synthetic checks pass, owner gameplay validation pending |
@@ -49,8 +49,7 @@ remain fully bright, and native VRAM is unchanged.
 Enhance Scaling now has a private viewport-resolution raster path (ADR-052).
 Windows -Game compiles HMBTN_ENH_SCALING; enhance.scaling defaults false. The
 initial implementation rerasterizes triangles/quads at viewport size, preserving
-original texture assets and 4:3 bars. Output supports up to 4096 per axis with software fallback. Per-texture
-filtering remains pending; high FPS in actual gameplay is not established. See
+original texture assets and 4:3 bars. Output supports up to 4096 per axis with software fallback. High FPS in actual gameplay is not established. See
 port/enhance/scaling/README.md and the synthetic measurements in PLATFORMS.md.
 
 Interpolation now uses stable field-cell identities and a shared-vertex mesh
@@ -64,3 +63,10 @@ independent of enhance.scaling. Software remains selectable. Native GPU pixel
 comparisons pass on Vulkan/D3D12; unsupported transfers/feedback and direct
 loading retain CPU fallback. The normal low-resolution VRAM compatibility path
 and pause canvas still use CPU. No complete GPU-offload or playthrough claim.
+
+Texture Bilinear now works in GPU Auto and Software, at native or enhanced
+resolution. HMBTN_ENH_FILTERING gates compilation; enhance.filtering defaults
+false, with migration of an existing explicit graphics.bilinear setting.
+Nearest preserves the reference path. Transparent taps preserve the background;
+UV bounds prevent neighboring atlas samples. See enhance/filtering/README.md
+and ADR-055 for mask policy and limitations. Actual gameplay remains unverified.

@@ -219,3 +219,13 @@ conservatively falls back on unsupported dependencies/transfers or capacity.
 The owner's active windows-release executable remains untouched; a separately
 linked windows-gpu-preview executable contains the latest changes while that
 process is open. Owner gameplay confirmation of the field-seam fix is pending.
+
+### Optional texture filtering (2026-10-26)
+
+ADR-055 adds palette-aware bilinear in GPU and private software output, independent
+of scaling. Native VRAM and game clocks remain authoritative and unchanged.
+Release/ASan/UBSan: 80/80 tests. Offscreen Vulkan and D3D12 pass native exact
+and enlarged tolerance comparisons with Nearest/Bilinear. Filtering-ON with
+scaling-OFF also compiles. No game was launched, no gameplay FPS measurement
+was made, and atlas behavior in actual gameplay remains owner-tested.
+No decomp-side source or matching guard changed.

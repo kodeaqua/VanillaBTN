@@ -18,6 +18,7 @@ try {
         $configureArgs += '-DHMBTN_ENH_PAUSE_MENU=ON'
         $configureArgs += '-DHMBTN_ENH_INTERPOLATION=ON'
         $configureArgs += '-DHMBTN_ENH_SCALING=ON'
+        $configureArgs += '-DHMBTN_ENH_FILTERING=ON'
     }
     & cmake @configureArgs
     if ($LASTEXITCODE -ne 0) { throw 'Windows configure failed' }

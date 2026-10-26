@@ -2,11 +2,10 @@
 #define HMBTN_SCALING_H
 #include "gfx/frame_events.h"
 #include "gfx/replay_sink.h"
-typedef struct {
-    const u16 *pixels;
-    u32 width, height;
-} hm_scaled_view;
+#include "gfx/software_output.h"
+typedef hm_software_view hm_scaled_view;
 int hm_scaling_enable(int enabled);
+void hm_scaling_filter(int linear);
 /* Configure only on output changes; steady-state rendering allocates nothing.
  * The limit is 4096 per axis / 16M pixels. Unsupported sizes return failure. */
 int hm_scaling_prepare(u32 width, u32 height);

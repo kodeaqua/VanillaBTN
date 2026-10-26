@@ -23,6 +23,7 @@ $outputRoot = Join-Path $repoRoot 'build/port/shaders'
 New-Item -ItemType Directory -Force -Path $outputRoot | Out-Null
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 $source = [IO.File]::ReadAllText((Join-Path $repoRoot 'port/gfx/shaders/scene.hlsl')).Replace("`r`n", "`n")
+$source += "`n/* filtering */`n" + [IO.File]::ReadAllText((Join-Path $repoRoot 'port/enhance/filtering/texture.hlsl')).Replace("`r`n", "`n")
 $hasher = [Security.Cryptography.SHA256]::Create()
 $sourceHash = -join ($hasher.ComputeHash($utf8.GetBytes($source)) | ForEach-Object { $_.ToString('x2') })
 $hasher.Dispose()

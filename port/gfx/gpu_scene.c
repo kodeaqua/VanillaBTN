@@ -10,7 +10,7 @@ struct hm_gpu_scene {
     u32 width, height, count, tiles_x, tiles_y;
     RECT area;
     const char *failure;
-    int begun;
+    int begun, texture_linear;
     u64 revision;
     const u32 *motion_previous, *motion_current;
     u32 motion_count, motion_alpha;
@@ -165,8 +165,9 @@ static void hm_scene_triangle(hm_gpu_scene *s, u32 *material, const u32 xy[3], c
     }
     if (x1 - x0 > 1023 || y1 - y0 > 511)
         return;
-    int margin=s->motion_previous?1:0;
-    if(x1+margin<=s->area.x||y1+margin<=s->area.y||x0-margin>=s->area.x+s->area.w||y0-margin>=s->area.y+s->area.h)
+    int margin = s->motion_previous ? 1 : 0;
+    if (x1 + margin <= s->area.x || y1 + margin <= s->area.y ||
+        x0 - margin >= s->area.x + s->area.w || y0 - margin >= s->area.y + s->area.h)
         return;
     s64 area = (s64)((s32)p[20] - (s32)p[18]) * ((s32)p[23] - (s32)p[19]) -
                (s64)((s32)p[21] - (s32)p[19]) * ((s32)p[22] - (s32)p[18]);
@@ -354,6 +355,7 @@ static void hm_scene_command(void *context, const u32 *w, u32 available, int aft
 }
 hm_gpu_scene *hm_gpu_scene_create(void) { return calloc(1, sizeof(hm_gpu_scene)); }
 void hm_gpu_scene_destroy(hm_gpu_scene *s) { free(s); }
+void hm_gpu_scene_texture_filter(hm_gpu_scene *s, int linear) { s->texture_linear = !!linear; }
 static u32 hm_scene_consume(void *context, const u32 *w, u32 available) {
     if (!available)
         return 0;
@@ -440,6 +442,7 @@ int hm_gpu_scene_end(hm_gpu_scene *s, hm_replay_sink previous, hm_gpu_scene_data
     s->packed[8] = primitives;
     s->packed[9] = bins;
     s->packed[10] = s->count;
+    s->packed[11] = (u32)s->texture_linear;
     memcpy(s->packed + primitives, s->primitives, s->count * HM_SCENE_STRIDE * sizeof(u32));
     memcpy(s->packed + bins, s->bins, s->tiles_x * s->tiles_y * HM_SCENE_BIN_WORDS * sizeof(u32));
     *data = (hm_gpu_scene_data){s->packed, (size_t)total * sizeof(u32), ++s->revision, s->width,

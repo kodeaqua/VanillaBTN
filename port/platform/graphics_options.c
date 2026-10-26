@@ -56,6 +56,17 @@ void hm_graphics_load(hm_graphics_options *o) {
         scale_length == 4 && !SDL_memcmp(scale_value, "true", 4))
         o->scaling = 1;
 #endif
+#ifdef HMBTN_ENH_FILTERING
+    const char *filter_value;
+    size_t filter_length;
+    if (bytes >= 0 && hm_json_property(text, (size_t)bytes, "enhance", &object, &length) == 1 &&
+        hm_json_property(object, length, "filtering", &filter_value, &filter_length) == 1) {
+        if (filter_length == 4 && !SDL_memcmp(filter_value, "true", 4))
+            o->linear = 1;
+        else if (filter_length == 5 && !SDL_memcmp(filter_value, "false", 5))
+            o->linear = 0;
+    }
+#endif
     SDL_free(text);
     hm_validate_rate(o);
 }
@@ -75,6 +86,10 @@ int hm_graphics_save(const hm_graphics_options *o) {
 #ifdef HMBTN_ENH_SCALING
     if (ok)
         ok = hm_user_data_set_nested_setting("enhance", "scaling", o->scaling ? "true" : "false");
+#endif
+#ifdef HMBTN_ENH_FILTERING
+    if (ok)
+        ok = hm_user_data_set_nested_setting("enhance", "filtering", o->linear ? "true" : "false");
 #endif
     return ok;
 }
@@ -379,7 +394,14 @@ void hm_graphics_value(const hm_graphics_options *o, int item, char *text, size_
     } else if (item == 9)
         SDL_snprintf(text, capacity, "%s", o->interpolation ? "On - world motion" : "Off");
     else if (item == 6)
-        SDL_snprintf(text, capacity, "%s", o->linear ? "Bilinear" : "Nearest Neighbor");
+        SDL_snprintf(text, capacity, "%s",
+                     o->linear ?
+#ifdef HMBTN_ENH_FILTERING
+                               "Bilinear - textures"
+#else
+                               "Bilinear - presentation"
+#endif
+                               : "Nearest Neighbor");
     else if (item == 10)
         SDL_snprintf(text, capacity, "%s",
                      o->renderer     ? "Software"
