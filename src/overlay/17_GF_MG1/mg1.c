@@ -99,7 +99,12 @@ static void mg1_screen_race_roster(void);
 static void mg1_start_race(void);
 static void mg1_race_frame(void);
 static void mg1_results_screen(void);
+#ifdef HMBTN_PORT
+/* PORT: the frame dispatcher ignores this result - see docs/port/DECISIONS.md#adr-067 */
+static void mg1_draw_award_screen(void);
+#else
 static s32 mg1_draw_award_screen(void);
+#endif
 static void mg1_show_total(void);
 static void mg1_init_records(void);
 static void mg1_record_add(s32 value, s16 code);
@@ -659,7 +664,12 @@ static void mg1_results_screen(void) {
 
 /* Draw the award window for the round's race, and play the award sound when the leader's bets
  * pay out. Once the window closes, move on to the total. */
+#ifdef HMBTN_PORT
+/* PORT: no undefined non-void fall-through while waiting - see docs/port/DECISIONS.md#adr-067 */
+static void mg1_draw_award_screen(void) {
+#else
 static s32 mg1_draw_award_screen(void) {
+#endif
     u_long *base;
     u_long *text_base;
     u_long *sub_object;
@@ -693,7 +703,12 @@ static s32 mg1_draw_award_screen(void) {
             mg1_state.soundVoice = sound_play(0x3E);
         }
         mg1_state.step = nextStep;
+#ifdef HMBTN_PORT
+        /* PORT: state advancement is carried by mg1_state.step - see docs/port/DECISIONS.md#adr-067 */
+        return;
+#else
         return nextStep;
+#endif
     }
 }
 
