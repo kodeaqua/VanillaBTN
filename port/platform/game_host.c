@@ -1,3 +1,4 @@
+#include "farm_state.h"
 #include "platform/gpu_present.h"
 #ifdef HMBTN_ENH_WIDESCREEN
 #include "enhance/widescreen/widescreen.h"
@@ -49,6 +50,7 @@ static Uint64 hm_start;
 static hm_input_replay hm_replay;
 static int hm_replay_enabled;
 static u64 hm_host_tick_limit;
+static int hm_trace_camera;
 static hm_present_clock hm_presentation;
 #ifdef HMBTN_ENH_PAUSE_MENU
 static hm_pause_assets hm_assets;
@@ -487,6 +489,21 @@ static void hm_host_pause(void) {
 #endif
 
 static void hm_host_present_scanout(u64 tick) {
+    if (hm_trace_camera && tick % 120 == 0) {
+        const FarmPlayer *player = &game_state.player;
+        const FarmScroll *scroll = &farm_area.mode.scroll;
+        fprintf(stderr,
+                "Camera tick=%llu area=%d place=%d,%d player=%d,%d,%d centre=%d,%d,%d "
+                "eye=%d,%d,%d yaw=%d distance=%d height=%d global=%08x debug=%08x "
+                "event=%d view=%d entry=%d,%d\n",
+                (unsigned long long)tick, farm_area.mode.area, farm_area.mode.place.value,
+                farm_area.mode.place.location, player->position.vx, player->position.vy,
+                player->position.vz, scroll->centre.vx, scroll->centre.vy, scroll->centre.vz,
+                scroll->a18, scroll->b1A, scroll->c1C, scroll->yaw, scroll->z, scroll->x,
+                game_state.globalFlags, game_state.debugFlags, farm_area.mode.eventMode,
+                farm_area.mode.view, game_state.progress.entryStep,
+                game_state.progress.entrySubStep);
+    }
     const hm_gpu_environment *state = hm_gpu_environment_state();
     const RECT *area = &state->display.disp;
 #if (defined(HMBTN_ENH_FILTERING) || defined(HMBTN_ENH_WIDESCREEN)) && defined(HMBTN_ENH_PAUSE_MENU)
@@ -790,6 +807,7 @@ int hm_game_host_start(hm_disc *disc) {
         hm_replay_enabled = 1;
     }
     SDL_SetMainReady();
+    hm_trace_camera = SDL_getenv("HMBTN_TRACE_CAMERA") != NULL;
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD | SDL_INIT_AUDIO))
         return 0;
     if (!hm_user_data_start()) {
