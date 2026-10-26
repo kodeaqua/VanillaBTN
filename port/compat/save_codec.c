@@ -1,4 +1,5 @@
 #include "compat/save_codec.h"
+#include "compat/save_partner.h"
 #include "farm_state.h"
 #include <stddef.h>
 #include <string.h>
@@ -109,6 +110,24 @@ static void hm_player(u8 *wire, FarmPlayer *live, int decode) {
         hm_anim(wire + 724 + i * 52, &live->toys[i].sprite, decode);
     }
     hm_span(wire + 980, live->poses, sizeof live->poses, decode);
+}
+int hm_save_partner_decode(hm_save_partner *partner, const void *image, size_t bytes) {
+    if (!partner || !image || bytes < HM_SAVE_IMAGE_BYTES)
+        return 0;
+    const hm_save_wire *wire = image;
+    memset(partner, 0, sizeof(*partner));
+    hm_animals((u8 *)wire->animals, &partner->animals, 1);
+    memcpy(&partner->estate, wire->estate, sizeof partner->estate);
+    memcpy(partner->identity, wire->flags, sizeof partner->identity);
+    return 1;
+}
+int hm_save_partner_encode_animals(void *image, size_t bytes, hm_save_partner *partner) {
+    if (!partner || !image || bytes < HM_SAVE_IMAGE_BYTES)
+        return 0;
+    hm_save_wire *wire = image;
+    memset(wire->animals, 0, sizeof wire->animals);
+    hm_animals(wire->animals, &partner->animals, 0);
+    return 1;
 }
 static void hm_helper(u8 *wire, FarmHelper *live, int decode) {
     hm_actor(wire, &live->actor, decode);

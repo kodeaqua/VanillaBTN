@@ -76,7 +76,7 @@ target_compile_options(hmbtn_game_options INTERFACE
 target_compile_definitions(hmbtn_game_options INTERFACE HMBTN_PORT=1)
 
 file(GLOB_RECURSE hm_game_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../src/*.c")
-add_library(hmbtn_game_initial STATIC ${hm_game_sources} overlay/game_lifecycle.c gfx/game_frame.c gfx/field_identity.c compat/async_wait.c compat/asset_wait.c compat/save_codec.c compat/villager_sprites.c enhance/widescreen/game_buffers.c enhance/widescreen/title_background.c enhance/widescreen/menu_background.c)
+add_library(hmbtn_game_initial STATIC ${hm_game_sources} overlay/game_lifecycle.c gfx/game_frame.c gfx/field_identity.c compat/async_wait.c compat/asset_wait.c compat/save_codec.c compat/villager_sprites.c compat/family_names.c enhance/widescreen/game_buffers.c enhance/widescreen/title_background.c enhance/widescreen/menu_background.c)
 target_link_libraries(hmbtn_game_initial PUBLIC hmbtn_game_options hmbtn_work_memory hmbtn_overlay)
 # Keep the game's entry point separate from the host test runners. This source
 # is compiled into the archive only; no native game executable is linked yet.

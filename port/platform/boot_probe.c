@@ -1,6 +1,7 @@
 /* Diagnostic entry into compiled game C. This is not a packaged game launcher;
  * unsupported runtime calls must stop here with their named error. */
 #include "platform/input_replay.h"
+#include "compat/family_names.h"
 #include "overlay/game_lifecycle.h"
 #include "psx/cd_runtime.h"
 #include "psx/pad.h"
@@ -76,6 +77,12 @@ int main(int argc, char **argv) {
     hm_disc_result status = hm_disc_mount(&disc, (hm_disc_stream){file, (u64)bytes, hm_read_at});
     if (status != HM_DISC_OK) {
         fprintf(stderr, "%s\n", hm_disc_error(status));
+        fclose(file);
+        return 1;
+    }
+    status = hm_family_names_load(&disc);
+    if (status != HM_DISC_OK) {
+        fprintf(stderr, "Cannot read original family text: %s\n", hm_disc_error(status));
         fclose(file);
         return 1;
     }
