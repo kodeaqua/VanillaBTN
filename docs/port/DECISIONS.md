@@ -1666,3 +1666,36 @@ mathematical parity limits and the pending-inventory regression check.
 Validation: Windows Release and ASan/UBSan builds each pass all 89 tests, including
 six new runtime fixtures and the inventory check. No new dependency or game data
 is used. Gameplay coverage remains with the owner.
+
+## ADR-062: Preserve widescreen groups during interpolation and tile menu sides
+
+Date: 2026-10-27
+
+Context: The owner observes widescreen only during dialogue, grey title sides,
+and incomplete load/save backgrounds. Inspection finds replay_group in mesh
+matching rather than in the interpolation execution loop. Regular frames use
+interpolation, while dialogue bypasses it. The title's scrolling layer was tagged
+as background but its green base animation 0x1D remained only 320 pixels wide.
+The load/save bg_tile dispatcher also emits only fifteen original tile columns.
+
+Decision: Restore each command's world/UI group during interpolation execution;
+mesh matching must not change replay state. Extend the title base using copies
+of its original animation, and intercept only bg_tile.c animation submissions to
+repeat four-column (96-pixel) periods outside the original grid. Preserve original
+frame, palette and scroll, with no new artwork or stretched text/logo. Tag both
+sprite and draw-mode ranges. Coalesce adjoining background spans so all 165 menu
+tiles and extra side tiles fit the existing inventory without losing later rows.
+All additional geometry is disabled when the runtime margin is zero. No decomp
+source changes, matching guard changes or dependencies are introduced.
+
+Validation: Windows Release and ASan/UBSan each pass 90/90 tests. Tests cover
+interpolated off-canvas world versus clipped UI, both menu allocation styles,
+all 24 scroll phases, 16:9/max-width coverage, original OFF submission counts,
+and title base expansion without logo tagging. Interactive visual confirmation
+remains with the owner; synthetic coverage is not a full-screen gameplay claim.
+
+The owner also reports camera displacement after two sleeps. A window capture
+confirms the reported view, but no camera/player state was captured before the
+process closed. An opt-in HMBTN_TRACE_CAMERA host diagnostic logs only game
+coordinates/flags every 120 hardware ticks. It does not alter simulation and is
+OFF unless explicitly set. Root cause and a camera fix remain pending evidence.

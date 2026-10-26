@@ -8,6 +8,9 @@
 #include "psx/vram.h"
 #include <stdio.h>
 #include <string.h>
+#ifdef TEST_INTERPOLATION
+#include "enhance/interpolation/interpolation.h"
+#endif
 #define CHECK(x)                                                                                   \
     do {                                                                                           \
         if (!(x)) {                                                                                \
@@ -108,6 +111,26 @@ int main(void) {
     CHECK(hm_software_output_replay(out, &frame));
     CHECK(hm_software_output_end(out, previous, &view));
     CHECK(view.pixels[15 * 428 + 20] == 31 && view.pixels[55 * 428 + 20] == 0);
+#ifdef TEST_INTERPOLATION
+    /* The normal moving-world path uses interpolation; dialogs use frame replay.
+     * Both must preserve world/UI clipping, including outside the native view. */
+    CHECK(hm_interpolation_enable(1));
+    for (int i = 0; i < 2; ++i) {
+        frame.tick = i * 2;
+        hm_render_begin(&frame);
+        hm_render_group(1);
+        hm_render_packet(world, 3);
+        hm_render_group(0);
+        hm_render_packet(ui, 3);
+        hm_render_end();
+    }
+    previous = hm_software_output_begin(out);
+    CHECK(hm_interpolation_replay(50000001, &frame));
+    CHECK(hm_software_output_end(out, previous, &view));
+    CHECK(view.pixels[15 * 428 + 20] == 31);
+    CHECK(view.pixels[55 * 428 + 20] == 0);
+    CHECK(hm_interpolation_enable(0));
+#endif
     hm_packet_identity_reset();
     hm_gpu_scene_destroy(gpu);
     hm_software_output_destroy(out);

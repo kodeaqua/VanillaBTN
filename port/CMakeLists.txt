@@ -76,7 +76,7 @@ target_compile_options(hmbtn_game_options INTERFACE
 target_compile_definitions(hmbtn_game_options INTERFACE HMBTN_PORT=1)
 
 file(GLOB_RECURSE hm_game_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../src/*.c")
-add_library(hmbtn_game_initial STATIC ${hm_game_sources} overlay/game_lifecycle.c gfx/game_frame.c gfx/field_identity.c compat/async_wait.c compat/save_codec.c enhance/widescreen/game_buffers.c enhance/widescreen/title_background.c)
+add_library(hmbtn_game_initial STATIC ${hm_game_sources} overlay/game_lifecycle.c gfx/game_frame.c gfx/field_identity.c compat/async_wait.c compat/save_codec.c enhance/widescreen/game_buffers.c enhance/widescreen/title_background.c enhance/widescreen/menu_background.c)
 target_link_libraries(hmbtn_game_initial PUBLIC hmbtn_game_options hmbtn_work_memory hmbtn_overlay)
 # Keep the game's entry point separate from the host test runners. This source
 # is compiled into the archive only; no native game executable is linked yet.
@@ -84,6 +84,8 @@ set_source_files_properties(../src/main/main.c PROPERTIES COMPILE_DEFINITIONS
     "main=hm_game_main;PutDrawEnv=hm_game_put_draw_env;DrawOTag=hm_game_draw_ot;ClearOTagR=hm_game_clear_ot;GsSetWorkBase=hm_game_set_work_base")
 set_source_files_properties(../src/overlay/27_GF_TITLE/title.c PROPERTIES COMPILE_DEFINITIONS
     "anim_draw_sprt_cursor=hm_title_draw_sprt_cursor")
+set_source_files_properties(../src/main/ui/bg_tile.c PROPERTIES COMPILE_DEFINITIONS
+    "anim_draw_sprt_cursor=hm_menu_draw_sprt_cursor;anim_draw_sprt=hm_menu_draw_sprt")
 set_source_files_properties(../src/overlay/11_GF_FARM/field/field.c PROPERTIES COMPILE_DEFINITIONS
     "estate_point_project=hm_field_point_project;anim_draw_sprt_cursor=hm_field_draw_sprt_cursor")
 
@@ -110,10 +112,18 @@ target_link_libraries(hmbtn_software_raster PUBLIC hmbtn_psx_initial)
 if(HMBTN_ENH_WIDESCREEN AND BUILD_TESTING)
     add_executable(hmbtn_widescreen_test tests/widescreen.c)
     target_link_libraries(hmbtn_widescreen_test PRIVATE hmbtn_software_raster hmbtn_gpu_scene)
+    if(HMBTN_ENH_INTERPOLATION)
+        target_link_libraries(hmbtn_widescreen_test PRIVATE hmbtn_interpolation)
+        target_compile_definitions(hmbtn_widescreen_test PRIVATE TEST_INTERPOLATION=1)
+    endif()
     add_test(NAME enhance.widescreen COMMAND hmbtn_widescreen_test)
     add_executable(hmbtn_widescreen_buffers_test tests/widescreen_buffers.c enhance/widescreen/game_buffers.c)
     target_link_libraries(hmbtn_widescreen_buffers_test PRIVATE hmbtn_game_options hmbtn_widescreen)
     add_test(NAME enhance.widescreen_buffers COMMAND hmbtn_widescreen_buffers_test)
+    add_executable(hmbtn_widescreen_background_test tests/widescreen_background.c
+        enhance/widescreen/menu_background.c enhance/widescreen/title_background.c)
+    target_link_libraries(hmbtn_widescreen_background_test PRIVATE hmbtn_game_options hmbtn_psx_initial)
+    add_test(NAME enhance.widescreen_backgrounds COMMAND hmbtn_widescreen_background_test)
 endif()
 if(HMBTN_ENH_FILTERING)
     target_compile_definitions(hmbtn_software_raster PRIVATE HMBTN_ENH_FILTERING=1)

@@ -179,3 +179,19 @@ PocketStation operations through proper asynchronous results. All 89 Release
 and ASan/UBSan tests pass. Re-test those three gameplay triggers with the newly
 built release. The exact day-transition hang cause remains unconfirmed without
 a hang stack. See API_COVERAGE.md for remaining explicit font failures.
+
+### Widescreen and camera follow-up (2026-10-27)
+
+The owner confirms the Natsume logo looks correct but reports grey title sides,
+incomplete load/save coverage and farm widescreen only while dialogue is shown.
+ADR-062 fixes interpolation replay grouping and extends original background
+assets through port adapters. Both Windows suites pass 90/90 tests. Recheck
+moving farm frames with interpolation On, title colour, and load/save sides.
+
+Camera displacement after sleeping twice is a separate open report. The ignored
+window capture is build/port/camera-after-sleep.png. Set HMBTN_TRACE_CAMERA=1 when
+launching the native executable directly to record player/centre/eye coordinates,
+view/event state and flags every 120 hardware ticks on stderr. No positions are
+changed. The diagnostic is disabled by default; never commit owner screenshots,
+save data or captured gameplay logs. The current local diagnostic launch writes
+build/port/camera-play.stderr.log. Do not claim the camera issue fixed yet.

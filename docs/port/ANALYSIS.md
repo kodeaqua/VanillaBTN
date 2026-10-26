@@ -632,3 +632,14 @@ a reproduced progress requirement; the reported hang itself has no captured stac
 ADR-061 and API_COVERAGE.md document implemented math, unsupported PocketStation
 completion and all nine remaining debug-font traps. Release and ASan/UBSan each
 pass 89 tests; these are technical checks, not a complete gameplay pass.
+
+### Widescreen follow-up (ADR-062, 2026-10-27)
+
+Interpolation previously selected replay groups inside mesh matching, leaving
+execution clipped to the UI group. It now restores world/UI per executed command.
+Title base animation 0x1D is repeated alongside the scrolling 0x25 layer; bg_tile
+submissions repeat their original four-column periods for menu side coverage.
+Background ranges merge when adjoining and include both sprite and mode arrays.
+Only CMake adapters/port code change; no additional matching guards are added.
+Release and ASan/UBSan each pass 90 tests. The owner-reported camera displacement
+after two sleeps remains unresolved; opt-in host coordinate logging is available.
