@@ -60,6 +60,12 @@ shared menu-background callback types are corrected as well (ADR-045/046).
 Release and ASan/UBSan pass 69 isolated tests. No new gameplay was launched for
 this fix; the owner still needs to confirm the menu behavior interactively.
 
+The owner confirmed that Load now opens, then reported overlay reentry failure
+when returning to title. The title and save/load overlays now restore their
+complete audited writable native object state on activation (ADR-047). Other
+overlays still reject unsupported reentry. Release and sanitizer builds pass
+71 technical tests; no game loop or interactive replay was run for this change.
+
 | Keyboard | Original pad |
 | --- | --- |
 | Arrows | D-pad |

@@ -53,7 +53,7 @@ target_compile_options(hmbtn_game_options INTERFACE
 target_compile_definitions(hmbtn_game_options INTERFACE HMBTN_PORT=1)
 
 file(GLOB_RECURSE hm_game_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../src/*.c")
-add_library(hmbtn_game_initial STATIC ${hm_game_sources})
+add_library(hmbtn_game_initial STATIC ${hm_game_sources} overlay/game_lifecycle.c)
 target_link_libraries(hmbtn_game_initial PUBLIC hmbtn_game_options hmbtn_work_memory hmbtn_overlay)
 # Keep the game's entry point separate from the host test runners. This source
 # is compiled into the archive only; no native game executable is linked yet.
@@ -114,6 +114,12 @@ add_executable(hmbtn_ot_bench EXCLUDE_FROM_ALL analysis/ot_bench.c)
 target_link_libraries(hmbtn_ot_bench PRIVATE hmbtn_psx_initial)
 
 if(BUILD_TESTING)
+    add_executable(hmbtn_overlay_lifecycle_test tests/overlay_lifecycle.c)
+    target_link_libraries(hmbtn_overlay_lifecycle_test PRIVATE hmbtn_game_initial hmbtn_psx_pending)
+    add_test(NAME overlay.title_load_return COMMAND hmbtn_overlay_lifecycle_test)
+    add_executable(hmbtn_title_reentry_test tests/title_reentry.c)
+    target_link_libraries(hmbtn_title_reentry_test PRIVATE hmbtn_game_initial hmbtn_psx_pending)
+    add_test(NAME overlay.title_reentry COMMAND hmbtn_title_reentry_test)
     add_executable(hmbtn_bg_tile_test tests/bg_tile.c)
     target_link_libraries(hmbtn_bg_tile_test PRIVATE hmbtn_game_options)
     add_test(NAME game.background_callbacks COMMAND hmbtn_bg_tile_test)

@@ -8,8 +8,8 @@ Full playthrough and broader gameplay remain unverified; see WINDOWS_PLAYTEST.md
 | Target | Foundation preset | Validation |
 | --- | --- | --- |
 | Linux x86-64 | linux-release, linux-asan-ubsan | Deferred; requires a separate Linux host, no WSL |
-| Windows x86-64 | windows-release | All 113 original source units and native window build; tests passed (69/69 with -Game) |
-| Windows x86-64 sanitizers | windows-asan-ubsan | All source units and native window build; Clang 20.1.8 ASan/UBSan tests passed (69/69 with -Game); gameplay coverage remains limited |
+| Windows x86-64 | windows-release | All 113 original source units and native window build; tests passed (71/71 with -Game) |
+| Windows x86-64 sanitizers | windows-asan-ubsan | All source units and native window build; Clang 20.1.8 ASan/UBSan tests passed (71/71 with -Game); gameplay coverage remains limited |
 | macOS universal | macos-universal-release | Pending; no macOS host tested |
 | Android arm64 | Pending NDK and minSdk selection | No device/build validation |
 
@@ -29,6 +29,12 @@ and ASan/UBSan. Tests cover deterministic progress during asynchronous asset
 waits, the combined save-image workspace, ordinary-card polling and background
 callback types. The existing hung owner process was inspected with LLDB and
 detached; no new gameplay or replay was run. Owner confirmation remains pending.
+The owner subsequently confirmed the Load menu opens and reported an abort on
+return to title. Title/save-load native state restoration is now implemented;
+actual-object and integration units bring the count to 71 with the SDL test
+(70 without it), all passing in release and ASan/UBSan. These are technical
+checks, not an interactive title/load/return gameplay run. Remaining overlays
+retain explicit unsupported-reentry failures.
 Windows validation compiles all original translation units and links the native
 boot diagnostic. The full-tree syntax inventory passes 113/113; warnings remain
 visible and do not establish runtime safety. Strong game definitions have no

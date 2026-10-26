@@ -1,6 +1,7 @@
 /* Diagnostic entry into compiled game C. This is not a packaged game launcher;
  * unsupported runtime calls must stop here with their named error. */
 #include "platform/input_replay.h"
+#include "overlay/game_lifecycle.h"
 #include "psx/cd_runtime.h"
 #include "psx/pad.h"
 #include "psx/timing.h"
@@ -112,6 +113,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 #endif
+    hm_game_overlays_init();
     int result = hm_game_main();
 #ifdef HMBTN_SDL_HOST
     hm_game_host_stop();

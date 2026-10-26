@@ -81,6 +81,8 @@ static void hm_wait_tick(void *context, u64 tick) {
     ++hm_host_ticks; /* The real window host pumps its event queue here. */
 }
 int main(void) {
+    hm_saveload_overlay_capture();
+    s16 initial_step = save_step;
     MemCardInit(0);
     MemCardStart();
     current_frame = &hm_frame;
@@ -120,5 +122,15 @@ int main(void) {
     CHECK(save_card_poll(SAVE_PORT_2) == SAVE_CARD_BUSY);
     CHECK(save_card_poll(SAVE_PORT_2) == SAVE_CARD_OK);
     hm_card_detach();
+    for (int visit = 0; visit < 4; ++visit) {
+        save_step = 99;
+        save_slot = 2;
+        save_image = save_file_header + 0x280;
+        save_file_header[SAVE_FILE_BYTES - 1] = 77;
+        save_sprites[0].source = (AnimFile *)hm_icons;
+        CHECK(hm_overlay_select(15, 1) == 0);
+        CHECK(save_step == initial_step && save_slot == 0 && save_image == NULL);
+        CHECK(save_file_header[SAVE_FILE_BYTES - 1] == 0 && save_sprites[0].source == NULL);
+    }
     return 0;
 }

@@ -1090,3 +1090,40 @@ per call, frame sequence, negative coordinates, animation binding and current
 frame primitive-cursor pointers. No actual asset or window is used. The original
 matching branches reconstruct exactly; the matching compiler check itself
 remains unverified because its Linux toolchain is unavailable here.
+
+<a id="adr-047"></a>
+
+## ADR-047: Restore title and save/load overlays from native object snapshots
+
+Date: 2026-10-26. Status: accepted for the title/load/return lifecycle.
+
+The owner reaches the Load menu, then returning to title aborts at the explicit
+overlay reentry guard from ADR-017. Removing that guard alone would retain
+mutated overlay data and BSS. Capture pristine native object representations
+before hm_game_main, after native relocations and C initializers have run.
+Before each supported activation, copy them back into their original objects.
+Resident game state, work buffers, hardware state and the other overlay region
+are not included in this restoration.
+
+The title inventory contains all 44 writable file-scope objects; save/load has
+42 original writable objects plus the native save workspace. Clang AST inspection
+and source review found no function-local static variables in these two units.
+Keep immutable constants untouched. Lists live in native-only includes at the
+end of each original translation unit and must be maintained when writable
+overlay state changes. This preserves private symbols and captures initialized
+tables, pointers, callbacks and zero-initialized arrays without assuming object
+adjacency, PS1 address layouts, linker sections or disabled sanitizer redzones.
+
+The registry copies object descriptors and pristine bytes once at startup.
+Repeated capture calls cannot replace the pristine copy with mutated state.
+Registry metadata reset retains snapshots. Unsupported overlays still explicitly
+reject reentry; their state inventories are not silently assumed complete.
+This supersedes ADR-017's reentry restriction only for title and save/load.
+
+Tests mutate actual private title counters, callback, arrays, native pointers and
+initialized tables and verify five restorations. The save/load fixture verifies
+four restorations including its complete workspace and animation pointer. A
+separate integration unit registers both real inventories, alternates their
+selections six times and checks resident game state survives. No game loop,
+window, disc or interactive replay is started. Matching check remains unavailable
+on this native Windows host; matching-branch text reconstruction is separate.

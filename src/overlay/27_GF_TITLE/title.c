@@ -3735,3 +3735,9 @@ static void title_copy_new_game_toolbox(void) {
         src++;
     } while (i < 5U);
 }
+#ifdef HMBTN_PORT
+/* PORT: restore native overlay state on reentry -
+ * see docs/port/DECISIONS.md#adr-047. */
+#include "compat/title_overlay_state.inc"
+#else
+#endif

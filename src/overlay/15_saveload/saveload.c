@@ -4819,3 +4819,9 @@ static void save_file_name(char *name, u32 slot)
     }
     strcpy(name, save_card_file_names[slot]);
 }
+#ifdef HMBTN_PORT
+/* PORT: restore native overlay state on reentry -
+ * see docs/port/DECISIONS.md#adr-047. */
+#include "compat/saveload_overlay_state.inc"
+#else
+#endif

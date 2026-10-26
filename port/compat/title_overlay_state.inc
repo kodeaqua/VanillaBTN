@@ -1,0 +1,53 @@
+/* Complete writable file-scope state inventory for this overlay.
+ * Audited with Clang AST; no function-local statics are present.
+ * Copy real objects individually so ASan global redzones stay enabled. */
+#include "overlay/registry.h"
+void hm_title_overlay_capture(void) {
+    static const hm_overlay_span spans[] = {
+        {&title_layout0_cells, sizeof(title_layout0_cells)},
+        {&title_layout1_cells, sizeof(title_layout1_cells)},
+        {&title_layout2_cells, sizeof(title_layout2_cells)},
+        {&title_layout3_cells, sizeof(title_layout3_cells)},
+        {&D_800BC998, sizeof(D_800BC998)},
+        {&D_800BCAEC, sizeof(D_800BCAEC)},
+        {&title_new_game_toolbox, sizeof(title_new_game_toolbox)},
+        {&title_image_0, sizeof(title_image_0)},
+        {&title_image_1, sizeof(title_image_1)},
+        {&title_image_2, sizeof(title_image_2)},
+        {&title_blocks, sizeof(title_blocks)},
+        {&title_step_handlers, sizeof(title_step_handlers)},
+        {&title_step_fn, sizeof(title_step_fn)},
+        {&title_load_state, sizeof(title_load_state)},
+        {&title_menu_page, sizeof(title_menu_page)},
+        {&title_logo_frames, sizeof(title_logo_frames)},
+        {&title_idle_frames, sizeof(title_idle_frames)},
+        {&title_sequence_state, sizeof(title_sequence_state)},
+        {&title_sequence_done, sizeof(title_sequence_done)},
+        {&title_saved_flags, sizeof(title_saved_flags)},
+        {&title_anim_a_timer, sizeof(title_anim_a_timer)},
+        {&title_anim_b_timer, sizeof(title_anim_b_timer)},
+        {&title_anim_c_timer, sizeof(title_anim_c_timer)},
+        {&title_column_a_count, sizeof(title_column_a_count)},
+        {&title_column_b_count, sizeof(title_column_b_count)},
+        {&title_column_c_count, sizeof(title_column_c_count)},
+        {&title_logo_slide, sizeof(title_logo_slide)},
+        {&title_drop_count, sizeof(title_drop_count)},
+        {&title_logo_wipe, sizeof(title_logo_wipe)},
+        {&title_image_ptrs, sizeof(title_image_ptrs)},
+        {&title_scroll_a, sizeof(title_scroll_a)},
+        {&title_scroll_b, sizeof(title_scroll_b)},
+        {&title_caption_offsets, sizeof(title_caption_offsets)},
+        {&title_block_entries, sizeof(title_block_entries)},
+        {&title_anim_0, sizeof(title_anim_0)},
+        {&title_anim_1, sizeof(title_anim_1)},
+        {&title_anim_2, sizeof(title_anim_2)},
+        {&title_column_a, sizeof(title_column_a)},
+        {&title_column_b, sizeof(title_column_b)},
+        {&title_column_c, sizeof(title_column_c)},
+        {&title_anim_3, sizeof(title_anim_3)},
+        {&title_cursor_anim, sizeof(title_cursor_anim)},
+        {&title_sprite_file, sizeof(title_sprite_file)},
+        {&title_birth_text, sizeof(title_birth_text)},
+    };
+    hm_overlay_capture(27, spans, sizeof(spans) / sizeof(spans[0]));
+}
