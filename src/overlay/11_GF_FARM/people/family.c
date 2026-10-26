@@ -81,9 +81,17 @@ void family_daily_update(void) {
 u32 family_tables[5] = {0x80127F98, 0x80127FA4, 0x80127FAC, 0x80127FB8, 0x80127FC4};
 
 /* The family_tables entry of the current wife. */
+#ifdef HMBTN_PORT
+/* PORT: original glyphs loaded from the owner disc - see docs/port/DECISIONS.md#adr-065 */
+#include "compat/family_names.h"
+u16 *family_table_lookup(void) {
+    return hm_family_name(game_state.family.wifeIndex);
+}
+#else
 s32 family_table_lookup(void) {
     return family_tables[game_state.family.wifeIndex];
 }
+#endif
 
 /* Count the pregnancy: after FAMILY_PREGNANCY_TICKS ticks the days count up, and the
  * pregnancy starts once the wife's affection is past FAMILY_PREGNANCY_AFFECTION. */
