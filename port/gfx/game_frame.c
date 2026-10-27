@@ -17,7 +17,8 @@ hm_render_frame hm_game_render_frame(void) {
     if (!current_frame)
         return frame;
     frame.tick = hm_timing_ticks();
-    frame.bypass = !main_put_env_enabled || loading_screen_is_active();
+    frame.bypass = loading_screen_is_active();
+    frame.retain = !main_put_env_enabled;
     frame.key = ((u64)(u16)main_scene << 48) | ((u64)(u16)farm_area.mode.area << 32) |
                 ((u64)(u16)farm_area.mode.place.value << 16) | (u16)farm_area.mode.place.location;
     frame.world_view = main_put_env_enabled && scene_frame_handler == farm_enter_dispatch &&
@@ -46,6 +47,12 @@ DRAWENV *hm_game_put_draw_env(DRAWENV *environment) {
     return result;
 }
 void hm_game_draw_ot(u32 *table) {
+    /* Frame blends intentionally skip PutDrawEnv. Observe their actual OT too;
+     * otherwise presentation falls back to the 4:3 native scanout mid-fade. */
+    if (!main_put_env_enabled && active_ot && table == active_ot + 1) {
+        hm_render_frame frame = hm_game_render_frame();
+        hm_render_begin(&frame);
+    }
     hm_render_group(current_frame && table == current_frame->ot + FRAME_OT_DEPTH - 1);
     DrawOTag(table);
     if (active_ot && table == active_ot + 1)

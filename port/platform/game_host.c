@@ -654,6 +654,23 @@ static void hm_host_present_scanout(u64 tick) {
         hm_software_output_end(hm_native_output, native_previous, &native_filtered);
     }
 #endif
+    /* A direct/loading scanout has no replayable scene. Keep its native pixels
+     * centred on the same wide canvas rather than changing the output aspect. */
+    RECT source_area = *area;
+#ifdef HMBTN_ENH_WIDESCREEN
+    RECT scanout_area = hm_widescreen_area(source_area);
+    int wide_scanout = 0;
+#ifdef HMBTN_ENH_SCALING
+    if (!scaled.pixels)
+#endif
+#if defined(HMBTN_ENH_FILTERING) || defined(HMBTN_ENH_WIDESCREEN)
+        if (!native_filtered.pixels)
+#endif
+        {
+            wide_scanout = scanout_area.w != source_area.w;
+            area = &scanout_area;
+        }
+#endif
     if (SDL_getenv("HMBTN_TRACE_SCANOUT") && tick % 60 == 0) {
         fprintf(stderr, "Scanout tick %llu: enabled=%d area=%d,%d %dx%d\n",
                 (unsigned long long)tick, state->display_enabled, area->x, area->y, area->w,
@@ -696,6 +713,10 @@ static void hm_host_present_scanout(u64 tick) {
     for (u32 y = 0; y < output_height; ++y)
         for (u32 x = 0; x < output_width; ++x) {
             u16 color = 0;
+            int source_x = area->x + (int)x, source_y = area->y + (int)y;
+            int source_visible = source_x >= source_area.x && source_y >= source_area.y &&
+                                 source_x < source_area.x + source_area.w &&
+                                 source_y < source_area.y + source_area.h;
 #ifdef HMBTN_ENH_SCALING
             if (scaled.pixels)
                 color = scaled.pixels[(size_t)y * output_width + x];
@@ -706,10 +727,11 @@ static void hm_host_present_scanout(u64 tick) {
                 color = native_filtered.pixels[(size_t)y * output_width + x];
             else
 #endif
-                color =
-                    state->display_enabled ? hm_vram_pixel((u32)area->x + x, (u32)area->y + y) : 0;
+                color = state->display_enabled && source_visible
+                            ? hm_vram_pixel((u32)source_x, (u32)source_y)
+                            : 0;
 #ifdef HMBTN_ENH_INTERPOLATION
-            if (interpolated.pixels
+            if (interpolated.pixels && source_visible
 #ifdef HMBTN_ENH_SCALING
                 && !scaled.pixels
 #endif
@@ -746,7 +768,11 @@ static void hm_host_present_scanout(u64 tick) {
                    scaled.pixels ? hm_host_wide_active()
                                  :
 #endif
-                                 0);
+#ifdef HMBTN_ENH_WIDESCREEN
+                                 wide_scanout);
+#else
+                   0);
+#endif
 #else
     hm_host_submit(output_width, output_height, 0, 0);
 #endif

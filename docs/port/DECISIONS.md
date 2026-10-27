@@ -1874,3 +1874,41 @@ callback/return/pointer-cast warnings. No gameplay/replay or owner save data is
 used. Matching check cannot run without the separate Linux toolchain (WSL is
 excluded); disabled native guards are checked textually instead. No full-game,
 other-platform or performance claim follows from this batch.
+
+## ADR-068: Wide transition capture, full-screen tiles and scanout canvas
+
+Date: 2026-10-27
+
+Context: The owner reports a 4:3 rucksack shade, side flicker between Natsume
+and title, and aspect changes during transitions. Rucksack shade uses a
+three-word TILE, whereas the full-screen expansion recognized only F4 packets.
+Frame blends skip main.c's PutDrawEnv call, so they previously never began a
+capture. Both private renderers also initialized extra pixels by repeating the
+changing native edge column.
+
+Decision: Expand exact full-screen variable TILE packets as well as F4, retaining
+their original command lengths. Start capture for main.c's direct fade OT path.
+Append its commands to a recent complete capture of the same draw rectangle,
+keeping the original snapshot and extended geometry. A normal frame starts a
+fresh capture. Coalesce consecutive equal groups so repeated fades do not exhaust
+group slots. Invalidated, bypassed, stale or different-buffer captures cannot be
+retained. Bounded command/group capacity still rejects incomplete replay.
+
+Initialize unrendered side pixels to black in both CPU and GPU paths. The host
+places direct/loading native scanout proportionally at the centre of an expanded
+canvas when no private replay is available, rather than selecting a 4:3 output
+destination. Do not stretch UI or native edge columns. Support the game's
+640x480 stepped-fade rectangle as well as 320x240. Native VRAM, game clocks,
+camera coordinates, source code and data files remain untouched.
+
+Validation: Windows Release and ASan/UBSan builds each pass 106/106 tests.
+Synthetic checks exercise TILE packet boundaries, native edge contamination,
+80 retained fade captures, final accumulated darkness, changed scene keys,
+bypass rejection, 640x480 expansion, OFF behavior and native state preservation.
+Offscreen D3D12 and Vulkan readbacks match the CPU reference at native/enlarged
+resolutions, with both filtering modes and a rucksack-style full-screen TILE.
+The presentation probe's obsolete edge-repeat expectation is corrected to match
+the existing proportional-image contract. No gameplay or owner save is opened.
+Actual logo/menu/area/cutscene transitions still need owner validation. These
+checks do not prove sufficient side scenery in every original map or absence
+of every widescreen bug; there is no performance or other-platform claim.

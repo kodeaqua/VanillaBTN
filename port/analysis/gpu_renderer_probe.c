@@ -120,8 +120,10 @@ static int hm_probe_presentation(SDL_GPUDevice *device, hm_gpu_renderer *rendere
         hm_gpu_present_image(command, image, 32, 32, target, 128, 48, 0, mode == 2, mode != 0);
         CHECK(!download_image(device, command, target, 128, 48, actual));
         u32 row = 24 * 128 * 4;
-        CHECK(actual[row] == (mode ? 255 : 0));
-        CHECK(actual[row + 127 * 4 + 2] == (mode ? 255 : 0));
+        /* Only an already expanded image may fill the wide destination. A
+         * widescreen request alone must never stretch a native image's edges. */
+        CHECK(actual[row] == (mode == 2 ? 255 : 0));
+        CHECK(actual[row + 127 * 4 + 2] == (mode == 2 ? 255 : 0));
         CHECK(actual[row + 64 * 4 + 1] == 255);
         if (mode != 2) {
             CHECK(actual[row + 47 * 4] == 255);
@@ -308,6 +310,8 @@ static void hm_probe_wide_draw(void) {
     hm_gpu_execute_words(ui, sizeof ui / sizeof *ui);
     u32 fade[] = {0xe1000040, 0x2a101010, 0, 320, 240u << 16, 320u | (240u << 16)};
     hm_gpu_execute_words(fade, sizeof fade / sizeof *fade);
+    u32 rucksack[] = {0xe1000040, 0x62080808, 0, xy(320, 240)};
+    hm_gpu_execute_words(rucksack, sizeof rucksack / sizeof *rucksack);
     u32 origin = (u32)hm_gpu_environment_state()->draw.ofs[1];
     u32 clip[] = {0xe3000000u | 16u | ((origin + 160) << 10),
                   0xe4000000u | 319u | ((origin + 255) << 10), 0xe100060e};

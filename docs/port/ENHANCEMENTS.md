@@ -84,3 +84,11 @@ logos/text and background extension from original assets. GPU/native fallback
 keeps the presentation aspect. Auto retries at native internal resolution to
 bound stalls; explicit Software keeps full-resolution CPU output. Actual
 in-game dialogue performance and all-screen visuals remain owner-tested.
+
+ADR-068 fixes full-width rucksack TILE shade and captures direct frame-blend
+commands over the retained extended scene. Native/direct/loading output uses a
+centred scanout on the same expanded canvas when replay is unavailable; it does
+not change back to a 4:3 destination. Uncovered pixels are black. Both renderers
+stop seeding side pixels from changing native edge columns during logo fades.
+This supersedes the earlier edge-extension description. Original artwork and
+text remain proportional. Interactive all-screen coverage is still owner-tested.

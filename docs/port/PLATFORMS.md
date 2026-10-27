@@ -327,3 +327,13 @@ reports zero selected core/unix/security and callback/return/pointer-cast findin
 Two original fixtures fail before repair, and a separate boolean terrain fixture
 reproduces a null store. These are synthetic technical checks only; gameplay,
 other devices, matching output and performance remain unverified by this batch.
+
+### Wide transition validation (2026-10-27)
+
+Windows Release and ASan/UBSan builds and ctest --output-on-failure each pass
+106/106 tests after ADR-068. Rebuilt hmbtn_gpu_renderer_probe and ran it with
+direct3d12 and vulkan; native/enlarged world/UI, filtering, full-screen TILE
+shade and presentation readbacks pass on both. Shaders were regenerated using
+the pinned DXC script. No game/replay, owner save, performance benchmark or
+other-platform build was run. Native scanout uses the same wide canvas when
+command replay is unavailable; content remains proportional.

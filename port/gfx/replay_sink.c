@@ -34,7 +34,7 @@ void hm_replay_command(const u32 *words, u32 available, int after) {
     int full = hm_widescreen_overlay(words, available, overlay);
     if (full) {
         words = overlay;
-        available = 5;
+        available = (u32)full;
     }
     hm_gpu_environment_set_clip(full ? hm_widescreen_area(saved) : hm_widescreen_clip(saved));
 #endif
@@ -53,7 +53,7 @@ u32 hm_replay_consume(const u32 *words, u32 available) {
     int full = hm_widescreen_overlay(words, available, overlay);
     if (full) {
         words = overlay;
-        available = 5;
+        available = (u32)full;
     }
     hm_gpu_environment_set_clip(full ? hm_widescreen_area(saved) : hm_widescreen_clip(saved));
 #endif

@@ -710,3 +710,14 @@ Both Windows builds pass all 106 tests; targeted analysis of six changed units
 reports zero selected analyzer/ABI warnings. Original source reconstruction is
 checked separately; matching compiler output and interactive gameplay remain
 unverified. No gameplay was launched in this batch.
+
+### Wide transitions and rucksack shade (2026-10-27)
+
+ADR-068 adds observation of main.c's direct fade OT path, retaining the captured
+wide scene while full-screen subtraction accumulates. Exact full-screen TILE
+packets now expand without corrupting subsequent command boundaries. CPU/GPU
+side initialization no longer copies changing native edge columns. Direct and
+loading scanouts stay proportional within a wide output canvas. This batch
+changes only port code/docs, adding no HMBTN_PORT guards or matching-source edits.
+Release and ASan/UBSan pass 106/106 tests; offscreen Vulkan/D3D12 comparisons
+pass. Full interactive coverage and map-side asset availability remain unverified.

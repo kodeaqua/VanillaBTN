@@ -80,10 +80,7 @@ static void hm_software_begin(void *context, const RECT *area) {
             s->pixels[(size_t)y * s->width + x] =
                 (hm_software_logical_x(s, (int)x) < native.x ||
                  hm_software_logical_x(s, (int)x) >= native.x + native.w)
-                    ? hm_vram_pixel((u32)(hm_software_logical_x(s, (int)x) < native.x
-                                              ? native.x
-                                              : native.x + native.w - 1),
-                                    (u32)hm_software_logical_y(s, (int)y))
+                    ? 0
                     : hm_vram_pixel((u32)hm_software_logical_x(s, (int)x),
                                     (u32)hm_software_logical_y(s, (int)y));
     s->begun = 1;

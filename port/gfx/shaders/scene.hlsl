@@ -46,7 +46,8 @@ void main(uint3 id:SV_DispatchThreadID){
     int2 logical=origin+local;
     bool native=(width==logical_size.x&&height==logical_size.y);
     bool bilinear_enabled=load_word(11)!=0;
-    uint color=vram(clamp(logical.x,int(load_word(12)),int(load_word(12)+load_word(13))-1),logical.y);
+    uint color=(logical.x<int(load_word(12))||logical.x>=int(load_word(12)+load_word(13)))?
+        0:vram(logical.x,logical.y);
     uint bin=load_word(9)+uint((local.y/16)*int(load_word(6))+local.x/16)*257;
     uint count=load_word(bin);
     [loop]for(uint item=0;item<count;++item){

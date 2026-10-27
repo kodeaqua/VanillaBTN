@@ -239,3 +239,18 @@ basket and callback dispatch code with synthetic state, not interactive game
 sessions. Owner checks still needed: dog retrieves ball, animal movement/basket
 placement, sound, MG1/MG4, and earlier NPC/camera reports. No claim that all
 analyzer warnings or full-game paths are resolved.
+
+### Wide transition follow-up (2026-10-27)
+
+ADR-068 handles rucksack TILE shade, observes direct frame-blend OTs and removes
+native edge-column seeding from both private renderers. Direct/loading scanout
+keeps the wide canvas with proportional central content. Release and ASan/UBSan
+pass 106 tests; offscreen D3D12/Vulkan comparisons pass. No gameplay was run.
+
+Owner checks: Widescreen ON from boot through Natsume-to-title fade, load/save,
+rucksack entry/exit, area changes and cutscene entry/exit; check both scaling
+settings and interpolation settings. The shade/fade should cover the sides,
+logo/text should retain proportions, and the output should not snap to a 4:3
+destination. Also check 21:9/monitor changes and OFF's original 4:3 presentation.
+Report remaining exposed map edges or missing original background coverage;
+synthetic tests do not establish an all-screen playthrough result.
