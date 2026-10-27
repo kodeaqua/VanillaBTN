@@ -8,6 +8,11 @@ override this one for their subtree.
 
 ### Current owner overrides (2026-10-25 and 2026-10-26)
 
+- Use 12 parallel build jobs (`cmake --build ... -j12`), as requested by the owner.
+- The owner paused multilingual work on 2026-10-28. Its WIP is preserved in the
+  named stash for `port/indonesian-language`; current runtime fixes belong on
+  `fix` from main.
+
 - Prioritize Windows x86-64 native bring-up before Linux, macOS, and Android.
   Phase 1 targets Windows; retain the portable architecture for the other targets.
 - Do not add, modify, run, or provision workflows/CI for the current work.

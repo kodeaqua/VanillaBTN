@@ -23,7 +23,7 @@ try {
     }
     & cmake @configureArgs
     if ($LASTEXITCODE -ne 0) { throw 'Windows configure failed' }
-    & cmake --build --preset $Preset
+    & cmake --build --preset $Preset -j12
     if ($LASTEXITCODE -ne 0) { throw 'Windows build failed' }
     & ctest --preset $Preset
     if ($LASTEXITCODE -ne 0) { throw 'Windows tests failed' }
