@@ -589,3 +589,158 @@ instead of oversized draw clips or full texture pages. Genuine offscreen writes,
 feedback, unsupported transfers/capacities still fall back. Auto fallback retries
 at native internal resolution, retaining full-size software only when explicitly
 selected. Owner real-world aspect/dialogue observations still need revalidation.
+
+### Runtime sleep/save/load corrections (ADR-058/059)
+
+Windows crash RVA 0x1e1573 in release 19f2994 maps to the animal selection scan
+used during overnight processing. Both animal base pointers were truncated to
+s32. An isolated original call reproduces the ASan access violation. Native
+byte-pointer arithmetic, explicit result forwarding and complete action-record
+clearing now cover this path. This is separate from save serialization.
+
+New matching-source guards:
+- src/overlay/11_GF_FARM/animals/animal_actions.c: native action clear size,
+  explicit slot result, and the two animal record address expressions (4 guards).
+- src/overlay/15_saveload/saveload.c: codec include and native pack/unpack routing
+  (3 additional guards). Original else implementations remain exact.
+
+compat/save_codec writes a fixed 0x6378 payload, independent of native pointer
+width and struct growth. Animal/player/helper wire fields use explicit strides;
+runtime pointers are omitted and existing native bindings are preserved on load
+(with original animal source invalidation). The card file remains 0x8000 bytes
+with original shifts/checksums. The old packer reproduces an invalid run16 read
+through its obsolete FarmState offset; the new synthetic fixture passes.
+Livestock-transfer SaveFile/SaveImage casts are not covered by this codec audit.
+
+The disabled new guards reconstruct both prior source files exactly after line
+ending normalization. This does not replace the unavailable Linux matching check.
+Full sleep, overnight events, menu save/load and PS1 interchange still need owner
+validation; no gameplay or replay was used by these technical regression tests.
+
+### Follow-up dialogue, overnight wait and SDK audit (2026-10-27)
+
+Additional source guards under ADR-060:
+- src/overlay/11_GF_FARM/people/player.c: forward the required player argument
+  rather than invoking player_advance_state through a zero-argument cast (1).
+- src/overlay/11_GF_FARM/world/clock_events.c: native helper include and
+  deterministic VBlank/CD progress in the overnight sound-fader wait (2).
+
+The owner confirms saving now succeeds, but reports a later day-transition hang,
+ordinary-dialogue access violation and missing ratan2 on entry to Yodel Ranch.
+The dialogue fault maps to the missing argument. The overnight helper addresses
+a reproduced progress requirement; the reported hang itself has no captured stack.
+ADR-061 and API_COVERAGE.md document implemented math, unsupported PocketStation
+completion and all nine remaining debug-font traps. Release and ASan/UBSan each
+pass 89 tests; these are technical checks, not a complete gameplay pass.
+
+### Widescreen follow-up (ADR-062, 2026-10-27)
+
+Interpolation previously selected replay groups inside mesh matching, leaving
+execution clipped to the UI group. It now restores world/UI per executed command.
+Title base animation 0x1D is repeated alongside the scrolling 0x25 layer; bg_tile
+submissions repeat their original four-column periods for menu side coverage.
+Background ranges merge when adjoining and include both sprite and mode arrays.
+Only CMake adapters/port code change; no additional matching guards are added.
+Release and ASan/UBSan each pass 90 tests. The owner-reported camera displacement
+after two sleeps remains unresolved; opt-in host coordinate logging is available.
+
+### Pause canvas and source audit (ADR-063/064, 2026-10-27)
+
+Pause now reconstructs a full logical wide frame once and keeps the original
+menu proportional at the centre. Unavailable private transition frames use
+proportional native output/black sides instead of fabricated edge-column strips.
+See ADR-063 for logical-resolution and resize limitations.
+
+New HMBTN_PORT guards under ADR-064:
+- event/event_script.c: native helper include and villager sprite-copy routing (2).
+- picture_cells.c: full-width gift table addressing and typed callback calls (2).
+- animals/chicken.c: sizeof-native record clearing (1).
+- farm_init.c: async-wait include and farm re-entry loader progress (2).
+
+All paths are under src/overlay/11_GF_FARM/. Five minigame overlays use only CMake
+asset-poll aliases, adding no matching-source guards. SOURCE_AUDIT.md records all
+113 game C files and 68 native implementation units initially analyzed, confirmed
+repairs and unresolved findings. The old sprite copy fails its synthetic fixture;
+Release and ASan/UBSan each pass 94 tests after the repairs. Saibara dialogue and
+two-sleep camera behavior remain owner-validation items.
+
+### Follow-up audit: shop, family text and animal exchange (2026-10-27)
+
+ADR-065 resolves the original adjacent shop vectors explicitly and corrects the
+family-name pointer return type using strings read from the owner's validated
+archive. New guards: shop_dialogues.c includes runtime errors, validates request
+IDs, selects the adjacent-vector equivalent and forwards the basket result (4);
+people/family.c returns loaded native text (1); people/family.h preserves the
+full-width return type (1). All are under src/overlay/11_GF_FARM/.
+
+ADR-066 adds 15 guards in src/overlay/15_saveload/saveload.c for native partner
+view/stash storage, decode/encode, farm identity, foreign capacities and names,
+count/free-slot routing, list views, typed restoration and complete buffer reset.
+The partner view is included in compat/saveload_overlay_state.inc. Original
+SaveFile/SaveImage wire casts remain only in disabled original alternatives on
+these transfer paths. They are not host object layouts.
+
+The old 928-byte stash reproduces a global-buffer-overflow on a 224-byte write.
+New transfer fixtures cover five native cows/chickens and preserve all non-animal
+payload bytes. The family text loader passes synthetic fixtures and an isolated
+read-only check with the validated owner BIN. Release and ASan/UBSan pass 99 tests;
+targeted Clang analysis of seven touched units reports no core/unix/security
+findings. Gameplay and matching compiler output remain unverified.
+
+### Third audit batch: optional outputs and callback ABI (ADR-067)
+
+New matching-source guards:
+- src/overlay/11_GF_FARM/estate.c: optional pickup seasonal output and initialized
+  basket probe (2).
+- src/overlay/11_GF_FARM/farm_probe.c: tile hit-class initialization, optional
+  capped output and local discard outputs for boolean-only occupant calls (3).
+- src/main/sound/sound.c: full-width sequence sentinel comparison (1).
+- src/main/graphics/texture_pack.c: diagnostic header, null bank and image index
+  bounds (3).
+- src/overlay/17_GF_MG1/mg1.c: void native award-frame declaration/definition and
+  return, since only the void frame table consumes it (3).
+- src/overlay/23_GF_MG4/mg4.c: no-argument native state callback type and call (2).
+
+The old optional-pickup and boolean terrain paths reproduce null member/store
+errors in bounded fixtures. Native sequence comparison fails its mocked low-word
+sentinel fixture before correction. Valid pickup transformations, actor flags,
+terrain decisions and callback quotas remain covered. Runtime image diagnostics
+replace an uninitialized rectangle on missing images, not a successful fallback.
+Both Windows builds pass all 106 tests; targeted analysis of six changed units
+reports zero selected analyzer/ABI warnings. Original source reconstruction is
+checked separately; matching compiler output and interactive gameplay remain
+unverified. No gameplay was launched in this batch.
+
+### Wide transitions and rucksack shade (2026-10-27)
+
+ADR-068 adds observation of main.c's direct fade OT path, retaining the captured
+wide scene while full-screen subtraction accumulates. Exact full-screen TILE
+packets now expand without corrupting subsequent command boundaries. CPU/GPU
+side initialization no longer copies changing native edge columns. Direct and
+loading scanouts stay proportional within a wide output canvas. This batch
+changes only port code/docs, adding no HMBTN_PORT guards or matching-source edits.
+Release and ASan/UBSan pass 106/106 tests; offscreen Vulkan/D3D12 comparisons
+pass. Full interactive coverage and map-side asset availability remain unverified.
+
+### Farm summary hang follow-up (2026-10-27)
+
+ADR-069 extends the blocking CD poll adapter to status_pages.c. Its only
+afile_read_bytes calls initiate and poll inside the same blocking loader.
+The source fixture also confirms out-of-array addressing of the two shared
+sprite globals. Four HMBTN_PORT guards in
+src/overlay/11_GF_FARM/menu/status_pages.c add the slot resolver include, guarded
+loader binding and guarded sprite selection in status_draw_sprite_label and
+status_draw_entry. Disabled native guards reconstruct the original exactly;
+this is not a matching binary check. Matching toolchain unavailable, no WSL.
+The original loader fixture and all 107 Release/ASan tests pass. No gameplay or
+owner save is used in the fixture.
+
+### Splash backdrop and cutscene buffer identity (2026-10-27)
+
+ADR-070 corrects white Natsume side initialization using the actual DRAWENV
+background colour. GPU header word 14 carries the same 15-bit colour used by
+software and native scanout. Frame replay now tracks the displayed rectangle
+rather than the simulation key that can change before a buffer flip; bypass,
+age and overlay invalidation remain enforced, and interpolation stays strict.
+Black/white GPU readbacks and displayed-buffer regression tests pass. This is
+a candidate correction for the reported Won flash, not an interactive result.

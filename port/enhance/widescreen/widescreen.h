@@ -12,5 +12,6 @@ RECT hm_widescreen_area(RECT native);
 void hm_widescreen_replay_begin(const RECT *native);
 void hm_widescreen_replay_group(int world);
 RECT hm_widescreen_clip(RECT clip);
+/* Returns the replacement packet length, or zero when unchanged. */
 int hm_widescreen_overlay(const u32 *words, u32 count, u32 output[5]);
 #endif

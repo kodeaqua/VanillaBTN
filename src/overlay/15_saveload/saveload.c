@@ -1,3 +1,8 @@
+#ifdef HMBTN_PORT
+/* PORT: fixed-width save payload - see docs/port/DECISIONS.md#adr-059 */
+#include "compat/save_codec.h"
+#include "psx/error.h"
+#endif
 /* The save/load screens: choosing a slot, saving and loading the farm to the memory card. */
 
 #include <sys/types.h>
@@ -732,7 +737,15 @@ static u16 save_name_line[24];
 static SaveHeader save_header;
 static SaveEntry save_entries[2][SAVE_LIST_ENTRIES];
 static u8 save_work_table[5488];
+#ifdef HMBTN_PORT
+/* PORT: native transfer view - see docs/port/DECISIONS.md#adr-066 */
+#include "compat/save_partner.h"
+static hm_save_partner hm_save_partner_state;
+static _Alignas(FarmLivestock) u8 save_out_buffer[SAVE_LIST_ENTRIES *
+    (sizeof(FarmLivestock) > sizeof(FarmChicken) ? sizeof(FarmLivestock) : sizeof(FarmChicken))];
+#else
 static u8 save_out_buffer[928];
+#endif
 static u8 save_sheet[sizeof(SaveSheet)];
 /* The five sprites save_load_image_file unpacks from file 0xE; [1] is the cursor. */
 static AnimState save_sprites[5];
@@ -2471,6 +2484,11 @@ static void save_transfer_verify_image_step(void)
     else
     {
         save_image_shift_out();
+#ifdef HMBTN_PORT
+        /* PORT: decode partner records before UI/transfer - see docs/port/DECISIONS.md#adr-066 */
+        if (!hm_save_partner_decode(&hm_save_partner_state, save_image, HM_SAVE_IMAGE_BYTES))
+            hm_runtime_error("save transfer", "invalid partner payload");
+#endif
         save_step = TRANSFER_STEP_CHECK_SAME_GAME;
     }
 }
@@ -2486,7 +2504,12 @@ static void save_transfer_check_same_game_step(void)
 {
     u_long *p = current_frame->otTags[0];
     SHOW_MESSAGE(p, LOCALIZED(text_bank.messages.loading_from_memory_card));
+#ifdef HMBTN_PORT
+/* PORT: native transfer view - see docs/port/DECISIONS.md#adr-066 */
+    if (memcmp(hm_save_partner_state.identity, &game_state, 8) == 0)
+#else
     if (memcmp(&((SaveFile *)save_image)->flagWords, &game_state, 8) == 0)
+#endif
     {
         save_step = TRANSFER_STEP_SAME_GAME;
     }
@@ -2588,9 +2611,19 @@ static void save_check_transfer_fit(void)
     haveCows[0] = save_count_records(&game_state.animals, SAVE_TABLE_LIVESTOCK);
     haveCows[1] = save_count_records(save_image, SAVE_TABLE_LIVESTOCK);
     hensLimit[0] = game_state.progress.estate.coopLevel == 0 ? COOP_CAPACITY_BASIC : COOP_CAPACITY_UPGRADED;
+#ifdef HMBTN_PORT
+/* PORT: native transfer view - see docs/port/DECISIONS.md#adr-066 */
+    hensLimit[1] = hm_save_partner_state.estate.coopLevel == 0 ? COOP_CAPACITY_BASIC : COOP_CAPACITY_UPGRADED;
+#else
     hensLimit[1] = ((FarmEstate *)&((SaveFile *)save_image)->estate)->coopLevel == 0 ? COOP_CAPACITY_BASIC : COOP_CAPACITY_UPGRADED;
+#endif
     cowsLimit[0] = game_state.progress.estate.barnLevel == 0 ? BARN_CAPACITY_BASIC : BARN_CAPACITY_UPGRADED;
+#ifdef HMBTN_PORT
+/* PORT: native transfer view - see docs/port/DECISIONS.md#adr-066 */
+    cowsLimit[1] = hm_save_partner_state.estate.barnLevel == 0 ? BARN_CAPACITY_BASIC : BARN_CAPACITY_UPGRADED;
+#else
     cowsLimit[1] = ((FarmEstate *)&((SaveFile *)save_image)->estate)->barnLevel == 0 ? BARN_CAPACITY_BASIC : BARN_CAPACITY_UPGRADED;
+#endif
     if (total[0] == 0 && total[1] == 0)
     {
         save_step = TRANSFER_STEP_NO_ANIMAL;
@@ -2677,6 +2710,11 @@ static void save_transfer_slot_confirm_screen(void)
         break;
     case SAVE_CARD_OK:
         save_transfer_stash();
+#ifdef HMBTN_PORT
+        /* PORT: update only animal wire bytes - see docs/port/DECISIONS.md#adr-066 */
+        if (!hm_save_partner_encode_animals(save_image, HM_SAVE_IMAGE_BYTES, &hm_save_partner_state))
+            hm_runtime_error("save transfer", "cannot encode partner animals");
+#endif
         save_image_shift_in();
         save_image_checksum_write();
         save_step = TRANSFER_STEP_WRITE;
@@ -2826,7 +2864,12 @@ static void save_place_row_spot(FarmActor *object, s16 slot) {
     object->place.location = 5;
 }
 
+#ifdef HMBTN_PORT
+/* PORT: native transfer view - see docs/port/DECISIONS.md#adr-066 */
+#define SAVE_CHARS (&hm_save_partner_state.animals)
+#else
 #define SAVE_CHARS ((FarmAnimals *)save_image)
+#endif
 #define FARM_CHARS (game_state.animals)
 /* Pack the entries selected in list 1 into save_out_buffer and clear them from the farm's animals. */
 static void save_transfer_stash(void)
@@ -2920,13 +2963,23 @@ static void save_transfer_restore(void)
         {
         case SAVE_PANEL_CHICKENS:
             dst = save_find_free_record(&game_state.animals, SAVE_TABLE_CHICKENS, &slot);
+#ifdef HMBTN_PORT
+/* PORT: native transfer view - see docs/port/DECISIONS.md#adr-066 */
+            *(FarmChicken *)dst = *(FarmChicken *)save_entries[1][i].data;
+#else
             *(FarmChickenImage *)dst = *(FarmChickenImage *)save_entries[1][i].data;
+#endif
             save_place_grid_spot(&game_state.animals.chickens[slot].actor, slot);
             break;
         case SAVE_PANEL_CATTLE:
         case SAVE_PANEL_SHEEP:
             dst = save_find_free_record(&game_state.animals, SAVE_TABLE_LIVESTOCK, &slot);
+#ifdef HMBTN_PORT
+/* PORT: native transfer view - see docs/port/DECISIONS.md#adr-066 */
+            *(FarmLivestock *)dst = *(FarmLivestock *)save_entries[1][i].data;
+#else
             *(FarmLivestockImage *)dst = *(FarmLivestockImage *)save_entries[1][i].data;
+#endif
             save_place_row_spot(&game_state.animals.livestock[slot].actor, slot);
             break;
         }
@@ -2937,6 +2990,11 @@ static void save_transfer_restore(void)
  * and its index, or NULL when the table is full. */
 static void *save_find_free_record(FarmAnimals *tables, s16 kind, s16 *index_out)
 {
+#ifdef HMBTN_PORT
+    /* PORT: never overlay native records on wire bytes - see docs/port/DECISIONS.md#adr-066 */
+    if (tables == (FarmAnimals *)save_image)
+        tables = &hm_save_partner_state.animals;
+#endif
     void *found = 0;
     s32 i;
 
@@ -2971,6 +3029,11 @@ static void *save_find_free_record(FarmAnimals *tables, s16 kind, s16 *index_out
 /* Count the used entries of the requested save-slot table. */
 static s32 save_count_records(FarmAnimals *animals, s16 kind)
 {
+#ifdef HMBTN_PORT
+    /* PORT: never overlay native records on wire bytes - see docs/port/DECISIONS.md#adr-066 */
+    if (animals == (FarmAnimals *)save_image)
+        animals = &hm_save_partner_state.animals;
+#endif
     s16 count;
     s32 i;
 
@@ -3021,7 +3084,12 @@ static void save_draw_transfer_lists(void)
     {
         if (side != 0)
         {
+#ifdef HMBTN_PORT
+/* PORT: native transfer view - see docs/port/DECISIONS.md#adr-066 */
+            records = &hm_save_partner_state.animals;
+#else
             records = save_image;
+#endif
         }
         else
         {
@@ -3104,7 +3172,12 @@ static s32 save_draw_name_panel(s16 side)
     }
     else
     {
+#ifdef HMBTN_PORT
+/* PORT: native transfer view - see docs/port/DECISIONS.md#adr-066 */
+        name = hm_save_partner_state.estate.farmName;
+#else
         name = (u16 *)&((SaveImage *)save_image)->progress.estate.words[5];
+#endif
     }
     for (i = 0; i < NAME_LENGTH; i++)
     {
@@ -3144,7 +3217,12 @@ static s32 save_transfer_list_step(s16 side)
     result = 0;
     if (side)
     {
+#ifdef HMBTN_PORT
+/* PORT: native transfer view - see docs/port/DECISIONS.md#adr-066 */
+        inv = &hm_save_partner_state.animals;
+#else
         inv = save_image;
+#endif
     }
     else
     {
@@ -3517,7 +3595,12 @@ static void save_reset_work_tables(void)
             save_entries[i][j].data = 0;
         }
     }
+#ifdef HMBTN_PORT
+/* PORT: native transfer view - see docs/port/DECISIONS.md#adr-066 */
+    memset(save_out_buffer, 0, sizeof save_out_buffer);
+#else
     memset(save_out_buffer, 0, 0x398);
+#endif
 }
 
 /* Reset the transfer list to the chickens page, the top row and an empty transfer count. */
@@ -3619,6 +3702,12 @@ static void save_slot_record_fill(s16 slot)
  * image at save_image_data. */
 static void save_pack_farm_state(void)
 {
+#ifdef HMBTN_PORT
+    /* PORT: named native fields, fixed wire spans - see docs/port/DECISIONS.md#adr-059 */
+    save_image = save_image_data;
+    if (!hm_save_encode(save_image_data, sizeof(save_image_data), &game_state))
+        hm_runtime_error("save_pack_farm_state", "invalid save payload or unbound estate records");
+#else
     s32 i;
 
     save_image = save_image_data;
@@ -3675,6 +3764,7 @@ static void save_pack_farm_state(void)
         SAVE_FILE->slots.livestock[i].actor.sprite.source = 0;
     }
     memset(SAVE_FILE->slots.extraChickens, 0, sizeof(SAVE_FILE->slots.extraChickens));
+#endif
 }
 #undef SAVE_FILE
 #undef PACK_800742EC
@@ -3697,6 +3787,12 @@ static void save_pack_farm_state(void)
 /* Copy the loaded save image into the live game state and the saved-progress block. */
 static void save_unpack_farm_state(void)
 {
+#ifdef HMBTN_PORT
+    /* PORT: named native fields, fixed wire spans - see docs/port/DECISIONS.md#adr-059 */
+    save_image = save_image_data;
+    if (!hm_save_decode(save_image_data, sizeof(save_image_data), &game_state))
+        hm_runtime_error("save_unpack_farm_state", "invalid save payload or unbound estate records");
+#else
     s32 i;
 
     save_image = save_image_data;
@@ -3744,6 +3840,7 @@ static void save_unpack_farm_state(void)
     *(Block34 *)&game_state.family.addressMode = SAVE_IMAGE->family;
     *(BlockC *)&game_state.ending.route = SAVE_IMAGE->ending.endingHead;
     *(BlockC *)&game_state.ending.tracks = SAVE_IMAGE->ending.endingTracks;
+#endif
 }
 #undef SAVE_IMAGE
 #undef SAVED_PROGRESS

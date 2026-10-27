@@ -120,8 +120,10 @@ static int hm_probe_presentation(SDL_GPUDevice *device, hm_gpu_renderer *rendere
         hm_gpu_present_image(command, image, 32, 32, target, 128, 48, 0, mode == 2, mode != 0);
         CHECK(!download_image(device, command, target, 128, 48, actual));
         u32 row = 24 * 128 * 4;
-        CHECK(actual[row] == (mode ? 255 : 0));
-        CHECK(actual[row + 127 * 4 + 2] == (mode ? 255 : 0));
+        /* Only an already expanded image may fill the wide destination. A
+         * widescreen request alone must never stretch a native image's edges. */
+        CHECK(actual[row] == (mode == 2 ? 255 : 0));
+        CHECK(actual[row + 127 * 4 + 2] == (mode == 2 ? 255 : 0));
         CHECK(actual[row + 64 * 4 + 1] == 255);
         if (mode != 2) {
             CHECK(actual[row + 47 * 4] == 255);
@@ -289,12 +291,15 @@ static int hm_probe_benchmark(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
     return 0;
 }
 #ifdef HMBTN_ENH_WIDESCREEN
+static int wide_background;
 static void hm_probe_wide_setup(int origin) {
     setup();
     DRAWENV draw;
     SetDefDrawEnv(&draw, 0, (s16)origin, 320, 240);
     draw.dtd = 0;
     draw.dfe = 1;
+    draw.isbg = (u8)wide_background;
+    draw.r0 = draw.g0 = draw.b0 = 255;
     PutDrawEnv(&draw);
 }
 static void hm_probe_wide_draw(void) {
@@ -308,6 +313,8 @@ static void hm_probe_wide_draw(void) {
     hm_gpu_execute_words(ui, sizeof ui / sizeof *ui);
     u32 fade[] = {0xe1000040, 0x2a101010, 0, 320, 240u << 16, 320u | (240u << 16)};
     hm_gpu_execute_words(fade, sizeof fade / sizeof *fade);
+    u32 rucksack[] = {0xe1000040, 0x62080808, 0, xy(320, 240)};
+    hm_gpu_execute_words(rucksack, sizeof rucksack / sizeof *rucksack);
     u32 origin = (u32)hm_gpu_environment_state()->draw.ofs[1];
     u32 clip[] = {0xe3000000u | 16u | ((origin + 160) << 10),
                   0xe4000000u | 319u | ((origin + 255) << 10), 0xe100060e};
@@ -391,48 +398,50 @@ static int hm_probe_widescreen(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
     hm_widescreen_configure(1, 1920, 1080);
     hm_widescreen_scene(1);
     const u32 sizes[][2] = {{428, 240}, {1280, 720}};
-    for (int origin = 0; origin <= 240; origin += 240)
-        for (int filter = 0; filter <
+    for (wide_background = 0; wide_background < 2; ++wide_background)
+        for (int origin = 0; origin <= 240; origin += 240)
+            for (int filter = 0; filter <
 #ifdef HM_FILTER_REFERENCE
-                             2
+                                 2
 #else
-                             1
+                                 1
 #endif
-             ;
-             ++filter)
-            for (int n = 0; n < 2; ++n) {
-                u32 width = sizes[n][0], height = sizes[n][1];
-                hm_probe_wide_setup(origin);
-                hm_gpu_scene_texture_filter(builder, filter);
-                hm_replay_sink previous = hm_gpu_scene_begin(builder, width, height);
-                RECT area = {0, (s16)origin, 320, 240};
-                hm_replay_begin(&area);
-                hm_probe_wide_draw();
-                hm_gpu_scene_data data;
-                CHECK(hm_gpu_scene_end(builder, previous, &data));
-                hm_probe_wide_setup(origin);
-                hm_software_surface surface = {.pixels = reference,
-                                               .width = width,
-                                               .height = height,
-                                               .texture_linear = filter};
-                previous = hm_replay_bind(hm_software_sink(&surface));
-                hm_replay_begin(&area);
-                hm_probe_wide_draw();
-                hm_replay_bind(previous);
-                CHECK(!readback(device, renderer, &data, actual));
-                for (u32 i = 0; i < width * height; ++i)
-                    for (u32 c = 0; c < 3; ++c) {
-                        int v = (reference[i] >> (c * 5)) & 31;
-                        int expected = (v << 3) | (v >> 2);
-                        if (abs(actual[i * 4 + c] - expected) > (n ? 9 : 0)) {
-                            fprintf(stderr,
-                                    "Widescreen mismatch origin=%d filter=%d size=%u pixel=%u "
-                                    "channel=%u expected=%d actual=%u\n",
-                                    origin, filter, width, i, c, expected, actual[i * 4 + c]);
-                            return 1;
+                 ;
+                 ++filter)
+                for (int n = 0; n < 2; ++n) {
+                    u32 width = sizes[n][0], height = sizes[n][1];
+                    hm_probe_wide_setup(origin);
+                    hm_gpu_scene_texture_filter(builder, filter);
+                    hm_replay_sink previous = hm_gpu_scene_begin(builder, width, height);
+                    RECT area = {0, (s16)origin, 320, 240};
+                    hm_replay_begin(&area);
+                    hm_probe_wide_draw();
+                    hm_gpu_scene_data data;
+                    CHECK(hm_gpu_scene_end(builder, previous, &data));
+                    hm_probe_wide_setup(origin);
+                    hm_software_surface surface = {.pixels = reference,
+                                                   .width = width,
+                                                   .height = height,
+                                                   .texture_linear = filter};
+                    previous = hm_replay_bind(hm_software_sink(&surface));
+                    hm_replay_begin(&area);
+                    hm_probe_wide_draw();
+                    hm_replay_bind(previous);
+                    CHECK(!readback(device, renderer, &data, actual));
+                    for (u32 i = 0; i < width * height; ++i)
+                        for (u32 c = 0; c < 3; ++c) {
+                            int v = (reference[i] >> (c * 5)) & 31;
+                            int expected = (v << 3) | (v >> 2);
+                            if (abs(actual[i * 4 + c] - expected) > (n ? 9 : 0)) {
+                                fprintf(stderr,
+                                        "Widescreen mismatch origin=%d filter=%d size=%u pixel=%u "
+                                        "channel=%u expected=%d actual=%u\n",
+                                        origin, filter, width, i, c, expected, actual[i * 4 + c]);
+                                return 1;
+                            }
                         }
-                    }
-            }
+                }
+    wide_background = 0;
     hm_widescreen_configure(0, 1920, 1080);
     hm_widescreen_scene(0);
     puts("Expanded world/UI offscreen GPU comparisons passed");

@@ -30,6 +30,32 @@ static void hm_capture_invalidate(void *context) {
 }
 static void hm_capture_begin(void *context, const hm_render_frame *meta) {
     hm_frame_replay *s = context;
+    const hm_gpu_environment *env = hm_gpu_environment_state();
+    int retained = -1;
+    if (meta->retain && !meta->bypass) {
+        for (int i = 0; i < 2; ++i) {
+            int slot = s->current ^ i;
+            hm_captured_frame *prior = &s->frames[slot];
+            if (prior->complete && !prior->meta.bypass && meta->tick >= prior->meta.tick &&
+                meta->tick - prior->meta.tick <= 4 &&
+                !memcmp(&prior->env.draw.clip, &env->draw.clip, sizeof(RECT))) {
+                retained = slot;
+                break;
+            }
+        }
+    }
+    /* Reuse the captured commands and original VRAM snapshot, including the
+     * geometry outside PS1 VRAM. Replaying only the new fade loses those sides.
+     * Native execution still sees precisely the original commands. */
+    if (retained >= 0) {
+        s->current = retained;
+        hm_captured_frame *f = &s->frames[retained];
+        f->meta = *meta;
+        f->complete = 0;
+        f->serial = ++s->serial;
+        s->capturing = 1;
+        return;
+    }
     s->current ^= 1;
     hm_captured_frame *f = &s->frames[s->current];
     f->meta = *meta;
@@ -44,6 +70,8 @@ static void hm_capture_group(void *context, int world) {
     hm_frame_replay *s = context;
     hm_captured_frame *f = &s->frames[s->current];
     if (!s->capturing)
+        return;
+    if (f->groups && f->group_world[f->groups - 1] == (u32) !!world)
         return;
     if (f->groups == 64) {
         s->capturing = 0;
@@ -104,9 +132,13 @@ static hm_captured_frame *hm_capture_select(hm_frame_replay *s, const hm_render_
     for (int i = 0; i < 2; ++i) {
         hm_captured_frame *f = &s->frames[s->current ^ i];
         const RECT *draw = &f->env.draw.clip;
-        if (f->complete && f->meta.key == live->key && draw->x == display->x &&
-            draw->y == display->y && draw->w == display->w && draw->h == display->h &&
-            live->tick >= f->meta.tick && live->tick - f->meta.tick <= 4)
+        /* The simulation may enter a new area/cutscene before the next buffer
+         * flip. Present the complete capture of the buffer actually scanned out;
+         * the new simulation key is not the identity of those displayed pixels.
+         * Interpolation keeps its separate, strict scene-key checks. */
+        if (f->complete && !f->meta.bypass && draw->x == display->x && draw->y == display->y &&
+            draw->w == display->w && draw->h == display->h && live->tick >= f->meta.tick &&
+            live->tick - f->meta.tick <= 4)
             return f;
     }
     return NULL;

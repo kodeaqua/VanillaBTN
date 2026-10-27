@@ -8,6 +8,9 @@
 #include "psx/vram.h"
 #include <stdio.h>
 #include <string.h>
+#ifdef TEST_INTERPOLATION
+#include "enhance/interpolation/interpolation.h"
+#endif
 #define CHECK(x)                                                                                   \
     do {                                                                                           \
         if (!(x)) {                                                                                \
@@ -95,6 +98,87 @@ int main(void) {
     hm_gpu_execute_words(full, 5);
     CHECK(hm_software_output_end(out, previous, &view));
     CHECK(view.pixels[15 * 428 + 20] == (31 << 10) && view.pixels[15 * 428 + 400] == (31 << 10));
+    /* Native edge colours must not seed the extra canvas during logo fades. */
+    hm_vram_draw_pixel(0, 15, 0x7fff);
+    hm_vram_draw_pixel(319, 15, 0x7fff);
+    previous = hm_software_output_begin(out);
+    hm_replay_begin(&native);
+    CHECK(hm_software_output_end(out, previous, &view));
+    CHECK(view.pixels[15 * 428] == 0 && view.pixels[15 * 428 + 427] == 0);
+    /* Publisher splash clears white through DRAWENV rather than a primitive. */
+    DRAWENV splash = d;
+    splash.isbg = 1;
+    splash.r0 = splash.g0 = splash.b0 = 255;
+    PutDrawEnv(&splash);
+    previous = hm_software_output_begin(out);
+    hm_replay_begin(&native);
+    CHECK(hm_software_output_end(out, previous, &view));
+    CHECK(view.pixels[15 * 428] == 0x7fff && view.pixels[15 * 428 + 427] == 0x7fff);
+    previous = hm_gpu_scene_begin(gpu, 428, 240);
+    hm_replay_begin(&native);
+    CHECK(hm_gpu_scene_end(gpu, previous, &data));
+    CHECK(data.words[14] == 0x7fff);
+    PutDrawEnv(&d);
+    /* Rucksack shade is a TILE followed by another command. Expanding it must
+     * preserve command boundaries and shade both side panels. */
+    previous = hm_software_output_begin(out);
+    hm_replay_begin(&native);
+    hm_replay_group(0);
+    u32 shade[] = {0xe1000440, 0x62080808, 0, xy(320, 240), 0x600000ff, xy(10, 10), xy(1, 1)};
+    hm_gpu_execute_words(full, 5);
+    hm_gpu_execute_words(shade, 7);
+    CHECK(hm_software_output_end(out, previous, &view));
+    CHECK(view.pixels[15 * 428] == (30 << 10));
+    CHECK(view.pixels[15 * 428 + 427] == (30 << 10));
+    CHECK(view.pixels[10 * 428 + 64] == 31);
+    /* Direct frame-blend OTs retain the extended scene and accumulate the same
+     * subtraction on every tick, even when the scene key changes. */
+    hm_vram_reset();
+    u32 background[] = {0x600000ff, xy(-54, 0), xy(428, 240)};
+    hm_vram_snapshot(&before);
+    hm_gpu_environment native_environment = *hm_gpu_environment_state();
+    hm_render_begin(&frame);
+    hm_render_group(1);
+    hm_render_packet(background, 3);
+    hm_render_end();
+    for (int i = 0; i < 80; ++i) {
+        hm_render_frame transition = frame;
+        transition.key = 99;
+        transition.tick = (u64)i + 1;
+        transition.retain = 1;
+        transition.eligible = 0;
+        u32 fade[] = {0xe1000440, 0x2a080808, 0, 320, 240u << 16, 320u | (240u << 16)};
+        hm_render_begin(&transition);
+        hm_render_group(0);
+        hm_render_packet(fade, 6);
+        hm_render_end();
+        if (i >= 3 && i < 79)
+            continue;
+        previous = hm_software_output_begin(out);
+        CHECK(hm_software_output_replay(out, &transition));
+        CHECK(hm_software_output_end(out, previous, &view));
+        int expected = i < 31 ? 30 - i : 0;
+        CHECK(view.pixels[15 * 428] == expected);
+        CHECK(view.pixels[15 * 428 + 427] == expected);
+        CHECK(view.pixels[15 * 428 + 200] == expected);
+    }
+    hm_vram_snapshot(&after);
+    CHECK(!memcmp(&before, &after, sizeof before));
+    CHECK(!memcmp(&native_environment, hm_gpu_environment_state(), sizeof native_environment));
+    CHECK(ticks == hm_timing_ticks());
+    /* A loading/native bypass must not resurrect the retained world. */
+    hm_render_frame bypass = frame;
+    bypass.bypass = 1;
+    previous = hm_software_output_begin(out);
+    CHECK(!hm_software_output_replay(out, &bypass));
+    CHECK(!hm_software_output_end(out, previous, &view));
+    RECT double_native = {0, 0, 640, 480};
+    CHECK(hm_widescreen_area(double_native).w == 856);
+    hm_widescreen_replay_begin(&double_native);
+    u32 double_fade[] = {0x2a080808, 0, 640, 480u << 16, 640u | (480u << 16)};
+    u32 expanded_fade[5];
+    CHECK(hm_widescreen_overlay(double_fade, 5, expanded_fade) == 5);
+    CHECK((s16)expanded_fade[1] == -108 && (s16)expanded_fade[2] == 748);
     hm_vram_reset();
     /* UI-only/title capture can selectively widen existing background assets. */
     hm_packet_identity_reset();
@@ -108,11 +192,33 @@ int main(void) {
     CHECK(hm_software_output_replay(out, &frame));
     CHECK(hm_software_output_end(out, previous, &view));
     CHECK(view.pixels[15 * 428 + 20] == 31 && view.pixels[55 * 428 + 20] == 0);
+#ifdef TEST_INTERPOLATION
+    /* The normal moving-world path uses interpolation; dialogs use frame replay.
+     * Both must preserve world/UI clipping, including outside the native view. */
+    CHECK(hm_interpolation_enable(1));
+    for (int i = 0; i < 2; ++i) {
+        frame.tick = i * 2;
+        hm_render_begin(&frame);
+        hm_render_group(1);
+        hm_render_packet(world, 3);
+        hm_render_group(0);
+        hm_render_packet(ui, 3);
+        hm_render_end();
+    }
+    previous = hm_software_output_begin(out);
+    CHECK(hm_interpolation_replay(50000001, &frame));
+    CHECK(hm_software_output_end(out, previous, &view));
+    CHECK(view.pixels[15 * 428 + 20] == 31);
+    CHECK(view.pixels[55 * 428 + 20] == 0);
+    CHECK(hm_interpolation_enable(0));
+#endif
     hm_packet_identity_reset();
     hm_gpu_scene_destroy(gpu);
     hm_software_output_destroy(out);
     hm_widescreen_configure(0, 1920, 1080);
     CHECK(hm_widescreen_area(native).w == 320);
+    CHECK(hm_widescreen_area(double_native).w == 640);
+    CHECK(!hm_widescreen_overlay(double_fade, 5, expanded_fade));
     puts("Widescreen world/UI, source bounds, OFF parity and native-state preservation passed");
     return 0;
 }

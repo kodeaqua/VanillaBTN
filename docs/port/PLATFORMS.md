@@ -292,3 +292,60 @@ readback. CPU fallback preserves the current native VRAM path; performance
 profiling of actual game logic, pacing/waits and GPU work remains for the
 follow-up runtime-fixes branch. Aggregate CPU/GPU usage alone is not a measure
 of available game-thread headroom.
+
+### Runtime sleep/save regressions (2026-10-26)
+
+The Windows Application Error location for the owner's sleeping crash maps to
+farm_action_pick_slot in the release executable. ASan/UBSan synthetic tests
+reproduce the original truncated pointer scan and the old save packer's invalid
+run16 read. Updated scans and fixed-wire codec pass their isolated regressions.
+The codec test uses an in-memory card only. Interactive gameplay is owner-tested;
+matching binaries are unverified because the Linux toolchain is unavailable.
+
+### Runtime follow-up validation (2026-10-27)
+
+Windows Release and ASan/UBSan builds pass 89/89 tests after dialogue argument,
+overnight loader progress, runtime math and ordinary-card PocketStation handling
+changes. No gameplay automation or performance claim accompanies these checks.
+Interactive overnight/dialogue/Yodel Ranch validation remains with the owner.
+
+### Second source-audit validation (2026-10-27)
+
+Native Windows commands: cmake --build build/port/windows-release and ctest
+--test-dir build/port/windows-release --output-on-failure; equivalent commands
+for windows-asan-ubsan. Both builds and all 99 tests pass. A separate ASan family
+name fixture reads the SHA-1-validated owner disc without executing gameplay.
+Seven touched translation units pass targeted Clang analysis without selected
+core/unix/security diagnostics. No performance improvement or other-device result
+is claimed. Matching check is unavailable without the separate Linux toolchain.
+
+### Third source-audit validation (2026-10-27)
+
+Native Windows Release and ASan/UBSan builds and ctest --output-on-failure pass
+106/106 tests each. Targeted Clang analysis of six changed game translation units
+reports zero selected core/unix/security and callback/return/pointer-cast findings.
+Two original fixtures fail before repair, and a separate boolean terrain fixture
+reproduces a null store. These are synthetic technical checks only; gameplay,
+other devices, matching output and performance remain unverified by this batch.
+
+### Wide transition validation (2026-10-27)
+
+Windows Release and ASan/UBSan builds and ctest --output-on-failure each pass
+106/106 tests after ADR-068. Rebuilt hmbtn_gpu_renderer_probe and ran it with
+direct3d12 and vulkan; native/enlarged world/UI, filtering, full-screen TILE
+shade and presentation readbacks pass on both. Shaders were regenerated using
+the pinned DXC script. No game/replay, owner save, performance benchmark or
+other-platform build was run. Native scanout uses the same wide canvas when
+command replay is unavailable; content remains proportional.
+
+### Summary and splash follow-up (2026-10-27)
+
+Release/ASan builds and ctest --output-on-failure pass 107/107 tests. The added
+fixture executes the original farm-summary sprite loader with bounded synthetic
+CD progress and validates five shared sprite slots. Rebuilt offscreen GPU probe
+passes Vulkan and D3D12 readbacks with original white/black DRAWENV backgrounds,
+both frame-buffer origins, native/enlarged output and filtering modes. Shader
+headers are regenerated with pinned DXC. No performance claim or other-platform
+build is made. Matching check cannot run without the separate Linux toolchain;
+original status-page source alternatives reconstruct exactly with native guards
+disabled. User gameplay validation remains separate from these fixtures.

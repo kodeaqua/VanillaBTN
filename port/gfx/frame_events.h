@@ -8,6 +8,7 @@ typedef struct {
     int eligible;
     int world_view; /* Farm world view, including its UI overlays. */
     int bypass;     /* Direct/loading presentation cannot replay an older OT. */
+    int retain;     /* Direct fade adds commands to the existing framebuffer. */
     const void *arena[2];
     size_t arena_bytes[2];
 } hm_render_frame;

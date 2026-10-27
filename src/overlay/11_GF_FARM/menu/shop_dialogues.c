@@ -7,6 +7,10 @@
 #include <libgpu.h>
 #include <libgs.h>
 #include "types.h"
+#ifdef HMBTN_PORT
+/* PORT: reject invalid request IDs - see docs/port/DECISIONS.md#adr-065 */
+#include "psx/error.h"
+#endif
 #include "actor.h"
 #include "animals.h"
 #include "chicken.h"
@@ -2759,6 +2763,11 @@ s32 shop_phase_run(void) {
  * and steps the event request until it is idle. */
 s32 shop_request_dispatch(s32 arg) {
     s32 result;
+#ifdef HMBTN_PORT
+    /* PORT: validate before selecting either native table - see docs/port/DECISIONS.md#adr-065 */
+    if ((u32)arg >= sizeof(shop_screen_run_handlers) / sizeof(shop_screen_run_handlers[0]))
+        hm_runtime_error("shop_request_dispatch", "invalid shop request id");
+#endif
 
     result = 1;
     if (shop_screen_id == 0 || arg == 1) {
@@ -2781,9 +2790,17 @@ s32 shop_request_dispatch(s32 arg) {
         }
         result = 0;
         shop_screen_id = arg;
+#ifdef HMBTN_PORT
+        /* PORT: PS1 tables were adjacent, native objects are independent -
+         * see docs/port/DECISIONS.md#adr-065. Request zero has no initializer. */
+        if (arg > 0 && arg <= 28 && shop_phase_complete_handlers[arg - 1] != 0) {
+            shop_phase_complete_handlers[arg - 1]();
+        }
+#else
         if (shop_screen_start_handlers[arg] != 0) {
             shop_screen_start_handlers[arg]();
         }
+#endif
     }
     return result;
 }
@@ -3125,7 +3142,12 @@ static s32 shop_basket_step(void) {
         menu_request_open(2, 0xD6);
         return 1;
     }
+#ifdef HMBTN_PORT
+    /* PORT: forward the pending/completed result - see docs/port/DECISIONS.md#adr-065 */
+    return shop_item_grant(ITEM_BASKET, 2, 0xD5, SHOP_GRANT_ITEM);
+#else
     shop_item_grant(ITEM_BASKET, 2, 0xD5, SHOP_GRANT_ITEM);
+#endif
 }
 
 /* The spring result: without a greenhouse it runs only in spring (done at once otherwise); a

@@ -1566,3 +1566,403 @@ Synthetic dialogue workload timings are recorded in PLATFORMS.md. Owner actual
 logo/title/save/load, all-map and dialog/transition validation remains pending.
 No additional decomp source guard or external dependency is added. FXAA/MSAA
 remain deferred; save/load crash fixes follow after merging this graphics PR.
+
+## ADR-058: Native animal scans during overnight processing
+
+Date: 2026-10-26
+
+Context: The owner reports sleeping without saving also crashes. Windows
+Application Error 1000 for the current release reports access violation at
+RVA 0x1e1573, farm_action_pick_slot+0x53 (build 19f2994). Disassembly shows a
+record flag read through a sign-extended 32-bit address. An isolated empty-table
+ASan fixture reproduces the invalid read in farm_pick_random_slot.
+
+Decision: Under HMBTN_PORT, form animal record addresses with byte-pointer
+arithmetic and native sizeof strides. Explicitly return the picked slot from
+the wrapper whose callers consume that result; its old C fall-through does
+not provide defined host behavior. Clear sizeof(FarmAction), including native
+animation-pointer tails, rather than the PS1-sized 0xB0 prefix. The original
+else branches remain exact. Candidate filtering, table order, held/event/place
+rules and random-call cadence stay unchanged.
+
+Validation: The original synthetic empty-table call crashes; the repaired call
+passes ASan/UBSan. Tests cover no candidates/no RNG advance, the final livestock
+and chicken slots, held/event/location exclusions and full action clearing.
+Actual sleeping/overnight gameplay remains owner-tested. Matching check cannot
+run on this host: its Linux toolchain is unavailable and WSL is prohibited.
+
+## ADR-059: Fixed save payload independent of native object layout
+
+Date: 2026-10-26
+
+Context: The original packer overlays PS1-address-shaped structs on FarmState.
+Native pointers move the fields, including run16/run18. A synthetic valid native
+state with registered estate tables still crashes in the old packer when it
+reads run16 from a poisoned old offset. Native FarmAnimals also grows beyond its
+0x1F34 wire extent. SaveImage contains native pointer fields among raw blocks.
+A pointer-cast repair alone would therefore leave corrupted saves/loads.
+
+Decision: Add compat/save_codec with a fixed 0x6378 unshifted byte schema and
+asserted wire offsets. Encode/decode persistent named native fields; handle
+actor, animation, player, toy and helper records explicitly at their original
+wire strides. Copy only verified pointer-free scalar spans. Never store host
+addresses. Runtime table/script/asset bindings stay native instead of importing
+saved addresses; chickens/livestock clear sprite.source for normal rebinding,
+and extra chicken records retain the original packer's zeroing rule. Validate
+payload length and estate run availability/capacities before changing output or
+live state. Native source pack/unpack entry points call this codec under narrow
+HMBTN_PORT guards; the exact original implementations remain in else branches.
+
+Keep the original 0x8000-byte card file, slot metadata, byte-shift algorithm and
+block checksums. Do not version a host memory dump or store sizeof(FarmState).
+The existing native card container and Documents/BackToNature paths do not
+change. Reserved runtime-address slots encode as zero; load does not overwrite
+owned native bindings from them. Original-PS1 interchange is not claimed until
+validated against owner data. Livestock-transfer raw views remain unaudited.
+
+Validation: The old packer crashes in an isolated synthetic fixture at its
+run16 copy. The new fixture checks original shift/checksum encode/decode,
+tamper detection, a 32 KiB card write/reopen/read in memory, persistent field
+restoration, native binding preservation, canonical re-encoding and rejected
+short/unbound inputs. No disc or real saves are used. These do not establish
+interactive save/load or full overnight gameplay parity. Original matching
+branches reconstruct exactly with the new guards disabled; matching binaries
+remain unverified because the Linux toolchain is unavailable (no WSL).
+
+## ADR-060: Native dialogue argument and overnight loader progress
+
+Date: 2026-10-27
+
+Context: The reported ordinary-dialogue access violation at RVA 0x1158f9 in
+release timestamp 0x6adf6b53 maps to player_advance_state reading its missing
+player argument. Separately, the overnight sound-fader busy wait polls the CD
+loader without advancing deterministic VBlank callbacks. Windows also records
+an application hang during the owner's day transition, but no hang stack was
+available to establish that this wait was the observed hang.
+
+Decision: Use narrow HMBTN_PORT guards to pass the player argument and replace
+the overnight wait with compat/async_wait. That helper polls the existing loader
+and advances VSync(0), one hardware tick, until ready. No background game thread,
+host-time logic step or arbitrary timeout is introduced. Original else branches
+remain exact. These add one player guard and two clock_events guards.
+
+Validation: Dialogue fixture covers confirmation, no confirmation and blocked
+targets. Loader fixture requires three hardware ticks and verifies that an
+already-ready loader advances none. Interactive dialogue and overnight completion
+remain owner-tested. Matching check could not run without the Linux toolchain;
+the owner excludes WSL.
+
+## ADR-061: Explicit SDK coverage instead of success stubs
+
+Date: 2026-10-27
+
+Decision: Implement mathematical ratan2 and Q12 csqrt in the existing runtime,
+without SDK code/tables. Complete unsupported PocketStation requests with actual
+NoCard/Invalid results through the existing asynchronous card controller. Do not
+claim PocketStation support or fabricate output. Preserve explicit debug-font
+failures until a real renderer exists. See API_COVERAGE.md for remaining callers,
+mathematical parity limits and the pending-inventory regression check.
+
+Validation: Windows Release and ASan/UBSan builds each pass all 89 tests, including
+six new runtime fixtures and the inventory check. No new dependency or game data
+is used. Gameplay coverage remains with the owner.
+
+## ADR-062: Preserve widescreen groups during interpolation and tile menu sides
+
+Date: 2026-10-27
+
+Context: The owner observes widescreen only during dialogue, grey title sides,
+and incomplete load/save backgrounds. Inspection finds replay_group in mesh
+matching rather than in the interpolation execution loop. Regular frames use
+interpolation, while dialogue bypasses it. The title's scrolling layer was tagged
+as background but its green base animation 0x1D remained only 320 pixels wide.
+The load/save bg_tile dispatcher also emits only fifteen original tile columns.
+
+Decision: Restore each command's world/UI group during interpolation execution;
+mesh matching must not change replay state. Extend the title base using copies
+of its original animation, and intercept only bg_tile.c animation submissions to
+repeat four-column (96-pixel) periods outside the original grid. Preserve original
+frame, palette and scroll, with no new artwork or stretched text/logo. Tag both
+sprite and draw-mode ranges. Coalesce adjoining background spans so all 165 menu
+tiles and extra side tiles fit the existing inventory without losing later rows.
+All additional geometry is disabled when the runtime margin is zero. No decomp
+source changes, matching guard changes or dependencies are introduced.
+
+Validation: Windows Release and ASan/UBSan each pass 90/90 tests. Tests cover
+interpolated off-canvas world versus clipped UI, both menu allocation styles,
+all 24 scroll phases, 16:9/max-width coverage, original OFF submission counts,
+and title base expansion without logo tagging. Interactive visual confirmation
+remains with the owner; synthetic coverage is not a full-screen gameplay claim.
+
+The owner also reports camera displacement after two sleeps. A window capture
+confirms the reported view, but no camera/player state was captured before the
+process closed. An opt-in HMBTN_TRACE_CAMERA host diagnostic logs only game
+coordinates/flags every 120 hardware ticks. It does not alter simulation and is
+OFF unless explicitly set. Root cause and a camera fix remain pending evidence.
+
+## ADR-063: Freeze the complete pause canvas and preserve fallback aspect
+
+Date: 2026-10-27
+
+Context: The owner supplies pause/transitions with horizontally smeared sides.
+Pause freezes a 320x240 native scanout; presentation extends its edge columns to
+fill widescreen. The same presenter invents side pixels while transitions bypass
+private frame replay. This is visible stretching rather than additional scene.
+
+Decision: Reconstruct one frozen logical widescreen canvas at pause entry using
+the existing private output, taking interpolation when applicable. Draw the
+original 320x240 menu in the centre, with the same 40% scrim across the full
+canvas. Retain real side pixels instead of repeating columns. Keep a proportional
+native fallback with black sidebars when a valid wide replay is unavailable.
+Remove edge-column extension from the common presenter. No camera, game state,
+RNG or game ticks are modified by pause reconstruction. The pause snapshot is at
+logical resolution; it does not promise a full-resolution GPU screenshot. Window
+aspect changes while already paused do not regenerate the frozen projection.
+
+Validation: The canvas fixture covers 320, 428, odd 571 and maximum 1024 widths,
+all rows, centre extraction, original OFF output and single scrim application.
+Interactive pause/transition validation remains with the owner. Missing wide
+transition captures may temporarily show black sidebars; full transition world
+reconstruction is not claimed.
+
+## ADR-064: Native event animation copy and source-audit corrections
+
+Date: 2026-10-27
+
+Context: The new NPC crash occurs reading an animation range. Whole-tree native
+compiler/analyzer passes and manual review find villager_sprites_copy still using
+PS1 sprite size (0x30) and villager stride (0x1D4). On a native state this copies
+wrong fields and leaves broken pointer tails. Gift reaction lookup also truncates
+pictureCodes; chicken_clear zeros only the old record prefix. Farm re-entry and
+minigame startup waits lack hardware progress. Two item callbacks are called
+through incompatible function types.
+
+Decision: Copy complete named native animation records through compat/villager_sprites,
+retaining the existing event-0x82 reload order. Index native gift tables, clear
+sizeof(FarmChicken), reuse the existing audio wait helper for farm re-entry and
+call the two special item callbacks through their actual signatures. Function
+pointer conversions are used only for identity comparison. Preserve exact original
+source branches under HMBTN_PORT. For the five minigame overlays only, a CMake
+adapter adds VSync(0) after an unfinished afile poll; initial/completed reads and
+all ordinary game asynchronous reads keep their timing. No fake assets, callback
+results or broad source reformatting are introduced.
+
+Validation: The old villager copier fails the new fixture; the fixed helper
+preserves all fields outside the copied animations across 37 records and checks
+the conditional reload path. Tests cover all gift bit positions/rows and remapped
+reaction classes, native chicken tails, coin/berry use and bounded pending asset
+polls. Release and ASan/UBSan each pass 94 tests. See SOURCE_AUDIT.md for exact
+coverage, open findings and the limits of static analysis. The reported NPC and
+camera behavior still need owner testing. Matching check is unavailable because
+the Linux toolchain is absent and WSL is prohibited; disabled new source branches
+are checked textually instead.
+
+## ADR-065: Explicit shop callback indexing and original family text
+
+Date: 2026-10-27
+
+Context: shop_request_dispatch indexes a one-element null table with request IDs
+up to 28. Read-only inspection of the owner's validated USA overlay finds a
+contiguous 29-entry vector at 0x800BB2BC: the null entry followed by the existing
+28 phase-complete handlers, with null entries at 0 and 21 and the shared default
+at 4..10. Native C objects cannot rely on that adjacency. family_table_lookup
+also returns one of five PS1 addresses as s32 for the status page's text pointer.
+
+Decision: Dispatch request 0 without an initializer, and request n through
+shop_phase_complete_handlers[n-1]. Reject IDs outside 0..28 explicitly. Keep the
+original mapping and null slots, not invented successful handlers. Forward the
+basket callback's pending/completed result explicitly rather than native C
+fall-through. Original source alternatives are preserved under HMBTN_PORT.
+
+For family text, resolve the existing address metadata against the original low
+overlay base (0x800B7E20), member 11 of A_FILE.BIN. Read the member range from
+A_FILE.HDT using the validated disc parser at launcher initialization, outside
+simulated CD/game ticks. Validate member/extent boundaries and a terminator within
+nine glyph words. Cache only those five strings in native storage. Return a full
+u16 pointer through a guarded family.h signature and function body. No glyph
+strings, disc content or SDK material are copied into source control. Missing or
+malformed text fails initialization clearly; invalid wife indices fail explicitly.
+
+Validation: Synthetic ISO fixtures check all five native pointers, terminators,
+range/I/O/malformed-data failures and lookup through the game entry point. An
+isolated read-only check also loaded all five names from the owner's SHA-1-validated
+BIN; it did not execute gameplay. Shop tests exercise the highest request, the
+null slot, the shared initializer, zero request, invalid ID rejection and basket
+pending/completed behavior. Matching check is unavailable on this Windows host
+without the Linux toolchain; WSL is excluded. Disabled new guards reconstruct the
+original sources exactly. No other platform/device or married-status gameplay
+claim follows from these checks.
+
+## ADR-066: Separate partner save bytes from native transfer records
+
+Date: 2026-10-27
+
+Context: Livestock exchange still casts unshifted save bytes to FarmAnimals and
+SaveFile/SaveImage with native pointers. A five-animal stash also uses the old
+928-byte buffer although native livestock records are 224 bytes on this build.
+Restoration copies only the old PS1 prefix. An isolated old-buffer reproduction
+fails ASan with a 224-byte write beyond save_out_buffer.
+
+Decision: Extend the fixed-width save codec with a typed partner view containing
+native animals, pointer-free estate metadata and the eight-byte farm identity.
+Decode only after checksum/slot validation and byte-unshifting. Route transfer
+counts, free slots, names, capacities and UI through that view. Stash and restore
+complete native records in an aligned buffer sized for five maximum-sized animal
+records. Clear the complete buffer. Before the existing shift/checksum/write,
+encode only the original 0x1F34 animal extent, clearing reserved runtime-address
+words and preserving every subsequent partner payload byte. Native view state
+joins the save overlay's reset inventory. Keep original source alternatives.
+
+Validation: Real source staging/restoration fixtures exchange five cows and five
+chickens using synthetic farms and an in-memory payload. They cover final record
+slots, stash capacity/reset, full native tail restoration, metadata/identity,
+short-input rejection, unchanged non-animal bytes and original shift/checksum
+round trips. No owner saves are opened or written. Release and ASan/UBSan each
+pass 99/99 tests; seven changed translation units pass targeted Clang analysis
+without core/unix/security findings. These checks do not establish interactive
+card failure/abort/retry behavior, original-PS1 interchange or full-game parity.
+The original exchange transaction/error policy is unchanged; no atomic-write or
+rollback guarantee is introduced. Matching check remains unavailable (no Linux
+toolchain, no WSL); textual source reconstruction is a separate check.
+
+## ADR-067: Optional probe outputs, pointer sentinels and native frame callbacks
+
+Date: 2026-10-27
+
+Context: The source audit's estate pickup warning is reachable: the dog approach
+path calls estate_field_pickup with a null output, but seasonal mapping reads it
+unconditionally. Boolean-only animal/estate terrain queries similarly omit tile
+and flag outputs that farm_tile_occupant writes, including at the callback cap.
+Bounded source fixtures reproduce both null writes/reads under UBSan. A synthetic
+opaque pointer also demonstrates sound_update misclassifying a non-sentinel
+native address when its low word is 0xFFFFFFFF.
+
+Decision: Under narrow HMBTN_PORT guards, seasonal mapping runs only when an item
+output is requested; record enable/claimed changes remain unchanged. Terrain
+queries use local discard outputs when callers omit them, and the capped branch
+clears flags only when provided. Initialize the standalone tile probe's hit class
+and the estate basket probe's unused map/padding, preserving filled coordinates,
+location, query result and callback counts. Compare full sequence pointers against
+SOUND_BUFFER_NONE, keeping slot/open/start behavior intact.
+
+An absent image index previously leaves the image-bank upload rectangle
+uninitialized. Reject null banks and indices outside count explicitly; keep the
+existing non-bank zero result and valid raw/RLE uploads. These checks do not
+validate an entire bank's encoded byte extent or RLE destination capacity.
+
+MG4 state functions all take no arguments: use a matching native function pointer
+and call, without passing the handler table as a fabricated context. MG1's award
+frame is used exclusively by a void frame dispatcher; make its native declaration
+and definition void and retain state advancement through mg1_state.step. Do not
+invent a pending integer result for the original non-void fall-through. Original
+matching alternatives remain exact.
+
+Validation: Old pickup and sequence fixtures fail before correction; the added
+boolean terrain fixture independently reproduces a null store before correction.
+Tests cover every season's optional pickup/seasonal item forms, one-time grapes,
+ordinary/opaque/sentinel sequence slots, no duplicate opens, stereo/mono, all seven
+MG4 slots/menu order, field/greenhouse classes, omitted outputs, callback cap and
+the actual estate_basket_check caller. Texture tests check named null/empty/index
+failures and retain the original decoder's valid output regressions. The opaque
+sequence pointer is never dereferenced and is not a claim about real allocations
+or audible music. MG1's waiting-screen behavior has compile/analyzer validation,
+not an interactive minigame test.
+
+Windows Release and ASan/UBSan each pass 106/106 tests. Targeted Clang analysis
+of six modified game units reports no core/unix/security findings or the selected
+callback/return/pointer-cast warnings. No gameplay/replay or owner save data is
+used. Matching check cannot run without the separate Linux toolchain (WSL is
+excluded); disabled native guards are checked textually instead. No full-game,
+other-platform or performance claim follows from this batch.
+
+## ADR-068: Wide transition capture, full-screen tiles and scanout canvas
+
+Date: 2026-10-27
+
+Context: The owner reports a 4:3 rucksack shade, side flicker between Natsume
+and title, and aspect changes during transitions. Rucksack shade uses a
+three-word TILE, whereas the full-screen expansion recognized only F4 packets.
+Frame blends skip main.c's PutDrawEnv call, so they previously never began a
+capture. Both private renderers also initialized extra pixels by repeating the
+changing native edge column.
+
+Decision: Expand exact full-screen variable TILE packets as well as F4, retaining
+their original command lengths. Start capture for main.c's direct fade OT path.
+Append its commands to a recent complete capture of the same draw rectangle,
+keeping the original snapshot and extended geometry. A normal frame starts a
+fresh capture. Coalesce consecutive equal groups so repeated fades do not exhaust
+group slots. Invalidated, bypassed, stale or different-buffer captures cannot be
+retained. Bounded command/group capacity still rejects incomplete replay.
+
+Initialize unrendered side pixels to black in both CPU and GPU paths. The host
+places direct/loading native scanout proportionally at the centre of an expanded
+canvas when no private replay is available, rather than selecting a 4:3 output
+destination. Do not stretch UI or native edge columns. Support the game's
+640x480 stepped-fade rectangle as well as 320x240. Native VRAM, game clocks,
+camera coordinates, source code and data files remain untouched.
+
+Validation: Windows Release and ASan/UBSan builds each pass 106/106 tests.
+Synthetic checks exercise TILE packet boundaries, native edge contamination,
+80 retained fade captures, final accumulated darkness, changed scene keys,
+bypass rejection, 640x480 expansion, OFF behavior and native state preservation.
+Offscreen D3D12 and Vulkan readbacks match the CPU reference at native/enlarged
+resolutions, with both filtering modes and a rucksack-style full-screen TILE.
+The presentation probe's obsolete edge-repeat expectation is corrected to match
+the existing proportional-image contract. No gameplay or owner save is opened.
+Actual logo/menu/area/cutscene transitions still need owner validation. These
+checks do not prove sufficient side scenery in every original map or absence
+of every widescreen bug; there is no performance or other-platform claim.
+
+## ADR-069: Farm summary loading and shared status sprites
+
+Date: 2026-10-27
+
+Context: Start opening the farm summary hangs; Windows reports AppHangB1. Its
+status_load_sprites has an empty afile_read_bytes polling loop, so deterministic
+CD progress never runs. After yielding is restored, a bounded fixture of the
+original loader exposes index 4 outside status_page_sprites[3] under UBSan.
+The original slots 3/4 refer to the separately named shared cursor/mark sprites;
+native globals need not be adjacent to the page array.
+
+Decision: Add status_pages.c to the existing blocking-asset-read CMake adapter.
+Only pending polls yield VSync(0); initiation and completion add no extra tick.
+Use a native-only checked slot resolver for the five loader slots and variable
+sprite accesses in two draw helpers. Keep all original matching expressions in
+exact #else alternatives. Do not enlarge the array and duplicate the shared
+cursor/mark state used elsewhere.
+
+Validation: The original loader runs in a synthetic bounded fixture, checking
+two hardware/host ticks, one read, one texture upload, five exact native bindings
+and the copied pack. The fixture neither runs gameplay nor uses disc/save data.
+Release and ASan/UBSan each pass 107 tests. Original source reconstruction with
+HMBTN_PORT disabled matches HEAD before the repair exactly. Matching check is
+unavailable without the separate Linux toolchain; WSL is excluded. Interactive
+summary-page navigation remains owner-tested.
+
+## ADR-070: Original splash clear colour and displayed-buffer identity
+
+Date: 2026-10-27
+
+Context: Natsume uses white DRAWENV background clearing, not a full-screen white
+primitive. ADR-068's unconditional black side initialization leaves that splash
+visibly bounded at 4:3. The owner also reports a brief narrow frame during Won's
+cutscene. Shared replay rejects a displayed capture if the simulation's scene key
+changes before the buffer flip, although those pixels still belong to the old
+completed buffer.
+
+Decision: Seed extra pixels with the original enabled DRAWENV clear colour,
+converted to 15-bit RGB, or black when background clearing is disabled. Share
+this rule between software, GPU scene header word 14 and native scanout. Do not
+stretch the logo or repeat edge columns. Shared frame replay selects a complete
+recent capture by the actual displayed rectangle, independently of the live
+simulation key; reject bypass captures and retain age/overlay-invalidation
+checks. Interpolation's strict scene-key checks remain unchanged.
+
+Validation: Synthetic splash tests check white side pixels and the GPU background
+word. Vulkan/D3D12 readbacks match software for white and black backgrounds at
+both buffer origins, native/enlarged resolutions and both filtering modes.
+Replay regression checks a live scene-key change before the buffer flips and
+rejects the wrong display buffer. Release/ASan pass 107 tests. These establish
+the source-level defects and corrections; the reported Won cutscene and actual
+Natsume presentation still require owner verification. No gameplay replay or
+owner saves are used. Matching source is unchanged by this graphics repair.

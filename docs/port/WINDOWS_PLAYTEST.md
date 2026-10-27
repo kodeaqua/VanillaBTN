@@ -155,3 +155,120 @@ the disc, screenshots or other extracted data to git.
 Matching check remains unverified because this Windows host lacks the separate
 Linux toolchain and the owner excludes WSL. Source-branch reconstruction is a
 separate textual check and does not establish matching compiler output.
+
+### Runtime-fixes branch: sleeping and save payload
+
+The reported sleep-without-save access violation maps to the animal record scan,
+where native pointers were truncated to 32 bits. ADR-058 fixes that scan and its
+native action record clearing. ADR-059 separately replaces PS1-offset state
+packing with explicit fixed-width save spans. Original checksums, shifts, card
+file size and Documents/BackToNature storage remain unchanged.
+
+Isolated regressions reproduce both old faults and pass after the fixes. The
+codec fixture writes/reopens/reads a synthetic in-memory card and restores named
+persistent state. It never accesses the owner's saves. This is not a gameplay
+pass: the owner still needs to try sleeping without saving, overnight events,
+sleep-and-save, returning to title and loading the saved slot. Other runtime
+faults may only become reachable after these blocking faults are removed.
+
+2026-10-27 follow-up: the owner confirms saving succeeds, but reports a later
+day-transition hang, ordinary dialogue crash and ratan2 abort entering Yodel
+Ranch. The branch now passes the required player argument, progresses VBlank
+inside the overnight audio wait, implements runtime math and rejects unsupported
+PocketStation operations through proper asynchronous results. All 89 Release
+and ASan/UBSan tests pass. Re-test those three gameplay triggers with the newly
+built release. The exact day-transition hang cause remains unconfirmed without
+a hang stack. See API_COVERAGE.md for remaining explicit font failures.
+
+### Widescreen and camera follow-up (2026-10-27)
+
+The owner confirms the Natsume logo looks correct but reports grey title sides,
+incomplete load/save coverage and farm widescreen only while dialogue is shown.
+ADR-062 fixes interpolation replay grouping and extends original background
+assets through port adapters. Both Windows suites pass 90/90 tests. Recheck
+moving farm frames with interpolation On, title colour, and load/save sides.
+
+Camera displacement after sleeping twice is a separate open report. The ignored
+window capture is build/port/camera-after-sleep.png. Set HMBTN_TRACE_CAMERA=1 when
+launching the native executable directly to record player/centre/eye coordinates,
+view/event state and flags every 120 hardware ticks on stderr. No positions are
+changed. The diagnostic is disabled by default; never commit owner screenshots,
+save data or captured gameplay logs. The current local diagnostic launch writes
+build/port/camera-play.stderr.log. Do not claim the camera issue fixed yet.
+
+### Pause, transitions and source audit (2026-10-27)
+
+The owner supplied a pause view with smeared horizontal side strips, also seen
+before/after cutscenes and area transitions. ADR-063 freezes genuine wide side
+pixels for pause, centres the original menu and removes edge-column stretching
+from all fallback presentation. Unsupported wide transition snapshots may use
+black sidebars; this is not full transition reconstruction.
+
+A later outside-blacksmith NPC crash maps to sprite_draw_frame+0x26 in timestamp
+0x6adfcd97. ADR-064 repairs a confirmed PS1-sized villager animation copy that
+corrupts native fields, plus other source-audit findings. The old copier fails
+its synthetic fixture. Current Release and ASan/UBSan each pass 94/94 tests.
+Try the same NPC interaction, repeated sleeps, pause and transitions again. No
+interactive success is claimed until the owner verifies them. SOURCE_AUDIT.md
+lists static coverage and remaining issues, including shop/status/transfer paths.
+
+### Second audit batch (2026-10-27)
+
+Shop request initialization no longer depends on neighboring C objects. Family
+status text is loaded from the validated original archive and returned as native
+pointers. Animal exchange decodes a native partner view and uses a five-record
+native stash; its old buffer reproduces an ASan overflow. See ADR-065/066.
+
+Windows Release and ASan/UBSan pass 99/99 tests. A read-only asset check resolves
+all five original spouse names from the owner's validated BIN. These checks do
+not open owner save files or run gameplay. Still owner-tested: shop dialogue
+lifecycles, married status UI, interactive animal exchange and card failure/retry,
+plus the earlier Saibara and repeated-sleep camera reports. No new gameplay launch
+was performed during this batch.
+
+### Third source-audit batch (2026-10-27)
+
+ADR-067 repairs reachable null output accesses in dog-ball pickup and boolean
+terrain probes used by animals/basket code. It also fixes full-width sequence
+sentinel comparison, uninitialized query fields and native minigame frame/state
+callback signatures. Missing texture-bank images now give explicit diagnostics
+instead of using an uninitialized rectangle.
+
+Release and ASan/UBSan pass 106/106 tests. Fixtures exercise the actual pickup,
+basket and callback dispatch code with synthetic state, not interactive game
+sessions. Owner checks still needed: dog retrieves ball, animal movement/basket
+placement, sound, MG1/MG4, and earlier NPC/camera reports. No claim that all
+analyzer warnings or full-game paths are resolved.
+
+### Wide transition follow-up (2026-10-27)
+
+ADR-068 handles rucksack TILE shade, observes direct frame-blend OTs and removes
+native edge-column seeding from both private renderers. Direct/loading scanout
+keeps the wide canvas with proportional central content. Release and ASan/UBSan
+pass 106 tests; offscreen D3D12/Vulkan comparisons pass. No gameplay was run.
+
+Owner checks: Widescreen ON from boot through Natsume-to-title fade, load/save,
+rucksack entry/exit, area changes and cutscene entry/exit; check both scaling
+settings and interpolation settings. The shade/fade should cover the sides,
+logo/text should retain proportions, and the output should not snap to a 4:3
+destination. Also check 21:9/monitor changes and OFF's original 4:3 presentation.
+Report remaining exposed map edges or missing original background coverage;
+synthetic tests do not establish an all-screen playthrough result.
+
+### Start / farm summary hang (2026-10-27)
+
+Windows records AppHangB1 for the owner session, not an access violation.
+ADR-069 yields hardware progress in the status sprite loader and maps its shared
+sprite slots explicitly; the original loader fixture exposes the old native
+out-of-array address and passes after correction. Release/ASan pass 107 tests.
+Owner checks: Start from the farm, summary opening, page arrows, animal/helper/
+tool pages where available, closing, then repeated entry. No interactive result
+is claimed from the isolated loader fixture. Matching check remains unavailable
+without the separate Linux toolchain; original alternatives are checked textually.
+
+ADR-070 extends the original white DRAWENV background across Natsume's extra
+canvas. Logo proportions remain unchanged. A completed displayed capture is no
+longer rejected just because cutscene/game state advances before the buffer flip;
+interpolation still rejects cross-scene blending. Check Natsume and the reported
+brief Won cutscene flash again; the latter has no confirmed interactive result.
+White/black offscreen GPU readbacks pass on Vulkan and D3D12.

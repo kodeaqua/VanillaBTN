@@ -59,7 +59,12 @@ void family_reset(void);
 void family_set_bride(s16 mode);
 void family_child_born(void);
 void family_daily_update(void);
+#ifdef HMBTN_PORT
+/* PORT: full native text pointer - see docs/port/DECISIONS.md#adr-065 */
+u16 *family_table_lookup(void);
+#else
 s32 family_table_lookup(void);
+#endif
 
 
 #endif /* FAMILY_H */

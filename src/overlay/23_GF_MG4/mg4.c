@@ -45,7 +45,12 @@
 /* A step of v along one axis when it moves on both: v / sqrt 2. */
 #define MG4_DIAGONAL(v) ((v) * 1000 / 1414)
 
+#ifdef HMBTN_PORT
+/* PORT: state handlers take no context - see docs/port/DECISIONS.md#adr-067 */
+typedef void (*Fn)(void);
+#else
 typedef void (*Fn)(void *);
+#endif
 
 /* Per-player allowed depth range. */
 typedef struct Mg4Range {
@@ -275,7 +280,12 @@ static void mg4_step_intro_wait(void) {
 /* Runs the menu, then the handler for mg4_state.state. */
 static void mg4_state_tick(void) {
     menu_run_state();
+#ifdef HMBTN_PORT
+    /* PORT: match the declared handler arguments - see docs/port/DECISIONS.md#adr-067 */
+    mg4_state_handlers[mg4_state.state]();
+#else
     mg4_state_handlers[mg4_state.state](mg4_state_handlers);
+#endif
 }
 /* Start the blend-out of the screen and the music's fade, and move to the next step. */
 static void mg4_fade_out(void) {

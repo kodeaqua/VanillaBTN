@@ -131,6 +131,11 @@ static s16 status_recipe_count;
 static AnimState status_page_sprites[3];
 AnimState status_cursor_sprite;
 AnimState status_mark_sprite;
+#ifdef HMBTN_PORT
+/* PORT: resolve the shared PS1 sprite slots explicitly -- see ADR-069. */
+#include "psx/error.h"
+#include "compat/status_sprites.inc"
+#endif
 
 /* A one-shot latch: set once, drawn while set, cleared to reset. */
 static s32 status_latch = 0;
@@ -422,7 +427,12 @@ static void status_load_sprites(void) {
     texture_pack_load(STAGING_BUFFER + sizeof(FarmPack));
     status_pack = *(FarmPack *)STAGING_BUFFER;
     for (i = 0; i < 5; i++) {
+#ifdef HMBTN_PORT
+        /* PORT: avoid crossing native C object boundaries -- see ADR-069. */
+        anim_bind_file(hm_status_sprite(i), (AnimFile *)(status_pack.bytes + status_sprite_offsets[i]));
+#else
         anim_bind_file(&status_page_sprites[i], (AnimFile *)(status_pack.bytes + status_sprite_offsets[i]));
+#endif
     }
 }
 
@@ -551,7 +561,12 @@ static void status_draw_summary(void) {
 }
 
 static void status_draw_sprite_label(s32 sprite, s32 anim, u16 *text, s16 x, s16 y) {
+#ifdef HMBTN_PORT
+    /* PORT: shared cursor/mark slots are separate native objects -- see ADR-069. */
+    anim_draw_sprt_cursor(&current_frame->otTags[0][26], hm_status_sprite(sprite), anim & 0xFF, 0,
+#else
     anim_draw_sprt_cursor(&current_frame->otTags[0][26], &status_page_sprites[sprite], anim & 0xFF, 0,
+#endif
                   x, y);
     text_draw_plain(&current_frame->otTags[0][21], text, x + 24, y + 4);
 }
@@ -631,7 +646,12 @@ typedef struct FarmStatusMark {
 } FarmStatusMark;
 
 static void status_draw_entry(s32 value, s32 sprite, s32 animation, s32 frame, u16 *text, s16 x, s16 y) {
+#ifdef HMBTN_PORT
+    /* PORT: resolve the shared native sprite explicitly -- see ADR-069. */
+    anim_draw_sprt_cursor(&current_frame->otTags[0][26], hm_status_sprite(sprite), animation & 0xFF,
+#else
     anim_draw_sprt_cursor(&current_frame->otTags[0][26], &status_page_sprites[sprite], animation & 0xFF,
+#endif
                   frame & 0xFF, x, y);
     text_draw_plain(&current_frame->otTags[0][21], text, x + 24, y + 2);
     status_draw_glyph_run_4(value, x + 96, y + 16);

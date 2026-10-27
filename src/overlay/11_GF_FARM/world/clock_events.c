@@ -1,3 +1,7 @@
+#ifdef HMBTN_PORT
+/* PORT: deterministic loader wait - see docs/port/DECISIONS.md#adr-060 */
+#include "compat/async_wait.h"
+#endif
 /* The clock's event callbacks, in the order of clock_callbacks: the ledger roll, the
  * end-of-day sequence, the season and hour refreshes and the objects shown on a date. */
 
@@ -177,10 +181,15 @@ s32 scene_overnight_step(void)
             break;
         }
         farm_mode_change();
+#ifdef HMBTN_PORT
+        /* PORT: progress CD/VBlank callbacks - see docs/port/DECISIONS.md#adr-060 */
+        hm_wait_sound_fader();
+#else
         while (sound_fader_ready() == 0)
         {
             sound_load_tick();
         }
+#endif
         sound_update();
         farm_set_message_timing();
         break;

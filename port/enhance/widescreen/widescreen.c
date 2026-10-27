@@ -27,6 +27,12 @@ int hm_widescreen_radius(int radius) {
 }
 RECT hm_widescreen_area(RECT native) {
     int margin = native.w == 320 && native.h == 240 ? hm_widescreen_margin() : 0;
+    /* The SDK's stepped fades temporarily select the double-sized framebuffer. */
+    if (native.w == 640 && native.h == 480) {
+        margin = hm_widescreen_margin() * 2;
+        if (margin > 192)
+            margin = 192;
+    }
     native.x -= margin;
     native.w += 2 * margin;
     return native;
@@ -42,10 +48,22 @@ RECT hm_widescreen_clip(RECT clip) {
     return clip;
 }
 int hm_widescreen_overlay(const u32 *words, u32 count, u32 output[5]) {
-    int margin = hm_widescreen_margin();
-    if (!margin || native_area.w != 320 || native_area.h != 240 || count < 5 ||
-        ((words[0] >> 24) & ~2u) != 0x28 || words[1] != 0 || words[2] != 320 ||
-        words[3] != (240u << 16) || words[4] != (320u | (240u << 16)))
+    RECT expanded = hm_widescreen_area(native_area);
+    int margin = native_area.x - expanded.x;
+    u32 width = (u16)native_area.w, height = (u32)(u16)native_area.h << 16;
+    if (!margin || !count)
+        return 0;
+    /* Rucksack/name-entry shade uses a variable-size TILE, not a polygon.
+     * Return its actual packet length: subsequent commands must stay aligned. */
+    if (((words[0] >> 24) & ~2u) == 0x60 && count >= 3 && words[1] == 0 &&
+        words[2] == (width | height)) {
+        output[0] = words[0];
+        output[1] = (u16)-margin;
+        output[2] = (width + 2 * margin) | height;
+        return 3;
+    }
+    if (count < 5 || ((words[0] >> 24) & ~2u) != 0x28 || words[1] != 0 || words[2] != width ||
+        words[3] != height || words[4] != (width | height))
         return 0;
     output[0] = words[0];
     for (int i = 1; i <= 4; ++i) {
@@ -53,5 +71,5 @@ int hm_widescreen_overlay(const u32 *words, u32 count, u32 output[5]) {
         x += x ? margin : -margin;
         output[i] = (words[i] & 0xffff0000u) | (u16)x;
     }
-    return 1;
+    return 5;
 }

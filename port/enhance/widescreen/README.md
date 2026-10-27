@@ -8,8 +8,9 @@ The private render area grows horizontally around the original center; original
 GTE projection/depth and camera eye/target stay intact. Model frustum/clip bands,
 field grid coverage and projected sprite visibility expand to reveal additional
 world. World OT clipping expands; normal UI retains its original size and stays
-centered. Full-screen flat F4 fades/fills cover the sides too. Side initialization
-is black, never adjacent texture/CLUT VRAM. Texture feedback still checks native
+centered. Full-screen flat F4 and variable TILE fades/fills cover the sides too. Side initialization
+uses the native DRAWENV clear colour when enabled, otherwise black, never
+adjacent texture/CLUT VRAM. Texture feedback still checks native
 framebuffer coordinates. Shared capture and interpolation preserve OT groups.
 
 Works through GPU Auto or the software reference, with scaling either ON or OFF.
@@ -21,8 +22,9 @@ remain native. OFF retains 4:3 bars and original source culling.
 Widescreen presentation now applies from the first logo through title, load/save,
 minigames, gameplay and pause (ADR-057). The title's original scrolling 0x25
 background tiles are tagged separately and exposed beyond their old clip;
-logo/text/cursor packets stay proportional. Native/pause/direct/loading output
-fills extra background from original edge columns, keeping centered content.
+logo/text/cursor packets stay proportional. Native/direct/loading scanout stays
+centred on the expanded canvas when command replay is unavailable. Uncovered
+pixels use the native clear colour; no source edge columns are stretched into invented background.
 Original black logo background remains black. Nothing invents new level scenery
 or enlarges weather particle pools. Scene-specific geometry/coverage still needs
 owner testing. GPU/native fallback never changes the presentation aspect.
@@ -30,6 +32,18 @@ Original primitive memory/overlay backups stay intact. Model submission stops
 with an 8 KiB UI reserve if its original arena fills. Two optional 256 KiB GS
 arenas supply sprite packet space; OFF restores original work arenas.
 CPU fallback at large output sizes can be slow.
+
+ADR-068 captures direct frame-blend OTs even when the game skips PutDrawEnv.
+Their commands accumulate over the captured scene, including its extended sides,
+until a normal frame replaces it. Consecutive equal OT groups are coalesced;
+capacity exhaustion invalidates replay instead of using partial geometry.
+The 640x480 stepped-fade domain also expands (856x480 at 16:9).
+Rucksack/name-entry TILE shade preserves its three-word command boundary.
+ADR-070 makes GPU/software/native side initialization follow the actual clear
+colour (including the white Natsume splash), independent of changing edge texels.
+Output aspect stays wide even for direct/loading scanouts, while
+native artwork remains proportional. This is a presentation guarantee in the
+implemented paths, not proof that every map has sufficient original side assets.
 
 Technical checks cover world/UI separation, full-screen fills, unchanged native
 VRAM/environment/ticks/projection, OFF culling, GS cursor/arena restoration and

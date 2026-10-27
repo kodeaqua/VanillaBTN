@@ -11,7 +11,7 @@
         }                                                                                          \
     } while (0)
 
-int main(void) {
+int main(int argc, char **argv) {
     /* Synthetic bank data exercises the original game decoder, not a rewritten
      * port decoder. All bytes are fixtures, unrelated to disc assets. */
     u32 storage[8] = {0};
@@ -19,6 +19,17 @@ int main(void) {
     BankImage *image = bank->images;
     bank->type = 0xD;
     bank->count = 1;
+    if (argc == 2) {
+        u8 buffer[8];
+        if (!strcmp(argv[1], "null"))
+            image_bank_upload(NULL, buffer, 0, 0, 0);
+        else {
+            if (!strcmp(argv[1], "empty"))
+                bank->count = 0;
+            image_bank_upload(bank, buffer, bank->count ? 1 : 0, 0, 0);
+        }
+        return 1;
+    }
     image->x = 5;
     image->y = 6;
     image->w = image->h = 2;
@@ -51,5 +62,7 @@ int main(void) {
     texture_pack_load((u8 *)bank);
     CHECK(hm_vram_pixel(5, 6) == 0x3311 && hm_vram_pixel(5, 7) == 0x4422);
     CHECK(hm_vram_pixel(6, 6) == 0x7755 && hm_vram_pixel(6, 7) == 0x8866);
+    bank->type = 0;
+    CHECK(image_bank_upload(bank, expanded, 0, 50, 60) == 0);
     return 0;
 }

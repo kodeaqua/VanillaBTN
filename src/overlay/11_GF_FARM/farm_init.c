@@ -50,6 +50,10 @@
 #include "text_bank.h"
 #include "villager.h"
 #include "weather.h"
+#ifdef HMBTN_PORT
+/* PORT: deterministic blocking loader - see docs/port/DECISIONS.md#adr-064 */
+#include "compat/async_wait.h"
+#endif
 
 static void farm_shop_rows_reset(void);
 static void farm_estate_reset(void);
@@ -341,9 +345,14 @@ void farm_reenter(void) {
     scene_mode_queue_run(&farm_area.mode.script);
     farm_zones_register_script(&farm_area.mode.script);
     farm_mode_change();
+#ifdef HMBTN_PORT
+    /* PORT: progress VBlank/CD callbacks - see docs/port/DECISIONS.md#adr-064 */
+    hm_wait_sound_fader();
+#else
     while (sound_fader_ready() == 0) {
         sound_load_tick();
     }
+#endif
     sound_update();
     farm_set_message_timing();
     if (farm_area.mode.place.location == PLACE_2) {

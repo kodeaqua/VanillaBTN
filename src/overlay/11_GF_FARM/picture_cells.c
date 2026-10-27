@@ -143,6 +143,14 @@ s32 item_run_use(FarmStoredItem *item) {
         argument = dispatch->firstArg;
     }
     if (dispatch != 0 && dispatch->callback != 0) {
+#ifdef HMBTN_PORT
+        /* PORT: call the two legacy callbacks with their actual prototypes -
+         * see docs/port/DECISIONS.md#adr-064. Pointer conversion is for identity only. */
+        if (dispatch->callback == (DispatchRecordCallback)item_use_coin)
+            return item_use_coin(argument, dispatch->secondArg, dispatch->thirdArg, 0);
+        if (dispatch->callback == (DispatchRecordCallback)farm_adjust_stamina_fatigue)
+            return farm_adjust_stamina_fatigue(argument, dispatch->secondArg);
+#endif
         return dispatch->callback(argument, dispatch->secondArg, dispatch->thirdArg, 0);
     }
     return -1;
@@ -396,7 +404,12 @@ s32 item_villager_reaction(s16 id, s16 slot) {
     if (flags & ITEM_FLAG_TOOL) {
         return -2;
     }
+#ifdef HMBTN_PORT
+    /* PORT: retain the native table pointer - see docs/port/DECISIONS.md#adr-064 */
+    codes = (s32 *)&game_state.pictureCodes[picture][slot / 10];
+#else
     codes = (s32 *)(picture * 16 + (s32)game_state.pictureCodes) + (slot / 10);
+#endif
     reaction = *codes >> ((slot % 10) * 3);
     reaction &= 7;
     if (flags & 0x180) {

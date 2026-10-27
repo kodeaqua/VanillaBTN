@@ -52,7 +52,15 @@ int hm_packet_identity_get(const void *packet, u64 *entity, u32 *part) {
 
 int hm_packet_background_span(const void *begin, const void *end) {
     uintptr_t first = (uintptr_t)begin, last = (uintptr_t)end;
-    if (!first || last <= first || hm_background_count == 128)
+    if (!first || last <= first)
+        return 0;
+    for (u32 i = 0; i < hm_background_count; ++i) {
+        if (first == hm_backgrounds[i].end) {
+            hm_backgrounds[i].end = last;
+            return 1;
+        }
+    }
+    if (hm_background_count == 128)
         return 0;
     hm_backgrounds[hm_background_count++] = (hm_identity_span){first, last, 0};
     return 1;
