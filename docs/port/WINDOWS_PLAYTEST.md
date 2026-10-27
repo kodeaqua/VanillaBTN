@@ -293,3 +293,14 @@ at the sides. ADR-072 removes a verified unchanged-buffer timeout during blockin
 waits and uses native write invalidation instead. 109 Release/ASan tests and
 Vulkan/D3D12 probes pass. Recheck those specific transitions after updating the
 executable; do not treat fixture success as an interactive resolution.
+
+### Repeated load / farm overlay re-entry (2026-10-27)
+
+Owner reports Natsume safe on 9c57d5a. Load later aborts with native overlay reentry
+is not implemented; WER records the runtime abort. ADR-073 adds the missing farm
+snapshot inventory instead of bypassing the error. 110 Release/ASan tests pass,
+including a title/farm/load loop that fails on the old registry and a fixture
+mutating every registered mutable object. No real save file is used in the tests.
+Owner checks: load into farm, return to title, load the same/another slot again,
+then repeat and verify player/day/animals and menus. Interactive success remains
+pending. TV/home-exit flicker is not established resolved by this unrelated fix.

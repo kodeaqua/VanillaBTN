@@ -1,0 +1,350 @@
+{
+  "animals/animal_actions.c": [
+    {
+      "function": "insect_cue_0",
+      "object": "steps",
+      "type": "FarmCueStep[2]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "farm_action_wander",
+      "object": "steps",
+      "type": "FarmCueStep[6]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "visitor_cue_3",
+      "object": "steps",
+      "type": "FarmCueStep[3]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "visitor_cue_4",
+      "object": "steps",
+      "type": "FarmCueStep[4]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "rabbit_cue_8",
+      "object": "steps",
+      "type": "FarmCueStep[3]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "rabbit_cue_9",
+      "object": "steps",
+      "type": "FarmCueStep[3]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "fox_cue_11",
+      "object": "steps",
+      "type": "FarmCueStep[3]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "fox_cue_12",
+      "object": "steps",
+      "type": "FarmCueStep[3]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "squirrel_cue_10",
+      "object": "steps",
+      "type": "FarmCueStep[3]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "monkey_cue_13",
+      "object": "steps",
+      "type": "FarmCueStep[3]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "insect_cue_14",
+      "object": "steps",
+      "type": "FarmCueStep[4]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "insect_cue_15",
+      "object": "steps",
+      "type": "FarmCueStep[4]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "insect_cue_16",
+      "object": "steps",
+      "type": "FarmCueStep[3]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "cat_cue_17",
+      "object": "steps",
+      "type": "FarmCueStep[3]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "dog_herd_cue",
+      "object": "steps",
+      "type": "FarmCueStep[3]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "cue_run_tick",
+      "object": "steps",
+      "type": "FarmCueStep[3]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    }
+  ],
+  "animals/chicken.c": [
+    {
+      "function": "farm_chicken_cue_run",
+      "object": "steps",
+      "type": "FarmCueStep[2]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "chicken_cue_walk",
+      "object": "steps",
+      "type": "FarmCueStep[3]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "chicken_cue_walk_quick",
+      "object": "steps",
+      "type": "FarmCueStep[3]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "chicken_cue_sound",
+      "object": "steps",
+      "type": "FarmCueStep[2]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "chicken_sick_cue",
+      "object": "steps",
+      "type": "FarmCueStep[2]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    }
+  ],
+  "animals/dog.c": [
+    {
+      "function": "dog_idle_cue",
+      "object": "steps",
+      "type": "FarmCueStep[2]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "dog_cue_2",
+      "object": "steps",
+      "type": "FarmCueStep[4]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "dog_cue_1",
+      "object": "steps",
+      "type": "FarmCueStep[3]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "dog_cue_8",
+      "object": "steps",
+      "type": "FarmCueStep[2]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "dog_cue_10",
+      "object": "steps",
+      "type": "FarmCueStep[2]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "dog_cue_11",
+      "object": "steps",
+      "type": "FarmCueStep[2]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "dog_cue_12",
+      "object": "steps",
+      "type": "FarmCueStep[3]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "dog_cue_13",
+      "object": "steps",
+      "type": "FarmCueStep[4]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "dog_cue_14",
+      "object": "steps",
+      "type": "FarmCueStep[4]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "dog_cue_15",
+      "object": "steps",
+      "type": "FarmCueStep[4]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "dog_cue_16",
+      "object": "steps",
+      "type": "FarmCueStep[4]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    }
+  ],
+  "animals/horse.c": [
+    {
+      "function": "horse_idle_cue",
+      "object": "steps",
+      "type": "FarmCueStep[2]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "horse_cue_2",
+      "object": "steps",
+      "type": "FarmCueStep[3]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "horse_cue_1",
+      "object": "steps",
+      "type": "FarmCueStep[2]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    }
+  ],
+  "animals/livestock.c": [
+    {
+      "function": "cow_idle_cue",
+      "object": "steps",
+      "type": "FarmCueStep[2]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "cow_sleep_cue",
+      "object": "steps",
+      "type": "FarmCueStep[4]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "cow_wake_cue",
+      "object": "steps",
+      "type": "FarmCueStep[3]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "cow_neglect_cue",
+      "object": "steps",
+      "type": "FarmCueStep[3]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "cow_scold_cue",
+      "object": "steps",
+      "type": "FarmCueStep[3]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "cow_happy_cue",
+      "object": "steps",
+      "type": "FarmCueStep[3]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "cow_cue_14",
+      "object": "steps",
+      "type": "FarmCueStep[2]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "cow_cue_17",
+      "object": "steps",
+      "type": "FarmCueStep[2]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "sheep_idle_cue",
+      "object": "steps",
+      "type": "FarmCueStep[2]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "sheep_sleep_cue",
+      "object": "steps",
+      "type": "FarmCueStep[4]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "sheep_wake_cue",
+      "object": "steps",
+      "type": "FarmCueStep[3]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "sheep_neglect_cue",
+      "object": "steps",
+      "type": "FarmCueStep[3]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "sheep_scold_cue",
+      "object": "steps",
+      "type": "FarmCueStep[3]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "sheep_happy_cue",
+      "object": "steps",
+      "type": "FarmCueStep[3]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "sheep_cue_14",
+      "object": "steps",
+      "type": "FarmCueStep[2]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    }
+  ],
+  "people/harvest_sprites.c": [
+    {
+      "function": "harvest_helper_idle_cue",
+      "object": "steps",
+      "type": "FarmCueStep[2]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "harvest_helper_cue_1",
+      "object": "steps",
+      "type": "FarmCueStep[3]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "harvest_helper_cue_2",
+      "object": "steps",
+      "type": "FarmCueStep[3]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "harvest_helper_cue_3",
+      "object": "steps",
+      "type": "FarmCueStep[2]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "harvest_helper_cue_4",
+      "object": "steps",
+      "type": "FarmCueStep[2]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    },
+    {
+      "function": "harvest_helper_scold_cue",
+      "object": "steps",
+      "type": "FarmCueStep[2]",
+      "consumer": "farm_cue_step_run (read-only table)"
+    }
+  ]
+}
