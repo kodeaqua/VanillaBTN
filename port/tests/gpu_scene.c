@@ -43,6 +43,8 @@ int main(void) {
     u64 displayed_serial = hm_frame_replay_serial(b, &live);
     ++live.key; /* Cutscene state changes before the displayed buffer flips. */
     CHECK(hm_frame_replay_serial(b, &live) == displayed_serial);
+    live.tick += 120; /* Blocking CD/audio wait; the display buffer is unchanged. */
+    CHECK(hm_frame_replay_serial(b, &live) == displayed_serial);
     DISPENV other;
     SetDefDispEnv(&other, 0, 240, 32, 32);
     PutDispEnv(&other);

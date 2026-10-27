@@ -38,6 +38,17 @@ typedef struct {
     hm_mesh_vertex vertices[VERTEX_HASH];
 } interpolation;
 static interpolation *state;
+static void transfer(void *opaque, s32 x, s32 y, u32 width, u32 height) {
+    interpolation *s = opaque;
+    for (int i = 0; i < 2; ++i) {
+        const RECT *r = &s->frames[i].env.draw.clip;
+        if (r->w > 0 && r->h > 0 && x < r->x + r->w && y < r->y + r->h && (s64)x + width > r->x &&
+            (s64)y + height > r->y) {
+            s->frames[i].complete = 0;
+            s->ready = 0;
+        }
+    }
+}
 
 static void invalidate(void *opaque) {
     interpolation *s = opaque;
@@ -289,7 +300,8 @@ int hm_interpolation_enable(int enabled) {
     state = calloc(1, sizeof(*state));
     if (!state)
         return 0;
-    if (!hm_render_subscribe((hm_render_observer){state, begin, group, packet, end, invalidate})) {
+    if (!hm_render_subscribe(
+            (hm_render_observer){state, begin, group, packet, end, invalidate, transfer})) {
         free(state);
         state = NULL;
         return 0;

@@ -171,6 +171,10 @@ void hm_gpu_execute_words(const u32 *words, u32 count) {
 void DrawOTag(u32 *table) {
     if (!table || ((uintptr_t)table & 3))
         hm_runtime_error("DrawOTag", "null or unaligned OT");
+    if (hm_vram_is_native()) {
+        const RECT *clip = &hm_gpu_environment_state()->draw.clip;
+        hm_render_direct_draw(clip->x, clip->y, (u32)clip->w, (u32)clip->h);
+    }
     const u32 *packet = table;
     for (u32 visited = 0; packet && visited < HM_GPU_LINK_CAPACITY; ++visited) {
         u32 tag = packet[0], count = tag >> 24;

@@ -2008,3 +2008,39 @@ and match the CPU reference at both buffer origins, native/enlarged sizes and
 both filtering modes. No gameplay, save contents or asset data is used in these
 fixtures. Actual Natsume/TV transitions and repeated saving remain owner-tested;
 this is not proof of all-screen parity or a performance measurement.
+
+## ADR-072: Display-buffer validity follows writes, not elapsed ticks
+
+Date: 2026-10-27
+
+Context: The owner confirms post-save/next-day camera framing is safe but still
+reports side flicker during Natsume fade-out, TV entry/exit and leaving home.
+A completed displayed capture expires after four ticks, even if a blocking
+CD/audio wait leaves the same native pixels on screen. A regression advancing
+the live tick by 120 without changing the buffer reproduces this rejection.
+This explains a concrete path to native-only presentation during loading; actual
+reported transitions remain owner-tested rather than claimed reproduced.
+
+Decision: Keep a complete capture while its native display rectangle remains
+valid, regardless of elapsed ticks. Reject future-dated or bypass captures and
+retain overlay invalidation and buffer matching. Notify capture observers when
+native LoadImage, ClearImage or MoveImage writes intersect a captured rectangle;
+invalidate only overlapping captures. Split SDK-wrapped transfers into up to
+four non-wrapping rectangles, including ClearImage's alignment/size semantics.
+StoreImage and texture writes outside the framebuffer do not invalidate it.
+
+Unobserved native DrawOTag submissions invalidate their draw rectangle, covering
+the loading-screen path outside the normal capture hook. Native VRAM reset
+invalidates all captures. Private software/interpolation VRAM contexts never
+issue native invalidations. Apply the same write notification to interpolation
+history without removing its separate scene-key checks. Notifications occur per
+transfer/submission, not per raster pixel, with no new steady-state allocation.
+
+Validation: The unchanged-buffer wait regression fails before correction.
+Release and ASan/UBSan builds each pass 109 tests after correction. New coherence
+checks cover long waits, unrelated texture uploads, the other framebuffer,
+readback, private transfers/reset, native clear/load/move, XY wrapping and direct
+OT drawing. Original fade-packet tests now include 120-tick waits during both
+fade-out phases; expanded pixels still match native scanout. Vulkan and D3D12
+offscreen readbacks pass. No matching source, shader, game assets or owner saves
+change; no gameplay, other-platform or performance result is inferred.

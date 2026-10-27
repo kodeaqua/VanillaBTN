@@ -27,12 +27,13 @@ int main(void) {
     hm_vram_reset();
     ResetGraph(0);
     int step = 0;
+    u64 tick = 0;
     for (int phase = 0; phase < 4; ++phase) {
         if (phase & 1)
             fade_start_out(10, 0, 2);
         else
             fade_start_in(10, 0, 2);
-        for (int frame = 0; frame < 16; ++frame, ++step) {
+        for (int frame = 0; frame < 16; ++frame, ++step, tick += 2) {
             int slot = step & 1;
             frame_index = slot;
             current_frame = &frame_records[slot];
@@ -49,11 +50,15 @@ int main(void) {
             PutDispEnv(&display);
             PutDrawEnv(&draw);
             screen_fade_frame();
-            hm_render_frame live = {.tick = (u64)step * 2, .key = (u64)phase};
+            hm_render_frame live = {.tick = tick, .key = (u64)phase};
             hm_render_begin(&live);
             hm_render_group(0);
             DrawOTag(active_ot + 1);
             hm_render_end();
+            if ((phase & 1) && frame == 5) {
+                tick += 120; /* Blocking asset wait during fade-out/TV exit. */
+                live.tick = tick;
+            }
             if (!step)
                 continue;
             hm_replay_sink prior = hm_software_output_begin(software);

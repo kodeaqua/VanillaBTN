@@ -361,3 +361,14 @@ ordinary title/save scenes. All three regression cases fail before correction.
 Rebuilt offscreen GPU probes pass on Vulkan and D3D12 with a changed live context
 before scene finalization. No shaders, dependencies or matching sources change.
 No benchmark, other-platform build or automated gameplay is claimed.
+
+### Blocking-wait display coherence (2026-10-27)
+
+Release and ASan/UBSan tests pass 109/109 after ADR-072. gfx.frame_coherence
+validates unchanged scanout across a long wait and native/private transfer
+invalidation, including wrapped uploads and direct loading OTs. Original fade
+fixtures insert 120-tick waits during fade-out. Rebuilt GPU probes pass Vulkan
+and D3D12 offscreen readbacks. No performance benchmark or other-platform build
+was run. Release test binaries were rebuilt separately while the owner's game
+held the main executable open. After the owner closed it, the full native Release
+build linked the updated main executable successfully.

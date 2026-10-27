@@ -1,4 +1,5 @@
 #include "psx/vram.h"
+#include "gfx/frame_events.h"
 #include "psx/error.h"
 #include <libgpu.h>
 #include <string.h>
@@ -6,6 +7,7 @@
 static hm_vram_context hm_default_vram;
 static hm_vram_context *hm_context = &hm_default_vram;
 const hm_vram_context *hm_vram_state(void) { return hm_context; }
+int hm_vram_is_native(void) { return hm_context == &hm_default_vram; }
 #define hm_vram (hm_context->pixels)
 #define hm_dirty (hm_context->dirty)
 #define hm_set_mask (hm_context->set_mask)
@@ -23,6 +25,8 @@ void hm_vram_snapshot(hm_vram_context *destination) {
 }
 
 void hm_vram_reset(void) {
+    if (hm_vram_is_native())
+        hm_render_invalidate();
     memset(hm_vram, 0, sizeof(hm_vram));
     memset(hm_dirty, 255, sizeof(hm_dirty));
     hm_set_mask = hm_check_mask = 0;
@@ -67,11 +71,26 @@ static void hm_vram_area(const RECT *area, const void *pixels, const char *api) 
     if (!area || !pixels)
         hm_runtime_error(api, "null image argument");
 }
+/* Split wrapped SDK transfers before notifying capture observers. Private
+ * reference rendering must never invalidate the displayed native capture. */
+static void hm_vram_transfer(u32 x, u32 y, u32 width, u32 height) {
+    if (!hm_vram_is_native())
+        return;
+    x &= 1023;
+    y &= 511;
+    u32 first_w = width < 1024 - x ? width : 1024 - x;
+    u32 first_h = height < 512 - y ? height : 512 - y;
+    hm_render_transfer((s32)x, (s32)y, first_w, first_h);
+    hm_render_transfer(0, (s32)y, width - first_w, first_h);
+    hm_render_transfer((s32)x, 0, first_w, height - first_h);
+    hm_render_transfer(0, 0, width - first_w, height - first_h);
+}
 
 s32 LoadImage(const RECT *area, const u32 *pixels) {
     hm_vram_area(area, pixels, "LoadImage");
     u32 width = (((u32)area->w - 1) & 1023) + 1;
     u32 height = (((u32)area->h - 1) & 511) + 1;
+    hm_vram_transfer((u32)area->x, (u32)area->y, width, height);
     const u8 *in = (const u8 *)pixels;
     for (u32 y = 0; y < height; ++y)
         for (u32 x = 0; x < width; ++x) {
@@ -106,6 +125,7 @@ s32 ClearImage(const RECT *area, u8 r, u8 g, u8 b) {
     u32 y0 = (u32)area->y & 511;
     u32 width = (((u32)area->w & 1023) + 15) & ~15u;
     u32 height = (u32)area->h & 511;
+    hm_vram_transfer(x0, y0, width, height);
     u16 color = (u16)((r >> 3) | ((g >> 3) << 5) | ((b >> 3) << 10));
     for (u32 y = 0; y < height; ++y)
         for (u32 x = 0; x < width; ++x)
@@ -132,6 +152,7 @@ s32 MoveImage(const RECT *area, s32 x, s32 y) {
     if (overlap_x && overlap_y && (sx != dx || sy != dy))
         hm_runtime_error("MoveImage",
                          "overlapping transfers require hardware copy-order validation");
+    hm_vram_transfer(dx, dy, width, height);
     for (u32 row = 0; row < height; ++row)
         for (u32 column = 0; column < width; ++column)
             hm_vram_put(dx + column, dy + row, hm_vram_pixel(sx + column, sy + row), 1);

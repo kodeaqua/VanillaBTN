@@ -758,3 +758,14 @@ SDK adapter at main.c's call site restores (160,120) for saved/menu farm returns
 only. It does not change source, camera eye/target or the save format. No new
 HMBTN_PORT guards are added. 108 Release/ASan tests and Vulkan/D3D12 offscreen
 readbacks pass; actual TV/splash/post-save behavior still needs owner validation.
+
+### Unchanged display buffers across blocking waits (2026-10-27)
+
+ADR-072 replaces shared replay's four-tick age cutoff with native framebuffer
+write invalidation. Source fixtures reproduce rejection of an unchanged display
+after a long wait. Native image transfers notify overlapping capture/history
+rectangles with SDK wrapping/alignment preserved; unobserved loading OTs and
+native VRAM reset invalidate affected history. Private replay transfers do not.
+109 Release/ASan tests and offscreen Vulkan/D3D12 checks pass. No new matching
+guards or source edits are needed. Owner now reports save/next-day camera safe;
+Natsume fade-out, TV and home-exit side flicker await revalidation.

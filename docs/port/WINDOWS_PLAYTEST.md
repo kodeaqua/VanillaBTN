@@ -286,3 +286,10 @@ Owner checks: boot through full Natsume fade-in/out; view TV programme informati
 enter the show and exit to the room; save, then move around and change areas;
 repeat sleep/save and test Widescreen OFF/ON. Confirm that the character remains
 correctly framed after cutscenes, and that both sides follow the same fade.
+
+Owner follow-up on aeb5563: fade-in Natsume and save/next-day camera are safe in
+the tested session. Fade-out Natsume, TV start/end and home exit still flicker
+at the sides. ADR-072 removes a verified unchanged-buffer timeout during blocking
+waits and uses native write invalidation instead. 109 Release/ASan tests and
+Vulkan/D3D12 probes pass. Recheck those specific transitions after updating the
+executable; do not treat fixture success as an interactive resolution.
