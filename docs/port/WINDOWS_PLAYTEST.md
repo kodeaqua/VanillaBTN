@@ -265,3 +265,10 @@ Owner checks: Start from the farm, summary opening, page arrows, animal/helper/
 tool pages where available, closing, then repeated entry. No interactive result
 is claimed from the isolated loader fixture. Matching check remains unavailable
 without the separate Linux toolchain; original alternatives are checked textually.
+
+ADR-070 extends the original white DRAWENV background across Natsume's extra
+canvas. Logo proportions remain unchanged. A completed displayed capture is no
+longer rejected just because cutscene/game state advances before the buffer flip;
+interpolation still rejects cross-scene blending. Check Natsume and the reported
+brief Won cutscene flash again; the latter has no confirmed interactive result.
+White/black offscreen GPU readbacks pass on Vulkan and D3D12.

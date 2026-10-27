@@ -337,3 +337,15 @@ shade and presentation readbacks pass on both. Shaders were regenerated using
 the pinned DXC script. No game/replay, owner save, performance benchmark or
 other-platform build was run. Native scanout uses the same wide canvas when
 command replay is unavailable; content remains proportional.
+
+### Summary and splash follow-up (2026-10-27)
+
+Release/ASan builds and ctest --output-on-failure pass 107/107 tests. The added
+fixture executes the original farm-summary sprite loader with bounded synthetic
+CD progress and validates five shared sprite slots. Rebuilt offscreen GPU probe
+passes Vulkan and D3D12 readbacks with original white/black DRAWENV backgrounds,
+both frame-buffer origins, native/enlarged output and filtering modes. Shader
+headers are regenerated with pinned DXC. No performance claim or other-platform
+build is made. Matching check cannot run without the separate Linux toolchain;
+original status-page source alternatives reconstruct exactly with native guards
+disabled. User gameplay validation remains separate from these fixtures.

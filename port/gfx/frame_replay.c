@@ -132,9 +132,13 @@ static hm_captured_frame *hm_capture_select(hm_frame_replay *s, const hm_render_
     for (int i = 0; i < 2; ++i) {
         hm_captured_frame *f = &s->frames[s->current ^ i];
         const RECT *draw = &f->env.draw.clip;
-        if (f->complete && f->meta.key == live->key && draw->x == display->x &&
-            draw->y == display->y && draw->w == display->w && draw->h == display->h &&
-            live->tick >= f->meta.tick && live->tick - f->meta.tick <= 4)
+        /* The simulation may enter a new area/cutscene before the next buffer
+         * flip. Present the complete capture of the buffer actually scanned out;
+         * the new simulation key is not the identity of those displayed pixels.
+         * Interpolation keeps its separate, strict scene-key checks. */
+        if (f->complete && !f->meta.bypass && draw->x == display->x && draw->y == display->y &&
+            draw->w == display->w && draw->h == display->h && live->tick >= f->meta.tick &&
+            live->tick - f->meta.tick <= 4)
             return f;
     }
     return NULL;

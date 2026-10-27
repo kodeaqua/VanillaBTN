@@ -40,6 +40,15 @@ int main(void) {
     hm_render_packet(rectangle, 3);
     hm_render_end();
     CHECK(hm_frame_replay_serial(b, &live));
+    u64 displayed_serial = hm_frame_replay_serial(b, &live);
+    ++live.key; /* Cutscene state changes before the displayed buffer flips. */
+    CHECK(hm_frame_replay_serial(b, &live) == displayed_serial);
+    DISPENV other;
+    SetDefDispEnv(&other, 0, 240, 32, 32);
+    PutDispEnv(&other);
+    CHECK(!hm_frame_replay_serial(b, &live));
+    other.disp.y = 0;
+    PutDispEnv(&other);
     hm_vram_snapshot(&before);
     hm_gpu_environment env = *hm_gpu_environment_state();
     u64 ticks = hm_timing_ticks();

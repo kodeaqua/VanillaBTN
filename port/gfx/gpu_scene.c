@@ -516,6 +516,7 @@ int hm_gpu_scene_end(hm_gpu_scene *s, hm_replay_sink previous, hm_gpu_scene_data
     s->packed[11] = (u32)s->texture_linear;
     s->packed[12] = s->native.x;
     s->packed[13] = s->native.w;
+    s->packed[14] = hm_gpu_background(&hm_gpu_environment_state()->draw);
     memcpy(s->packed + primitives, s->primitives, s->count * HM_SCENE_STRIDE * sizeof(u32));
     memcpy(s->packed + bins, s->bins, s->tiles_x * s->tiles_y * HM_SCENE_BIN_WORDS * sizeof(u32));
     *data = (hm_gpu_scene_data){s->packed, (size_t)total * sizeof(u32), ++s->revision, s->width,

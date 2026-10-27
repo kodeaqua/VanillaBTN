@@ -105,6 +105,20 @@ int main(void) {
     hm_replay_begin(&native);
     CHECK(hm_software_output_end(out, previous, &view));
     CHECK(view.pixels[15 * 428] == 0 && view.pixels[15 * 428 + 427] == 0);
+    /* Publisher splash clears white through DRAWENV rather than a primitive. */
+    DRAWENV splash = d;
+    splash.isbg = 1;
+    splash.r0 = splash.g0 = splash.b0 = 255;
+    PutDrawEnv(&splash);
+    previous = hm_software_output_begin(out);
+    hm_replay_begin(&native);
+    CHECK(hm_software_output_end(out, previous, &view));
+    CHECK(view.pixels[15 * 428] == 0x7fff && view.pixels[15 * 428 + 427] == 0x7fff);
+    previous = hm_gpu_scene_begin(gpu, 428, 240);
+    hm_replay_begin(&native);
+    CHECK(hm_gpu_scene_end(gpu, previous, &data));
+    CHECK(data.words[14] == 0x7fff);
+    PutDrawEnv(&d);
     /* Rucksack shade is a TILE followed by another command. Expanding it must
      * preserve command boundaries and shade both side panels. */
     previous = hm_software_output_begin(out);

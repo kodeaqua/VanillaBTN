@@ -75,12 +75,13 @@ static void hm_software_begin(void *context, const RECT *area) {
     for (u32 y = 0; y < s->height; ++y)
         s->logical_y[y] = area->y + (int)(((u64)(2 * y + 1) * (u32)area->h) / (2 * s->height));
     RECT native = hm_gpu_environment_state()->draw.clip;
+    u16 background = hm_gpu_background(&s->environment->draw);
     for (u32 y = 0; y < s->height; ++y)
         for (u32 x = 0; x < s->width; ++x)
             s->pixels[(size_t)y * s->width + x] =
                 (hm_software_logical_x(s, (int)x) < native.x ||
                  hm_software_logical_x(s, (int)x) >= native.x + native.w)
-                    ? 0
+                    ? background
                     : hm_vram_pixel((u32)hm_software_logical_x(s, (int)x),
                                     (u32)hm_software_logical_y(s, (int)y));
     s->begun = 1;

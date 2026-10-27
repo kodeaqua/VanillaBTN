@@ -92,3 +92,9 @@ not change back to a 4:3 destination. Uncovered pixels are black. Both renderers
 stop seeding side pixels from changing native edge columns during logo fades.
 This supersedes the earlier edge-extension description. Original artwork and
 text remain proportional. Interactive all-screen coverage is still owner-tested.
+
+ADR-070 supersedes the unconditional black backdrop: Natsume's original enabled
+DRAWENV white clear now covers the expanded area too; disabled clearing uses
+black. Shared frame replay keeps the capture for the actual displayed buffer
+when simulation state advances before a flip. Interpolation still rejects
+cross-scene blending. Owner verification of the reported Won flash is pending.

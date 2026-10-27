@@ -734,3 +734,13 @@ status_draw_entry. Disabled native guards reconstruct the original exactly;
 this is not a matching binary check. Matching toolchain unavailable, no WSL.
 The original loader fixture and all 107 Release/ASan tests pass. No gameplay or
 owner save is used in the fixture.
+
+### Splash backdrop and cutscene buffer identity (2026-10-27)
+
+ADR-070 corrects white Natsume side initialization using the actual DRAWENV
+background colour. GPU header word 14 carries the same 15-bit colour used by
+software and native scanout. Frame replay now tracks the displayed rectangle
+rather than the simulation key that can change before a buffer flip; bypass,
+age and overlay invalidation remain enforced, and interpolation stays strict.
+Black/white GPU readbacks and displayed-buffer regression tests pass. This is
+a candidate correction for the reported Won flash, not an interactive result.

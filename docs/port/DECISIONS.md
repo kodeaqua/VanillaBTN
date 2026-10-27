@@ -1938,3 +1938,31 @@ Release and ASan/UBSan each pass 107 tests. Original source reconstruction with
 HMBTN_PORT disabled matches HEAD before the repair exactly. Matching check is
 unavailable without the separate Linux toolchain; WSL is excluded. Interactive
 summary-page navigation remains owner-tested.
+
+## ADR-070: Original splash clear colour and displayed-buffer identity
+
+Date: 2026-10-27
+
+Context: Natsume uses white DRAWENV background clearing, not a full-screen white
+primitive. ADR-068's unconditional black side initialization leaves that splash
+visibly bounded at 4:3. The owner also reports a brief narrow frame during Won's
+cutscene. Shared replay rejects a displayed capture if the simulation's scene key
+changes before the buffer flip, although those pixels still belong to the old
+completed buffer.
+
+Decision: Seed extra pixels with the original enabled DRAWENV clear colour,
+converted to 15-bit RGB, or black when background clearing is disabled. Share
+this rule between software, GPU scene header word 14 and native scanout. Do not
+stretch the logo or repeat edge columns. Shared frame replay selects a complete
+recent capture by the actual displayed rectangle, independently of the live
+simulation key; reject bypass captures and retain age/overlay-invalidation
+checks. Interpolation's strict scene-key checks remain unchanged.
+
+Validation: Synthetic splash tests check white side pixels and the GPU background
+word. Vulkan/D3D12 readbacks match software for white and black backgrounds at
+both buffer origins, native/enlarged resolutions and both filtering modes.
+Replay regression checks a live scene-key change before the buffer flips and
+rejects the wrong display buffer. Release/ASan pass 107 tests. These establish
+the source-level defects and corrections; the reported Won cutscene and actual
+Natsume presentation still require owner verification. No gameplay replay or
+owner saves are used. Matching source is unchanged by this graphics repair.

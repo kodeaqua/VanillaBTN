@@ -710,6 +710,7 @@ static void hm_host_present_scanout(u64 tick) {
     u8 *pixels = SDL_MapGPUTransferBuffer(hm_device, hm_upload, true);
     if (!pixels)
         hm_host_fail();
+    u16 backdrop = state->display_enabled ? hm_gpu_background(&state->draw) : 0;
     for (u32 y = 0; y < output_height; ++y)
         for (u32 x = 0; x < output_width; ++x) {
             u16 color = 0;
@@ -729,7 +730,7 @@ static void hm_host_present_scanout(u64 tick) {
 #endif
                 color = state->display_enabled && source_visible
                             ? hm_vram_pixel((u32)source_x, (u32)source_y)
-                            : 0;
+                            : backdrop;
 #ifdef HMBTN_ENH_INTERPOLATION
             if (interpolated.pixels && source_visible
 #ifdef HMBTN_ENH_SCALING
