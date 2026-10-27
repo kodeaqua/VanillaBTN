@@ -304,3 +304,13 @@ mutating every registered mutable object. No real save file is used in the tests
 Owner checks: load into farm, return to title, load the same/another slot again,
 then repeat and verify player/day/animals and menus. Interactive success remains
 pending. TV/home-exit flicker is not established resolved by this unrelated fix.
+
+### Held-animal layout correction (2026-10-28, pending owner gameplay)
+
+Branch fix is based on current main; multilingual work is parked separately.
+The owner reproduced a dog put-down crash under LLDB. ADR-075 fixes the pickup
+write that corrupted the native animation pointer, and the audited helper-number
+read. Interactive follow-up: pick up and put down the young/adult dog repeatedly,
+then try a chicken and talk to the Harvest Sprites. Confirm sprites, affection
+cue, movement and dialogue remain correct. Isolated regression tests do not
+establish complete gameplay coverage.

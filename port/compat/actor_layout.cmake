@@ -1,0 +1,42 @@
+# Correct the one audited post-animation field read without changing matching C.
+# Preserve the farm snapshot wrapper and its object-provider footer.
+file(REAL_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../src/overlay/11_GF_FARM/people/player.c"
+    hm_actor_original)
+get_source_file_property(hm_actor_previous "${hm_actor_original}" HM_NATIVE_WRAPPER)
+if(NOT hm_actor_previous)
+    message(FATAL_ERROR "Missing native player snapshot wrapper")
+endif()
+file(READ "${hm_actor_original}" hm_actor_source)
+set(hm_actor_anchor "((FarmObjectRecord *)farmTarget)->talkVillager")
+string(FIND "${hm_actor_source}" "${hm_actor_anchor}" hm_actor_at)
+if(hm_actor_at LESS 0)
+    message(FATAL_ERROR "Native helper-number read changed; audit ADR-075")
+endif()
+string(LENGTH "${hm_actor_anchor}" hm_actor_length)
+math(EXPR hm_actor_after "${hm_actor_at} + ${hm_actor_length}")
+string(SUBSTRING "${hm_actor_source}" ${hm_actor_after} -1 hm_actor_tail)
+string(FIND "${hm_actor_tail}" "${hm_actor_anchor}" hm_actor_duplicate)
+if(NOT hm_actor_duplicate LESS 0)
+    message(FATAL_ERROR "Ambiguous native helper-number read")
+endif()
+string(REPLACE "${hm_actor_anchor}" "hm_actor_helper_number(farmTarget)"
+    hm_actor_source "${hm_actor_source}")
+file(READ "${hm_actor_previous}" hm_actor_wrapper)
+string(FIND "${hm_actor_wrapper}" "#include \"${hm_actor_original}\"" hm_actor_include)
+if(hm_actor_include LESS 0)
+    message(FATAL_ERROR "Native player wrapper changed; audit ADR-075")
+endif()
+string(REPLACE "#include \"${hm_actor_original}\"" "${hm_actor_source}"
+    hm_actor_wrapper "${hm_actor_wrapper}")
+# Retain the canonical per-TU wrapper name used by the AST inventory tool.
+set(hm_actor_native "${hm_actor_previous}")
+file(CONFIGURE OUTPUT "${hm_actor_native}" CONTENT
+    "/* Native actor layout; matching source stays read-only. */\n#include \"compat/types.h\"\nu16 hm_actor_helper_number(const void *target);\n${hm_actor_wrapper}" @ONLY)
+list(FIND hm_game_sources "${hm_actor_previous}" hm_actor_index)
+if(hm_actor_index LESS 0)
+    message(FATAL_ERROR "Missing native actor source")
+endif()
+list(REMOVE_AT hm_game_sources ${hm_actor_index})
+list(INSERT hm_game_sources ${hm_actor_index} "${hm_actor_native}")
+set_source_files_properties("${hm_actor_original}" PROPERTIES HM_NATIVE_WRAPPER "${hm_actor_native}")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${hm_actor_original}")

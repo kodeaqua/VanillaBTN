@@ -782,3 +782,20 @@ fingerprints and TU coverage prevent silently stale metadata. Original SDK remap
 for field/status are preserved. Resident state and owner save files are excluded.
 110 Release/ASan tests and a fresh AST inventory --check pass. Original lifecycle
 failure is reproduced before correction. Actual repeated load remains owner-tested.
+
+### Actor alias layout audit (2026-10-28)
+
+ADR-075 addresses the owner-reproduced dog put-down crash. LLDB identifies a
+partLists read through a pointer whose low 32 bits became 0x0000ffff. An isolated
+test reproduces that exact write in the original farm_action_begin: its padded
+FarmActionSlot.cue at 0xa8 aliases native FarmActor.sprite.partLists, not cue.
+The native replacement accesses the shared actor definition instead. The related
+player helper-number alias at 0xac reads pointer bits instead of FarmHelper.number
+at 0xd0; a checked native expression adapter corrects it.
+
+Reviewed scalar-prefix aliases remain valid: item at 0, facing at 0x22, nearby
+action value at 0x1a, villager mode at 0x1e, place at 0x30, flags at 0x34 and
+position at 0x38. ACTOR_OF_POSITION still agrees with native position offset.
+Static assertions protect the replacement's task/flags/speed assumptions. This
+audit covers the animal/player aliases, not every runtime path. No matching
+source, header, source guard, game data or save representation was changed.

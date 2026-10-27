@@ -77,7 +77,9 @@ target_compile_definitions(hmbtn_game_options INTERFACE HMBTN_PORT=1)
 
 file(GLOB_RECURSE hm_game_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../src/*.c")
 include("${CMAKE_CURRENT_SOURCE_DIR}/overlay/farm_state.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/compat/actor_layout.cmake")
 add_library(hmbtn_game_initial STATIC ${hm_game_sources} overlay/game_lifecycle.c overlay/farm_state.c gfx/game_frame.c gfx/field_identity.c compat/async_wait.c compat/asset_wait.c compat/view_context.c compat/save_codec.c compat/villager_sprites.c compat/family_names.c enhance/widescreen/game_buffers.c enhance/widescreen/title_background.c enhance/widescreen/menu_background.c)
+target_sources(hmbtn_game_initial PRIVATE compat/animal_actions.c)
 target_include_directories(hmbtn_game_initial PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/native_farm")
 target_link_libraries(hmbtn_game_initial PUBLIC hmbtn_game_options hmbtn_work_memory hmbtn_overlay)
 # Keep the game's entry point separate from the host test runners. This source
@@ -90,6 +92,8 @@ set_source_files_properties(../src/main/ui/bg_tile.c PROPERTIES COMPILE_DEFINITI
     "anim_draw_sprt_cursor=hm_menu_draw_sprt_cursor;anim_draw_sprt=hm_menu_draw_sprt")
 set_source_files_properties(../src/overlay/11_GF_FARM/field/field.c PROPERTIES COMPILE_DEFINITIONS
     "estate_point_project=hm_field_point_project;anim_draw_sprt_cursor=hm_field_draw_sprt_cursor")
+set_source_files_properties(../src/overlay/11_GF_FARM/animals/animals.c PROPERTIES
+    COMPILE_DEFINITIONS "farm_action_begin=hm_psx_original_farm_action_begin")
 set_source_files_properties(../src/overlay/17_GF_MG1/mg1.c ../src/overlay/19_GF_MG2/mg2.c
     ../src/overlay/21_GF_MG3/mg3.c ../src/overlay/23_GF_MG4/mg4.c ../src/overlay/25_GF_MG5/mg5.c
     ../src/overlay/11_GF_FARM/menu/status_pages.c
@@ -376,6 +380,9 @@ if(BUILD_TESTING)
     add_executable(hmbtn_animal_slots_test tests/animal_slots.c)
     target_link_libraries(hmbtn_animal_slots_test PRIVATE hmbtn_game_initial hmbtn_psx_pending)
     add_test(NAME game.native_animal_slots COMMAND hmbtn_animal_slots_test)
+    add_executable(hmbtn_animal_action_layout_test tests/animal_action_layout.c)
+    target_link_libraries(hmbtn_animal_action_layout_test PRIVATE hmbtn_game_initial hmbtn_psx_pending)
+    add_test(NAME game.native_animal_action_layout COMMAND hmbtn_animal_action_layout_test)
     add_executable(hmbtn_save_codec_test tests/save_codec.c)
     target_link_libraries(hmbtn_save_codec_test PRIVATE hmbtn_game_initial hmbtn_psx_pending)
     add_test(NAME game.save_wire_codec COMMAND hmbtn_save_codec_test)

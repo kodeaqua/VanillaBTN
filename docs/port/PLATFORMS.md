@@ -386,3 +386,13 @@ Python/AST generation. No other-platform, gameplay or performance claim is made.
 A separate Windows build with all enhancement options OFF also compiles the farm
 and lifecycle fixtures; both overlay.farm_reentry and overlay.title_load_return
 pass. This is a targeted OFF-build check, not a full second test-suite run.
+
+ADR-075 validation (2026-10-28): Windows Release and ASan/UBSan builds use 12 jobs;
+both full suites pass 111/111 tests. The added fixture reproduces the former
+pickup pointer overwrite, preserves four native actor prefixes and all seven
+helper IDs, and exercises 16 young/adult dog pickup/drop combinations plus 960
+phase updates. An enhancements-OFF build passes the actor-layout and farm/title
+re-entry fixtures (3/3). Clang AST --check still audits all 51 farm units,
+703 objects and 56 local cue tables. No assets, gameplay or real save files are
+used by these fixtures. Matching source is unchanged; matching check and other
+platform builds were not run on this Windows host.
