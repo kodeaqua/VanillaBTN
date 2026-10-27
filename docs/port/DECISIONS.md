@@ -1966,3 +1966,45 @@ rejects the wrong display buffer. Release/ASan pass 107 tests. These establish
 the source-level defects and corrections; the reported Won cutscene and actual
 Natsume presentation still require owner verification. No gameplay replay or
 owner saves are used. Matching source is unchanged by this graphics repair.
+
+## ADR-071: Capture backdrop lifetime and farm projection on menu return
+
+Date: 2026-10-27
+
+Context: The owner reports flicker during Natsume fades and TV entry/exit, plus a
+persistent upper-left camera shift after saving. GPU scene_end reads backdrop
+colour after replay restores the live environment, so a newly drawing frame can
+replace the displayed capture's colour. A completed clear-only frame is also
+rejected solely because it contains no primitive words. Both fail bounded tests.
+
+The original main_frame_reset sets the GTE centre to (0,0) on every scene switch.
+Full farm startup later initializes (160,120), but saved-game farm re-entry and
+the cached menu-return path skip that initialization. The original reset fixture
+reproduces the zero centre on SCENE_FARM_SAVED; the offset persists across farm
+area changes. Do not reset camera eye/target, lighting or script camera state to
+hide the displacement.
+
+Decision: Save the GPU scene's solid backdrop at begin_capture, beside its native
+rectangle and VRAM snapshot. Scene_end serializes that stored colour without
+consulting the live environment. Accept a completed empty OT when its captured
+DRAWENV explicitly clears the background; retain rejection of empty non-clearing
+frames and existing invalidation/age/bypass guards.
+
+Remap only main.c's SetGeomOffset call through a native view-context adapter.
+Its zero-offset reset restores the original logical centre (160,120) for
+SCENE_FARM_SAVED and SCENE_FARM_MENU_RETURN. Title/save resets remain (0,0);
+nonzero requests are forwarded unchanged. Projection distance and world/camera
+coordinates are unchanged. The correction is independent of widescreen/scaling
+and introduces no enhancement or matching-source guard.
+
+Validation: Before correction, GPU backdrop lifetime, original main reset and
+original fade-packet/empty-OT fixtures fail. After correction, Release and
+ASan/UBSan each pass 108 tests. Original screen_fade_frame packets run through
+64 alternating buffers across white/coloured fade-in/out phases; side pixels
+match native scanout, including clear-only frames and a changed live backdrop.
+The reset fixture checks both farm returns and ordinary title/save resets.
+Offscreen Vulkan and D3D12 comparisons switch live contexts before scene_end
+and match the CPU reference at both buffer origins, native/enlarged sizes and
+both filtering modes. No gameplay, save contents or asset data is used in these
+fixtures. Actual Natsume/TV transitions and repeated saving remain owner-tested;
+this is not proof of all-screen parity or a performance measurement.

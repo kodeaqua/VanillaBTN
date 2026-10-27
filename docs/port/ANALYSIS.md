@@ -744,3 +744,17 @@ rather than the simulation key that can change before a buffer flip; bypass,
 age and overlay invalidation remain enforced, and interpolation stays strict.
 Black/white GPU readbacks and displayed-buffer regression tests pass. This is
 a candidate correction for the reported Won flash, not an interactive result.
+
+### Fade/context lifetime and persistent post-save projection (2026-10-27)
+
+ADR-071 fixes a verified GPU scene-end read from the restored live environment:
+the backdrop now belongs to the captured frame. Clear-only completed frames are
+valid without primitive words. An original screen_fade_frame fixture checks both
+framebuffers, fade directions and backdrop changes against native VRAM pixels.
+
+The original main frame-reset fixture reproduces a zero GTE projection centre
+on the saved-farm return path, which skips full camera initialization. A native
+SDK adapter at main.c's call site restores (160,120) for saved/menu farm returns
+only. It does not change source, camera eye/target or the save format. No new
+HMBTN_PORT guards are added. 108 Release/ASan tests and Vulkan/D3D12 offscreen
+readbacks pass; actual TV/splash/post-save behavior still needs owner validation.

@@ -60,6 +60,18 @@ int main(void) {
     hm_vram_snapshot(&after);
     CHECK(!memcmp(&before, &after, sizeof(before)));
     CHECK(!memcmp(&env, hm_gpu_environment_state(), sizeof(env)) && ticks == hm_timing_ticks());
+    /* Replay restores the live environment before scene_end. The output must
+     * keep its own captured backdrop instead of reading the next frame's clear. */
+    hm_gpu_environment splash_env = env;
+    splash_env.draw.isbg = 1;
+    splash_env.draw.r0 = splash_env.draw.g0 = splash_env.draw.b0 = 255;
+    hm_gpu_environment *live_env = hm_gpu_environment_bind(&splash_env);
+    previous = hm_gpu_scene_begin(s, 32, 32);
+    RECT splash_area = splash_env.draw.clip;
+    hm_replay_begin(&splash_area);
+    hm_gpu_environment_bind(live_env);
+    CHECK(hm_gpu_scene_end(s, previous, &data));
+    CHECK(data.words[14] == 0x7fff);
     hm_render_invalidate();
     CHECK(!hm_frame_replay_serial(b, &live));
     hm_frame_replay_release(b);

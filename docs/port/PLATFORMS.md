@@ -349,3 +349,15 @@ headers are regenerated with pinned DXC. No performance claim or other-platform
 build is made. Matching check cannot run without the separate Linux toolchain;
 original status-page source alternatives reconstruct exactly with native guards
 disabled. User gameplay validation remains separate from these fixtures.
+
+### Fade/camera context regression checks (2026-10-27)
+
+Windows Release and ASan/UBSan builds and ctest --output-on-failure pass 108/108
+tests. enhance.fade_buffers executes original fade packets over both framebuffers
+and compares the expanded software canvas to native scanout through 64 frames.
+gfx.gpu_scene_packets reproduces/restores the captured background lifetime;
+game.work_memory executes original reset code for saved/menu farm returns and
+ordinary title/save scenes. All three regression cases fail before correction.
+Rebuilt offscreen GPU probes pass on Vulkan and D3D12 with a changed live context
+before scene finalization. No shaders, dependencies or matching sources change.
+No benchmark, other-platform build or automated gameplay is claimed.

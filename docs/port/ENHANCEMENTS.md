@@ -98,3 +98,10 @@ DRAWENV white clear now covers the expanded area too; disabled clearing uses
 black. Shared frame replay keeps the capture for the actual displayed buffer
 when simulation state advances before a flip. Interpolation still rejects
 cross-scene blending. Owner verification of the reported Won flash is pending.
+
+ADR-071 keeps GPU backdrop colour in the captured scene through finalization
+and accepts completed clear-only OTs. Original fade packets are tested across
+both framebuffers and changing backdrops. A separate native SDK adapter restores
+the farm projection centre after save/menu returns, independently of enhancement
+settings. Natsume/TV side flashes and persistent post-save framing remain pending
+owner revalidation despite passing isolated regressions.

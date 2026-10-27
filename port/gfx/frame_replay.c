@@ -95,7 +95,8 @@ static void hm_capture_packet(void *context, const u32 *words, u32 count) {
 static void hm_capture_end(void *context) {
     hm_frame_replay *s = context;
     if (s->capturing)
-        s->frames[s->current].complete = s->frames[s->current].used != 0;
+        s->frames[s->current].complete =
+            s->frames[s->current].used != 0 || s->frames[s->current].env.draw.isbg;
     s->capturing = 0;
 }
 hm_frame_replay *hm_frame_replay_acquire(void) {
