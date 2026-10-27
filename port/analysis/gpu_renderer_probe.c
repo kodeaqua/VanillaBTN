@@ -417,7 +417,13 @@ static int hm_probe_widescreen(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
                     hm_replay_begin(&area);
                     hm_probe_wide_draw();
                     hm_gpu_scene_data data;
+                    /* Production replay restores the live context before end;
+                     * its next-frame clear must not replace this scene's colour. */
+                    hm_gpu_environment next_frame = *hm_gpu_environment_state();
+                    next_frame.draw.isbg = (u8)!wide_background;
+                    hm_gpu_environment *captured = hm_gpu_environment_bind(&next_frame);
                     CHECK(hm_gpu_scene_end(builder, previous, &data));
+                    hm_gpu_environment_bind(captured);
                     hm_probe_wide_setup(origin);
                     hm_software_surface surface = {.pixels = reference,
                                                    .width = width,

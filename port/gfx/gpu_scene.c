@@ -12,6 +12,7 @@ struct hm_gpu_scene {
     u32 packed[HM_SCENE_MAX_WORDS];
     u32 width, height, count, tiles_x, tiles_y;
     RECT area, native;
+    u16 background;
     const char *failure;
     int begun, texture_linear;
     u64 revision;
@@ -186,6 +187,7 @@ static void hm_scene_begin_capture(void *context, const RECT *area) {
     }
     s->area = *area;
     s->native = hm_gpu_environment_state()->draw.clip;
+    s->background = hm_gpu_background(&hm_gpu_environment_state()->draw);
     s->tiles_x = ((u32)area->w + 15) / 16;
     s->tiles_y = ((u32)area->h + 15) / 16;
     for (u32 i = 0; i < s->tiles_x * s->tiles_y; ++i)
@@ -516,7 +518,7 @@ int hm_gpu_scene_end(hm_gpu_scene *s, hm_replay_sink previous, hm_gpu_scene_data
     s->packed[11] = (u32)s->texture_linear;
     s->packed[12] = s->native.x;
     s->packed[13] = s->native.w;
-    s->packed[14] = hm_gpu_background(&hm_gpu_environment_state()->draw);
+    s->packed[14] = s->background;
     memcpy(s->packed + primitives, s->primitives, s->count * HM_SCENE_STRIDE * sizeof(u32));
     memcpy(s->packed + bins, s->bins, s->tiles_x * s->tiles_y * HM_SCENE_BIN_WORDS * sizeof(u32));
     *data = (hm_gpu_scene_data){s->packed, (size_t)total * sizeof(u32), ++s->revision, s->width,

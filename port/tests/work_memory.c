@@ -1,20 +1,23 @@
 /* Include, rather than copy, the original TU so its static setup functions can
  * be exercised without exporting test hooks from production game code. */
 #define main static hm_test_unexecuted_game_entry
+#define SetGeomOffset hm_game_set_geom_offset
 #include "../../src/main/main.c"
 #undef main
+#undef SetGeomOffset
+#include <inline_c.h>
 
+#include "psx/unimplemented.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include "psx/unimplemented.h"
 
 _Static_assert(REGION_BYTES == HM_FRAME_WORK_BYTES, "Native workspace follows the source capacity");
 _Static_assert(FARM_IMAGE_SIZE == HM_FARM_IMAGE_BYTES, "Native image window follows the source");
 
-#define CHECK(condition)                                                                            \
+#define CHECK(condition)                                                                           \
     do {                                                                                           \
         if (!(condition)) {                                                                        \
-            fprintf(stderr, "Failed at line %d: %s\n", __LINE__, #condition);                        \
+            fprintf(stderr, "Failed at line %d: %s\n", __LINE__, #condition);                      \
             return 1;                                                                              \
         }                                                                                          \
     } while (0)
@@ -24,12 +27,12 @@ _Static_assert(FARM_IMAGE_SIZE == HM_FARM_IMAGE_BYTES, "Native image window foll
 static struct {
     u32 *table;
     s32 entries;
-} hm_test_clears[8];
+} hm_test_clears[32];
 static u32 hm_test_clear_count;
 static void *hm_test_gs_work;
 
 u32 *ClearOTagR(u32 *table, s32 entries) {
-    if (hm_test_clear_count >= 8 || table == NULL || entries <= 0) {
+    if (hm_test_clear_count >= 32 || table == NULL || entries <= 0) {
         abort();
     }
     hm_test_clears[hm_test_clear_count].table = table;
@@ -38,17 +41,16 @@ u32 *ClearOTagR(u32 *table, s32 entries) {
     return table;
 }
 
-void GsSetWorkBase(void *base) {
-    hm_test_gs_work = base;
-}
+void GsSetWorkBase(void *base) { hm_test_gs_work = base; }
 
-void *GsGetWorkBase(void) {
-    return hm_test_gs_work;
+void *GsGetWorkBase(void) { return hm_test_gs_work; }
+void GsSetOffset(s32 x, s32 y) {
+    if (x || y)
+        abort();
 }
+void GsSetDrawBuffOffset(void) {}
 
-s32 host_poll(void) {
-    hm_unimplemented("unexpected work-memory test host_poll");
-}
+s32 host_poll(void) { hm_unimplemented("unexpected work-memory test host_poll"); }
 
 void SystemError(s32 code, s32 detail) {
     (void)code;
@@ -90,7 +92,8 @@ static int hm_test_frame_setup(s32 wide) {
         CHECK(hm_test_frame_span(frame->workBase, frame->workSize));
         CHECK(frame->workSize == (u32)(wide ? 0x5EDC : 0x2EE0));
         for (s32 layer = 0; layer < 3; ++layer) {
-            CHECK(hm_test_frame_span(frame->otTags[layer], frame->otTagCounts[layer] * sizeof(u32)));
+            CHECK(
+                hm_test_frame_span(frame->otTags[layer], frame->otTagCounts[layer] * sizeof(u32)));
             CHECK(frame->ots[layer].org == frame->otTags[layer]);
             CHECK(frame->ots[layer].tag == frame->otTags[layer] + frame->otTagCounts[layer] - 1);
         }
@@ -117,6 +120,22 @@ static int hm_test_frame_setup(s32 wide) {
 
 int main(void) {
     CHECK(hm_test_frame_setup(0) == 0);
+    main_scene = SCENE_FARM_SAVED;
+    hm_test_clear_count = 0;
+    main_frame_reset(0);
+    CHECK(hm_gte.ofx == 160 * 65536 && hm_gte.ofy == 120 * 65536);
+    main_scene = SCENE_FARM_MENU_RETURN;
+    hm_test_clear_count = 0;
+    main_frame_reset(0);
+    CHECK(hm_gte.ofx == 160 * 65536 && hm_gte.ofy == 120 * 65536);
+    main_scene = SCENE_TITLE;
+    hm_test_clear_count = 0;
+    main_frame_reset(0);
+    CHECK(hm_gte.ofx == 0 && hm_gte.ofy == 0);
+    main_scene = SCENE_SAVE;
+    hm_test_clear_count = 0;
+    main_frame_reset(0);
+    CHECK(hm_gte.ofx == 0 && hm_gte.ofy == 0);
     farm_state_init();
     CHECK(farm_area.loadWindow == hm_farm_load_window());
     CHECK(farm_area.sectionBuffer == farm_area.loadWindow + FARM_IMAGE_SIZE);

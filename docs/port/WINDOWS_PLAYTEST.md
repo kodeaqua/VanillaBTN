@@ -272,3 +272,24 @@ longer rejected just because cutscene/game state advances before the buffer flip
 interpolation still rejects cross-scene blending. Check Natsume and the reported
 brief Won cutscene flash again; the latter has no confirmed interactive result.
 White/black offscreen GPU readbacks pass on Vulkan and D3D12.
+
+### Reopened fade and post-save camera reports (2026-10-27)
+
+The owner's initial 1-3 stability checks were overall safe, but subsequent tests
+report Natsume fade flicker, side flashes entering/leaving TV, and a post-save
+camera shift persisting outside cutscenes and across areas. These reports remain
+open until revalidated. ADR-071 fixes independently reproduced backdrop-lifetime,
+clear-only capture and saved/menu-return projection defects. All 108 Release/ASan
+tests and Vulkan/D3D12 probes pass. No gameplay/save fixture accesses owner data.
+
+Owner checks: boot through full Natsume fade-in/out; view TV programme information,
+enter the show and exit to the room; save, then move around and change areas;
+repeat sleep/save and test Widescreen OFF/ON. Confirm that the character remains
+correctly framed after cutscenes, and that both sides follow the same fade.
+
+Owner follow-up on aeb5563: fade-in Natsume and save/next-day camera are safe in
+the tested session. Fade-out Natsume, TV start/end and home exit still flicker
+at the sides. ADR-072 removes a verified unchanged-buffer timeout during blocking
+waits and uses native write invalidation instead. 109 Release/ASan tests and
+Vulkan/D3D12 probes pass. Recheck those specific transitions after updating the
+executable; do not treat fixture success as an interactive resolution.

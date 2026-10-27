@@ -56,3 +56,10 @@ GPU Auto uses native-resolution retry for unsupported scenes to avoid a large CP
 raster stall; explicit Software retains viewport-sized reference rendering.
 Supported GPU scenes still use Enhance Scaling's requested size. A retry can
 reduce detail temporarily. See PLATFORMS.md for synthetic dialogue measurements.
+
+ADR-072 keeps completed displayed frames across blocking CD/audio waits without
+a tick-age timeout. Native framebuffer image writes, direct loading OTs and
+reset invalidate the affected captures; unrelated texture uploads and private
+rendering do not. This supersedes earlier age-based rejection and avoids losing
+the extended canvas merely because simulation waits on assets. Actual reported
+Natsume/TV/home-exit transitions remain owner-tested.

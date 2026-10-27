@@ -23,6 +23,15 @@ struct hm_frame_replay {
     u64 serial;
 };
 static hm_frame_replay *hm_shared_replay;
+static void hm_capture_transfer(void *context, s32 x, s32 y, u32 width, u32 height) {
+    hm_frame_replay *s = context;
+    for (int i = 0; i < 2; ++i) {
+        const RECT *r = &s->frames[i].env.draw.clip;
+        if (r->w > 0 && r->h > 0 && x < r->x + r->w && y < r->y + r->h && (s64)x + width > r->x &&
+            (s64)y + height > r->y)
+            s->frames[i].complete = 0;
+    }
+}
 static void hm_capture_invalidate(void *context) {
     hm_frame_replay *s = context;
     s->capturing = 0;
@@ -37,7 +46,6 @@ static void hm_capture_begin(void *context, const hm_render_frame *meta) {
             int slot = s->current ^ i;
             hm_captured_frame *prior = &s->frames[slot];
             if (prior->complete && !prior->meta.bypass && meta->tick >= prior->meta.tick &&
-                meta->tick - prior->meta.tick <= 4 &&
                 !memcmp(&prior->env.draw.clip, &env->draw.clip, sizeof(RECT))) {
                 retained = slot;
                 break;
@@ -95,7 +103,8 @@ static void hm_capture_packet(void *context, const u32 *words, u32 count) {
 static void hm_capture_end(void *context) {
     hm_frame_replay *s = context;
     if (s->capturing)
-        s->frames[s->current].complete = s->frames[s->current].used != 0;
+        s->frames[s->current].complete =
+            s->frames[s->current].used != 0 || s->frames[s->current].env.draw.isbg;
     s->capturing = 0;
 }
 hm_frame_replay *hm_frame_replay_acquire(void) {
@@ -108,7 +117,7 @@ hm_frame_replay *hm_frame_replay_acquire(void) {
         return NULL;
     if (!hm_render_subscribe((hm_render_observer){s, hm_capture_begin, hm_capture_group,
                                                   hm_capture_packet, hm_capture_end,
-                                                  hm_capture_invalidate})) {
+                                                  hm_capture_invalidate, hm_capture_transfer})) {
         free(s);
         return NULL;
     }
@@ -137,8 +146,7 @@ static hm_captured_frame *hm_capture_select(hm_frame_replay *s, const hm_render_
          * the new simulation key is not the identity of those displayed pixels.
          * Interpolation keeps its separate, strict scene-key checks. */
         if (f->complete && !f->meta.bypass && draw->x == display->x && draw->y == display->y &&
-            draw->w == display->w && draw->h == display->h && live->tick >= f->meta.tick &&
-            live->tick - f->meta.tick <= 4)
+            draw->w == display->w && draw->h == display->h && live->tick >= f->meta.tick)
             return f;
     }
     return NULL;
