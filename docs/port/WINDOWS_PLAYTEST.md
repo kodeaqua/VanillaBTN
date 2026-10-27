@@ -254,3 +254,14 @@ logo/text should retain proportions, and the output should not snap to a 4:3
 destination. Also check 21:9/monitor changes and OFF's original 4:3 presentation.
 Report remaining exposed map edges or missing original background coverage;
 synthetic tests do not establish an all-screen playthrough result.
+
+### Start / farm summary hang (2026-10-27)
+
+Windows records AppHangB1 for the owner session, not an access violation.
+ADR-069 yields hardware progress in the status sprite loader and maps its shared
+sprite slots explicitly; the original loader fixture exposes the old native
+out-of-array address and passes after correction. Release/ASan pass 107 tests.
+Owner checks: Start from the farm, summary opening, page arrows, animal/helper/
+tool pages where available, closing, then repeated entry. No interactive result
+is claimed from the isolated loader fixture. Matching check remains unavailable
+without the separate Linux toolchain; original alternatives are checked textually.

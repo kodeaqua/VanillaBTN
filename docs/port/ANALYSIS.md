@@ -721,3 +721,16 @@ loading scanouts stay proportional within a wide output canvas. This batch
 changes only port code/docs, adding no HMBTN_PORT guards or matching-source edits.
 Release and ASan/UBSan pass 106/106 tests; offscreen Vulkan/D3D12 comparisons
 pass. Full interactive coverage and map-side asset availability remain unverified.
+
+### Farm summary hang follow-up (2026-10-27)
+
+ADR-069 extends the blocking CD poll adapter to status_pages.c. Its only
+afile_read_bytes calls initiate and poll inside the same blocking loader.
+The source fixture also confirms out-of-array addressing of the two shared
+sprite globals. Four HMBTN_PORT guards in
+src/overlay/11_GF_FARM/menu/status_pages.c add the slot resolver include, guarded
+loader binding and guarded sprite selection in status_draw_sprite_label and
+status_draw_entry. Disabled native guards reconstruct the original exactly;
+this is not a matching binary check. Matching toolchain unavailable, no WSL.
+The original loader fixture and all 107 Release/ASan tests pass. No gameplay or
+owner save is used in the fixture.

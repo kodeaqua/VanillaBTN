@@ -1912,3 +1912,29 @@ the existing proportional-image contract. No gameplay or owner save is opened.
 Actual logo/menu/area/cutscene transitions still need owner validation. These
 checks do not prove sufficient side scenery in every original map or absence
 of every widescreen bug; there is no performance or other-platform claim.
+
+## ADR-069: Farm summary loading and shared status sprites
+
+Date: 2026-10-27
+
+Context: Start opening the farm summary hangs; Windows reports AppHangB1. Its
+status_load_sprites has an empty afile_read_bytes polling loop, so deterministic
+CD progress never runs. After yielding is restored, a bounded fixture of the
+original loader exposes index 4 outside status_page_sprites[3] under UBSan.
+The original slots 3/4 refer to the separately named shared cursor/mark sprites;
+native globals need not be adjacent to the page array.
+
+Decision: Add status_pages.c to the existing blocking-asset-read CMake adapter.
+Only pending polls yield VSync(0); initiation and completion add no extra tick.
+Use a native-only checked slot resolver for the five loader slots and variable
+sprite accesses in two draw helpers. Keep all original matching expressions in
+exact #else alternatives. Do not enlarge the array and duplicate the shared
+cursor/mark state used elsewhere.
+
+Validation: The original loader runs in a synthetic bounded fixture, checking
+two hardware/host ticks, one read, one texture upload, five exact native bindings
+and the copied pack. The fixture neither runs gameplay nor uses disc/save data.
+Release and ASan/UBSan each pass 107 tests. Original source reconstruction with
+HMBTN_PORT disabled matches HEAD before the repair exactly. Matching check is
+unavailable without the separate Linux toolchain; WSL is excluded. Interactive
+summary-page navigation remains owner-tested.

@@ -21,6 +21,15 @@ No owner save or screenshot is included in git. No game/replay was automated.
 
 ## Confirmed repairs (ADR-064)
 
+Later owner-triggered finding (ADR-069): Start opens the farm summary through
+an empty blocking CD poll that cannot advance deterministic interrupts. Remap
+that translation unit to the existing yielding adapter. The original loader
+fixture subsequently reproduces indexing beyond status_page_sprites[3]; native
+slots 3/4 now resolve the shared cursor/mark globals explicitly. All five loader
+bindings and the variable draw accesses use the same checked resolver. The
+bounded loader fixture passes with two host ticks and no disc/save/gameplay.
+107 Release/ASan tests pass; this does not establish full status-page navigation.
+
 - Event preparation copied 48-byte sprites at a 468-byte villager stride. Native
   AnimState and FarmVillager are larger. Copy full named sprite80 into sprite in
   each native record, preserving the original 0x82 reload behavior. The old copier

@@ -90,6 +90,7 @@ set_source_files_properties(../src/overlay/11_GF_FARM/field/field.c PROPERTIES C
     "estate_point_project=hm_field_point_project;anim_draw_sprt_cursor=hm_field_draw_sprt_cursor")
 set_source_files_properties(../src/overlay/17_GF_MG1/mg1.c ../src/overlay/19_GF_MG2/mg2.c
     ../src/overlay/21_GF_MG3/mg3.c ../src/overlay/23_GF_MG4/mg4.c ../src/overlay/25_GF_MG5/mg5.c
+    ../src/overlay/11_GF_FARM/menu/status_pages.c
     PROPERTIES COMPILE_DEFINITIONS "afile_read_bytes=hm_blocking_asset_read")
 
 add_library(hmbtn_psx_initial STATIC
@@ -304,6 +305,10 @@ if(BUILD_TESTING)
     add_executable(hmbtn_asset_wait_test tests/asset_wait.c compat/asset_wait.c)
     target_link_libraries(hmbtn_asset_wait_test PRIVATE hmbtn_game_options hmbtn_psx_initial)
     add_test(NAME game.blocking_asset_poll COMMAND hmbtn_asset_wait_test)
+    add_executable(hmbtn_status_wait_test tests/status_wait.c)
+    target_link_libraries(hmbtn_status_wait_test PRIVATE hmbtn_game_initial hmbtn_psx_pending)
+    add_test(NAME game.status_asset_wait COMMAND hmbtn_status_wait_test)
+    set_tests_properties(game.status_asset_wait PROPERTIES TIMEOUT 10)
     add_executable(hmbtn_player_dialog_test tests/player_dialog.c)
     target_link_libraries(hmbtn_player_dialog_test PRIVATE hmbtn_game_initial hmbtn_psx_pending)
     add_test(NAME game.native_player_dialog COMMAND hmbtn_player_dialog_test)
