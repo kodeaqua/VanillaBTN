@@ -372,3 +372,17 @@ and D3D12 offscreen readbacks. No performance benchmark or other-platform build
 was run. Release test binaries were rebuilt separately while the owner's game
 held the main executable open. After the owner closed it, the full native Release
 build linked the updated main executable successfully.
+
+### Native farm re-entry validation (2026-10-27)
+
+Windows Release and ASan/UBSan builds pass 110/110 tests after ADR-073. The farm
+fixture mutates/restores all 677 mutable farm objects across repeated activations,
+preserves resident state, checks const classification and read-only cue tables.
+The original lifecycle test reproduces the prior re-entry abort without a disc.
+Clang AST --check covers all 51 TUs and verifies the checked metadata; field/status
+SDK definitions are retained by their generated wrappers. Normal builds need no
+Python/AST generation. No other-platform, gameplay or performance claim is made.
+
+A separate Windows build with all enhancement options OFF also compiles the farm
+and lifecycle fixtures; both overlay.farm_reentry and overlay.title_load_return
+pass. This is a targeted OFF-build check, not a full second test-suite run.

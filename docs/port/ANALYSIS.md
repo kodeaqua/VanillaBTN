@@ -769,3 +769,16 @@ native VRAM reset invalidate affected history. Private replay transfers do not.
 109 Release/ASan tests and offscreen Vulkan/D3D12 checks pass. No new matching
 guards or source edits are needed. Owner now reports save/next-day camera safe;
 Natsume fade-out, TV and home-exit side flicker await revalidation.
+
+### Farm overlay re-entry inventory (2026-10-27)
+
+Owner confirms Natsume safe on 9c57d5a but reports a load force-close. Runtime
+diagnostics identify the existing unsupported second activation of member 11.
+ADR-073 inventories all 51 farm TUs: 703 file-scope objects, 677 mutable objects
+(49,201 bytes on Windows x64), 26 top-level const exclusions, and 56 local cue
+tables read only by farm_cue_step_run. Native wrappers add per-object providers
+without changing matching source or sanitizer instrumentation. Source/header
+fingerprints and TU coverage prevent silently stale metadata. Original SDK remaps
+for field/status are preserved. Resident state and owner save files are excluded.
+110 Release/ASan tests and a fresh AST inventory --check pass. Original lifecycle
+failure is reproduced before correction. Actual repeated load remains owner-tested.

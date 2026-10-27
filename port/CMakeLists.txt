@@ -76,7 +76,9 @@ target_compile_options(hmbtn_game_options INTERFACE
 target_compile_definitions(hmbtn_game_options INTERFACE HMBTN_PORT=1)
 
 file(GLOB_RECURSE hm_game_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../src/*.c")
-add_library(hmbtn_game_initial STATIC ${hm_game_sources} overlay/game_lifecycle.c gfx/game_frame.c gfx/field_identity.c compat/async_wait.c compat/asset_wait.c compat/view_context.c compat/save_codec.c compat/villager_sprites.c compat/family_names.c enhance/widescreen/game_buffers.c enhance/widescreen/title_background.c enhance/widescreen/menu_background.c)
+include("${CMAKE_CURRENT_SOURCE_DIR}/overlay/farm_state.cmake")
+add_library(hmbtn_game_initial STATIC ${hm_game_sources} overlay/game_lifecycle.c overlay/farm_state.c gfx/game_frame.c gfx/field_identity.c compat/async_wait.c compat/asset_wait.c compat/view_context.c compat/save_codec.c compat/villager_sprites.c compat/family_names.c enhance/widescreen/game_buffers.c enhance/widescreen/title_background.c enhance/widescreen/menu_background.c)
+target_include_directories(hmbtn_game_initial PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/native_farm")
 target_link_libraries(hmbtn_game_initial PUBLIC hmbtn_game_options hmbtn_work_memory hmbtn_overlay)
 # Keep the game's entry point separate from the host test runners. This source
 # is compiled into the archive only; no native game executable is linked yet.
@@ -92,6 +94,15 @@ set_source_files_properties(../src/overlay/17_GF_MG1/mg1.c ../src/overlay/19_GF_
     ../src/overlay/21_GF_MG3/mg3.c ../src/overlay/23_GF_MG4/mg4.c ../src/overlay/25_GF_MG5/mg5.c
     ../src/overlay/11_GF_FARM/menu/status_pages.c
     PROPERTIES COMPILE_DEFINITIONS "afile_read_bytes=hm_blocking_asset_read")
+foreach(original IN LISTS hm_farm_wrapped_originals)
+    get_source_file_property(wrapper "${original}" HM_NATIVE_WRAPPER)
+    foreach(property COMPILE_DEFINITIONS COMPILE_OPTIONS INCLUDE_DIRECTORIES)
+        get_source_file_property(value "${original}" "${property}")
+        if(value)
+            set_source_files_properties("${wrapper}" PROPERTIES "${property}" "${value}")
+        endif()
+    endforeach()
+endforeach()
 
 add_library(hmbtn_psx_initial STATIC
     gfx/replay_sink.c gfx/frame_replay.c
@@ -298,6 +309,9 @@ if(BUILD_TESTING)
     add_executable(hmbtn_overlay_lifecycle_test tests/overlay_lifecycle.c)
     target_link_libraries(hmbtn_overlay_lifecycle_test PRIVATE hmbtn_game_initial hmbtn_psx_pending)
     add_test(NAME overlay.title_load_return COMMAND hmbtn_overlay_lifecycle_test)
+    add_executable(hmbtn_farm_reentry_test tests/farm_reentry.c)
+    target_link_libraries(hmbtn_farm_reentry_test PRIVATE hmbtn_game_initial hmbtn_psx_pending)
+    add_test(NAME overlay.farm_reentry COMMAND hmbtn_farm_reentry_test)
     add_executable(hmbtn_title_reentry_test tests/title_reentry.c)
     target_link_libraries(hmbtn_title_reentry_test PRIVATE hmbtn_game_initial hmbtn_psx_pending)
     add_test(NAME overlay.title_reentry COMMAND hmbtn_title_reentry_test)

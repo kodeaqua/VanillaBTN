@@ -1,5 +1,6 @@
 #include "overlay/registry.h"
 #include "gfx/frame_events.h"
+#include "overlay/state_inventory.h"
 #include "psx/error.h"
 #include <stdlib.h>
 #include <string.h>
@@ -15,6 +16,34 @@ static struct {
     u8 *initial;
     size_t count;
 } hm_state[13];
+
+void hm_overlay_capture_parts(s32 member, const hm_overlay_inventory *parts, size_t count) {
+    if (!parts || !count)
+        hm_runtime_error("hm_overlay_capture_parts", "missing state inventory");
+    size_t total = 0;
+    for (size_t i = 0; i < count; ++i) {
+        if (!parts[i].spans && parts[i].count)
+            hm_runtime_error("hm_overlay_capture_parts", "missing object spans");
+        for (size_t j = 0; j < parts[i].count; ++j)
+            if (parts[i].spans[j].bytes) {
+                if (total == SIZE_MAX / sizeof(hm_overlay_span))
+                    hm_runtime_error("hm_overlay_capture_parts", "too many object spans");
+                ++total;
+            }
+    }
+    if (!total)
+        hm_runtime_error("hm_overlay_capture_parts", "empty state inventory");
+    hm_overlay_span *spans = malloc(total * sizeof(*spans));
+    if (!spans)
+        hm_runtime_error("hm_overlay_capture_parts", "cannot allocate object spans");
+    size_t at = 0;
+    for (size_t i = 0; i < count; ++i)
+        for (size_t j = 0; j < parts[i].count; ++j)
+            if (parts[i].spans[j].bytes)
+                spans[at++] = parts[i].spans[j];
+    hm_overlay_capture(member, spans, total);
+    free(spans);
+}
 
 void hm_overlay_capture(s32 member, const hm_overlay_span *spans, size_t count) {
     for (u32 i = 0; i < 13; ++i) {

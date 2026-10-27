@@ -1,0 +1,41 @@
+/* Real objects only; const objects are filtered by their C type. */
+#include "overlay/state_inventory.h"
+hm_overlay_inventory hm_farm_inventory_event_cue_history_c(void) {
+    static const hm_overlay_span spans[] = {
+        HM_OVERLAY_OBJECT(cue_history_item_1),
+        HM_OVERLAY_OBJECT(cue_history_item_2),
+        HM_OVERLAY_OBJECT(cue_history_item_3),
+        HM_OVERLAY_OBJECT(cue_history_item_4),
+        HM_OVERLAY_OBJECT(cue_history_item_5),
+        HM_OVERLAY_OBJECT(cue_history_item_6),
+        HM_OVERLAY_OBJECT(cue_history_item_7),
+        HM_OVERLAY_OBJECT(cue_history_item_8),
+        HM_OVERLAY_OBJECT(cue_history_item_9),
+        HM_OVERLAY_OBJECT(cue_history_item_10),
+        HM_OVERLAY_OBJECT(cue_history_item_11),
+        HM_OVERLAY_OBJECT(cue_history_item_12),
+        HM_OVERLAY_OBJECT(cue_history_item_13),
+        HM_OVERLAY_OBJECT(cue_history_item_14),
+        HM_OVERLAY_OBJECT(cue_history_item_15),
+        HM_OVERLAY_OBJECT(cue_history_item_16),
+        HM_OVERLAY_OBJECT(cue_history_item_17),
+        HM_OVERLAY_OBJECT(cue_history_item_18),
+        HM_OVERLAY_OBJECT(cue_history_item_19),
+        HM_OVERLAY_OBJECT(cue_history_item_20),
+        HM_OVERLAY_OBJECT(cue_history_item_21),
+        HM_OVERLAY_OBJECT(cue_history_item_22),
+        HM_OVERLAY_OBJECT(cue_history_item_23),
+        HM_OVERLAY_OBJECT(cue_history_item_24),
+        HM_OVERLAY_OBJECT(cue_history_item_25),
+        HM_OVERLAY_OBJECT(cue_history_item_26),
+        HM_OVERLAY_OBJECT(cue_history_item_28),
+        HM_OVERLAY_OBJECT(cue_history_item_29),
+        HM_OVERLAY_OBJECT(cue_history_item_31),
+        HM_OVERLAY_OBJECT(cue_history_item_32),
+        HM_OVERLAY_OBJECT(cue_history_item_34),
+        HM_OVERLAY_OBJECT(cue_history_item_35),
+        HM_OVERLAY_OBJECT(cue_history_item_36),
+        HM_OVERLAY_OBJECT(cue_history_scripts),
+    };
+    return (hm_overlay_inventory){spans, sizeof spans / sizeof spans[0]};
+}

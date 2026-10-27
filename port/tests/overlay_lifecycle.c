@@ -16,8 +16,9 @@ int main(void) {
     for (int visit = 0; visit < 6; ++visit) {
         CHECK(hm_overlay_select(27, 0) == 0);
         CHECK(hm_overlay_active(0) == 27);
+        CHECK(hm_overlay_select(11, 0) == 0);
         CHECK(hm_overlay_select(15, 1) == 0);
-        CHECK(hm_overlay_active(0) == 27 && hm_overlay_active(1) == 15);
+        CHECK(hm_overlay_active(0) == 11 && hm_overlay_active(1) == 15);
         CHECK(game_state.player.stamina == 73);
     }
     return 0;

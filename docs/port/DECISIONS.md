@@ -2044,3 +2044,50 @@ OT drawing. Original fade-packet tests now include 120-tick waits during both
 fade-out phases; expanded pixels still match native scanout. Vulkan and D3D12
 offscreen readbacks pass. No matching source, shader, game assets or owner saves
 change; no gameplay, other-platform or performance result is inferred.
+
+## ADR-073: Restore farm overlay objects on re-entry
+
+Date: 2026-10-27
+
+Context: After playing, returning to title and loading again aborts with
+hm_overlay_select: native overlay reentry is not implemented. Title and save/load
+have pristine state inventories, but member 11 (farm) does not. The existing
+title/load lifecycle fixture reproduces the same error after adding farm visits.
+Removing the rejection without resetting private farm state is insufficient.
+
+Decision: Audit all 51 farm TUs with Clang AST and compile native-only wrappers
+containing the unchanged original source plus per-TU inventory providers. Preserve
+source order and native source-specific SDK remaps. Combine the providers into a
+pristine snapshot at host startup using the existing object-based overlay loader.
+Restore each real C object on activation, preserving ASan global instrumentation.
+Do not copy linker ranges, reset the resident game state or write save files.
+
+The inventory contains 703 file-scope objects. A compiler type test skips only
+top-level const objects, correctly distinguishing mutable pointers to const data
+from immutable pointers. On the validated x64 build, 677 mutable objects occupy
+49,201 bytes and 26 objects are excluded. All 56 function-local static tables are
+FarmCueStep arrays passed only to the read-only table consumer farm_cue_step_run;
+their unchanged contents need no restoration. Record and check that exception.
+
+Checked source/header fingerprints and the full TU list fail CMake configuration
+when audited input changes. The optional Clang/Python maintenance tool regenerates
+or checks inventories; normal builds do not run it or require Python. Mutable
+function-local statics or new consumers require a fresh design/audit rather than
+silently being ignored. Other overlays keep their existing re-entry rejection
+unless they have their own complete inventory.
+
+Validation: The modified title/farm/load loop fails before the repair and passes
+afterwards. The farm fixture mutates every registered mutable object and verifies
+exact pristine restoration over four visits, resident game_state/farm_area
+preservation, repeated initialization without recapturing live data, and const
+classification. Selecting the high save overlay preserves the still-resident
+farm's live state; only selecting member 11 restores it. The fixture tests the
+cue consumer with read-only tables on both location
+branches. Native wrapper call-site definitions are checked for field and status
+units. The generator --check audits 51 TUs against the checked inventory.
+
+Windows Release and ASan/UBSan builds each pass 110 tests, with the final repeated
+initialization assertion rerun under ASan separately. No gameplay, disc or owner
+saves are used by these fixtures. Matching sources are unchanged, adding no guards.
+Actual title-to-load-to-farm return remains owner-tested; other platforms and full
+playthrough parity are not established.

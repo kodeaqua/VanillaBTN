@@ -19,6 +19,14 @@ Local evidence is ignored: build/port/source-audit-diagnostics.json,
 source-audit-analyzer.json, port-audit-analyzer.json and regression/test logs.
 No owner save or screenshot is included in git. No game/replay was automated.
 
+ADR-073 adds a targeted farm-state AST inventory after the owner reproduces a
+second-load overlay abort. It covers all 51 farm TUs and 703 file-scope objects;
+the compiled inventory snapshots 677 mutable objects and excludes 26 const
+objects. All 56 function-local static arrays are cue tables with one read-only
+consumer, checked by AST reference use and a read-only-storage fixture. Generated
+native wrappers retain source-specific SDK definitions. No matching source was
+edited. These checks establish state restoration, not a complete gameplay audit.
+
 ## Confirmed repairs (ADR-064)
 
 Later owner-triggered finding (ADR-069): Start opens the farm summary through
