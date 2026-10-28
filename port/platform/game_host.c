@@ -82,6 +82,7 @@ static hm_fxaa *hm_fxaa_output;
 #endif
 static int hm_ignore_held;
 static int hm_pause_enabled;
+static int hm_host_in_pause;
 static u8 hm_pause_background[320 * 240 * 4];
 static u8 hm_pause_frozen[1024 * 240 * 4];
 #endif
@@ -233,7 +234,7 @@ static void hm_host_blit(SDL_GPUCommandBuffer *command, SDL_GPUTexture *image, u
     enabled = hm_widescreen_enabled();
 #endif
 #ifdef HM_HOST_AA
-    if (hm_options.antialiasing == HM_AA_FXAA) {
+    if (hm_options.antialiasing == HM_AA_FXAA && !hm_host_in_pause) {
         SDL_GPUTexture *filtered = hm_fxaa_encode(hm_fxaa_output, command, image, image_width, image_height);
         if (filtered) image = filtered;
         else {
@@ -393,6 +394,7 @@ static int hm_host_gpu_present(const RECT *native_area) {
 
 #ifdef HMBTN_ENH_PAUSE_MENU
 static void hm_host_pause(void) {
+    hm_host_in_pause = 1;
     hm_pause_menu menu;
     hm_pause_open(&menu);
     Uint64 before = SDL_GetTicksNS();
@@ -617,6 +619,7 @@ static void hm_host_pause(void) {
     hm_host_reset_presentation();
     hm_ignore_held = 1;
     hm_audio_output_pause(0);
+    hm_host_in_pause = 0;
 }
 #endif
 
@@ -1127,11 +1130,11 @@ int hm_game_host_start(hm_disc *disc) {
         return 0;
     }
 #endif
-#if defined(HMBTN_ENH_PGXP) && defined(HMBTN_ENH_PAUSE_MENU)
-    hm_pgxp_set_enabled(hm_options.pgxp);
+#if defined(HMBTN_ENH_PGXP)
+    hm_pgxp_set_enabled(1); /* Auto-applied: 3D subpixel precision without wobble */
 #endif
-#if defined(HMBTN_ENH_DITHERING) && defined(HMBTN_ENH_PAUSE_MENU)
-    hm_dither_set_enabled(hm_options.dither);
+#if defined(HMBTN_ENH_DITHERING)
+    hm_dither_set_enabled(0); /* Auto-applied: clean 32-bit smooth colors without dither noise */
 #endif
 #ifdef HMBTN_GPU_RASTER
     hm_gpu_output = hm_gpu_renderer_create(hm_device);

@@ -5,7 +5,7 @@
 
 #define HM_GPU_LINK_MASK UINT32_C(0x00FFFFFF)
 #define HM_GPU_LINK_END UINT32_C(0x00FFFFFF)
-enum { HM_GPU_LINK_CAPACITY = 65536 };
+enum { HM_GPU_LINK_CAPACITY = 262144 };
 
 /* Tags remain PS1-sized. Only live, word-aligned tag addresses may be encoded.
  * Handles depend on first-use order, never on host address bits. Reset only

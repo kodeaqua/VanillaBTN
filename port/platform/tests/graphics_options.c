@@ -42,6 +42,10 @@ int main(int argc, char **argv) {
     CHECK(hm_graphics_change(NULL,NULL,&options,5,1) && options.antialiasing==HM_AA_OFF);
     options.aa_capabilities=1;
     CHECK(!hm_graphics_change(NULL,NULL,&options,5,1) && options.antialiasing==HM_AA_OFF);
+    options.linear=0;
+    CHECK(hm_graphics_change(NULL,NULL,&options,6,1) && options.linear==1);
+    CHECK(hm_graphics_change(NULL,NULL,&options,6,1) && options.linear==2);
+    CHECK(hm_graphics_change(NULL,NULL,&options,6,1) && options.linear==0);
     hm_user_data_stop();SDL_free(root);SDL_Quit();
     return 0;
 }
