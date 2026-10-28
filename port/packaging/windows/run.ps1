@@ -1,12 +1,16 @@
 # Launch the native Windows game with the owner's local, validated USA BIN.
+# Without -DiscPath the game uses the path remembered in settings.json or a .bin next to the exe.
 param(
-    [Parameter(Mandatory = $true)]
     [string]$DiscPath
 )
 $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../../..')).Path
-$disc = (Resolve-Path -LiteralPath $DiscPath).Path
-if (-not (Test-Path -LiteralPath $disc -PathType Leaf)) { throw 'DiscPath must name a BIN file' }
+$discArguments = @()
+if ($DiscPath) {
+    $disc = (Resolve-Path -LiteralPath $DiscPath).Path
+    if (-not (Test-Path -LiteralPath $disc -PathType Leaf)) { throw 'DiscPath must name a BIN file' }
+    $discArguments = @($disc)
+}
 $game = Join-Path $repoRoot 'build/port/windows-release/hmbtn_native.exe'
 if (-not (Test-Path -LiteralPath $game)) {
     & (Join-Path $PSScriptRoot 'build.ps1') -Preset windows-release -Game
@@ -20,7 +24,7 @@ try {
         $previous[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
         [Environment]::SetEnvironmentVariable($name, $null, 'Process')
     }
-    & $game $disc
+    & $game @discArguments
     if ($LASTEXITCODE -ne 0) { throw "Native game exited with code $LASTEXITCODE" }
 } finally {
     foreach ($name in $diagnosticNames) {

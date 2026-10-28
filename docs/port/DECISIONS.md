@@ -2169,3 +2169,25 @@ people/player.c). Not verified against the matching build (no Linux toolchain
 here) and no gameplay was run; the owner must confirm the hop distance
 interactively. This is an audit of one overrun; other cross-object reads of
 this kind may exist.
+
+<a id="adr-078"></a>
+
+## ADR-078: Locate the disc from argument, settings, then executable folder
+
+Date: 2026-10-28. Status: accepted.
+
+Context: The native executable required the BIN path as a command-line argument
+every time. AGENTS.md section 7 asks for the chosen disc to be remembered in the
+config. A native file picker is not part of this change.
+
+Decision: Add platform/disc_locator. An explicit argument is tried alone. Without
+one, try settings.json ``disc_path``, then ``*.bin`` files beside the executable
+(case-insensitive, name order). The launcher starts user data before locating
+the disc, and the host reuses the running instance. A validated path is stored
+as an absolute path; failure shows a message box. Unvalidated paths are never
+trusted: every candidate goes through the existing USA disc mount checks.
+
+Consequences: Double-clicking the exe works when the BIN sits beside it or was
+used once before. Selecting a different disc requires passing the argument
+again. Unit tests cover JSON path encoding and the locate order with isolated
+roots and a fake validator; no real disc or gameplay was used. No file picker.

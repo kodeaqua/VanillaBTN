@@ -900,7 +900,8 @@ int hm_game_host_start(hm_disc *disc) {
     hm_trace_camera = SDL_getenv("HMBTN_TRACE_CAMERA") != NULL;
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD | SDL_INIT_AUDIO))
         return 0;
-    if (!hm_user_data_start()) {
+    /* The launcher starts user data first to read the remembered disc path. */
+    if (!hm_user_data_root() && !hm_user_data_start()) {
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Back to Nature",
                                  "Cannot open Documents/BackToNature. Check folder permissions and "
                                  "close any other game instance.",

@@ -14,7 +14,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File port/packaging/windows/build
 powershell -NoProfile -ExecutionPolicy Bypass -File port/packaging/windows/run.ps1 -DiscPath 'D:/Games/Harvest Moon USA.bin'
 ```
 
-The executable is build/port/windows-release/hmbtn_native.exe. The launcher
+The executable is build/port/windows-release/hmbtn_native.exe. It finds the disc in
+this order: an explicit path argument (used alone, never replaced by a fallback);
+the `disc_path` remembered in Documents/BackToNature/settings.json; then each
+`*.bin` next to the executable, in name order. Every candidate is validated
+against the USA disc, and a working path is stored as an absolute `disc_path`.
+If none validates, a message box explains how to supply it. run.ps1 accepts
+-DiscPath optionally. The launcher
 builds it if missing, disables diagnostic replay/tick limits for normal play,
 and restores the caller's environment afterward. Click the game window for
 keyboard focus. Enter is Start; use arrows to select New Game and X to confirm.

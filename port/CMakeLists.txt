@@ -273,7 +273,7 @@ if(HMBTN_BUILD_GPU_SPIKE OR HMBTN_BUILD_NATIVE_WINDOW)
     endif()
     if(HMBTN_BUILD_NATIVE_WINDOW)
         add_executable(hmbtn_native platform/boot_probe.c platform/game_host.c platform/input_replay.c
-            platform/audio_output.c platform/audio_ring.c platform/user_data.c)
+            platform/audio_output.c platform/audio_ring.c platform/user_data.c platform/disc_locator.c)
         target_compile_definitions(hmbtn_native PRIVATE SDL_MAIN_HANDLED HMBTN_SDL_HOST=1)
         target_link_libraries(hmbtn_native PRIVATE hmbtn_game_initial hmbtn_psx_pending SDL3::SDL3)
         target_link_libraries(hmbtn_native PRIVATE hmbtn_settings_json hmbtn_gpu_presentation)
@@ -319,6 +319,12 @@ if(HMBTN_BUILD_GPU_SPIKE OR HMBTN_BUILD_NATIVE_WINDOW)
             target_link_libraries(hmbtn_user_data_test PRIVATE hmbtn_settings_json)
             add_test(NAME platform.documents_storage COMMAND hmbtn_user_data_test
                 "${CMAKE_CURRENT_BINARY_DIR}/user-data-test")
+            add_executable(hmbtn_disc_locator_test platform/tests/disc_locator.c
+                platform/disc_locator.c platform/user_data.c)
+            target_link_libraries(hmbtn_disc_locator_test PRIVATE hmbtn_psx_initial SDL3::SDL3
+                hmbtn_settings_json)
+            add_test(NAME platform.disc_locator COMMAND hmbtn_disc_locator_test
+                "${CMAKE_CURRENT_BINARY_DIR}/disc-locator-test")
             if(HMBTN_ENH_ANTIALIASING)
                 add_executable(hmbtn_graphics_options_test platform/tests/graphics_options.c
                     platform/graphics_options.c platform/user_data.c)
