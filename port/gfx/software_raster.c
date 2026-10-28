@@ -1,3 +1,4 @@
+#include "enhance/dithering/dithering.h"
 #ifdef HMBTN_ENH_WIDESCREEN
 #include "enhance/widescreen/widescreen.h"
 #endif
@@ -215,7 +216,7 @@ static void hm_software_triangle(hm_software_surface *s, hm_software_vertex a, h
                                                              c.rgb[channel], w, area);
                     if (textured)
                         value = value * ((texel >> (channel * 5)) & 31) / 16;
-                    if (d->dtd && ((op & 16) || (textured && !raw)))
+                    if (hm_dither_enabled() && d->dtd && ((op & 16) || (textured && !raw)))
                         value += dither[hm_software_logical_y(s, y) & 3]
                                        [hm_software_logical_x(s, x) & 3];
                     color |= (u16)((hm_software_clamp(value, 255) >> 3) << (channel * 5));

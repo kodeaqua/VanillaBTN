@@ -19,6 +19,7 @@ The owner requested the native pause interface and graphics settings on
 | Gameplay Enhancements | Suite of 9 toggleable options in Settings > Gameplay (ADR-080); runtime default OFF except wild dog; owner gameplay validation pending |
 | Controls Settings | Gamepad, keyboard presets, and mouse interaction in Settings > Controls (ADR-081); persistent in settings.json |
 | PGXP Geometry | Subpixel vertex precision and perspective-correct texture mapping (ADR-083); eliminates wobble and texture warping; default OFF |
+| Dithering | PS1 hardware 4x4 Bayer ordered dithering toggle (ADR-084); toggle between original PS1 dither pattern and smooth 32-bit colors; default ON |
 
 HMBTN_ENH_PAUSE_MENU defaults OFF in CMake; Windows build.ps1 -Game enables it.
 The owner explicitly requests ESC availability across scenes, so that interface
@@ -118,3 +119,10 @@ view-space depth W without modifying the integer coordinates used by original ga
 The GPU scene backend retrieves subpixel coordinates and depth values, rendering geometry with
 perspective-divided texture coordinates ($u/w, v/w, 1/w$), completely eliminating PS1 integer vertex snapping
 wobble and affine texture distortion. Toggleable in Pause Menu > Settings > Graphics > PGXP Geometry.
+
+The owner requested an option to toggle PS1 hardware dithering (ADR-084).
+Windows -Game builds HMBTN_ENH_DITHERING; runtime enhance.disable_dithering defaults false (vanilla parity).
+PS1 hardware uses 16-bit color depth (R5G5B5) and applies an ordered 4x4 Bayer dithering matrix to reduce color banding.
+On modern high-resolution displays, this ordered pattern manifests as checkerboard noise.
+When Dithering is set to Off (`enhance.disable_dithering = true`), dithering is bypassed, producing clean true-color gradients.
+Toggleable in Pause Menu > Settings > Graphics > Dithering.

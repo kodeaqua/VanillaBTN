@@ -1,3 +1,4 @@
+#include "enhance/dithering/dithering.h"
 #include "psx/error.h"
 #include "psx/gpu_environment.h"
 #include "psx/gpu_raster.h"
@@ -67,7 +68,7 @@ static void hm_triangle(hm_vertex a, hm_vertex b, hm_vertex c, u32 opcode, u16 c
     int edge0 = hm_top_left(&b, &c), edge1 = hm_top_left(&c, &a), edge2 = hm_top_left(&a, &b);
     static const s8 dither[4][4] = {{-4, 0, -3, 1}, {2, -2, 3, -1}, {-3, 1, -4, 0}, {3, -1, 2, -2}};
     int textured = (opcode & 4) != 0, raw = textured && (opcode & 1);
-    int dithering = draw->dtd && ((opcode & 16) || (textured && !raw));
+    int dithering = hm_dither_enabled() && draw->dtd && ((opcode & 16) || (textured && !raw));
     for (s32 y = miny; y < maxy; ++y)
         for (s32 x = minx; x < maxx; ++x) {
             s32 px = x * 2 + 1, py = y * 2 + 1;

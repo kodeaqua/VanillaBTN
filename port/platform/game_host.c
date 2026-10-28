@@ -34,6 +34,9 @@
 #include "platform/graphics_options.h"
 #ifdef HMBTN_ENH_PGXP
 #include "enhance/pgxp/pgxp.h"
+#ifdef HMBTN_ENH_DITHERING
+#include "enhance/dithering/dithering.h"
+#endif
 #endif
 #include "platform/controls_options.h"
 #ifdef HMBTN_ENH_GAMEPLAY
@@ -1126,6 +1129,9 @@ int hm_game_host_start(hm_disc *disc) {
 #endif
 #if defined(HMBTN_ENH_PGXP) && defined(HMBTN_ENH_PAUSE_MENU)
     hm_pgxp_set_enabled(hm_options.pgxp);
+#endif
+#if defined(HMBTN_ENH_DITHERING) && defined(HMBTN_ENH_PAUSE_MENU)
+    hm_dither_set_enabled(hm_options.dither);
 #endif
 #ifdef HMBTN_GPU_RASTER
     hm_gpu_output = hm_gpu_renderer_create(hm_device);

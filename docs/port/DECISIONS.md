@@ -2364,3 +2364,35 @@ Decision:
 
 Consequences:
 When PGXP is enabled, 3D character models, farm buildings, trees, and terrain render with fluid subpixel precision and perspective-correct textures, eliminating PS1 wobble and warping. When disabled, identical vanilla rendering is fully preserved.
+
+## ADR-084: PS1 hardware ordered dithering toggle
+
+Date: 2026-10-28. Status: accepted.
+
+Context: On original PlayStation hardware, the GPU rasterizer applies a 4x4 Bayer matrix
+ordered dithering pattern (`draw->dtd`) to shaded and textured primitives to mask the
+color banding inherent in 16-bit (RGB555) framebuffers. While this dithering blended
+naturally on 1990s CRT displays, on modern high-resolution LCD/OLED monitors it appears
+as visible checkerboard stippling/noise across 3D surfaces and backgrounds.
+
+The owner requested an option to toggle this dithering effect on or off.
+
+Decision:
+1. Module `port/enhance/dithering/`:
+   - Exposes `hm_dither_set_enabled(int enabled)` and `hm_dither_enabled()`.
+   - Default state returns `1` (enabled) to strictly guarantee vanilla PS1 parity.
+2. Rendering Pipelines:
+   - GPU Scene (`port/gfx/gpu_scene.c`): Clears the `dtd` bit (`flags & 1`) in primitive packet word 4 when dithering is disabled, instructing `scene.hlsl` to skip `dither()` offset addition.
+   - Software Rasterizer (`port/gfx/software_raster.c`) and CPU polygon/line fallbacks (`port/psx/gpu_polygon.c`, `port/psx/gpu_line.c`): Guard Bayer dither addition with `hm_dither_enabled()`.
+3. Configuration and Pause Menu:
+   - Configuration key `enhance.disable_dithering` in `settings.json`, defaulting to `false` (vanilla parity).
+   - Pause Menu > Settings > Graphics item 12 ("Dithering") with values:
+     - `On - PS1 original pattern`
+     - `Off - smooth 32-bit colors`
+   - Fixed description display for item 11 ("PGXP Geometry") and item 12 ("Dithering") in `hm_graphics_value`.
+4. Tests:
+   - Added unit test `port/tests/dithering.c` (`enhance.dithering`) verifying default parity and toggle states.
+   - Updated pause menu unit test for 13 graphics items.
+
+Consequences:
+Players can choose between authentic PS1 dithered presentation and clean, noise-free true-color gradients without modifying core game logic or save data.

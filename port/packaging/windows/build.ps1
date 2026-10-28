@@ -23,6 +23,7 @@ try {
         $configureArgs += '-DHMBTN_ENH_ANTIALIASING=ON'
         $configureArgs += '-DHMBTN_ENH_GAMEPLAY=ON'
         $configureArgs += '-DHMBTN_ENH_PGXP=ON'
+        $configureArgs += '-DHMBTN_ENH_DITHERING=ON'
     }
     & cmake @configureArgs
     if ($LASTEXITCODE -ne 0) { throw 'Windows configure failed' }
