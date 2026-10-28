@@ -18,17 +18,17 @@ This is not a full-game completion claim or verification of every SDK semantic.
   than the existing CardType and ExecFlag identifiers are internal opaque IDs;
   the audited source only compares ExecFlag. PocketStation emulation is absent.
 
-## Nine remaining explicit failures
+## Eight remaining explicit failures
 
-`FntFlush`, `FntLoad`, `FntOpen`, `FntPrint`, `KanjiFntClose`, `KanjiFntFlush`,
+`FntFlush`, `FntLoad`, `FntOpen`, `KanjiFntClose`, `KanjiFntFlush`,
 `KanjiFntOpen`, `KanjiFntPrint`, `SetDumpFnt` remain fail-fast debug-font APIs.
 No SDK font data is bundled and font rendering is not replaced with fake success.
 
-Most callers are DEBUG, PdaSamp and swind overlays. FntPrint also occurs in
-animation validation errors, an event-command row-not-found error and the mcard
-overlay. Thus exceptional ordinary-game paths may still reach it; these calls
-are not all unreachable. Supporting their rendering requires a separate font
-implementation and asset-source decision, not silently suppressing the error.
+Most callers are DEBUG, PdaSamp and swind overlays. `FntPrint` is now implemented
+in `psx/font.c` (ADR-082), outputting formatted text to standard error with
+automatic flushing so that animation validation warnings, event-command
+diagnostics, and overlay messages do not abort the process.
+Full debug font primitive rendering on screen remains pending a font asset decision.
 
 `psx.pending_inventory` rejects new pending names and calls from source files
 outside this audited list. It does not detect a new call inside an already

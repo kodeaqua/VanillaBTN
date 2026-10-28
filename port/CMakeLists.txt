@@ -127,7 +127,7 @@ add_library(hmbtn_psx_initial STATIC
     psx/xa_decode.c psx/card_store.c
     psx/gte_rotation.c
     psx/unimplemented.c psx/gte_vectors.c psx/gte_runtime.c psx/gs_lighting.c psx/trig.c psx/timing.c psx/sound_control.c psx/spu_decode.c psx/spu_voice.c psx/cd_position.c psx/cd_runtime.c
-    psx/gpu_links.c psx/gpu_ot.c psx/gpu_packets.c psx/gpu_environment.c psx/gpu_commands.c psx/gpu_polygon.c psx/gpu_line.c psx/vram.c psx/card.c psx/pad.c psx/sound_bank.c psx/sequence.c psx/sound_voice.c psx/reverb.c)
+    psx/gpu_links.c psx/gpu_ot.c psx/gpu_packets.c psx/gpu_environment.c psx/gpu_commands.c psx/gpu_polygon.c psx/gpu_line.c psx/vram.c psx/card.c psx/pad.c psx/sound_bank.c psx/sequence.c psx/sound_voice.c psx/reverb.c psx/font.c)
 target_link_libraries(hmbtn_psx_initial PUBLIC hmbtn_port_options hmbtn_frame_events)
 target_include_directories(hmbtn_psx_initial PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/compat/psyq")
 
@@ -576,6 +576,9 @@ if(BUILD_TESTING)
     add_test(NAME psx.pending.FntFlush
         COMMAND "${CMAKE_COMMAND}" "-DPROGRAM=$<TARGET_FILE:hmbtn_pending_test>" "-DAPI=FntFlush"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_unimplemented.cmake")
+    add_executable(hmbtn_font_test tests/font.c)
+    target_link_libraries(hmbtn_font_test PRIVATE hmbtn_psx_initial)
+    add_test(NAME psx.font COMMAND hmbtn_font_test)
     add_executable(hmbtn_timing_test tests/timing.c)
     target_link_libraries(hmbtn_timing_test PRIVATE hmbtn_psx_initial)
     add_test(NAME psx.timing COMMAND hmbtn_timing_test)
