@@ -50,6 +50,30 @@ override this one for their subtree.
   native/CPU fallback aspect stable. Gameplay coverage remains owner-tested.
   Report CPU raster performance and untested gameplay/device behavior plainly.
 
+### Current state and agent workflow (as of 2026-10-28)
+
+- Active branch workflow: Always work on `fix` branched from `main`. Commit changes,
+  push to `origin/fix`, open PR to `main` via `gh pr create`, squash-merge via `gh pr merge --squash`,
+  and sync both branches (`git checkout main; git pull; git checkout fix; git reset --hard origin/main`).
+- Build command for playable Windows game executable and tests:
+  `powershell.exe -NoProfile -ExecutionPolicy Bypass -File port/packaging/windows/build.ps1 -Preset windows-release -Game`
+- Decomp Overlay Manifest Integrity Rule: Whenever any file in `src/overlay/11_GF_FARM/`
+  is edited (e.g. `calendar.c`, `status_pages.c`), the SHA-256 hash of the normalized content
+  (`\r\n` replaced with `\n`) MUST be recalculated and updated in `port/overlay/farm_state/manifest.cmake`.
+  Failure to do so causes CMake configuration failure.
+- Active Executable Lock: If `hmbtn_native.exe` is currently running, linking will fail with
+  `Permission denied`. Never kill the user's running process without consent; check `Get-Process`
+  first and ask the owner to close the game before compiling `-Game`.
+- Implemented Features:
+  1. ESC Pause Menu with Settings (Graphics, Controls, Gameplay) and Resume / Exit Game.
+  2. Controls Options (ADR-081): Gamepad, Keyboard (Preset A/B/C/Custom), and Mouse.
+  3. Gameplay Enhancements (ADR-080): Walk through crops, 99 item stacking in rucksack with
+     quantity selector dialog, durable fences, connected wooden rails, wild dog attacks toggle,
+     smart animal bell, 10-heart stamina HUD in top-left (visible during NPC dialogues, hides
+     during fullscreen menus/storage), calendar NPC birthday/milestone dialogue info on X press,
+     and roaming horse.
+  4. Unit test suite: 116 tests passing 100%.
+
 These explicit owner decisions override conflicting roadmap, CI skeleton,
 workflow, and definition-of-done requirements below.
 
