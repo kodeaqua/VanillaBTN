@@ -1,6 +1,7 @@
 #include "enhance/pause_menu/assets.h"
 #include "enhance/pause_menu/menu.h"
 #include <stdio.h>
+#include <string.h>
 
 /* Execute the game's actual frame geometry with private canvas sinks. This
  * preserves its bevel, corners and gradient; no replacement UI art is authored. */
@@ -58,8 +59,8 @@ void hm_pause_gradient(u_long *ot, s16 x, s16 y, s16 w, s16 h, s32 c0, s32 c1, s
             hm_put(x + col, y + row, color);
     }
 }
-static void hm_text(const hm_pause_assets *assets, const char *text, int x, int y) {
-    if (!text)
+static void hm_text_font(const u16 *font, const char *text, int x, int y) {
+    if (!text || !font)
         return;
     for (; *text && x < 304; ++text, x += 8) {
         unsigned char c = (unsigned char)*text;
@@ -80,8 +81,8 @@ static void hm_text(const hm_pause_assets *assets, const char *text, int x, int 
             continue;
         for (unsigned row = 0; row < 12; ++row)
             for (unsigned col = 0; col < 8; ++col) {
-                u16 color = assets->font[((glyph / 16) * 12 + row) * HM_PAUSE_FONT_W +
-                                         (glyph % 16) * 8 + col];
+                u16 color = font[((glyph / 16) * 12 + row) * HM_PAUSE_FONT_W +
+                                 (glyph % 16) * 8 + col];
                 if (!color)
                     continue;
                 u32 rgb = 0;
@@ -93,13 +94,19 @@ static void hm_text(const hm_pause_assets *assets, const char *text, int x, int 
             }
     }
 }
-static void hm_center(const hm_pause_assets *assets, const char *text, int y) {
-    if (!text)
+static void hm_text(const hm_pause_assets *assets, const char *text, int x, int y) {
+    hm_text_font(assets ? assets->font : NULL, text, x, y);
+}
+static void hm_center_font(const u16 *font, const char *text, int y) {
+    if (!text || !font)
         return;
     size_t length = strlen(text);
     if (length > 36)
         length = 36;
-    hm_text(assets, text, 160 - (int)length * 4, y);
+    hm_text_font(font, text, 160 - (int)length * 4, y);
+}
+static void hm_center(const hm_pause_assets *assets, const char *text, int y) {
+    hm_center_font(assets ? assets->font : NULL, text, y);
 }
 void hm_pause_draw(const hm_pause_assets *assets, u8 *rgba, const hm_pause_menu *menu,
                    const hm_pause_view *view) {
@@ -148,8 +155,10 @@ void hm_pause_draw(const hm_pause_assets *assets, u8 *rgba, const hm_pause_menu 
                 hm_text(assets, "-", 90, y);
             hm_text(assets, hm_pause_label(menu, i), 108, y);
         }
-        hm_center(assets, "X Confirm   D Back", 204);
-        hm_center(assets, root ? "ESC Resume" : "ESC Back", 220);
+        const u16 *font_prompt =
+            assets && assets->font_light[0] ? assets->font_light : (assets ? assets->font : NULL);
+        hm_center_font(font_prompt, "X Confirm   D Back", 204);
+        hm_center_font(font_prompt, root ? "ESC Resume" : "ESC Back", 220);
     }
     hm_canvas = NULL;
 }

@@ -51,6 +51,7 @@ int hm_pause_assets_load(hm_pause_assets *assets, hm_disc *disc) {
             u16 packed = hm_vram_pixel(896 + x / 4, y);
             unsigned color = (packed >> ((x % 4) * 4)) & 15;
             assets->font[y * HM_PAUSE_FONT_W + x] = hm_vram_pixel(896 + color, 252);
+            assets->font_light[y * HM_PAUSE_FONT_W + x] = hm_vram_pixel(896 + color, 250);
         }
     ok = 1;
 done:
