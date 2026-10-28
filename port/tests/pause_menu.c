@@ -28,8 +28,9 @@ int main(void) {
     hm_pause_handle(&menu, HM_PAUSE_UP);
     CHECK(menu.selected == 0);
     hm_pause_handle(&menu, HM_PAUSE_CONFIRM);
-    CHECK(menu.page == HM_PAUSE_GRAPHICS && hm_pause_count(&menu) == 11);
+    CHECK(menu.page == HM_PAUSE_GRAPHICS && hm_pause_count(&menu) == 12);
     CHECK(!strcmp(hm_pause_label(&menu, 10), "Renderer"));
+    CHECK(!strcmp(hm_pause_label(&menu, 11), "PGXP Geometry"));
     CHECK(!strcmp(hm_pause_label(&menu, 4), "Widescreen Mode"));
     CHECK(!strcmp(hm_pause_label(&menu, 7), "VSync") &&
           !strcmp(hm_pause_label(&menu, 8), "FPS Limit"));

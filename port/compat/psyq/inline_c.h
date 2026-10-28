@@ -2,6 +2,7 @@
 #define HMBTN_COMPAT_INLINE_C_H
 
 #include "psx/gte_core.h"
+#include "enhance/pgxp/pgxp.h"
 #include <libgte.h>
 #include <string.h>
 
@@ -71,12 +72,20 @@ static inline u32 hm_gte_xy(u32 index) {
     return (u32)(u16)hm_gte.sx[index] | ((u32)(u16)hm_gte.sy[index] << 16);
 }
 
-static inline void gte_stsxy(void *value) { hm_gte_store_word(value, hm_gte_xy(2)); }
+static inline void gte_stsxy(void *value) {
+    u32 xy = hm_gte_xy(2);
+    hm_gte_store_word(value, xy);
+    hm_pgxp_store_vertex(value, xy, hm_gte.sxf[2], hm_gte.syf[2], hm_gte.szf[3]);
+}
 static inline void gte_stsxy2(void *value) { gte_stsxy(value); }
 
 static inline void hm_gte_packet_xy(void *packet, u32 stride) {
-    for (u32 i = 0; i < 3; ++i)
-        hm_gte_store_word((u8 *)packet + 8 + i * stride, hm_gte_xy(i));
+    for (u32 i = 0; i < 3; ++i) {
+        void *dest = (u8 *)packet + 8 + i * stride;
+        u32 xy = hm_gte_xy(i);
+        hm_gte_store_word(dest, xy);
+        hm_pgxp_store_vertex(dest, xy, hm_gte.sxf[i], hm_gte.syf[i], hm_gte.szf[i + 1]);
+    }
 }
 
 #define gte_stsxy3_f3(p) hm_gte_packet_xy((p), 4)

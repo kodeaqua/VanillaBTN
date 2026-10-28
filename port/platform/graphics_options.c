@@ -2,6 +2,9 @@
 #include "enhance/scaling/scaling.h"
 #endif
 #include "platform/graphics_options.h"
+#ifdef HMBTN_ENH_PGXP
+#include "enhance/pgxp/pgxp.h"
+#endif
 #include "platform/settings_json.h"
 #include "platform/user_data.h"
 #ifdef HMBTN_ENH_INTERPOLATION
@@ -10,7 +13,7 @@
 static void hm_validate_rate(hm_graphics_options *options);
 
 void hm_graphics_defaults(hm_graphics_options *o) {
-    *o = (hm_graphics_options){.width = 640, .height = 480, .vsync = 1, .fps_denominator = 1};
+    *o = (hm_graphics_options){.width = 640, .height = 480, .vsync = 1, .fps_denominator = 1, .pgxp = 0};
     o->aa_capabilities =
 #ifdef HMBTN_ENH_ANTIALIASING
         (1u << HM_AA_COUNT) - 1;
@@ -88,6 +91,14 @@ void hm_graphics_load(hm_graphics_options *o) {
         (o->renderer && o->antialiasing >= HM_AA_MSAA2))
         o->antialiasing = HM_AA_OFF;
 #endif
+#ifdef HMBTN_ENH_PGXP
+    const char *pgxp_value;
+    size_t pgxp_length;
+    if (bytes >= 0 && hm_json_property(text, (size_t)bytes, "enhance", &object, &length) == 1 &&
+        hm_json_property(object, length, "pgxp", &pgxp_value, &pgxp_length) == 1 &&
+        pgxp_length == 4 && !SDL_memcmp(pgxp_value, "true", 4))
+        o->pgxp = 1;
+#endif
     SDL_free(text);
     hm_validate_rate(o);
 }
@@ -123,6 +134,10 @@ int hm_graphics_save(const hm_graphics_options *o) {
         SDL_snprintf(mode, sizeof(mode), "%d", o->antialiasing);
         ok = hm_user_data_set_nested_setting("enhance", "antialiasing", mode);
     }
+#endif
+#ifdef HMBTN_ENH_PGXP
+    if (ok)
+        ok = hm_user_data_set_nested_setting("enhance", "pgxp", o->pgxp ? "true" : "false");
 #endif
     return ok;
 }
@@ -388,6 +403,12 @@ int hm_graphics_change(SDL_GPUDevice *device, SDL_Window *window, hm_graphics_op
     else if (item == 10)
         candidate.renderer = !candidate.renderer;
 #endif
+#ifdef HMBTN_ENH_PGXP
+    else if (item == 11) {
+        candidate.pgxp = !candidate.pgxp;
+        hm_pgxp_set_enabled(candidate.pgxp);
+    }
+#endif
     else
         return 0; /* Renderer enhancements remain unavailable until implemented. */
     int window_changed = item >= 0 && item <= 2;
@@ -510,6 +531,8 @@ void hm_graphics_row_value(const hm_graphics_options *o, int item, char *text, s
     }
     else if (item == 10)
         SDL_snprintf(text, capacity, "%s", o->renderer ? "Software" : "GPU Auto");
+    else if (item == 11)
+        SDL_snprintf(text, capacity, "%s", o->pgxp ? "On" : "Off");
     else
         SDL_snprintf(text, capacity, "Off");
 }

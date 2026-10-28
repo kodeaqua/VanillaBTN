@@ -4,7 +4,7 @@
 #include "enhance/antialiasing/antialiasing.h"
 #include <SDL3/SDL.h>
 typedef struct {
-    int monitor, mode, width, height, linear, vsync, interpolation, scaling, widescreen;
+    int monitor, mode, width, height, linear, vsync, interpolation, scaling, widescreen, pgxp;
     int renderer, gpu_active;           /* 0 = GPU Auto, 1 = Software; active is transient. */
     int antialiasing;
     unsigned aa_capabilities; /* Transient supported-mode bitmask; never serialized. */

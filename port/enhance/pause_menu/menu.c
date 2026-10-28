@@ -5,7 +5,7 @@ static const char *const hm_root_items[] = {"Resume", "Settings", "Exit Game"};
 static const char *const hm_settings_items[] = {"Graphics", "Gameplay", "Controls"};
 static const char *const hm_graphics_items[] = {
     "Monitor",   "Window Mode", "Resolution", "Enhance Scaling", "Widescreen Mode", "Anti-Aliasing",
-    "Filtering", "VSync",       "FPS Limit",  "Interpolation",   "Renderer"};
+    "Filtering", "VSync",       "FPS Limit",  "Interpolation",   "Renderer",        "PGXP Geometry"};
 static const char *const hm_gameplay_items[] = {
     "Walk Crops", "Item Stacking", "Durable Fences", "Connect Fences", "Wild Dog Attacks",
     "Smart Bell", "Stamina HUD",   "Calendar Events","Roaming Horse"};
