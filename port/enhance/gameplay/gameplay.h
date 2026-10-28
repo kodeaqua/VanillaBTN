@@ -24,7 +24,6 @@ void hm_gameplay_set_active(const void *options_ptr);
 
 /* Visual & logic helpers */
 void hm_gameplay_draw_fence_connections(s16 row, s16 col, s16 x, s16 y, s32 depth);
-void hm_gameplay_draw_stamina_hud(s16 base_x);
 void hm_gameplay_smart_bell_ring(void);
 void hm_gameplay_smart_bell_tick(void);
 int hm_gameplay_calendar_has_event(s16 season, s16 day);

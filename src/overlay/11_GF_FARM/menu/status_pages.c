@@ -79,6 +79,9 @@ typedef struct {
 typedef void (*DrawRowFn)(s16 row, s16 y);
 
 static void status_draw_clock(void);
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+static void status_draw_stamina_hud(void);
+#endif
 static void status_page_tick(void);
 static void status_page_close(void);
 static void status_draw_summary(void);
@@ -176,12 +179,8 @@ static void status_draw_clock(void)
     s32 y;
 
 #ifdef HMBTN_PORT
-    /* PORT: Dynamic widescreen HUD anchoring and stamina HUD - see docs/port/DECISIONS.md#adr-080 */
+    /* PORT: Dynamic stamina HUD in top-left - see docs/port/DECISIONS.md#adr-080 */
     s16 base_x = 228;
-#if defined(HMBTN_ENH_WIDESCREEN)
-    extern int hm_widescreen_margin(void);
-    base_x += hm_widescreen_margin();
-#endif
     ot = current_frame->otTags[0];
     text = &ot[35];
     morning = game_state.progress.clock.time.hm.hour < 12;
@@ -230,7 +229,7 @@ static void status_draw_clock(void)
                   (game_state.progress.clock.time.hm.minute - game_state.progress.clock.time.hm.minute / 10 * 10) / 5);
 #if defined(HMBTN_ENH_GAMEPLAY)
     if (hm_gameplay_stamina_hud()) {
-        hm_gameplay_draw_stamina_hud(base_x);
+        status_draw_stamina_hud();
     }
 #endif
 #else
@@ -495,6 +494,59 @@ static void status_load_sprites(void) {
 #endif
     }
 }
+
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+/* PORT: Stamina HUD using authentic start menu assets in top-left - see docs/port/DECISIONS.md#adr-080 */
+static void status_draw_stamina_hud(void) {
+    s32 cur, max, active_hearts;
+    s16 base_x = 14;
+    s16 base_y = 16;
+    s16 px, py, hx, hy;
+    int i;
+    u32 k;
+
+    if (status_page_sprites[0].source == NULL) {
+        afile_read_bytes(STATUS_PACK_FILE, 0, STATUS_PACK_BYTES, STAGING_BUFFER, 1, 1);
+        while (afile_read_bytes(STATUS_PACK_FILE, 0, STATUS_PACK_BYTES, STAGING_BUFFER, 1, 0) == 0) {
+        }
+        texture_pack_load(STAGING_BUFFER + sizeof(FarmPack));
+        status_pack = *(FarmPack *)STAGING_BUFFER;
+        for (k = 0; k < 5; k++) {
+            anim_bind_file(hm_status_sprite(k), (AnimFile *)(status_pack.bytes + status_sprite_offsets[k]));
+        }
+    }
+
+    cur = game_state.player.stamina;
+    max = game_state.player.maxStamina;
+    if (max <= 0)
+        max = 100;
+    if (cur < 0)
+        cur = 0;
+    if (cur > max)
+        cur = max;
+    active_hearts = (cur * 10 + (max / 20)) / max;
+    if (active_hearts > 10)
+        active_hearts = 10;
+
+    /* Window frame: top-left (14, 16), width 110, height 32 - aligns with clock HUD */
+    window_frame_draw_at(&current_frame->otTags[0][36], 1, base_x, base_y, 110, 32);
+
+    /* Pete head icon: authentic start menu asset status_page_sprites[0], anim 0, frame 0 */
+    px = base_x + 6;
+    py = base_y + 8;
+    anim_draw_sprt_cursor(&current_frame->otTags[0][26], &status_page_sprites[0], 0, 0, px, py);
+
+    /* Hearts: authentic start menu asset status_cursor_sprite, anim 5 (power berry heart) */
+    hx = base_x + 28;
+    hy = base_y + 12;
+    for (i = 0; i < 10; i++) {
+        s16 x = hx + i * 7;
+        if (i < active_hearts) {
+            anim_draw_sprt_cursor(&current_frame->otTags[0][26], &status_cursor_sprite, 5, 0, x, hy);
+        }
+    }
+}
+#endif
 
 /* Advance the page sequence (steps 1 to 6) as the screen fades out and back in.
  * The background cursor animates during steps 3 to 5. */
