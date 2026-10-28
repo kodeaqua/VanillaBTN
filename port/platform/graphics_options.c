@@ -4,6 +4,9 @@
 #include "platform/graphics_options.h"
 #ifdef HMBTN_ENH_PGXP
 #include "enhance/pgxp/pgxp.h"
+#ifdef HMBTN_ENH_DITHERING
+#include "enhance/dithering/dithering.h"
+#endif
 #endif
 #include "platform/settings_json.h"
 #include "platform/user_data.h"
@@ -13,7 +16,7 @@
 static void hm_validate_rate(hm_graphics_options *options);
 
 void hm_graphics_defaults(hm_graphics_options *o) {
-    *o = (hm_graphics_options){.width = 640, .height = 480, .vsync = 1, .fps_denominator = 1, .pgxp = 0};
+    *o = (hm_graphics_options){.width = 640, .height = 480, .vsync = 1, .fps_denominator = 1, .pgxp = 0, .dither = 1};
     o->aa_capabilities =
 #ifdef HMBTN_ENH_ANTIALIASING
         (1u << HM_AA_COUNT) - 1;
@@ -99,6 +102,14 @@ void hm_graphics_load(hm_graphics_options *o) {
         pgxp_length == 4 && !SDL_memcmp(pgxp_value, "true", 4))
         o->pgxp = 1;
 #endif
+#ifdef HMBTN_ENH_DITHERING
+    const char *dither_value;
+    size_t dither_length;
+    if (bytes >= 0 && hm_json_property(text, (size_t)bytes, "enhance", &object, &length) == 1 &&
+        hm_json_property(object, length, "disable_dithering", &dither_value, &dither_length) == 1 &&
+        dither_length == 4 && !SDL_memcmp(dither_value, "true", 4))
+        o->dither = 0;
+#endif
     SDL_free(text);
     hm_validate_rate(o);
 }
@@ -138,6 +149,11 @@ int hm_graphics_save(const hm_graphics_options *o) {
 #ifdef HMBTN_ENH_PGXP
     if (ok)
         ok = hm_user_data_set_nested_setting("enhance", "pgxp", o->pgxp ? "true" : "false");
+#endif
+#ifdef HMBTN_ENH_DITHERING
+    if (ok)
+        ok = hm_user_data_set_nested_setting("enhance", "disable_dithering",
+                                             !o->dither ? "true" : "false");
 #endif
     return ok;
 }
@@ -409,6 +425,12 @@ int hm_graphics_change(SDL_GPUDevice *device, SDL_Window *window, hm_graphics_op
         hm_pgxp_set_enabled(candidate.pgxp);
     }
 #endif
+#ifdef HMBTN_ENH_DITHERING
+    else if (item == 12) {
+        candidate.dither = !candidate.dither;
+        hm_dither_set_enabled(candidate.dither);
+    }
+#endif
     else
         return 0; /* Renderer enhancements remain unavailable until implemented. */
     int window_changed = item >= 0 && item <= 2;
@@ -488,6 +510,12 @@ void hm_graphics_value(const hm_graphics_options *o, int item, char *text, size_
                      o->renderer     ? "Software"
                      : o->gpu_active ? "GPU - active"
                                      : "GPU Auto - CPU fallback");
+    else if (item == 11)
+        SDL_snprintf(text, capacity, "%s",
+                     o->pgxp ? "On - subpixel & perspective" : "Off - original PS1 wobble");
+    else if (item == 12)
+        SDL_snprintf(text, capacity, "%s",
+                     o->dither ? "On - PS1 original pattern" : "Off - smooth 32-bit colors");
     else
         SDL_snprintf(text, capacity, "Off - not available yet");
 }
@@ -533,6 +561,8 @@ void hm_graphics_row_value(const hm_graphics_options *o, int item, char *text, s
         SDL_snprintf(text, capacity, "%s", o->renderer ? "Software" : "GPU Auto");
     else if (item == 11)
         SDL_snprintf(text, capacity, "%s", o->pgxp ? "On" : "Off");
+    else if (item == 12)
+        SDL_snprintf(text, capacity, "%s", o->dither ? "On" : "Off");
     else
         SDL_snprintf(text, capacity, "Off");
 }

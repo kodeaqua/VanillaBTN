@@ -10,7 +10,7 @@ typedef enum {
 } hm_pause_page;
 
 enum {
-    HM_PAUSE_GRAPHICS_ITEMS = 12,
+    HM_PAUSE_GRAPHICS_ITEMS = 13,
     HM_PAUSE_GAMEPLAY_ITEMS = 9,
     HM_PAUSE_CONTROLS_ITEMS = 3,
     HM_PAUSE_VISIBLE_ROWS = 7
