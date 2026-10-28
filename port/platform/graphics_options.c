@@ -69,14 +69,20 @@ void hm_graphics_load(hm_graphics_options *o) {
         o->scaling = 1;
 #endif
 #ifdef HMBTN_ENH_FILTERING
-    const char *filter_value;
-    size_t filter_length;
-    if (bytes >= 0 && hm_json_property(text, (size_t)bytes, "enhance", &object, &length) == 1 &&
-        hm_json_property(object, length, "filtering", &filter_value, &filter_length) == 1) {
-        if (filter_length == 4 && !SDL_memcmp(filter_value, "true", 4))
-            o->linear = 1;
-        else if (filter_length == 5 && !SDL_memcmp(filter_value, "false", 5))
-            o->linear = 0;
+    if (bytes >= 0 && hm_json_property(text, (size_t)bytes, "enhance", &object, &length) == 1) {
+        int mode_val = -1;
+        if (hm_json_integer(object, length, "filtering_mode", &mode_val) && mode_val >= 0 && mode_val <= 2) {
+            o->linear = mode_val;
+        } else {
+            const char *filter_value;
+            size_t filter_length;
+            if (hm_json_property(object, length, "filtering", &filter_value, &filter_length) == 1) {
+                if (filter_length == 4 && !SDL_memcmp(filter_value, "true", 4))
+                    o->linear = 1;
+                else if (filter_length == 5 && !SDL_memcmp(filter_value, "false", 5))
+                    o->linear = 0;
+            }
+        }
     }
 #endif
 #ifdef HMBTN_ENH_WIDESCREEN
@@ -131,8 +137,11 @@ int hm_graphics_save(const hm_graphics_options *o) {
         ok = hm_user_data_set_nested_setting("enhance", "scaling", o->scaling ? "true" : "false");
 #endif
 #ifdef HMBTN_ENH_FILTERING
-    if (ok)
-        ok = hm_user_data_set_nested_setting("enhance", "filtering", o->linear ? "true" : "false");
+    if (ok) {
+        char f_mode[16];
+        SDL_snprintf(f_mode, sizeof(f_mode), "%d", o->linear);
+        ok = hm_user_data_set_nested_setting("enhance", "filtering_mode", f_mode);
+    }
 #endif
 #ifdef HMBTN_ENH_WIDESCREEN
     if (ok)
@@ -340,7 +349,7 @@ int hm_graphics_change(SDL_GPUDevice *device, SDL_Window *window, hm_graphics_op
         return 0; /* Keep the selected mode explicit: Software offers Off/FXAA. */
 #endif
     if (item == 6) {
-        o->linear = !o->linear;
+        o->linear = (o->linear + 3 + step) % 3;
         return 1;
     }
     if (item == 7)
@@ -415,22 +424,7 @@ int hm_graphics_change(SDL_GPUDevice *device, SDL_Window *window, hm_graphics_op
     else if (item == 4)
         candidate.widescreen = !candidate.widescreen;
 #endif
-#ifdef HMBTN_GPU_RASTER
-    else if (item == 10)
-        candidate.renderer = !candidate.renderer;
-#endif
-#ifdef HMBTN_ENH_PGXP
-    else if (item == 11) {
-        candidate.pgxp = !candidate.pgxp;
-        hm_pgxp_set_enabled(candidate.pgxp);
-    }
-#endif
-#ifdef HMBTN_ENH_DITHERING
-    else if (item == 12) {
-        candidate.dither = !candidate.dither;
-        hm_dither_set_enabled(candidate.dither);
-    }
-#endif
+
     else
         return 0; /* Renderer enhancements remain unavailable until implemented. */
     int window_changed = item >= 0 && item <= 2;
@@ -489,13 +483,9 @@ void hm_graphics_value(const hm_graphics_options *o, int item, char *text, size_
         SDL_snprintf(text, capacity, "%s", o->interpolation ? "On - world motion" : "Off");
     else if (item == 6)
         SDL_snprintf(text, capacity, "%s",
-                     o->linear ?
-#ifdef HMBTN_ENH_FILTERING
-                               "Bilinear - textures"
-#else
-                               "Bilinear - presentation"
-#endif
-                               : "Nearest Neighbor");
+                     o->linear == 2 ? "xBR - sharp edge-directed curves" :
+                     o->linear == 1 ? "Bilinear - smooth & soft" :
+                                      "Nearest Neighbor - pixel art");
     else if (item == 5) {
 #ifdef HMBTN_ENH_ANTIALIASING
         SDL_snprintf(text, capacity, "%s%s", hm_antialiasing_name(o->antialiasing),
@@ -505,17 +495,7 @@ void hm_graphics_value(const hm_graphics_options *o, int item, char *text, size_
 #else
         SDL_snprintf(text, capacity, "Off");
 #endif
-    } else if (item == 10)
-        SDL_snprintf(text, capacity, "%s",
-                     o->renderer     ? "Software"
-                     : o->gpu_active ? "GPU - active"
-                                     : "GPU Auto - CPU fallback");
-    else if (item == 11)
-        SDL_snprintf(text, capacity, "%s",
-                     o->pgxp ? "On - subpixel & perspective" : "Off - original PS1 wobble");
-    else if (item == 12)
-        SDL_snprintf(text, capacity, "%s",
-                     o->dither ? "On - PS1 original pattern" : "Off - smooth 32-bit colors");
+    }
     else
         SDL_snprintf(text, capacity, "Off - not available yet");
 }
@@ -549,7 +529,9 @@ void hm_graphics_row_value(const hm_graphics_options *o, int item, char *text, s
     } else if (item == 9)
         SDL_snprintf(text, capacity, "%s", o->interpolation ? "On" : "Off");
     else if (item == 6)
-        SDL_snprintf(text, capacity, "%s", o->linear ? "Bilinear" : "Nearest");
+        SDL_snprintf(text, capacity, "%s",
+                     o->linear == 2 ? "xBR" :
+                     o->linear == 1 ? "Bilinear" : "Nearest");
     else if (item == 5) {
 #ifdef HMBTN_ENH_ANTIALIASING
         SDL_snprintf(text, capacity, "%s", hm_antialiasing_name(o->antialiasing));
@@ -557,12 +539,6 @@ void hm_graphics_row_value(const hm_graphics_options *o, int item, char *text, s
         SDL_snprintf(text, capacity, "Off");
 #endif
     }
-    else if (item == 10)
-        SDL_snprintf(text, capacity, "%s", o->renderer ? "Software" : "GPU Auto");
-    else if (item == 11)
-        SDL_snprintf(text, capacity, "%s", o->pgxp ? "On" : "Off");
-    else if (item == 12)
-        SDL_snprintf(text, capacity, "%s", o->dither ? "On" : "Off");
     else
         SDL_snprintf(text, capacity, "Off");
 }

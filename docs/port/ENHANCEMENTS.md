@@ -9,7 +9,7 @@ The owner requested the native pause interface and graphics settings on
 | ESC pause, Resume, Settings > Graphics, Exit Game | Host interface implemented; owner interactive test pending |
 | Original dialog presentation/font | Original window-frame C and runtime disc glyph cache; synthetic composition and local asset decoding checks pass |
 | Monitor/window mode/resolution | SDL display controls implemented; owner monitor/fullscreen test pending |
-| Filtering | Optional palette-aware texture bilinear plus final-frame presentation (ADR-055) |
+| Filtering | Texture filtering: Nearest Neighbor, Bilinear, and xBR sharp edge-directed curves (ADR-085) |
 | VSync | On (mailbox/FIFO) or supported immediate Off; device validation pending |
 | FPS limit | Native (30), Off (Unlimited), or monitor-derived rational caps; fixed 60 Hz game ticks; native images unless optional interpolation is enabled |
 | Visual interpolation | Optional private primitive replay for normal farm views; synthetic checks pass, owner gameplay validation pending |
@@ -126,3 +126,12 @@ PS1 hardware uses 16-bit color depth (R5G5B5) and applies an ordered 4x4 Bayer d
 On modern high-resolution displays, this ordered pattern manifests as checkerboard noise.
 When Dithering is set to Off (`enhance.disable_dithering = true`), dithering is bypassed, producing clean true-color gradients.
 Toggleable in Pause Menu > Settings > Graphics > Dithering.
+
+The owner requested edge-directed sharp texture filtering without blur (ADR-085).
+Filtering now supports three selectable modes in Pause Menu > Settings > Graphics:
+- **Nearest Neighbor**: Authentic raw PS1 pixels.
+- **Bilinear**: Soft/smooth linear interpolation.
+- **xBR**: Edge-directed smart scaling that rounds pixel art corners into smooth diagonal contours while preserving 100% crispness without blur.
+
+Additionally, FXAA is now bypassed during Pause Menu presentation to keep UI text, dialogue, and font pixel art perfectly crisp.
+PGXP geometry stabilization, 32-bit clean dithering bypass, and GPU rendering are now auto-applied defaults, simplifying the Graphics menu to 10 essential controls.

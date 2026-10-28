@@ -2396,3 +2396,31 @@ Decision:
 
 Consequences:
 Players can choose between authentic PS1 dithered presentation and clean, noise-free true-color gradients without modifying core game logic or save data.
+
+## ADR-085: xBR edge-directed texture filtering, Pause Menu FXAA bypass, and Graphics menu simplification
+
+Date: 2026-10-28. Status: accepted.
+
+Context: On high-resolution modern monitors, classic PS1 nearest-neighbor texture sampling produces noticeable pixelated stair-stepping, while standard bilinear filtering blurs low-resolution (16x16 to 64x64) retro textures. Furthermore, applying FXAA globally blurred 320x240 pause menu font and dialog presentation. The owner requested:
+1. Adding an xBR-style filter that eliminates texture jaggies with smooth curves without causing blur.
+2. Fixing FXAA blurring the pause menu while maintaining its benefits in 3D gameplay.
+3. Simplifying the Graphics menu by making PGXP geometry stabilization, 32-bit smooth dithering, and GPU rendering auto-applied defaults.
+
+Decision:
+1. xBR Texture Filter (`port/enhance/filtering/texture.hlsl`, `port/gfx/shaders/scene.hlsl`):
+   - Added mode 2 to texture filtering: xBR-style edge-directed interpolation.
+   - Evaluates sub-texel fractions with an anti-aliased Hermite transition curve ($w = 0.18$) that keeps the interior of texels sharp and solid while smoothing border transitions.
+   - Detects diagonal corner contours ($cA == cD$ or $cB == cC$) and smoothly curves 90-degree pixel steps into clean 45-degree diagonal slopes without blurring flat areas.
+   - Recompiled shaders to DXIL and SPIR-V (`scene_dxil.h`, `scene_spirv.h`).
+2. Pause Menu FXAA Bypass (`port/platform/game_host.c`):
+   - Track active pause UI state via `hm_host_in_pause`.
+   - In `hm_host_blit()`, bypass FXAA encoding when `hm_host_in_pause` is set, preserving crisp pixel-perfect font rendering on the 320x240 pause canvas. FXAA remains fully active during 3D gameplay.
+3. Graphics Menu Simplification (`port/enhance/pause_menu/menu.c`, `menu.h`, `port/platform/graphics_options.c`):
+   - Streamlined Graphics menu to 10 core settings (`HM_PAUSE_GRAPHICS_ITEMS = 10`): Monitor, Window Mode, Resolution, Enhance Scaling, Widescreen Mode, Anti-Aliasing, Filtering, VSync, FPS Limit, and Interpolation.
+   - Auto-applied PGXP geometry precision (`hm_pgxp_set_enabled(1)`), clean 32-bit non-dithered rendering (`hm_dither_set_enabled(0)`), and GPU rendering without requiring manual toggle navigation.
+   - Filtering option cycles cleanly between `Nearest`, `Bilinear`, and `xBR`.
+4. Tests:
+   - Updated `port/tests/pause_menu.c` and `port/platform/tests/graphics_options.c` for 10-item menu layout and 3-mode filtering cycle. 119 unit tests passing 100%.
+
+Consequences:
+Textures in gameplay render with smooth diagonal curves without blurring, pause menu text is pin-sharp under FXAA, and graphics settings are clean and intuitive.
