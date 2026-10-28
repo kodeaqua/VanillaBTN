@@ -6,15 +6,26 @@ your own copy of the disc, the whole disc image.
 
 ## Building
 
-The native port currently targets Windows first. To build and test its Phase 0
-foundation and initial source subset locally (not a playable game yet):
+### Native Port (Windows)
+
+The native port compiles the decompiled C source into a native 64-bit Windows executable (`hmbtn_native.exe`) with a clean-room PS1 hardware runtime.
+
+To build the native Windows game executable and run the test suite:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File port/packaging/windows/build.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File port/packaging/windows/build.ps1 -Preset windows-release -Game
 ```
 
-This provisions project-local tools and requires no WSL or PSX SDK. No workflow/CI
-changes are included. See [port status](docs/port/ANALYSIS.md).
+This provisions project-local tools (LLVM-MinGW, CMake, Ninja) and requires no WSL, Docker, or PSX SDK. User saves and configuration are stored under `%USERPROFILE%\Documents\BackToNature\`.
+
+#### Features & Enhancements
+- **Vanilla Parity**: Exact native PS1 simulation and logic by default.
+- **ESC Pause Interface**: Native in-game pause menu with original styling.
+- **Graphics Options**: Viewport scaling, 16:9 widescreen, VSync, visual interpolation, texture filtering, and FXAA / MSAA.
+- **Controls Options**: Gamepad, Keyboard presets, and Mouse input (Settings > Controls).
+- **Gameplay Enhancements**: Optional toggles in Settings > Gameplay (walk through crops, 99 item stacking with quantity dialog, durable fences, connected wooden rails, wild dog toggle, smart animal bell, stamina HUD in top-left, calendar NPC birthday/milestone dialogue info on X press, roaming horse).
+
+### Matching Decompilation Build (Linux)
 
 For the original matching binaries:
 
@@ -30,11 +41,6 @@ cmake --build build/match --target check
 
 `check` compares every output with the original's SHA-1. Without `-DORIGINAL_DISC` it
 builds and checks only the 14 code binaries, which needs no game data.
-
-The separate native port is in Phase 0. Its presets live in `port/` and currently
-build the compatibility layer and eleven source units, including the archived game
-entry point and A_FILE reader. No playable game executable is linked yet. See
-[reconnaissance and outstanding gates](docs/port/ANALYSIS.md).
 
 ## Exceptions
 
