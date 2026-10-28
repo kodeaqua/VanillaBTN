@@ -18,6 +18,7 @@ The owner requested the native pause interface and graphics settings on
 | FXAA/MSAA | FXAA (final-image) and MSAA 2x/4x (GPU scene) implemented (ADR-072); runtime default Off; owner gameplay validation pending |
 | Gameplay Enhancements | Suite of 9 toggleable options in Settings > Gameplay (ADR-080); runtime default OFF except wild dog; owner gameplay validation pending |
 | Controls Settings | Gamepad, keyboard presets, and mouse interaction in Settings > Controls (ADR-081); persistent in settings.json |
+| PGXP Geometry | Subpixel vertex precision and perspective-correct texture mapping (ADR-083); eliminates wobble and texture warping; default OFF |
 
 HMBTN_ENH_PAUSE_MENU defaults OFF in CMake; Windows build.ps1 -Game enables it.
 The owner explicitly requests ESC availability across scenes, so that interface
@@ -109,3 +110,11 @@ settings. Natsume/TV side flashes and persistent post-save framing remain pendin
 owner revalidation despite passing isolated regressions.
 
 ADR-081 adds a dedicated Settings > Controls menu with Gamepad, Keyboard layout presets (Arrows+ZX / WASD+JK / Off), and Mouse modes (Off / Action / Move & Act with click-to-walk). Input is mapped cleanly to PS1 pad bitmasks and persisted under controls in settings.json. Unit tests cover configuration and pause menu transitions.
+
+The owner requested PGXP subpixel vertex precision and perspective-correct texture mapping (ADR-083).
+Windows -Game builds HMBTN_ENH_PGXP; runtime enhance.pgxp defaults false (vanilla parity).
+When enabled, GTE projection captures high-precision 32-bit floating-point screen coordinates and
+view-space depth W without modifying the integer coordinates used by original game logic or collision.
+The GPU scene backend retrieves subpixel coordinates and depth values, rendering geometry with
+perspective-divided texture coordinates ($u/w, v/w, 1/w$), completely eliminating PS1 integer vertex snapping
+wobble and affine texture distortion. Toggleable in Pause Menu > Settings > Graphics > PGXP Geometry.

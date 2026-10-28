@@ -2,6 +2,8 @@
 #include "enhance/widescreen/widescreen.h"
 #endif
 #include "gfx/gpu_scene.h"
+#include "enhance/pgxp/pgxp.h"
+#include <math.h>
 #include "psx/gpu_environment.h"
 #include "psx/vram.h"
 #include <stdlib.h>
@@ -197,22 +199,44 @@ static void hm_scene_begin_capture(void *context, const RECT *area) {
     s->begun = 1;
 }
 static void hm_scene_triangle(hm_gpu_scene *s, u32 *material, const u32 xy[3], const u32 rgb[3],
-                              const u32 uv[3], const u32 indices[3]) {
+                              const u32 uv[3], const u32 indices[3], const u32 *w) {
     u32 p[HM_SCENE_STRIDE];
     memcpy(p, material, sizeof(p));
     p[0] = 0;
     const DRAWENV *d = &hm_gpu_environment_state()->draw;
     int x0 = 32767, y0 = 32767, x1 = -32768, y1 = -32768;
+
+    float pgxp_x[3], pgxp_y[3], pgxp_z[3];
+    int has_pgxp = hm_pgxp_enabled();
+    if (has_pgxp) {
+        for (int i = 0; i < 3; ++i) {
+            const void *ptr = &w[indices[i]];
+            if (!hm_pgxp_lookup_vertex(ptr, xy[i], &pgxp_x[i], &pgxp_y[i], &pgxp_z[i])) {
+                has_pgxp = 0;
+                break;
+            }
+        }
+    }
+
     for (int i = 0; i < 3; ++i) {
         int x = hm_scene_signed(xy[i]) + d->ofs[0], y = hm_scene_signed(xy[i] >> 16) + d->ofs[1];
         p[18 + i * 2] = (u32)x;
         p[19 + i * 2] = (u32)y;
         p[24 + i] = rgb[i] & 0xffffff;
         p[27 + i] = uv[i] & 65535;
-        s64 qx = hm_scene_coordinate(s, indices[i], 0, xy[i], d->ofs[0]);
-        s64 qy = hm_scene_coordinate(s, indices[i], 16, xy[i], d->ofs[1]);
-        p[34 + i * 2] = hm_scene_scaled(qx, s->area.x, s->width, s->area.w);
-        p[35 + i * 2] = hm_scene_scaled(qy, s->area.y, s->height, s->area.h);
+        if (has_pgxp && !s->motion_previous) {
+            s64 qx = (s64)roundf(pgxp_x[i] * 65536.0f) + (s64)d->ofs[0] * 65536;
+            s64 qy = (s64)roundf(pgxp_y[i] * 65536.0f) + (s64)d->ofs[1] * 65536;
+            p[34 + i * 2] = hm_scene_scaled(qx, s->area.x, s->width, s->area.w);
+            p[35 + i * 2] = hm_scene_scaled(qy, s->area.y, s->height, s->area.h);
+            float z_val = pgxp_z[i] > 1.0f ? pgxp_z[i] : 1.0f;
+            memcpy(&p[30 + i], &z_val, sizeof(float));
+        } else {
+            s64 qx = hm_scene_coordinate(s, indices[i], 0, xy[i], d->ofs[0]);
+            s64 qy = hm_scene_coordinate(s, indices[i], 16, xy[i], d->ofs[1]);
+            p[34 + i * 2] = hm_scene_scaled(qx, s->area.x, s->width, s->area.w);
+            p[35 + i * 2] = hm_scene_scaled(qy, s->area.y, s->height, s->area.h);
+        }
         if (x < x0)
             x0 = x;
         if (x > x1)
@@ -227,8 +251,11 @@ static void hm_scene_triangle(hm_gpu_scene *s, u32 *material, const u32 xy[3], c
 
     s64 area = (s64)((s32)p[20] - (s32)p[18]) * ((s32)p[23] - (s32)p[19]) -
                (s64)((s32)p[21] - (s32)p[19]) * ((s32)p[22] - (s32)p[18]);
-    if (s->motion_previous) {
+    if (s->motion_previous || has_pgxp) {
         p[4] |= 32;
+        if (has_pgxp) {
+            p[33] = 1;
+        }
         area = ((s64)(s32)p[36] - (s32)p[34]) * ((s64)(s32)p[39] - (s32)p[35]) -
                ((s64)(s32)p[37] - (s32)p[35]) * ((s64)(s32)p[38] - (s32)p[34]);
     }
@@ -252,6 +279,11 @@ static void hm_scene_triangle(hm_gpu_scene *s, u32 *material, const u32 xy[3], c
         tmp = p[28];
         p[28] = p[29];
         p[29] = tmp;
+        if (has_pgxp) {
+            tmp = p[31];
+            p[31] = p[32];
+            p[32] = tmp;
+        }
     }
     if (p[1] & 4) {
         u32 u0 = 255, u1 = 0, v0 = 255, v1 = 0;
@@ -292,9 +324,9 @@ static void hm_scene_polygon(hm_gpu_scene *s, const u32 *w, u32 available) {
     u32 page = tex ? uv[1] >> 16 : hm_gpu_environment_state()->draw.tpage;
     if (!hm_scene_material(s, p, op, page, tex ? uv[0] >> 16 : 0))
         return;
-    hm_scene_triangle(s, p, xy, rgb, uv, indices);
+    hm_scene_triangle(s, p, xy, rgb, uv, indices, w);
     if (n == 4)
-        hm_scene_triangle(s, p, xy + 1, rgb + 1, uv + 1, indices + 1);
+        hm_scene_triangle(s, p, xy + 1, rgb + 1, uv + 1, indices + 1, w);
 }
 static void hm_scene_rectangle(hm_gpu_scene *s, const u32 *w, u32 available) {
     u32 op = w[0] >> 24, size = (op >> 3) & 3;

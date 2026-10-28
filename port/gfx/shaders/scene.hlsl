@@ -95,8 +95,11 @@ void main(uint3 id:SV_DispatchThreadID){
                 if(textured){if(bilinear_enabled)filtered_uv=int2(hm_filter_uv_i(uint3(t0.x,t1.x,t2.x),wi,ai),hm_filter_uv_i(uint3(t0.y,t1.y,t2.y),wi,ai));
                     else st=uint2(interp_i(uint3(t0.x,t1.x,t2.x),wi,ai),interp_i(uint3(t0.y,t1.y,t2.y),wi,ai));}}
             else{if((op&16)&&!raw)light=uint3(interp_f(uint3(r0.x,r1.x,r2.x),wf,af),interp_f(uint3(r0.y,r1.y,r2.y),wf,af),interp_f(uint3(r0.z,r1.z,r2.z),wf,af));
-                if(textured){if(bilinear_enabled)filtered_uv=int2(hm_filter_uv_f(uint3(t0.x,t1.x,t2.x),wf,af),hm_filter_uv_f(uint3(t0.y,t1.y,t2.y),wf,af));
-                    else st=uint2(interp_f(uint3(t0.x,t1.x,t2.x),wf,af),interp_f(uint3(t0.y,t1.y,t2.y),wf,af));}}
+                if(textured){float3 wp=wf;float ap=af;
+                    if(word(p,33)!=0){float3 zv=float3(asfloat(word(p,30)),asfloat(word(p,31)),asfloat(word(p,32)));
+                        wp=wf/max(zv,1.0);float sw=dot(wp,float3(1,1,1));if(sw>0.0)ap=sw;}
+                    if(bilinear_enabled)filtered_uv=int2(hm_filter_uv_f(uint3(t0.x,t1.x,t2.x),wp,ap),hm_filter_uv_f(uint3(t0.y,t1.y,t2.y),wp,ap));
+                    else st=uint2(interp_f(uint3(t0.x,t1.x,t2.x),wp,ap),interp_f(uint3(t0.y,t1.y,t2.y),wp,ap));}}
         }else{int2 delta;
             texture_bounds=uint4(st,st+uint2(word(p,32),word(p,33))-1);
             if(flags&32){float2 low=float2(int2(word(p,35),word(p,36)))/256.0;

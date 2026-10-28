@@ -18,6 +18,7 @@ typedef struct {
     s32 ofx, ofy, dqb;
     s16 dqa, ir0;
     u16 distance;
+    float sxf[3], syf[3], szf[4];
 } hm_gte_state;
 
 /* Explicit arithmetic shift and wrapping avoid signed shifts/overflow UB. */
@@ -171,16 +172,25 @@ static inline void hm_gte_project(hm_gte_state *state, u32 vector, u32 shift, in
     }
     if (z < 0 || z > 65535)
         state->flags |= UINT32_C(1) << 18;
-    for (u32 i = 0; i < 3; ++i)
+    for (u32 i = 0; i < 3; ++i) {
         state->sz[i] = state->sz[i + 1];
+        state->szf[i] = state->szf[i + 1];
+    }
     state->sz[3] = (u16)(z < 0 ? 0 : z > 65535 ? 65535 : z);
+    state->szf[3] = (float)(state->sz[3] > 0 ? state->sz[3] : 1);
     u32 ratio = hm_gte_divide(state, state->distance, state->sz[3]);
     for (u32 i = 0; i < 2; ++i) {
         state->sx[i] = state->sx[i + 1];
         state->sy[i] = state->sy[i + 1];
+        state->sxf[i] = state->sxf[i + 1];
+        state->syf[i] = state->syf[i + 1];
     }
-    state->sx[2] = hm_gte_screen(state, (s64)ratio * state->ir[0] + state->ofx, 14);
-    state->sy[2] = hm_gte_screen(state, (s64)ratio * state->ir[1] + state->ofy, 13);
+    s64 val_x = (s64)ratio * state->ir[0] + state->ofx;
+    s64 val_y = (s64)ratio * state->ir[1] + state->ofy;
+    state->sx[2] = hm_gte_screen(state, val_x, 14);
+    state->sy[2] = hm_gte_screen(state, val_y, 13);
+    state->sxf[2] = (float)val_x / 65536.0f;
+    state->syf[2] = (float)val_y / 65536.0f;
     if (depth_cue) {
         s64 value = (s64)ratio * state->dqa + state->dqb;
         hm_gte_mac0(state, value);

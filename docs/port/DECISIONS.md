@@ -2324,3 +2324,43 @@ Decision:
 
 Consequences:
 Calls to `FntPrint` during gameplay or diagnostics no longer terminate the game process with an unhandled exception. Log messages are cleanly visible on standard error output. Unit test suite passes 100%.
+
+## ADR-083: PGXP subpixel vertex precision and perspective-correct texture mapping
+
+Date: 2026-10-28. Status: accepted.
+
+Context: On original PlayStation hardware, 3D vertices are projected to 16-bit integer
+screen coordinates, causing noticeable vertex snapping ("polygon wobble"). Furthermore,
+the PS1 GPU rasterizer only supports 2D affine texture interpolation, leading to affine
+texture distortion / shearing when surfaces are viewed at an angle.
+
+The owner requested eliminating polygon wobble and affine texture warping using a PGXP
+(Parallel/Precision Geometry Transform) architecture:
+1. GTE handler modification to compute float screen coordinates (SX/SY) and depth (W).
+2. Vertex cache tracking float precision without altering integer coordinates used by game logic.
+3. GPU scene polygon processing retrieving float coordinates with graceful integer fallback for 2D/UI.
+4. Perspective-divided UV interpolation ($u/w, v/w, 1/w$) in shaders.
+5. Runtime toggle (`enhance.pgxp = true/false`) defaulting to OFF for vanilla parity.
+
+Decision:
+1. GTE Precision Tracking (`port/psx/gte_core.h` & `port/compat/psyq/inline_c.h`):
+   - In `hm_gte_project()`, compute high-precision float screen coordinates `sxf[2] = (float)val_x / 65536.0f; syf[2] = (float)val_y / 65536.0f;` and view depth `szf[3] = (float)sz[3];` before integer clamping.
+   - Exact integer arithmetic for `state->sx/sy/sz` is strictly preserved, ensuring 100% deterministic vanilla game logic and collision behavior.
+   - In `gte_stsxy` and `hm_gte_packet_xy`, call `hm_pgxp_record_vertex()` to cache the float coordinates alongside the packet memory destination.
+2. PGXP Vertex Cache (`port/enhance/pgxp/pgxp.c`):
+   - 32,768-entry hash table with 8-slot linear probing, keyed by destination packet memory address and verified against the expected integer coordinate word.
+   - Generational frame tags automatically evict stale entries across frames without per-frame memory allocation.
+3. GPU Scene Subpixel & Depth Pipeline (`port/gfx/gpu_scene.c`):
+   - When converting GPU packets to scene primitives (`POLY_F3/G3/FT3/GT3`, `POLY_F4/G4/FT4/GT4`), query the PGXP cache for each vertex.
+   - If all vertices originate from 3D GTE projection, emit 16.16 subpixel scaled coordinates (`p[34..39]`), set the subpixel flag (`p[4] |= 32`), write vertex depths (`p[30..32]`), and set the perspective flag (`p[33] = 1`).
+   - If any vertex lacks PGXP data (e.g. 2D sprites, UI, tiles), smoothly fall back to standard integer coordinates without perspective distortion.
+4. Perspective-Correct Shader Interpolation (`port/gfx/shaders/scene.hlsl`):
+   - When perspective flag `word(p, 33)` is active, calculate perspective-divided barycentric weights $w_i' = rac{w_i}{z_i}$, normalized by $\sum w_i'$.
+   - Texture coordinates and colors are interpolated using perspective weights, eliminating affine texture warping.
+5. Runtime Settings & Parity:
+   - Configuration key `enhance.pgxp` in `Documents/BackToNature/settings.json`, defaulting to `false`.
+   - Exposed as "PGXP Geometry" in ESC Pause Menu > Settings > Graphics.
+   - Added unit test `port/tests/pgxp.c` (`enhance.pgxp`) testing enable/disable parity, hash lookup, integer coordinate verification, and generational eviction.
+
+Consequences:
+When PGXP is enabled, 3D character models, farm buildings, trees, and terrain render with fluid subpixel precision and perspective-correct textures, eliminating PS1 wobble and warping. When disabled, identical vanilla rendering is fully preserved.
