@@ -1650,8 +1650,30 @@ static s32 player_run_action(FarmPlayer *player)
     case PLAYER_MODE_STORE_ITEM:
         if (!item_is_print(player->held[HELD_ITEM].id))
         {
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+            int stacked = 0;
+            if (hm_gameplay_item_stacking()) {
+                for (int i = 0; i < player->itemSlots; ++i) {
+                    if (player->items[i].id == player->held[HELD_ITEM].id && player->items[i].count < HM_STACK_MAX) {
+                        s32 add = player->held[HELD_ITEM].count > 0 ? player->held[HELD_ITEM].count : 1;
+                        if (player->items[i].count + add <= HM_STACK_MAX) {
+                            player->items[i].count += add;
+                        } else {
+                            player->items[i].count = HM_STACK_MAX;
+                        }
+                        stacked = 1;
+                        break;
+                    }
+                }
+            }
+            if (!stacked) {
+                stored_item_copy(&player->items[player->itemSlots - 1], &player->held[HELD_ITEM]);
+                player_compact_items();
+            }
+#else
             stored_item_copy(&player->items[player->itemSlots - 1], &player->held[HELD_ITEM]);
             player_compact_items();
+#endif
         }
         else
         {
@@ -4541,6 +4563,43 @@ static s32 stored_item_table_exchange(FarmStoredItem *current, s32 count, FarmSt
     {
         return -1;
     }
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+    /* PORT: Handle stack splitting on R2 take, and merge into existing stack on store */
+    if (other->id == 0) {
+        if (mode == 0 && current->id != 0 && current->count > 1) {
+            *other = *current;
+            other->count = 1;
+            current->count--;
+            return 1;
+        } else if (mode == 1) {
+            previous = count - 1;
+            while (previous >= 0 && current[previous].id == 0) {
+                previous--;
+            }
+            if (previous >= 0 && current[previous].count > 1) {
+                *other = current[previous];
+                other->count = 1;
+                current[previous].count--;
+                return 1;
+            }
+        }
+    } else if (hm_gameplay_item_stacking() && other->id != 0) {
+        for (int i = 0; i < count; ++i) {
+            if (current[i].id == other->id && current[i].count < HM_STACK_MAX) {
+                s32 add = other->count > 0 ? other->count : 1;
+                if (current[i].count + add <= HM_STACK_MAX) {
+                    current[i].count += add;
+                } else {
+                    current[i].count = HM_STACK_MAX;
+                }
+                other->id = 0;
+                other->count = 0;
+                other->modifier = 0;
+                return 1;
+            }
+        }
+    }
+#endif
     switch (mode)
     {
     case 0:
@@ -4826,7 +4885,20 @@ static void player_carry_tick(void)
         return;
     }
     player_compact_items();
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+    int can_store = (player->items[player->itemSlots - 1].id == 0);
+    if (!can_store && hm_gameplay_item_stacking()) {
+        for (int i = 0; i < player->itemSlots; ++i) {
+            if (player->items[i].id == player->held[HELD_ITEM].id && player->items[i].count < HM_STACK_MAX) {
+                can_store = 1;
+                break;
+            }
+        }
+    }
+    if (can_store)
+#else
     if (player->items[player->itemSlots - 1].id == 0)
+#endif
     {
         sound_play(8);
         player_set_mode(player, PLAYER_MODE_STORE_ITEM, player->facing38 + 0x1D, -2);
@@ -6175,6 +6247,12 @@ s32 player_zone_action(FarmPlayer *player)
     {
         return 2;
     }
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+    /* PORT: Allow riding horse through zone exits when roaming horse is enabled - see docs/port/DECISIONS.md#adr-080 */
+    if (hm_gameplay_roaming_horse()) {
+        mode = (player->stateFlags & PLAYER_FLAG_NO_INPUT) == 0;
+    } else
+#endif
     mode = (player->stateFlags & (PLAYER_FLAG_NO_INPUT | PLAYER_FLAG_RIDING)) == 0;
     if (player->stateFlags & PLAYER_FLAG_SCRIPTED)
     {

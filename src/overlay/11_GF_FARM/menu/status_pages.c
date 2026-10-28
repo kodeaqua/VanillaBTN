@@ -175,6 +175,65 @@ static void status_draw_clock(void)
     s32 x;
     s32 y;
 
+#ifdef HMBTN_PORT
+    /* PORT: Dynamic widescreen HUD anchoring and stamina HUD - see docs/port/DECISIONS.md#adr-080 */
+    s16 base_x = 228;
+#if defined(HMBTN_ENH_WIDESCREEN)
+    extern int hm_widescreen_margin(void);
+    base_x += hm_widescreen_margin();
+#endif
+    ot = current_frame->otTags[0];
+    text = &ot[35];
+    morning = game_state.progress.clock.time.hm.hour < 12;
+    window_frame_draw_at(&ot[36], 1, base_x, 16, 78, 32);
+    y = 19;
+    x = base_x + 48;
+    ui_draw_icon_2b_sub(text, base_x + 4, 19, game_state.progress.clock.date.season);
+    *text_format_number(game_state.progress.clock.date.day + 1, status_day_text, 2) = TEXT_END;
+    text_draw_plain(text, status_day_text, base_x + 24, 19);
+    *text_write_weekday(game_state.progress.clock.date.weekday, status_day_text) = TEXT_END;
+    saved = text_get_palette();
+    switch (game_state.progress.clock.date.weekday) {
+    default:
+        color = saved;
+        break;
+    case WEEKDAY_SATURDAY:
+        color = 5;
+        break;
+    case WEEKDAY_SUNDAY:
+        color = 4;
+        break;
+    }
+    text_set_palette(color);
+    text_draw_plain(text, status_day_text, x, y);
+    text_set_palette(saved);
+    x = base_x + 4;
+    y = 33;
+    glyphs = status_day_text;
+    if (!morning) {
+        glyphs[0] = 0xF;
+    } else {
+        glyphs[0] = 0;
+    }
+    glyphs[1] = 0xC;
+    glyphs[2] = TEXT_BLANK;
+    glyphs += 3;
+    glyphs = text_format_number(morning ? game_state.progress.clock.time.hm.hour : game_state.progress.clock.time.hm.hour - 12, glyphs, 2);
+    *glyphs = TEXT_BLANK;
+    glyphs = text_format_number(game_state.progress.clock.time.hm.minute / 10, glyphs + 1, 1);
+    glyphs = text_format_number(0, glyphs, 1);
+    *glyphs = TEXT_END;
+    text_draw_plain(text, status_day_text, x, y);
+    status_day_text[0] = 0x66;
+    status_day_text[1] = TEXT_END;
+    text_draw_semi(text, status_day_text, base_x + 44, y,
+                  (game_state.progress.clock.time.hm.minute - game_state.progress.clock.time.hm.minute / 10 * 10) / 5);
+#if defined(HMBTN_ENH_GAMEPLAY)
+    if (hm_gameplay_stamina_hud()) {
+        hm_gameplay_draw_stamina_hud(base_x);
+    }
+#endif
+#else
     ot = current_frame->otTags[0];
     text = &ot[35];
     morning = game_state.progress.clock.time.hm.hour < 12;
@@ -221,6 +280,7 @@ static void status_draw_clock(void)
     status_day_text[1] = TEXT_END;
     text_draw_semi(text, status_day_text, 272, y,
                   (game_state.progress.clock.time.hm.minute - game_state.progress.clock.time.hm.minute / 10 * 10) / 5);
+#endif
 }
 
 /* The steps of the status page sequence. Each step waits for the fade it started. */

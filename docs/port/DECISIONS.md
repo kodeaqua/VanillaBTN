@@ -2219,3 +2219,33 @@ Consequences: 2 MiB of static memory when the widescreen module is compiled. OFF
 uses the original region and bounds unchanged. If the bin still vanishes and the
 stderr line appears, the arena is still too small; if it does not appear, the cause
 lies elsewhere. Unit test updated; no gameplay was run.
+
+<a id="adr-080"></a>
+
+## ADR-080: Gameplay Enhancements Suite and Menu Controls
+
+Date: 2026-10-28. Status: accepted.
+
+Context: The owner requested optional gameplay enhancements configurable in ESC
+Pause Menu -> Settings -> Gameplay:
+1. Walk through crops & wild weeds
+2. Item stacking up to 99 in rucksack with native quantity dialog for partial stack transfers
+3. Durable farm lumber fences (no decaying/rotting)
+4. Connected wooden fence rails between adjacent lumber posts (double-rail ranch beams)
+5. Wild dog attacks toggle (vanilla Enabled by default)
+6. Smart bell herding (animals seek barn/coop doors when bell is rung)
+7. Stamina HUD: 10 dynamic hearts under clock showing stamina relative to max
+8. Widescreen HUD anchoring: preserve right margin padding seamlessly
+9. Calendar events: festival names, villager birthdays, and livestock maturation
+10. Roaming horse: ride outside farm with location reset fallback to prevent corruption.
+
+Decision: Add enhance/gameplay and platform/gameplay_options, gated by
+HMBTN_ENH_GAMEPLAY (enabled in Windows build.ps1 -Game; runtime defaults OFF except
+wild_dog=1 for vanilla parity). Keep options saved in settings.json under "gameplay".
+When splitting or moving stacked items in the rucksack menu, show the native-style
+quantity selector dialog with D-pad input (+-1, +-10) and item preview. Draw connected
+fences as two-tiered shaded wooden rails with highlight/shadow behind the posts.
+
+Consequences: Vanilla parity maintained when options are OFF. All 115 unit tests
+pass. Interactive gameplay testing performed by the owner.
+

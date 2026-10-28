@@ -29,6 +29,9 @@
 #include "text_bank.h"
 #include "texture_pack.h"
 #include "ui_icons.h"
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+#include "enhance/gameplay/gameplay.h"
+#endif
 
 /* One marker on the storage screen: its position, then twelve bytes of data. */
 typedef struct FarmMarker {
@@ -819,6 +822,11 @@ zero:
     if (status == 0) {
         goto failed;
     }
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+    if (hm_gameplay_item_stacking() && item_slot_category(otherCol) == ITEM_SLOT_HELD && item->count > 1) {
+        goto failed;
+    }
+#endif
     if (status < 0) {
         return 0;
     }
@@ -907,6 +915,15 @@ static s32 item_merge_pair(FarmStoredItem *first, s32 first_arg, FarmStoredItem 
 /* Stack `item` onto `target` (the cell at second_col) when the category allows: a tool
  * never stacks, and a held or bag-row cell takes seeds only. */
 static s32 item_merge_values(FarmStoredItem *item, s32 first_col, FarmStoredItem *target, s32 second_col) {
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+    if (hm_gameplay_item_stacking()) {
+        if (item_category(item->id) == ITEM_CATEGORY_TOOL) {
+            return 0;
+        }
+        item_stack_merge(item, target);
+        return 1;
+    }
+#endif
     switch (item_slot_category(second_col)) {
     case 0:
     case 1:

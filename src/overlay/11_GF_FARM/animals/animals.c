@@ -192,9 +192,23 @@ void farm_animals_tick(void) {
         farm_objects_update();
         farm_cue_runners_step();
         farm_mode_check_poll();
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+        if (hm_gameplay_smart_bell()) {
+            hm_gameplay_smart_bell_tick();
+        }
+        if (!hm_gameplay_roaming_horse()) {
+            hm_gameplay_horse_safety_check();
+        }
+#endif
         if (farm_area.mode.place.location == PLACE_FARM) {
             mode = game_state.progress.clock.time.hm.hour;
             if (mode >= 18) {
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+                /* PORT: Configurable wild dog attacks - see docs/port/DECISIONS.md#adr-080 */
+                if (!hm_gameplay_wild_dog_enabled()) {
+                    /* Wild dog attacks disabled */
+                } else
+#endif
                 if (mode < 23 && (game_state.progress.estate.estateFlags & (ESTATE_FLAG_STRAY_DOGS | ESTATE_FLAG_DOG_WALK)) == ESTATE_FLAG_STRAY_DOGS) {
                     if (mode == 18) {
                         if (game_state.progress.clock.time.hm.minute >= 10) {
@@ -2332,6 +2346,13 @@ static void farm_mode_check(s32 mode)
 
     switch (mode) {
     case FARM_MODE_CHECK_LIVESTOCK:
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+        if (hm_gameplay_smart_bell()) {
+            hm_gameplay_smart_bell_ring();
+            farm_mode_check_timers[0] = 0;
+            break;
+        }
+#endif
         if (farm_area.mode.place.location == game_state.animals.dog.actor.place.location) {
             dog_set_phase(&game_state.animals.dog, DOG_PHASE_SEEK_ITEM);
         }

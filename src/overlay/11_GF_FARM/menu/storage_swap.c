@@ -22,6 +22,9 @@
 #include "text.h"
 #include "text_bank.h"
 #include "ui_icons.h"
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+#include "enhance/gameplay/gameplay.h"
+#endif
 
 /* A frame rectangle. */
 typedef struct FarmFrameRect {
@@ -49,12 +52,22 @@ typedef struct FarmSpot {
 
 /* The spot-swap screen's states: browsing the spots, taking the spot under the cursor,
  * and leaving the screen. */
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+enum StorageSwapState {
+    SWAP_IDLE = 0,
+    SWAP_BROWSE = 1,
+    SWAP_TAKE = 2,
+    SWAP_LEAVE = 3,
+    SWAP_QTY = 4,
+};
+#else
 enum StorageSwapState {
     SWAP_IDLE = 0,
     SWAP_BROWSE = 1,
     SWAP_TAKE = 2,
     SWAP_LEAVE = 3,
 };
+#endif
 
 /* The cursor's directions; a spot that is marked shifts them to the second block of
  * the next_spot table. */
@@ -96,12 +109,24 @@ static s32 storage_swap_cursor = 0;
 static s32 storage_swap_pick = 0;
 
 static s32 storage_swap_marked = SPOT_NONE;
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+static s32 storage_swap_qty_from = 0;
+static s32 storage_swap_qty_to = 0;
+static s16 storage_swap_qty_cur = 1;
+static s16 storage_swap_qty_max = 1;
+#endif
 
 static void storage_swap_reset(void) {
     storage_swap_state = SWAP_IDLE;
     storage_swap_cursor = 0;
     storage_swap_pick = 0;
     storage_swap_marked = SPOT_NONE;
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+    storage_swap_qty_from = 0;
+    storage_swap_qty_to = 0;
+    storage_swap_qty_cur = 1;
+    storage_swap_qty_max = 1;
+#endif
 }
 
 /* Open the spot-swap screen from idle. */
@@ -224,6 +249,75 @@ static void storage_swap_screen(void) {
     } else {
         dir = 0;
     }
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+    if (storage_swap_state == SWAP_QTY) {
+        FarmStoredItem *src_it = storage_spot_item(storage_swap_qty_from);
+        FarmStoredItem *dst_it = storage_spot_item(storage_swap_qty_to);
+        s16 box_x = 90;
+        s16 box_y = 60;
+        s16 box_w = 140;
+        s16 box_h = 56;
+        u_long *box_ot = &current_frame->otTags[0][18];
+        u_long *elem_ot = &current_frame->otTags[0][17];
+        u16 num_buf[32];
+        u16 *p;
+
+        if (input_pad1->triggered & PAD_RIGHT) {
+            storage_swap_qty_cur++;
+            if (storage_swap_qty_cur > storage_swap_qty_max)
+                storage_swap_qty_cur = 1;
+            sound_play(5);
+        } else if (input_pad1->triggered & PAD_LEFT) {
+            storage_swap_qty_cur--;
+            if (storage_swap_qty_cur < 1)
+                storage_swap_qty_cur = storage_swap_qty_max;
+            sound_play(5);
+        } else if (input_pad1->triggered & PAD_UP) {
+            storage_swap_qty_cur += 10;
+            if (storage_swap_qty_cur > storage_swap_qty_max)
+                storage_swap_qty_cur = storage_swap_qty_max;
+            sound_play(5);
+        } else if (input_pad1->triggered & PAD_DOWN) {
+            storage_swap_qty_cur -= 10;
+            if (storage_swap_qty_cur < 1)
+                storage_swap_qty_cur = 1;
+            sound_play(5);
+        } else if (input_pad1->pressed & PAD_CROSS) {
+            if (dst_it->id == 0) {
+                dst_it->id = src_it->id;
+                dst_it->modifier = src_it->modifier;
+                dst_it->count = storage_swap_qty_cur;
+            } else if (dst_it->id == src_it->id) {
+                dst_it->count += storage_swap_qty_cur;
+            }
+            src_it->count -= storage_swap_qty_cur;
+            if (src_it->count <= 0) {
+                picture_cell_place_item(src_it);
+            }
+            sound_play(0);
+            storage_swap_marked = SPOT_NONE;
+            storage_swap_state = SWAP_BROWSE;
+            return;
+        } else if ((input_pad1->pressed & PAD_CIRCLE) || (input_pad1->pressed & PAD_TRIANGLE)) {
+            sound_play(1);
+            storage_swap_state = SWAP_BROWSE;
+            return;
+        }
+
+        window_frame_draw_at(box_ot, 1, box_x, box_y, box_w, box_h);
+        picture_cell_build_prim(src_it->id, 0, elem_ot, box_x + 22, box_y + 28, PICTURE_CELL_CENTER);
+        ui_draw_icon_0d_phase(elem_ot, box_x + 44, box_y + 20);
+        p = text_format_number(storage_swap_qty_cur, num_buf, 2);
+        *p++ = 0x20;
+        *p++ = '/';
+        *p++ = 0x20;
+        p = text_format_number(storage_swap_qty_max, p, 2);
+        *p = 0xFFFF;
+        text_draw_plain(elem_ot, num_buf, box_x + 58, box_y + 20);
+        ui_draw_icon_0c_phase(elem_ot, box_x + 116, box_y + 20);
+        return;
+    }
+#endif
     if (storage_swap_state != SWAP_BROWSE) {
         storage_item_message(storage_spot_item(storage_swap_cursor));
         return;
@@ -260,6 +354,33 @@ static void storage_swap_screen(void) {
                 if (storage_swap_marked == storage_swap_cursor) {
                     storage_swap_cursor = (storage_swap_marked < SPOT_HELD_ITEM) ? SPOT_HELD_TOOL : SPOT_HELD_ITEM;
                 }
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+                if (hm_gameplay_item_stacking()) {
+                    FarmStoredItem *src_it = storage_spot_item(storage_swap_marked);
+                    FarmStoredItem *dst_it = storage_spot_item(storage_swap_cursor);
+                    if (src_it != dst_it && src_it->id != 0 && src_it->count > 1 &&
+                        (dst_it->id == 0 || dst_it->id == src_it->id) &&
+                        !storage_spot_is_held(storage_swap_cursor)) {
+                        s32 max_transfer = src_it->count;
+                        if (dst_it->id == src_it->id) {
+                            s32 space = STACK_MAX - dst_it->count;
+                            if (space < max_transfer) max_transfer = space;
+                        }
+                        if (max_transfer > 0) {
+                            storage_swap_qty_from = storage_swap_marked;
+                            storage_swap_qty_to = storage_swap_cursor;
+                            storage_swap_qty_max = max_transfer;
+                            storage_swap_qty_cur = 1;
+                            storage_swap_state = SWAP_QTY;
+                            sound_play(0);
+                            return;
+                        } else {
+                            sound_play(2);
+                            return;
+                        }
+                    }
+                }
+#endif
                 refused = storage_swap_spots(storage_swap_marked, storage_swap_cursor);
                 storage_swap_cursor = storage_swap_pick;
                 if (refused == 0) {
@@ -354,12 +475,27 @@ static s32 storage_move_item(FarmStoredItem *item, s32 spot, FarmStoredItem *oth
 /* Try a swap of two spots that cannot simply move or stack: refuse (return 1) when
  * the pair is not allowed, otherwise swap the two items (return 0). */
 static s32 storage_try_swap(FarmStoredItem *first, s32 firstSpot, FarmStoredItem *second, s32 secondSpot) {
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+    if (hm_gameplay_item_stacking()) {
+        /* When taking from a stack in the bag into the held item slot, take 1 */
+        if (storage_spot_is_held(secondSpot) && second->id == 0 && first->count > 1) {
+            second->id = first->id;
+            second->modifier = first->modifier;
+            second->count = 1;
+            first->count--;
+            return 0;
+        }
+    }
+#endif
     switch (storage_spot_is_held(secondSpot)) {
     case 0:
         if (item_class_word_negative(first->id) == 0) {
             return 1;
         }
     case 1:
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+        if (!hm_gameplay_item_stacking())
+#endif
         if (item_category(first->id) == ITEM_CATEGORY_CROP && first->count >= 2) {
             return 1;
         }
@@ -370,6 +506,9 @@ static s32 storage_try_swap(FarmStoredItem *first, s32 firstSpot, FarmStoredItem
             return 1;
         }
     case 1:
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+        if (!hm_gameplay_item_stacking())
+#endif
         if (item_category(second->id) == ITEM_CATEGORY_CROP && second->count >= 2) {
             return 1;
         }
@@ -382,6 +521,15 @@ static s32 storage_try_swap(FarmStoredItem *first, s32 firstSpot, FarmStoredItem
 /* Stack a seed onto the same kind in `other`. Other kinds are refused (return 1). */
 static s32 storage_stack_items(FarmStoredItem *item, s32 spot, FarmStoredItem *other, s32 otherSpot) {
     s32 result;
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+    /* PORT: Allow identical non-tool items to stack when item stacking is enabled - see docs/port/DECISIONS.md#adr-080 */
+    if (hm_gameplay_item_stacking()) {
+        if (item->id != 0 && item->id == other->id && item_category(item->id) != ITEM_CATEGORY_TOOL) {
+            storage_stack_count(item, other);
+            return 0;
+        }
+    }
+#endif
     if (item_category(item->id) == ITEM_CATEGORY_SEED) {
         storage_stack_count(item, other);
         result = 0;
@@ -435,7 +583,11 @@ static void storage_draw_spot(u_long *ot, s32 index, FarmStoredItem *item) {
         return;
     }
     picture_cell_build_prim(item->id, 0, ot, storage_spots[index].x, storage_spots[index].y, PICTURE_CELL_CENTER);
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+    if (hm_gameplay_item_stacking() ? (item->count > 1) : (item_category(item->id) == 2)) {
+#else
     if (item_category(item->id) == 2) {
+#endif
         item_anim_draw(&current_frame->otTags[0][SWAP_LAYER_COUNTS], storage_spots[index].x,
                       storage_spots[index].y, item->count);
     }

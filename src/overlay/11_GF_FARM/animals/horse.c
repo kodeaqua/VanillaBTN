@@ -224,6 +224,10 @@ void horse_load_sprite(void) {
 
     object = &game_state.animals.horse;
     object->actor.flags |= ACTOR_FLAG_BIT27;
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+    /* PORT: Allow horse sprite to load in any scene when roaming horse is enabled - see docs/port/DECISIONS.md#adr-080 */
+    if (!hm_gameplay_roaming_horse())
+#endif
     if (farm_area.mode.place.location != PLACE_3 && farm_area.mode.place.location != PLACE_FARM) {
         object->actor.sprite.source = 0;
         return;

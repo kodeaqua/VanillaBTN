@@ -19,8 +19,12 @@ int main(void) {
     CHECK(hm_pause_handle(&menu, HM_PAUSE_CONFIRM) == HM_PAUSE_EXIT);
     hm_pause_handle(&menu, HM_PAUSE_UP);
     CHECK(hm_pause_handle(&menu, HM_PAUSE_CONFIRM) == HM_PAUSE_NONE);
-    CHECK(menu.page == HM_PAUSE_SETTINGS && hm_pause_count(&menu) == 1);
+    CHECK(menu.page == HM_PAUSE_SETTINGS && hm_pause_count(&menu) == 2);
+    CHECK(!strcmp(hm_pause_label(&menu, 0), "Graphics"));
+    CHECK(!strcmp(hm_pause_label(&menu, 1), "Gameplay"));
     hm_pause_handle(&menu, HM_PAUSE_DOWN);
+    CHECK(menu.selected == 1);
+    hm_pause_handle(&menu, HM_PAUSE_UP);
     CHECK(menu.selected == 0);
     hm_pause_handle(&menu, HM_PAUSE_CONFIRM);
     CHECK(menu.page == HM_PAUSE_GRAPHICS && hm_pause_count(&menu) == 11);
@@ -37,7 +41,29 @@ int main(void) {
     }
     CHECK(menu.selected == 0 && menu.first_visible == 0);
     hm_pause_handle(&menu, HM_PAUSE_BACK);
-    CHECK(menu.page == HM_PAUSE_SETTINGS);
+    CHECK(menu.page == HM_PAUSE_SETTINGS && menu.selected == 0);
+    /* Test gameplay settings menu */
+    hm_pause_handle(&menu, HM_PAUSE_DOWN);
+    CHECK(menu.selected == 1);
+    hm_pause_handle(&menu, HM_PAUSE_CONFIRM);
+    CHECK(menu.page == HM_PAUSE_GAMEPLAY && hm_pause_count(&menu) == HM_PAUSE_GAMEPLAY_ITEMS);
+    CHECK(!strcmp(hm_pause_label(&menu, 0), "Walk Crops"));
+    CHECK(!strcmp(hm_pause_label(&menu, 1), "Item Stacking"));
+    CHECK(!strcmp(hm_pause_label(&menu, 2), "Durable Fences"));
+    CHECK(!strcmp(hm_pause_label(&menu, 3), "Connect Fences"));
+    CHECK(!strcmp(hm_pause_label(&menu, 4), "Wild Dog Attacks"));
+    CHECK(!strcmp(hm_pause_label(&menu, 5), "Smart Bell"));
+    CHECK(!strcmp(hm_pause_label(&menu, 6), "Stamina HUD"));
+    CHECK(!strcmp(hm_pause_label(&menu, 7), "Calendar Events"));
+    CHECK(!strcmp(hm_pause_label(&menu, 8), "Roaming Horse"));
+    for (int i = 0; i < HM_PAUSE_GAMEPLAY_ITEMS; ++i) {
+        CHECK(menu.selected == i);
+        CHECK(hm_pause_handle(&menu, HM_PAUSE_RIGHT) == HM_PAUSE_CHANGE_GAMEPLAY);
+        CHECK(hm_pause_handle(&menu, HM_PAUSE_LEFT) == HM_PAUSE_CHANGE_GAMEPLAY);
+        hm_pause_handle(&menu, HM_PAUSE_DOWN);
+    }
+    hm_pause_handle(&menu, HM_PAUSE_BACK);
+    CHECK(menu.page == HM_PAUSE_SETTINGS && menu.selected == 1);
     hm_pause_handle(&menu, HM_PAUSE_BACK);
     CHECK(menu.page == HM_PAUSE_ROOT && menu.selected == 1);
     CHECK(hm_pause_handle(&menu, HM_PAUSE_BACK) == HM_PAUSE_RESUME);

@@ -16,6 +16,7 @@ The owner requested the native pause interface and graphics settings on
 | Enhance Scaling | Optional viewport-resolution output through GPU Auto or Software; default OFF; gameplay checks pending |
 | Widescreen Mode | All-screen wide canvas, original title background tiles, proportional UI and stable fallback (ADR-057); owner validation pending |
 | FXAA/MSAA | FXAA (final-image) and MSAA 2x/4x (GPU scene) implemented (ADR-072); runtime default Off; owner gameplay validation pending |
+| Gameplay Enhancements | Suite of 9 toggleable options in Settings > Gameplay (ADR-080); runtime default OFF except wild dog; owner gameplay validation pending |
 
 HMBTN_ENH_PAUSE_MENU defaults OFF in CMake; Windows build.ps1 -Game enables it.
 The owner explicitly requests ESC availability across scenes, so that interface

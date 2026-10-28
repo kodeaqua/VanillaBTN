@@ -267,6 +267,17 @@ static void farm_calendar_mark_events(u_long *ot, s16 season, s16 offset) {
     for (i = 0; i < CALENDAR_EVENT_COUNT; i++) {
         if (calendar_events[i].season == season) farm_calendar_draw_event(ot, calendar_events[i].day, offset);
     }
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+    /* PORT: Show birthdays and livestock milestones on calendar - see docs/port/DECISIONS.md#adr-080 */
+    if (hm_gameplay_calendar_events()) {
+        s16 d;
+        for (d = 0; d < 30; d++) {
+            if (hm_gameplay_calendar_has_event(season, d)) {
+                farm_calendar_draw_event(ot, d, offset);
+            }
+        }
+    }
+#endif
 }
 
 /* Mark the wedding day on the calendar, when it falls in this year and season. */
@@ -347,6 +358,27 @@ static void farm_calendar_draw_result(u_long *ot, s16 year, s16 season) {
     ui_draw_icon_2b_sub(ot, 142, 52, season);
     *text_write_season(season, calendar_scratch) = 0xFFFF;
     text_draw_plain(ot, calendar_scratch, 158, 52);
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+    /* PORT: Display event name for selected day - see docs/port/DECISIONS.md#adr-080 */
+    if (hm_gameplay_calendar_events()) {
+        const char *name = hm_gameplay_calendar_event_name(season, calendar_cursor_day);
+        if (name) {
+            u16 event_text[32];
+            u16 *p = event_text;
+            const char *s = name;
+            while (*s && p < event_text + 30) {
+                if (*s >= 'A' && *s <= 'Z') *p++ = *s - 'A';
+                else if (*s >= 'a' && *s <= 'z') *p++ = *s - 'a' + 26;
+                else if (*s >= '0' && *s <= '9') *p++ = 0x40 + *s - '0';
+                else if (*s == 39) *p++ = 0x69;
+                else *p++ = 0xFFD;
+                s++;
+            }
+            *p = 0xFFFF;
+            text_draw_plain(ot, event_text, 192, 52);
+        }
+    }
+#endif
 }
 
 /* Draw the thirty day cells, from the starting phase. */
