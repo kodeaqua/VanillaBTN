@@ -32,6 +32,10 @@
 #include "enhance/pause_menu/canvas.h"
 #include "enhance/pause_menu/menu.h"
 #include "platform/graphics_options.h"
+#ifdef HMBTN_ENH_ANTIALIASING
+#include "platform/fxaa.h"
+#define HM_HOST_AA 1
+#endif
 #endif
 #include "psx/gpu_environment.h"
 #include "psx/pad.h"
@@ -56,6 +60,9 @@ static hm_present_clock hm_presentation;
 #ifdef HMBTN_ENH_PAUSE_MENU
 static hm_pause_assets hm_assets;
 static hm_graphics_options hm_options;
+#ifdef HM_HOST_AA
+static hm_fxaa *hm_fxaa_output;
+#endif
 static int hm_ignore_held;
 static int hm_pause_enabled;
 static u8 hm_pause_background[320 * 240 * 4];
@@ -208,6 +215,16 @@ static void hm_host_blit(SDL_GPUCommandBuffer *command, SDL_GPUTexture *image, u
 #ifdef HMBTN_ENH_WIDESCREEN
     enabled = hm_widescreen_enabled();
 #endif
+#ifdef HM_HOST_AA
+    if (hm_options.antialiasing == HM_AA_FXAA) {
+        SDL_GPUTexture *filtered = hm_fxaa_encode(hm_fxaa_output, command, image, image_width, image_height);
+        if (filtered) image = filtered;
+        else {
+            hm_options.antialiasing = HM_AA_OFF;
+            fprintf(stderr, "FXAA output unavailable; anti-aliasing disabled\n");
+        }
+    }
+#endif
     hm_gpu_present_image(command, image, image_width, image_height, target, width, height, linear,
                          expanded, enabled);
 }
@@ -289,16 +306,22 @@ static int hm_host_gpu_present(const RECT *native_area) {
     interpolate = hm_options.interpolation && live.eligible;
 #endif
     u32 texture_filter = 0;
+    unsigned multisamples = 1;
+#ifdef HM_HOST_AA
+    multisamples = hm_antialiasing_samples(hm_options.antialiasing);
+#endif
 #if defined(HMBTN_ENH_FILTERING) && defined(HMBTN_ENH_PAUSE_MENU)
     texture_filter = (u32)hm_options.linear;
 #endif
     u64 cache_serial = interpolate ? 0 : serial;
     if (!cache_serial || hm_gpu_cached_serial != cache_serial || hm_gpu_cached.width != width ||
         hm_gpu_cached.height != height ||
-        (hm_gpu_cached.words && hm_gpu_cached.words[11] != texture_filter)) {
+        (hm_gpu_cached.words && (hm_gpu_cached.words[11] != texture_filter ||
+                                hm_gpu_cached.words[15] != multisamples))) {
         hm_gpu_cached_serial = 0;
         hm_gpu_cached = (hm_gpu_scene_data){0};
         hm_gpu_scene_texture_filter(hm_gpu_commands, texture_filter);
+        hm_gpu_scene_multisamples(hm_gpu_commands, multisamples);
         hm_replay_sink previous = hm_gpu_scene_begin(hm_gpu_commands, width, height);
         int replayed = 0;
 #ifdef HMBTN_ENH_INTERPOLATION
@@ -484,8 +507,13 @@ static void hm_host_pause(void) {
 #endif
                     hm_host_reset_presentation();
                     notice = hm_graphics_save(&hm_options) ? "" : "Cannot save settings";
-                } else
+                } else {
                     notice = "Option unavailable";
+#ifdef HM_HOST_AA
+                    if (menu.selected == 10 && hm_options.antialiasing >= HM_AA_MSAA2)
+                        notice = "MSAA requires GPU Auto";
+#endif
+                }
             }
         }
         if (!running)
@@ -945,6 +973,16 @@ int hm_game_host_start(hm_disc *disc) {
         fprintf(stderr, "GPU scene renderer unavailable; using software rendering\n");
     }
 #endif
+#ifdef HM_HOST_AA
+    hm_fxaa_output = hm_fxaa_create(hm_device);
+    hm_options.aa_capabilities = 1u | (hm_fxaa_output ? 1u << HM_AA_FXAA : 0);
+#ifdef HMBTN_GPU_RASTER
+    if (hm_gpu_output && hm_gpu_commands)
+        hm_options.aa_capabilities |= (1u << HM_AA_MSAA2) | (1u << HM_AA_MSAA4);
+#endif
+    if (!(hm_options.aa_capabilities & (1u << hm_options.antialiasing)))
+        hm_options.antialiasing = HM_AA_OFF;
+#endif
     hm_start = SDL_GetTicksNS();
     hm_host_reset_presentation();
     hm_timing_reset((hm_timing_host){NULL, hm_host_tick, NULL});
@@ -976,6 +1014,10 @@ void hm_game_host_stop(void) {
     hm_audio_output_stop();
     if (hm_device) {
         SDL_WaitForGPUIdle(hm_device);
+#ifdef HM_HOST_AA
+        hm_fxaa_destroy(hm_fxaa_output);
+        hm_fxaa_output = NULL;
+#endif
 #ifdef HMBTN_GPU_RASTER
         hm_gpu_renderer_destroy(hm_gpu_output);
         hm_gpu_output = NULL;
