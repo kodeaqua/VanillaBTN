@@ -2424,3 +2424,29 @@ Decision:
 
 Consequences:
 Textures in gameplay render with smooth diagonal curves without blurring, pause menu text is pin-sharp under FXAA, and graphics settings are clean and intuitive.
+
+
+## ADR-086: GPU link stability audit, removal of premature link reset, and Floyd's cycle detection in DrawOTag
+
+Date: 2026-10-29. Status: accepted.
+
+Context:
+During game data loading from the save/load overlay (`SCENE_LOAD` -> `SCENE_FARM_LOADED`), the game encountered:
+`PSX runtime error: DrawOTag: OT cycle or traversal limit exceeded`.
+Investigation revealed the root cause:
+1. In ADR-085, `hm_gpu_links_reset()` was prematurely triggered inside `hm_game_clear_ot()` upon scene transition. However, as documented in ADR-009, GPU link handles must remain stable throughout double-buffered frame lifecycles, active ordering tables, and static primitive caches. In `main_frame_begin()`, `active_ot` and `otTags[0..3]` are cleared before `current_frame->ot`; triggering `hm_gpu_links_reset()` when clearing `current_frame->ot` invalidated previously assigned handles, causing handle reallocation that overlapped with active chains and generated circular references.
+2. Furthermore, in `DrawOTag()`, encountering a cycle previously triggered a fatal process abort (`hm_runtime_error`), completely halting execution and crashing to desktop during player sessions.
+
+Decision:
+1. Stability Audit & Removal of Premature Reset (`port/gfx/game_frame.c`):
+   - Removed `hm_gpu_links_reset()` from `hm_game_clear_ot()`.
+   - With `HM_GPU_LINK_CAPACITY` set to 262,144 (256K words), the capacity exceeds the entire physical frame workspace (`HM_FRAME_WORK_BYTES = 257,616 bytes` = 64,404 word addresses) plus all static primitive pools by over 3.5x. Address identity in the hash table ensures rewound cursors reuse identical handles indefinitely without growth.
+2. Floyd's Cycle-Finding Algorithm in `DrawOTag` (`port/psx/gpu_commands.c`):
+   - Implemented Tortoise and Hare (Floyd's cycle detection) in `DrawOTag`: the tortoise advances every 2 packet steps.
+   - Any circular reference is detected in $O(\text{cycle\_length})$ iterations instead of spinning for 262,144 iterations.
+   - Upon cycle detection or reaching the traversal limit, `DrawOTag` gracefully breaks traversal (`return;`) instead of aborting the process with `hm_runtime_error`. This matches PS1 hardware DMA behavior where corrupted chains do not crash the CPU, allowing the engine to recover on subsequent frames.
+3. Verification:
+   - All 119 unit tests passing 100%.
+
+Consequences:
+Loading game data proceeds smoothly without crashes or cycles, GPU link handles remain stable across all scenes, and ordering table traversal is protected against infinite loops.

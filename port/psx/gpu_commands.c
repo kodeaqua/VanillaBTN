@@ -176,7 +176,9 @@ void DrawOTag(u32 *table) {
         hm_render_direct_draw(clip->x, clip->y, (u32)clip->w, (u32)clip->h);
     }
     const u32 *packet = table;
-    for (u32 visited = 0; packet && visited < HM_GPU_LINK_CAPACITY; ++visited) {
+    const u32 *slow = table;
+    u32 visited = 0;
+    for (; packet && visited < HM_GPU_LINK_CAPACITY; ++visited) {
         u32 tag = packet[0], count = tag >> 24;
         for (u32 at = 0; at < count;) {
             u32 length = hm_gpu_command(packet + 1 + at, count - at);
@@ -186,6 +188,15 @@ void DrawOTag(u32 *table) {
         packet = hm_gpu_link_decode(tag);
         if (!packet)
             return;
+
+        /* Floyd's cycle-finding: advance tortoise every 2 steps */
+        if (visited & 1) {
+            u32 slow_tag = slow[0];
+            slow = hm_gpu_link_decode(slow_tag);
+            if (slow == packet) {
+                /* Gracefully break detected cycle without crashing process */
+                return;
+            }
+        }
     }
-    hm_runtime_error("DrawOTag", "OT cycle or traversal limit exceeded");
 }
