@@ -799,3 +799,7 @@ position at 0x38. ACTOR_OF_POSITION still agrees with native position offset.
 Static assertions protect the replacement's task/flags/speed assumptions. This
 audit covers the animal/player aliases, not every runtime path. No matching
 source, header, source guard, game data or save representation was changed.
+
+HMBTN_PORT guard under ADR-077: people/player.c replaces the HOPS[row][facing]
+read that overruns move_steps_large into the adjacent hop_steps object with
+explicit row selection (move_steps_large for row 0, hop_steps for row 1).
