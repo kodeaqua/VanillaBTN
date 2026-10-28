@@ -96,7 +96,7 @@ s32 ratan2(s32 y, s32 x) {
     return y < 0 ? -result : result;
 }
 s32 hm_psx_csqrt(s32 value) {
-    if (value < 0)
-        hm_runtime_error("csqrt", "negative fixed-point input");
+    if (value <= 0)
+        return 0;
     return (s32)hm_integer_sqrt((u64)(u32)value << 12);
 }

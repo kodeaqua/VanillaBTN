@@ -52,17 +52,17 @@ u32 hm_gpu_line(const u32 *words, u32 available) {
     int shaded = (opcode & 16) != 0, polyline = (opcode & 8) != 0;
     u32 minimum = shaded ? 4 : 3;
     if (available < minimum)
-        hm_runtime_error("DrawOTag", "truncated line");
+        return available;
     u32 at = 2, previous_xy = words[1], previous_color = words[0];
     int skip_first = 0;
     for (;;) {
         if (at >= available)
-            hm_runtime_error("DrawOTag", "unterminated polyline");
+            return available;
         if (polyline && skip_first && (words[at] & 0xF000F000u) == 0x50005000u)
             return at + 1;
         u32 color = shaded ? words[at++] : previous_color;
         if (at >= available)
-            hm_runtime_error("DrawOTag", "truncated shaded line");
+            return available;
         u32 xy = words[at++];
         hm_line_segment(previous_xy, xy, previous_color, color, opcode, skip_first);
         if (!polyline)

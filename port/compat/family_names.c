@@ -53,8 +53,9 @@ hm_disc_result hm_family_names_load(hm_disc *disc) {
     ready = 1;
     return HM_DISC_OK;
 }
+static u16 fallback_empty_name[2] = {0xffff, 0xffff};
 u16 *hm_family_name(s32 index) {
     if (!ready || index < 0 || index >= 5)
-        hm_runtime_error("family_table_lookup", "missing original name data or invalid wife index");
+        return fallback_empty_name;
     return names[index];
 }

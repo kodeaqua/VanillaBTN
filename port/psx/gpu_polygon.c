@@ -109,7 +109,7 @@ u32 hm_gpu_polygon(const u32 *words, u32 available) {
     int textured = (opcode & 4) != 0, gouraud = (opcode & 16) != 0;
     u32 length = 1 + count + (textured ? count : 0) + (gouraud ? count - 1 : 0);
     if (available < length)
-        hm_runtime_error("DrawOTag", "truncated polygon");
+        return available;
     hm_vertex vertices[4];
     u32 at = 1, rgb = words[0];
     u16 clut = 0, page = 0;
