@@ -19,9 +19,10 @@ int main(void) {
     CHECK(hm_pause_handle(&menu, HM_PAUSE_CONFIRM) == HM_PAUSE_EXIT);
     hm_pause_handle(&menu, HM_PAUSE_UP);
     CHECK(hm_pause_handle(&menu, HM_PAUSE_CONFIRM) == HM_PAUSE_NONE);
-    CHECK(menu.page == HM_PAUSE_SETTINGS && hm_pause_count(&menu) == 2);
+    CHECK(menu.page == HM_PAUSE_SETTINGS && hm_pause_count(&menu) == 3);
     CHECK(!strcmp(hm_pause_label(&menu, 0), "Graphics"));
     CHECK(!strcmp(hm_pause_label(&menu, 1), "Gameplay"));
+    CHECK(!strcmp(hm_pause_label(&menu, 2), "Controls"));
     hm_pause_handle(&menu, HM_PAUSE_DOWN);
     CHECK(menu.selected == 1);
     hm_pause_handle(&menu, HM_PAUSE_UP);
@@ -64,6 +65,25 @@ int main(void) {
     }
     hm_pause_handle(&menu, HM_PAUSE_BACK);
     CHECK(menu.page == HM_PAUSE_SETTINGS && menu.selected == 1);
+
+    /* Test controls settings menu */
+    hm_pause_handle(&menu, HM_PAUSE_DOWN);
+    CHECK(menu.selected == 2);
+    hm_pause_handle(&menu, HM_PAUSE_CONFIRM);
+    CHECK(menu.page == HM_PAUSE_CONTROLS && hm_pause_count(&menu) == HM_PAUSE_CONTROLS_ITEMS);
+    CHECK(!strcmp(hm_pause_label(&menu, 0), "Gamepad"));
+    CHECK(!strcmp(hm_pause_label(&menu, 1), "Keyboard"));
+    CHECK(!strcmp(hm_pause_label(&menu, 2), "Mouse"));
+    for (int i = 0; i < HM_PAUSE_CONTROLS_ITEMS; ++i) {
+        CHECK(menu.selected == i);
+        CHECK(hm_pause_handle(&menu, HM_PAUSE_RIGHT) == HM_PAUSE_CHANGE_CONTROLS);
+        CHECK(hm_pause_handle(&menu, HM_PAUSE_LEFT) == HM_PAUSE_CHANGE_CONTROLS);
+        CHECK(hm_pause_handle(&menu, HM_PAUSE_CONFIRM) == HM_PAUSE_CHANGE_CONTROLS);
+        hm_pause_handle(&menu, HM_PAUSE_DOWN);
+    }
+    hm_pause_handle(&menu, HM_PAUSE_BACK);
+    CHECK(menu.page == HM_PAUSE_SETTINGS && menu.selected == 2);
+
     hm_pause_handle(&menu, HM_PAUSE_BACK);
     CHECK(menu.page == HM_PAUSE_ROOT && menu.selected == 1);
     CHECK(hm_pause_handle(&menu, HM_PAUSE_BACK) == HM_PAUSE_RESUME);

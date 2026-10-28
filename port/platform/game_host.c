@@ -32,6 +32,7 @@
 #include "enhance/pause_menu/canvas.h"
 #include "enhance/pause_menu/menu.h"
 #include "platform/graphics_options.h"
+#include "platform/controls_options.h"
 #ifdef HMBTN_ENH_GAMEPLAY
 #include "platform/gameplay_options.h"
 #endif
@@ -58,6 +59,10 @@ static Uint64 hm_start;
 static hm_input_replay hm_replay;
 static int hm_replay_enabled;
 static u64 hm_host_tick_limit;
+static hm_controls_options hm_controls;
+static SDL_Gamepad *hm_active_gamepad = NULL;
+static int hm_mouse_wheel_up = 0;
+static int hm_mouse_wheel_down = 0;
 static int hm_trace_camera;
 static hm_present_clock hm_presentation;
 #ifdef HMBTN_ENH_PAUSE_MENU
@@ -466,31 +471,51 @@ static void hm_host_pause(void) {
                 exit(0);
             }
             hm_host_display_event(event.type);
-            if (event.type != SDL_EVENT_KEY_DOWN || event.key.repeat)
-                continue;
             hm_pause_input input;
-            switch (event.key.key) {
-            case SDLK_ESCAPE:
-            case SDLK_D:
-                input = HM_PAUSE_BACK;
-                break;
-            case SDLK_RETURN:
-            case SDLK_X:
-                input = HM_PAUSE_CONFIRM;
-                break;
-            case SDLK_UP:
-                input = HM_PAUSE_UP;
-                break;
-            case SDLK_DOWN:
-                input = HM_PAUSE_DOWN;
-                break;
-            case SDLK_LEFT:
-                input = HM_PAUSE_LEFT;
-                break;
-            case SDLK_RIGHT:
-                input = HM_PAUSE_RIGHT;
-                break;
-            default:
+            if (event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN) {
+                switch (event.gbutton.button) {
+                case SDL_GAMEPAD_BUTTON_DPAD_UP:
+                    input = HM_PAUSE_UP; break;
+                case SDL_GAMEPAD_BUTTON_DPAD_DOWN:
+                    input = HM_PAUSE_DOWN; break;
+                case SDL_GAMEPAD_BUTTON_DPAD_LEFT:
+                    input = HM_PAUSE_LEFT; break;
+                case SDL_GAMEPAD_BUTTON_DPAD_RIGHT:
+                    input = HM_PAUSE_RIGHT; break;
+                case SDL_GAMEPAD_BUTTON_SOUTH:
+                    input = HM_PAUSE_CONFIRM; break;
+                case SDL_GAMEPAD_BUTTON_EAST:
+                case SDL_GAMEPAD_BUTTON_START:
+                    input = HM_PAUSE_BACK; break;
+                default:
+                    continue;
+                }
+            } else if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat) {
+                switch (event.key.key) {
+                case SDLK_ESCAPE:
+                case SDLK_D:
+                    input = HM_PAUSE_BACK;
+                    break;
+                case SDLK_RETURN:
+                case SDLK_X:
+                    input = HM_PAUSE_CONFIRM;
+                    break;
+                case SDLK_UP:
+                    input = HM_PAUSE_UP;
+                    break;
+                case SDLK_DOWN:
+                    input = HM_PAUSE_DOWN;
+                    break;
+                case SDLK_LEFT:
+                    input = HM_PAUSE_LEFT;
+                    break;
+                case SDLK_RIGHT:
+                    input = HM_PAUSE_RIGHT;
+                    break;
+                default:
+                    continue;
+                }
+            } else {
                 continue;
             }
             hm_pause_action action = hm_pause_handle(&menu, input);
@@ -533,6 +558,12 @@ static void hm_host_pause(void) {
                 notice = "Option unavailable";
             }
 #endif
+            if (action == HM_PAUSE_CHANGE_CONTROLS) {
+                if (hm_controls_change(&hm_controls, menu.selected,
+                                       input == HM_PAUSE_LEFT ? -1 : 1)) {
+                    notice = hm_controls_save(&hm_controls) ? "" : "Cannot save settings";
+                }
+            }
         }
         if (!running)
             break;
@@ -557,6 +588,11 @@ static void hm_host_pause(void) {
                     for (int i = 0; i < HM_PAUSE_GAMEPLAY_ITEMS; ++i)
                         hm_gameplay_row_value(&hm_gameplay, i, rows[i], sizeof(rows[i]));
 #endif
+                if (menu.page == HM_PAUSE_CONTROLS)
+                    hm_controls_value(&hm_controls, menu.selected, value, sizeof(value));
+                if (menu.page == HM_PAUSE_CONTROLS)
+                    for (int i = 0; i < HM_PAUSE_CONTROLS_ITEMS; ++i)
+                        hm_controls_row_value(&hm_controls, i, rows[i], sizeof(rows[i]));
                 value_dirty = 0;
             }
             view.notice = notice;
@@ -847,6 +883,20 @@ static void hm_host_events(void) {
             exit(0);
         }
         hm_host_display_event(event.type);
+        if (event.type == SDL_EVENT_GAMEPAD_ADDED) {
+            if (!hm_active_gamepad)
+                hm_active_gamepad = SDL_OpenGamepad(event.gdevice.which);
+        } else if (event.type == SDL_EVENT_GAMEPAD_REMOVED) {
+            if (hm_active_gamepad && SDL_GetGamepadID(hm_active_gamepad) == event.gdevice.which) {
+                SDL_CloseGamepad(hm_active_gamepad);
+                hm_active_gamepad = NULL;
+            }
+        } else if (event.type == SDL_EVENT_MOUSE_WHEEL) {
+            if (event.wheel.y > 0)
+                hm_mouse_wheel_up = 4;
+            else if (event.wheel.y < 0)
+                hm_mouse_wheel_down = 4;
+        }
 #ifdef HMBTN_ENH_PAUSE_MENU
         if (hm_pause_enabled && event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat &&
             event.key.key == SDLK_ESCAPE)
@@ -880,16 +930,99 @@ static void hm_host_tick(void *context, u64 tick) {
         if (wake > now)
             SDL_DelayPrecise(wake - now);
     }
-    const bool *keys = SDL_GetKeyboardState(NULL);
-    static const SDL_Scancode mapping[16] = {
-        SDL_SCANCODE_Q,         SDL_SCANCODE_E,       SDL_SCANCODE_A,       SDL_SCANCODE_S,
-        SDL_SCANCODE_W,         SDL_SCANCODE_D,       SDL_SCANCODE_X,       SDL_SCANCODE_Z,
-        SDL_SCANCODE_BACKSPACE, SDL_SCANCODE_UNKNOWN, SDL_SCANCODE_UNKNOWN, SDL_SCANCODE_RETURN,
-        SDL_SCANCODE_UP,        SDL_SCANCODE_RIGHT,   SDL_SCANCODE_DOWN,    SDL_SCANCODE_LEFT};
     u16 held = 0;
-    for (u32 i = 0; i < 16; ++i)
-        if (mapping[i] != SDL_SCANCODE_UNKNOWN && keys[mapping[i]])
-            held |= (u16)(1u << i);
+    if (hm_controls.keyboard_layout == HM_KEYBOARD_LAYOUT_ARROWS) {
+        const bool *keys = SDL_GetKeyboardState(NULL);
+        static const SDL_Scancode mapping[16] = {
+            SDL_SCANCODE_Q,         SDL_SCANCODE_E,       SDL_SCANCODE_A,       SDL_SCANCODE_S,
+            SDL_SCANCODE_W,         SDL_SCANCODE_D,       SDL_SCANCODE_X,       SDL_SCANCODE_Z,
+            SDL_SCANCODE_BACKSPACE, SDL_SCANCODE_UNKNOWN, SDL_SCANCODE_UNKNOWN, SDL_SCANCODE_RETURN,
+            SDL_SCANCODE_UP,        SDL_SCANCODE_RIGHT,   SDL_SCANCODE_DOWN,    SDL_SCANCODE_LEFT};
+        for (u32 i = 0; i < 16; ++i)
+            if (mapping[i] != SDL_SCANCODE_UNKNOWN && keys[mapping[i]])
+                held |= (u16)(1u << i);
+    } else if (hm_controls.keyboard_layout == HM_KEYBOARD_LAYOUT_WASD) {
+        const bool *keys = SDL_GetKeyboardState(NULL);
+        static const SDL_Scancode mapping_wasd[16] = {
+            SDL_SCANCODE_Y,         SDL_SCANCODE_P,       SDL_SCANCODE_O,       SDL_SCANCODE_U,
+            SDL_SCANCODE_I,         SDL_SCANCODE_L,       SDL_SCANCODE_K,       SDL_SCANCODE_J,
+            SDL_SCANCODE_SPACE,     SDL_SCANCODE_UNKNOWN, SDL_SCANCODE_UNKNOWN, SDL_SCANCODE_RETURN,
+            SDL_SCANCODE_W,         SDL_SCANCODE_D,       SDL_SCANCODE_S,       SDL_SCANCODE_A};
+        for (u32 i = 0; i < 16; ++i)
+            if (mapping_wasd[i] != SDL_SCANCODE_UNKNOWN && keys[mapping_wasd[i]])
+                held |= (u16)(1u << i);
+    }
+    if (hm_controls.controller_enabled && hm_active_gamepad) {
+        if (SDL_GetGamepadButton(hm_active_gamepad, SDL_GAMEPAD_BUTTON_DPAD_UP))
+            held |= HM_PAD_UP;
+        if (SDL_GetGamepadButton(hm_active_gamepad, SDL_GAMEPAD_BUTTON_DPAD_DOWN))
+            held |= HM_PAD_DOWN;
+        if (SDL_GetGamepadButton(hm_active_gamepad, SDL_GAMEPAD_BUTTON_DPAD_LEFT))
+            held |= HM_PAD_LEFT;
+        if (SDL_GetGamepadButton(hm_active_gamepad, SDL_GAMEPAD_BUTTON_DPAD_RIGHT))
+            held |= HM_PAD_RIGHT;
+
+        Sint16 stick_x = SDL_GetGamepadAxis(hm_active_gamepad, SDL_GAMEPAD_AXIS_LEFTX);
+        Sint16 stick_y = SDL_GetGamepadAxis(hm_active_gamepad, SDL_GAMEPAD_AXIS_LEFTY);
+        if (stick_x < -12000) held |= HM_PAD_LEFT;
+        if (stick_x > 12000) held |= HM_PAD_RIGHT;
+        if (stick_y < -12000) held |= HM_PAD_UP;
+        if (stick_y > 12000) held |= HM_PAD_DOWN;
+
+        if (SDL_GetGamepadButton(hm_active_gamepad, SDL_GAMEPAD_BUTTON_SOUTH))
+            held |= HM_PAD_CROSS;
+        if (SDL_GetGamepadButton(hm_active_gamepad, SDL_GAMEPAD_BUTTON_EAST))
+            held |= HM_PAD_CIRCLE;
+        if (SDL_GetGamepadButton(hm_active_gamepad, SDL_GAMEPAD_BUTTON_WEST))
+            held |= HM_PAD_SQUARE;
+        if (SDL_GetGamepadButton(hm_active_gamepad, SDL_GAMEPAD_BUTTON_NORTH))
+            held |= HM_PAD_TRIANGLE;
+
+        if (SDL_GetGamepadButton(hm_active_gamepad, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER))
+            held |= HM_PAD_L1;
+        if (SDL_GetGamepadButton(hm_active_gamepad, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER))
+            held |= HM_PAD_R1;
+        if (SDL_GetGamepadAxis(hm_active_gamepad, SDL_GAMEPAD_AXIS_LEFT_TRIGGER) > 12000)
+            held |= HM_PAD_L2;
+        if (SDL_GetGamepadAxis(hm_active_gamepad, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) > 12000)
+            held |= HM_PAD_R2;
+
+        if (SDL_GetGamepadButton(hm_active_gamepad, SDL_GAMEPAD_BUTTON_START))
+            held |= HM_PAD_START;
+        if (SDL_GetGamepadButton(hm_active_gamepad, SDL_GAMEPAD_BUTTON_BACK))
+            held |= HM_PAD_SELECT;
+    }
+    if (hm_controls.mouse_mode != HM_MOUSE_MODE_OFF) {
+        float mx, my;
+        Uint32 mbuttons = SDL_GetMouseState(&mx, &my);
+        if (mbuttons & SDL_BUTTON_LMASK)
+            held |= HM_PAD_CROSS;
+        if (mbuttons & SDL_BUTTON_RMASK)
+            held |= HM_PAD_SQUARE;
+        if (mbuttons & SDL_BUTTON_MMASK)
+            held |= HM_PAD_TRIANGLE;
+        if (hm_mouse_wheel_up > 0) {
+            held |= HM_PAD_R1;
+            hm_mouse_wheel_up--;
+        }
+        if (hm_mouse_wheel_down > 0) {
+            held |= HM_PAD_R2;
+            hm_mouse_wheel_down--;
+        }
+        if (hm_controls.mouse_mode == HM_MOUSE_MODE_MOVE && (mbuttons & SDL_BUTTON_LMASK)) {
+            int win_w = 0, win_h = 0;
+            if (SDL_GetWindowSize(hm_window, &win_w, &win_h) && win_w > 0 && win_h > 0) {
+                float center_x = win_w * 0.5f;
+                float center_y = win_h * 0.5f;
+                float dx = mx - center_x;
+                float dy = my - center_y;
+                if (dx > 40.0f) held |= HM_PAD_RIGHT;
+                if (dx < -40.0f) held |= HM_PAD_LEFT;
+                if (dy > 40.0f) held |= HM_PAD_DOWN;
+                if (dy < -40.0f) held |= HM_PAD_UP;
+            }
+        }
+    }
     if (hm_replay_enabled)
         held = hm_input_replay_sample(&hm_replay, tick);
 #ifdef HMBTN_ENH_PAUSE_MENU
@@ -1014,6 +1147,14 @@ int hm_game_host_start(hm_disc *disc) {
     if (!(hm_options.aa_capabilities & (1u << hm_options.antialiasing)))
         hm_options.antialiasing = HM_AA_OFF;
 #endif
+    hm_controls_defaults(&hm_controls);
+    hm_controls_load(&hm_controls);
+    int pad_count = 0;
+    SDL_JoystickID *pads = SDL_GetGamepads(&pad_count);
+    if (pads && pad_count > 0) {
+        hm_active_gamepad = SDL_OpenGamepad(pads[0]);
+        SDL_free(pads);
+    }
     hm_start = SDL_GetTicksNS();
     hm_host_reset_presentation();
     hm_timing_reset((hm_timing_host){NULL, hm_host_tick, NULL});
@@ -1023,6 +1164,10 @@ int hm_game_host_start(hm_disc *disc) {
 }
 
 void hm_game_host_stop(void) {
+    if (hm_active_gamepad) {
+        SDL_CloseGamepad(hm_active_gamepad);
+        hm_active_gamepad = NULL;
+    }
 #if defined(HMBTN_ENH_FILTERING) || defined(HMBTN_ENH_WIDESCREEN)
     hm_software_output_destroy(hm_native_output);
     hm_native_output = NULL;

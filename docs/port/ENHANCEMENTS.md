@@ -17,6 +17,7 @@ The owner requested the native pause interface and graphics settings on
 | Widescreen Mode | All-screen wide canvas, original title background tiles, proportional UI and stable fallback (ADR-057); owner validation pending |
 | FXAA/MSAA | FXAA (final-image) and MSAA 2x/4x (GPU scene) implemented (ADR-072); runtime default Off; owner gameplay validation pending |
 | Gameplay Enhancements | Suite of 9 toggleable options in Settings > Gameplay (ADR-080); runtime default OFF except wild dog; owner gameplay validation pending |
+| Controls Settings | Gamepad, keyboard presets, and mouse interaction in Settings > Controls (ADR-081); persistent in settings.json |
 
 HMBTN_ENH_PAUSE_MENU defaults OFF in CMake; Windows build.ps1 -Game enables it.
 The owner explicitly requests ESC availability across scenes, so that interface
@@ -106,3 +107,5 @@ both framebuffers and changing backdrops. A separate native SDK adapter restores
 the farm projection centre after save/menu returns, independently of enhancement
 settings. Natsume/TV side flashes and persistent post-save framing remain pending
 owner revalidation despite passing isolated regressions.
+
+ADR-081 adds a dedicated Settings > Controls menu with Gamepad, Keyboard layout presets (Arrows+ZX / WASD+JK / Off), and Mouse modes (Off / Action / Move & Act with click-to-walk). Input is mapped cleanly to PS1 pad bitmasks and persisted under controls in settings.json. Unit tests cover configuration and pause menu transitions.
