@@ -103,7 +103,16 @@ typedef s32 (*CellFromWorldToolClear)(s32 *, u16 *, u16 *);
 typedef s32 (*WorldToCellHandler)(VECTOR *, s16 *, s16 *);
 
 /* Hop steps indexed [row][facing]: row 0 while the jump crouches, row 1 otherwise. */
+#ifdef HMBTN_PORT
+/* PORT: the original reads row 1 past move_steps_large into the neighbouring hop_steps object.
+ * Native object layout is not contiguous, so select the two rows explicitly - see
+ * docs/port/DECISIONS.md#adr-077. */
+#define HOPS_ROW_LARGE ((FarmHopStep *)move_steps_large)
+#define HOPS_ROW_SMALL hop_steps
+#define HOP_STEP(row, facing) ((row) == 0 ? &HOPS_ROW_LARGE[(facing)] : &HOPS_ROW_SMALL[(facing)])
+#else
 #define HOPS ((FarmHopStep(*)[12])move_steps_large)
+#endif
 
 /* Tool experience: the base gain, and the gain of a committed move. */
 #define TOOL_EXP_BASE 40
@@ -4411,6 +4420,17 @@ void player_update_position(void)
     {
         if (!(player->stateFlags & PLAYER_FLAG_STILL))
         {
+#ifdef HMBTN_PORT
+            hop = HOP_STEP(1, player->facing38);
+            if (player->mode == PLAYER_MODE_JUMP_CROUCH)
+            {
+                hop = HOP_STEP(0, player->facing38);
+            }
+            if (player->mode == PLAYER_MODE_JUMP_LAUNCH)
+            {
+                hop = HOP_STEP(1, player->facing38);
+            }
+#else
             hop = &HOPS[1][player->facing38];
             if (player->mode == PLAYER_MODE_JUMP_CROUCH)
             {
@@ -4420,6 +4440,7 @@ void player_update_position(void)
             {
                 hop = &HOPS[1][player->facing38];
             }
+#endif
             player->velocity[0] += hop->dx;
             player->velocity[2] += hop->dz;
             ground_set_tolerance(GROUND_TOLERANCE_JUMP);

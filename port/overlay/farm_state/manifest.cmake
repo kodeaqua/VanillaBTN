@@ -42,7 +42,7 @@ hm_farm_state_unit("menu/status_pages.c" "52ee49684c763d24cafd59ac4765f42483e2e8
 hm_farm_state_unit("menu/storage_swap.c" "dbac40c781d7dac224ded4b755cb8c47808b00bcf43b0ea601dc15428f9ef178")
 hm_farm_state_unit("people/family.c" "a3df4e17ca40bbc208fcb4d52913b69d3c2cdc98f3ab8501deb426f1db59cc28")
 hm_farm_state_unit("people/harvest_sprites.c" "d6a822ef6e3b87ec820f6a7023282061f6400c90341580f1010b6cf68b1f5ce4")
-hm_farm_state_unit("people/player.c" "105d7b622f9e38e3f99f84b015a5b07de2bbd2a636072043a26424ed40e597fa")
+hm_farm_state_unit("people/player.c" "c53866a758aa6a388075503b60390d542c56735788b05e583aec547b9d24bd84")
 hm_farm_state_unit("people/villager.c" "2e4cdfed510182c54408781cd4fbad9e717659ca91c1a2d0858e87e66abe7aaa")
 hm_farm_state_unit("picture_cells.c" "b3cda3868f150bab7589b85fd144d0ba29600267a1cb153eb9a5372a8809a82f")
 hm_farm_state_unit("world/clock.c" "e91075635275f993faee342826b7d1299b459bd53b13d590ddfa86ef4398e915")

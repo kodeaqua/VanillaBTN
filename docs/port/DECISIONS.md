@@ -2144,3 +2144,28 @@ coverage reference and round-trip settings tests. GPU probes cover FXAA and
 MSAA pipeline creation. The vanilla OFF path is unchanged; all 102 Windows
 Release tests pass. CPU raster performance is unaffected. Interactive gameplay
 coverage and device-specific AA quality remain owner-tested.
+
+<a id="adr-077"></a>
+
+## ADR-077: Select hop rows explicitly instead of overrunning move_steps_large
+
+Date: 2026-10-28. Status: accepted, narrow HMBTN_PORT source guard.
+
+Context: Hopping over a rock, weed or similar low obstacle sent the player a
+very long way. player_update_position indexes HOPS[row][facing], a cast of
+move_steps_large (16 s16, so two rows of four steps) to rows of 12 steps. The
+original row 1 therefore lies 48 bytes in, past move_steps_large (32 bytes) and
+move_steps_riding (16 bytes), at the adjacent hop_steps object ({0,-51}, ...).
+The matching layout makes that overrun land on valid data. Native objects are
+not contiguous, so the read returned unrelated memory and added a huge
+per-frame offset for the whole airborne time.
+
+Decision: In the native branch only, pick row 0 from move_steps_large and row 1
+from hop_steps explicitly. The #else branch keeps the original expression.
+
+Consequences: Native hops use the original +-73 (crouch) and +-51 (airborne)
+per-frame steps. One new HMBTN_PORT guard pair (macros and the hop lookup in
+people/player.c). Not verified against the matching build (no Linux toolchain
+here) and no gameplay was run; the owner must confirm the hop distance
+interactively. This is an audit of one overrun; other cross-object reads of
+this kind may exist.
