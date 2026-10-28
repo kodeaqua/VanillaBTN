@@ -305,6 +305,37 @@ static void farm_calendar_select_message(u_long *unused0, u_long *unused1, s16 y
             message = CALENDAR_MESSAGE_WEDDING;
         }
         menu_request_open(3, message);
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+        /* PORT: Display birthday or milestone name in dialogue box - see docs/port/DECISIONS.md#adr-080 */
+        if (hm_gameplay_calendar_events() && message == CALENDAR_MESSAGE_DEFAULT) {
+            const char *custom_event = hm_gameplay_calendar_event_name(season, day);
+            if (custom_event != NULL) {
+                static u16 custom_msg[64];
+                u16 *p = custom_msg;
+                u16 *sec = (u16 *)(game_state.work.sector + 0x1800);
+                const char *s = custom_event;
+                while (*s && p < custom_msg + 60) {
+                    u16 c;
+                    if (*s >= 'A' && *s <= 'Z') c = *s - 'A';
+                    else if (*s >= 'a' && *s <= 'z') c = *s - 'a' + 26;
+                    else if (*s >= '0' && *s <= '9') c = 0x40 + *s - '0';
+                    else if (*s == '\'') c = 0x69;
+                    else if (*s == '-') c = 0x69;
+                    else if (*s == '!') c = 0x63;
+                    else if (*s == '?') c = 0x62;
+                    else if (*s == '.') c = 0x67;
+                    else c = 0xFFD;
+                    *p++ = c;
+                    *sec++ = c;
+                    s++;
+                }
+                *p = 0xFFFF;
+                *sec = 0xFFFF;
+                extern u16 *menu_text;
+                menu_text = custom_msg;
+            }
+        }
+#endif
         if (menu_get_phase() == TEXT_WINDOW_CLOSED) {
             calendar_choice = CALENDAR_CHOICE_NONE;
             menu_begin_close();
@@ -358,27 +389,6 @@ static void farm_calendar_draw_result(u_long *ot, s16 year, s16 season) {
     ui_draw_icon_2b_sub(ot, 142, 52, season);
     *text_write_season(season, calendar_scratch) = 0xFFFF;
     text_draw_plain(ot, calendar_scratch, 158, 52);
-#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
-    /* PORT: Display event name for selected day - see docs/port/DECISIONS.md#adr-080 */
-    if (hm_gameplay_calendar_events()) {
-        const char *name = hm_gameplay_calendar_event_name(season, calendar_cursor_day);
-        if (name) {
-            u16 event_text[32];
-            u16 *p = event_text;
-            const char *s = name;
-            while (*s && p < event_text + 30) {
-                if (*s >= 'A' && *s <= 'Z') *p++ = *s - 'A';
-                else if (*s >= 'a' && *s <= 'z') *p++ = *s - 'a' + 26;
-                else if (*s >= '0' && *s <= '9') *p++ = 0x40 + *s - '0';
-                else if (*s == 39) *p++ = 0x69;
-                else *p++ = 0xFFD;
-                s++;
-            }
-            *p = 0xFFFF;
-            text_draw_plain(ot, event_text, 192, 52);
-        }
-    }
-#endif
 }
 
 /* Draw the thirty day cells, from the starting phase. */

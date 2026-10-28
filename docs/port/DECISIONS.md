@@ -2246,8 +2246,11 @@ When splitting or moving stacked items in the rucksack menu, show the native-sty
 quantity selector dialog with D-pad input (+-1, +-10) and item preview. Draw connected
 fences as two-tiered shaded wooden rails with highlight/shadow behind the posts.
 The clock HUD is preserved at base_x = 228 to avoid clipping against the 320-pixel UI buffer.
-The stamina HUD is positioned at top-left (14, 16) with dimensions (110, 32), drawing authentic
-Start Menu Pete head and heart sprites dynamically loaded from the disc status pack.
+The stamina HUD is positioned at top-left (14, 16) with compact dimensions (84, 20), drawing a scaled
+Pete head and authentic affection hearts (anim 4) from the status screen; it hides automatically when
+menus, dialogs, or the toolbox are open.
+Calendar birthday/event previews in the top-right are removed in favor of opening authentic event
+dialogue boxes upon pressing the Cross (X) button.
 
 Consequences: Vanilla parity maintained when options are OFF. All 115 unit tests
 pass. Interactive gameplay testing performed by the owner.

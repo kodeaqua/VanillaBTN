@@ -505,6 +505,13 @@ static void status_draw_stamina_hud(void) {
     int i;
     u32 k;
 
+    if (game_state.globalFlags & (GLOBAL_FLAG_MENU_OPEN | GLOBAL_FLAG_PAUSED | GLOBAL_FLAG_TRANSITION)) {
+        return;
+    }
+    if (game_state.system.menuState != MENU_STATE_IDLE) {
+        return;
+    }
+
     if (status_page_sprites[0].source == NULL) {
         afile_read_bytes(STATUS_PACK_FILE, 0, STATUS_PACK_BYTES, STAGING_BUFFER, 1, 1);
         while (afile_read_bytes(STATUS_PACK_FILE, 0, STATUS_PACK_BYTES, STAGING_BUFFER, 1, 0) == 0) {
@@ -528,21 +535,21 @@ static void status_draw_stamina_hud(void) {
     if (active_hearts > 10)
         active_hearts = 10;
 
-    /* Window frame: top-left (14, 16), width 110, height 32 - aligns with clock HUD */
-    window_frame_draw_at(&current_frame->otTags[0][36], 1, base_x, base_y, 110, 32);
+    /* Compact window frame: top-left (14, 16), width 84, height 20 */
+    window_frame_draw_at(&current_frame->otTags[0][36], 1, base_x, base_y, 84, 20);
 
-    /* Pete head icon: authentic start menu asset status_page_sprites[0], anim 0, frame 0 */
-    px = base_x + 6;
-    py = base_y + 8;
-    anim_draw_sprt_cursor(&current_frame->otTags[0][26], &status_page_sprites[0], 0, 0, px, py);
+    /* Pete head icon: scaled down to fit sleekly and vertically centered */
+    px = base_x + 5;
+    py = base_y + 5;
+    anim_draw_ft4_cursor(&current_frame->otTags[0][35], &status_page_sprites[0], 0, 0, px, py, 0x900, 0, 0);
 
-    /* Hearts: authentic start menu asset status_cursor_sprite, anim 5 (power berry heart) */
-    hx = base_x + 28;
-    hy = base_y + 12;
+    /* Hearts: authentic heart icon from status screen (animation 4), vertically centered */
+    hx = base_x + 18;
+    hy = base_y + 6;
     for (i = 0; i < 10; i++) {
-        s16 x = hx + i * 7;
+        s16 x = hx + i * 6;
         if (i < active_hearts) {
-            anim_draw_sprt_cursor(&current_frame->otTags[0][26], &status_cursor_sprite, 5, 0, x, hy);
+            anim_draw_sprt_cursor(&current_frame->otTags[0][35], &status_cursor_sprite, 4, 0, x, hy);
         }
     }
 }
