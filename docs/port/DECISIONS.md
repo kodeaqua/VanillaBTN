@@ -2191,3 +2191,31 @@ Consequences: Double-clicking the exe works when the BIN sits beside it or was
 used once before. Selecting a different disc requires passing the argument
 again. Unit tests cover JSON path encoding and the locate order with isolated
 roots and a fake validator; no real disc or gameplay was used. No file picker.
+
+<a id="adr-079"></a>
+
+## ADR-079: Private wide primitive arena for model and field packets
+
+Date: 2026-10-28. Status: accepted.
+
+Context: At 21:9 and wider the shipping bin disappeared and its area stayed empty.
+ADR-056 stops model submission with an 8 KiB UI reserve once the original
+96000-byte per-frame primitive arena fills, and warned that dense scenes can omit
+geometry. The wide frustum and field radius (about 2.7x at 32:9) submit far more
+packets, so late model parts, such as the bin, were dropped. This cause is inferred
+from the code and the documented limit; it was not reproduced or measured with a
+running game.
+
+Decision: While wide world drawing is active, point each frame record's primStart
+at a private 1 MiB arena, restored when widescreen or the world scene ends. This
+uses the same switch point as the wide GS work arenas. primBuffer and primSize keep
+describing the original region because overlay backup copies use them. The model
+reserve test now asks hm_widescreen_prim_full, which measures the active arena
+(eight guarded lines in model.c), and replay/interpolation arena bounds follow
+hm_game_prim_capacity. A one-time stderr line is printed if even the private arena
+is exhausted.
+
+Consequences: 2 MiB of static memory when the widescreen module is compiled. OFF
+uses the original region and bounds unchanged. If the bin still vanishes and the
+stderr line appears, the arena is still too small; if it does not appear, the cause
+lies elsewhere. Unit test updated; no gameplay was run.

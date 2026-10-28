@@ -35,14 +35,20 @@ int main(void) {
     hm_game_set_work_base(work[0]);
     CHECK(cursor == current_frame->workBase && cursor != work[0] &&
           current_frame->workSize == 262144);
-    CHECK(current_frame->primSize == 96000 && current_frame->primStart == primitive[0] &&
-          current_frame->primBuffer == primitive[0]);
+    /* Only primStart moves; primBuffer/primSize keep the original region for overlay backups. */
+    CHECK(current_frame->primSize == 96000 && current_frame->primBuffer == primitive[0]);
+    CHECK(current_frame->primStart != primitive[0] && hm_game_prim_capacity() == 1048576);
+    u8 *wide_start = current_frame->primStart;
+    CHECK(!hm_widescreen_prim_full(wide_start + 96000));
+    CHECK(!hm_widescreen_prim_full(wide_start + 1048576 - 52 - 8192));
+    CHECK(hm_widescreen_prim_full(wide_start + 1048576 - 52 - 8192 + 1));
     u8 *next = (u8 *)cursor + 128;
     hm_game_set_work_base(next);
     CHECK(cursor == next); /* Allocation must advance. */
     hm_widescreen_configure(0, 1920, 1080);
     hm_game_set_work_base(current_frame->workBase);
     CHECK(cursor == work[0] && current_frame->workSize == 24000);
+    CHECK(current_frame->primStart == primitive[0] && hm_game_prim_capacity() == 96000);
     current_frame = &frame_records[1];
     hm_widescreen_configure(1, 1920, 1080);
     hm_game_set_work_base(work[1]);
@@ -53,6 +59,7 @@ int main(void) {
     hm_widescreen_configure(0, 1920, 1080);
     hm_game_set_work_base(current_frame->workBase);
     CHECK(cursor == work[1] && !hm_widescreen_margin());
+    CHECK(current_frame->primStart == primitive[1] && current_frame->primBuffer == primitive[1]);
     puts("Wide GS arenas preserve allocation cursor, OFF layout and overlay backup primitives");
     return 0;
 }

@@ -803,3 +803,7 @@ source, header, source guard, game data or save representation was changed.
 HMBTN_PORT guard under ADR-077: people/player.c replaces the HOPS[row][facing]
 read that overruns move_steps_large into the adjacent hop_steps object with
 explicit row selection (move_steps_large for row 0, hop_steps for row 1).
+
+HMBTN_PORT guards changed under ADR-079: the eight widescreen UI-reserve checks in
+geometry/model.c now call hm_widescreen_prim_full instead of comparing against
+primStart + primSize. Their original (#else) behavior is unchanged.

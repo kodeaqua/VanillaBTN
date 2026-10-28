@@ -434,7 +434,7 @@ static void model_draw_tmd_object(TmdObject *table, TmdObject *object) {
 loopF3:
 #if defined(HMBTN_PORT) && defined(HMBTN_ENH_WIDESCREEN)
     /* PORT: retain a UI reserve in the native arena ? see docs/port/DECISIONS.md#adr-056 */
-    if (hm_widescreen_margin() && prim > current_frame->primStart + current_frame->primSize - 52 - 8192) goto done;
+    if (hm_widescreen_margin() && hm_widescreen_prim_full(prim)) goto done;
 #endif
     if (count <= 0) {
         goto done;
@@ -485,7 +485,7 @@ loopF3:
 loopG3:
 #if defined(HMBTN_PORT) && defined(HMBTN_ENH_WIDESCREEN)
     /* PORT: retain a UI reserve in the native arena ? see docs/port/DECISIONS.md#adr-056 */
-    if (hm_widescreen_margin() && prim > current_frame->primStart + current_frame->primSize - 52 - 8192) goto done;
+    if (hm_widescreen_margin() && hm_widescreen_prim_full(prim)) goto done;
 #endif
     if (count <= 0) {
         goto done;
@@ -538,7 +538,7 @@ loopG3:
 loopFT3:
 #if defined(HMBTN_PORT) && defined(HMBTN_ENH_WIDESCREEN)
     /* PORT: retain a UI reserve in the native arena ? see docs/port/DECISIONS.md#adr-056 */
-    if (hm_widescreen_margin() && prim > current_frame->primStart + current_frame->primSize - 52 - 8192) goto done;
+    if (hm_widescreen_margin() && hm_widescreen_prim_full(prim)) goto done;
 #endif
     if (count <= 0) {
         goto done;
@@ -592,7 +592,7 @@ loopFT3:
 loopGT3:
 #if defined(HMBTN_PORT) && defined(HMBTN_ENH_WIDESCREEN)
     /* PORT: retain a UI reserve in the native arena ? see docs/port/DECISIONS.md#adr-056 */
-    if (hm_widescreen_margin() && prim > current_frame->primStart + current_frame->primSize - 52 - 8192) goto done;
+    if (hm_widescreen_margin() && hm_widescreen_prim_full(prim)) goto done;
 #endif
     if (count <= 0) {
         goto done;
@@ -648,7 +648,7 @@ loopGT3:
 loopF4:
 #if defined(HMBTN_PORT) && defined(HMBTN_ENH_WIDESCREEN)
     /* PORT: retain a UI reserve in the native arena ? see docs/port/DECISIONS.md#adr-056 */
-    if (hm_widescreen_margin() && prim > current_frame->primStart + current_frame->primSize - 52 - 8192) goto done;
+    if (hm_widescreen_margin() && hm_widescreen_prim_full(prim)) goto done;
 #endif
     if (count <= 0) {
         goto done;
@@ -707,7 +707,7 @@ loopF4:
 loopG4:
 #if defined(HMBTN_PORT) && defined(HMBTN_ENH_WIDESCREEN)
     /* PORT: retain a UI reserve in the native arena ? see docs/port/DECISIONS.md#adr-056 */
-    if (hm_widescreen_margin() && prim > current_frame->primStart + current_frame->primSize - 52 - 8192) goto done;
+    if (hm_widescreen_margin() && hm_widescreen_prim_full(prim)) goto done;
 #endif
     if (count <= 0) {
         goto done;
@@ -769,7 +769,7 @@ loopG4:
 loopFT4:
 #if defined(HMBTN_PORT) && defined(HMBTN_ENH_WIDESCREEN)
     /* PORT: retain a UI reserve in the native arena ? see docs/port/DECISIONS.md#adr-056 */
-    if (hm_widescreen_margin() && prim > current_frame->primStart + current_frame->primSize - 52 - 8192) goto done;
+    if (hm_widescreen_margin() && hm_widescreen_prim_full(prim)) goto done;
 #endif
     if (count <= 0) {
         goto done;
@@ -832,7 +832,7 @@ loopFT4:
 loopGT4:
 #if defined(HMBTN_PORT) && defined(HMBTN_ENH_WIDESCREEN)
     /* PORT: retain a UI reserve in the native arena ? see docs/port/DECISIONS.md#adr-056 */
-    if (hm_widescreen_margin() && prim > current_frame->primStart + current_frame->primSize - 52 - 8192) goto done;
+    if (hm_widescreen_margin() && hm_widescreen_prim_full(prim)) goto done;
 #endif
     if (count == 0) {
         goto done;

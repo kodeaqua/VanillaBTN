@@ -31,7 +31,7 @@ hm_render_frame hm_game_render_frame(void) {
                        (GLOBAL_FLAG_TRANSITION | GLOBAL_FLAG_TRANSITION_BEGIN |
                         GLOBAL_FLAG_TRANSITION_END | GLOBAL_FLAG_PAUSED | GLOBAL_FLAG_MENU_OPEN));
     frame.arena[0] = current_frame->primStart;
-    frame.arena_bytes[0] = current_frame->primSize > 0 ? (size_t)current_frame->primSize : 0;
+    frame.arena_bytes[0] = hm_game_prim_capacity();
     frame.arena[1] = current_frame->workBase;
     frame.arena_bytes[1] = current_frame->workSize;
     return frame;
