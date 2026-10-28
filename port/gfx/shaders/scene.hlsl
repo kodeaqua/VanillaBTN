@@ -38,6 +38,7 @@ uint interp_i(uint3 values,int3 w,int area){return (uint(w.x)*values.x+uint(w.y)
     uint(w.z)*values.z+uint(area/2))/uint(area);}
 uint interp_f(uint3 values,float3 w,float area){return uint(floor(dot(float3(values),w)/area+0.5));}
 #include "../../enhance/filtering/texture.hlsl"
+#include "../../enhance/antialiasing/msaa.hlsl"
 [numthreads(8,8,1)]
 void main(uint3 id:SV_DispatchThreadID){
     uint width=load_word(0),height=load_word(1);if(id.x>=width||id.y>=height)return;
@@ -48,6 +49,8 @@ void main(uint3 id:SV_DispatchThreadID){
     bool bilinear_enabled=load_word(11)!=0;
     uint color=(logical.x<int(load_word(12))||logical.x>=int(load_word(12)+load_word(13)))?
         load_word(14):vram(logical.x,logical.y);
+    uint samples=load_word(15);if(samples!=2&&samples!=4)samples=1;
+    uint sample_colors[4]={color,color,color,color};
     uint bin=load_word(9)+uint((local.y/16)*int(load_word(6))+local.x/16)*257;
     uint count=load_word(bin);
     [loop]for(uint item=0;item<count;++item){
@@ -56,11 +59,14 @@ void main(uint3 id:SV_DispatchThreadID){
         if(any(logical<clip)||any(logical>=clip_end))continue;
         int2 display=int2(word(p,13),word(p,14)),display_end=display+int2(word(p,15),word(p,16));
         if(!(flags&2)&&word(p,17)&&all(logical>=display)&&all(logical<display_end))continue;
-        if((flags&8)&&(color&32768))continue;
+        uint coverage=(1u<<samples)-1;
+        [unroll]for(uint mask_sample=0;mask_sample<4;++mask_sample){if(mask_sample>=samples)break;
+            if((flags&8)&&(sample_colors[mask_sample]&32768))coverage&=~(1u<<mask_sample);}
+        if(!coverage)continue;
         uint3 light=rgb(word(p,24));uint2 st=uv(word(p,27));
         int2 filtered_uv=int2(st)*256;uint4 texture_bounds=uint4(st,st);
         bool textured=(op&4)!=0,raw=textured&&((op&1)!=0);
-        bool exact_native=native&&!(flags&32);
+        bool exact_native=native&&!(flags&32)&&samples==1;
         if(word(p,0)==0){
             int2 a=int2(word(p,18),word(p,19)),b=int2(word(p,20),word(p,21)),c=int2(word(p,22),word(p,23));
             int3 wi=0;float3 wf=0;int ai=0;float af=0;
@@ -72,11 +78,14 @@ void main(uint3 id:SV_DispatchThreadID){
                 float2 bb=float2(int2(word(p,36),word(p,37)))/256.0;
                 float2 cc=float2(int2(word(p,38),word(p,39)))/256.0;
                 float2 center=float2(id.xy)+0.5;
-                wf=float3(edge_f(bb,cc,center),edge_f(cc,aa,center),edge_f(aa,bb,center));af=edge_f(aa,bb,cc);
                 int2 qa=int2(word(p,34),word(p,35)),qb=int2(word(p,36),word(p,37)),qc=int2(word(p,38),word(p,39));
+                if(samples>1){coverage&=hm_aa_triangle(qa,qb,qc,id.xy,samples);if(!coverage)continue;
+                    center=hm_aa_center(id.xy,coverage,samples);}
+                wf=float3(edge_f(bb,cc,center),edge_f(cc,aa,center),edge_f(aa,bb,center));af=edge_f(aa,bb,cc);
                 int2 sample_q8=int2(id.xy)*256+128;
                 int3 signs=int3(hm_edge_sign(qb,qc,sample_q8,wf.x),hm_edge_sign(qc,qa,sample_q8,wf.y),hm_edge_sign(qa,qb,sample_q8,wf.z));
-                if(af<=0||any(signs<0)||(signs.x==0&&!top_left_f(bb,cc))||(signs.y==0&&!top_left_f(cc,aa))||(signs.z==0&&!top_left_f(aa,bb)))continue;
+                if(af<=0)continue;
+                if(samples==1&&(any(signs<0)||(signs.x==0&&!top_left_f(bb,cc))||(signs.y==0&&!top_left_f(cc,aa))||(signs.z==0&&!top_left_f(aa,bb))))continue;
                 wf=max(wf,0);
             }
             uint3 r0=rgb(word(p,24)),r1=rgb(word(p,25)),r2=rgb(word(p,26));
@@ -92,16 +101,21 @@ void main(uint3 id:SV_DispatchThreadID){
             texture_bounds=uint4(st,st+uint2(word(p,32),word(p,33))-1);
             if(flags&32){float2 low=float2(int2(word(p,35),word(p,36)))/256.0;
                 float2 high=float2(int2(word(p,37),word(p,38)))/256.0,center=float2(id.xy)+0.5;
-                if(any(center<low)||any(center>=high))continue;
+                if(samples>1){coverage&=hm_aa_rect(int2(word(p,35),word(p,36)),int2(word(p,37),word(p,38)),id.xy,samples);
+                    if(!coverage)continue;center=hm_aa_center(id.xy,coverage,samples);}
+                else if(any(center<low)||any(center>=high))continue;
                 delta=int2(floor((center-low)*float2(logical_size)/float2(width,height)));
-                if(bilinear_enabled){int2 fixed_center=int2(id.xy)*256+128-int2(word(p,35),word(p,36));
+                if(bilinear_enabled){int2 fixed_center=int2(floor(center*256.0))-int2(word(p,35),word(p,36));
                     filtered_uv=int2(st)*256+int2((uint2(fixed_center)*logical_size+uint2(width,height)/2)/uint2(width,height))-128;}
             }else{delta=logical-int2(word(p,30),word(p,31));
                 if(any(delta<0)||delta.x>=int(word(p,32))||delta.y>=int(word(p,33)))continue;
                 if(bilinear_enabled){uint2 center_q8=((2*id.xy+1)*logical_size*128+uint2(width,height)/2)/uint2(width,height);
                     filtered_uv=int2(st)*256+int2(center_q8)+(origin-int2(word(p,30),word(p,31)))*256-128;}}
             st+=uint2(delta);}
-        if(textured&&bilinear_enabled){color=hm_filter_compose(p,filtered_uv,texture_bounds,light,logical,color);continue;}
+        if(textured&&bilinear_enabled){
+            [unroll]for(uint filtered_sample=0;filtered_sample<4;++filtered_sample){if(filtered_sample>=samples)break;
+                if(coverage&(1u<<filtered_sample))sample_colors[filtered_sample]=hm_filter_compose(p,filtered_uv,texture_bounds,light,logical,sample_colors[filtered_sample]);}
+            continue;}
         uint sample_color=textured?texel(p,st):0;if(textured&&sample_color==0)continue;
         uint source=sample_color&32768;
         if(raw)source=sample_color;
@@ -112,12 +126,19 @@ void main(uint3 id:SV_DispatchThreadID){
             }else{if(textured)value=min(tex*value/128,31);
                 else{if(word(p,34)&&(flags&1))value=clamp(value+dither(logical),0,255);value>>=3;}}
             source|=uint(value.x|(value.y<<5)|(value.z<<10));}
+        [unroll]for(uint blend_sample=0;blend_sample<4;++blend_sample){if(blend_sample>=samples)break;
+        if(!(coverage&(1u<<blend_sample)))continue;
+        uint result=source,background=sample_colors[blend_sample];
         if((op&2)&&(!textured||(sample_color&32768))){
-            int3 back=int3(color&31,(color>>5)&31,(color>>10)&31),front=int3(source&31,(source>>5)&31,(source>>10)&31);
+            int3 back=int3(background&31,(background>>5)&31,(background>>10)&31),front=int3(source&31,(source>>5)&31,(source>>10)&31);
             uint mode=(word(p,2)>>5)&3;int3 mixed=mode==0?back/2+front/2:mode==1?back+front:mode==2?back-front:back+front/4;
-            mixed=clamp(mixed,0,31);source=(source&32768)|uint(mixed.x|(mixed.y<<5)|(mixed.z<<10));}
-        color=source|((flags&4)?32768:0);
+            mixed=clamp(mixed,0,31);result=(source&32768)|uint(mixed.x|(mixed.y<<5)|(mixed.z<<10));}
+        sample_colors[blend_sample]=result|((flags&4)?32768:0);}
     }
-    uint3 c=uint3(color&31,(color>>5)&31,(color>>10)&31);c=(c<<3)|(c>>2);
+    uint3 sum=0;
+    [unroll]for(uint resolve_sample=0;resolve_sample<4;++resolve_sample){if(resolve_sample>=samples)break;
+        uint pixel=sample_colors[resolve_sample];uint3 value=uint3(pixel&31,(pixel>>5)&31,(pixel>>10)&31);
+        sum+=(value<<3)|(value>>2);}
+    uint3 c=(sum+samples/2)/samples;
     output_image[id.xy]=float4(float3(c)/255.0,1.0);
 }

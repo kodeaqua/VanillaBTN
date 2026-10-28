@@ -1,10 +1,13 @@
 #ifndef HMBTN_PLATFORM_GRAPHICS_OPTIONS_H
 #define HMBTN_PLATFORM_GRAPHICS_OPTIONS_H
 #include "platform/presentation_clock.h"
+#include "enhance/antialiasing/antialiasing.h"
 #include <SDL3/SDL.h>
 typedef struct {
     int monitor, mode, width, height, linear, vsync, interpolation, scaling, widescreen;
     int renderer, gpu_active;           /* 0 = GPU Auto, 1 = Software; active is transient. */
+    int antialiasing;
+    unsigned aa_capabilities; /* Transient supported-mode bitmask; never serialized. */
     int fps_numerator, fps_denominator; /* 0 = Native (30); -1 = Off (Unlimited). */
 } hm_graphics_options;
 void hm_graphics_defaults(hm_graphics_options *options);

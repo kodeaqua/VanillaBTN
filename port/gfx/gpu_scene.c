@@ -15,6 +15,7 @@ struct hm_gpu_scene {
     u16 background;
     const char *failure;
     int begun, texture_linear;
+    unsigned multisamples;
     u64 revision;
     const u32 *motion_previous, *motion_current;
     u32 motion_count, motion_alpha;
@@ -429,6 +430,9 @@ static void hm_scene_command(void *context, const u32 *w, u32 available, int aft
 hm_gpu_scene *hm_gpu_scene_create(void) { return calloc(1, sizeof(hm_gpu_scene)); }
 void hm_gpu_scene_destroy(hm_gpu_scene *s) { free(s); }
 void hm_gpu_scene_texture_filter(hm_gpu_scene *s, int linear) { s->texture_linear = !!linear; }
+void hm_gpu_scene_multisamples(hm_gpu_scene *s, unsigned samples) {
+    s->multisamples = samples == 2 || samples == 4 ? samples : 1;
+}
 static u32 hm_scene_consume(void *context, const u32 *w, u32 available) {
     if (!available)
         return 0;
@@ -519,6 +523,7 @@ int hm_gpu_scene_end(hm_gpu_scene *s, hm_replay_sink previous, hm_gpu_scene_data
     s->packed[12] = s->native.x;
     s->packed[13] = s->native.w;
     s->packed[14] = s->background;
+    s->packed[15] = s->multisamples == 2 || s->multisamples == 4 ? s->multisamples : 1;
     memcpy(s->packed + primitives, s->primitives, s->count * HM_SCENE_STRIDE * sizeof(u32));
     memcpy(s->packed + bins, s->bins, s->tiles_x * s->tiles_y * HM_SCENE_BIN_WORDS * sizeof(u32));
     *data = (hm_gpu_scene_data){s->packed, (size_t)total * sizeof(u32), ++s->revision, s->width,

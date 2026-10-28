@@ -11,6 +11,12 @@ static void hm_validate_rate(hm_graphics_options *options);
 
 void hm_graphics_defaults(hm_graphics_options *o) {
     *o = (hm_graphics_options){.width = 640, .height = 480, .vsync = 1, .fps_denominator = 1};
+    o->aa_capabilities =
+#ifdef HMBTN_ENH_ANTIALIASING
+        (1u << HM_AA_COUNT) - 1;
+#else
+        1;
+#endif
 }
 void hm_graphics_load(hm_graphics_options *o) {
     hm_graphics_defaults(o);
@@ -75,6 +81,13 @@ void hm_graphics_load(hm_graphics_options *o) {
         wide_length == 4 && !SDL_memcmp(wide_value, "true", 4))
         o->widescreen = 1;
 #endif
+#ifdef HMBTN_ENH_ANTIALIASING
+    if (bytes >= 0 && hm_json_property(text, (size_t)bytes, "enhance", &object, &length) == 1)
+        hm_json_integer(object, length, "antialiasing", &o->antialiasing);
+    if (o->antialiasing < HM_AA_OFF || o->antialiasing >= HM_AA_COUNT ||
+        (o->renderer && o->antialiasing >= HM_AA_MSAA2))
+        o->antialiasing = HM_AA_OFF;
+#endif
     SDL_free(text);
     hm_validate_rate(o);
 }
@@ -103,6 +116,13 @@ int hm_graphics_save(const hm_graphics_options *o) {
     if (ok)
         ok = hm_user_data_set_nested_setting("enhance", "widescreen",
                                              o->widescreen ? "true" : "false");
+#endif
+#ifdef HMBTN_ENH_ANTIALIASING
+    if (ok) {
+        char mode[16];
+        SDL_snprintf(mode, sizeof(mode), "%d", o->antialiasing);
+        ok = hm_user_data_set_nested_setting("enhance", "antialiasing", mode);
+    }
 #endif
     return ok;
 }
@@ -277,6 +297,17 @@ int hm_graphics_change(SDL_GPUDevice *device, SDL_Window *window, hm_graphics_op
                        int direction) {
     hm_graphics_options candidate = *o;
     int step = direction < 0 ? -1 : 1;
+#ifdef HMBTN_ENH_ANTIALIASING
+    if (item == 5) {
+        unsigned supported = o->aa_capabilities & (o->renderer ? 3u : 15u);
+        int next = hm_antialiasing_cycle(o->antialiasing, step, supported);
+        if (next == o->antialiasing) return 0;
+        o->antialiasing = next;
+        return 1;
+    }
+    if (item == 10 && !o->renderer && o->antialiasing >= HM_AA_MSAA2)
+        return 0; /* Keep the selected mode explicit: Software offers Off/FXAA. */
+#endif
     if (item == 6) {
         o->linear = !o->linear;
         return 1;
@@ -422,7 +453,16 @@ void hm_graphics_value(const hm_graphics_options *o, int item, char *text, size_
                                "Bilinear - presentation"
 #endif
                                : "Nearest Neighbor");
-    else if (item == 10)
+    else if (item == 5) {
+#ifdef HMBTN_ENH_ANTIALIASING
+        SDL_snprintf(text, capacity, "%s%s", hm_antialiasing_name(o->antialiasing),
+                     o->antialiasing >= HM_AA_MSAA2 ?
+                         (o->gpu_active ? " - GPU scenes" : " - inactive on CPU frames") :
+                     o->antialiasing == HM_AA_FXAA ? " - final image" : "");
+#else
+        SDL_snprintf(text, capacity, "Off");
+#endif
+    } else if (item == 10)
         SDL_snprintf(text, capacity, "%s",
                      o->renderer     ? "Software"
                      : o->gpu_active ? "GPU - active"
@@ -461,6 +501,13 @@ void hm_graphics_row_value(const hm_graphics_options *o, int item, char *text, s
         SDL_snprintf(text, capacity, "%s", o->interpolation ? "On" : "Off");
     else if (item == 6)
         SDL_snprintf(text, capacity, "%s", o->linear ? "Bilinear" : "Nearest");
+    else if (item == 5) {
+#ifdef HMBTN_ENH_ANTIALIASING
+        SDL_snprintf(text, capacity, "%s", hm_antialiasing_name(o->antialiasing));
+#else
+        SDL_snprintf(text, capacity, "Off");
+#endif
+    }
     else if (item == 10)
         SDL_snprintf(text, capacity, "%s", o->renderer ? "Software" : "GPU Auto");
     else

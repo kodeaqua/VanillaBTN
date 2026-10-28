@@ -22,23 +22,29 @@ if (-not (Test-Path -LiteralPath $compiler)) {
 $outputRoot = Join-Path $repoRoot 'build/port/shaders'
 New-Item -ItemType Directory -Force -Path $outputRoot | Out-Null
 $utf8 = New-Object System.Text.UTF8Encoding($false)
-$source = [IO.File]::ReadAllText((Join-Path $repoRoot 'port/gfx/shaders/scene.hlsl')).Replace("`r`n", "`n")
-$source += "`n/* filtering */`n" + [IO.File]::ReadAllText((Join-Path $repoRoot 'port/enhance/filtering/texture.hlsl')).Replace("`r`n", "`n")
-$hasher = [Security.Cryptography.SHA256]::Create()
-$sourceHash = -join ($hasher.ComputeHash($utf8.GetBytes($source)) | ForEach-Object { $_.ToString('x2') })
-$hasher.Dispose()
 Push-Location $repoRoot
 try {
+    foreach ($program in @('scene', 'fxaa')) {
+    $folder = if ($program -eq 'scene') { 'port/gfx/shaders' } else { 'port/enhance/antialiasing' }
+    $shaderPath = "$folder/$program.hlsl"
+    $source = [IO.File]::ReadAllText((Join-Path $repoRoot $shaderPath)).Replace("`r`n", "`n")
+    if ($program -eq 'scene') {
+        $source += "`n/* filtering */`n" + [IO.File]::ReadAllText((Join-Path $repoRoot 'port/enhance/filtering/texture.hlsl')).Replace("`r`n", "`n")
+        $source += "`n/* multisampling */`n" + [IO.File]::ReadAllText((Join-Path $repoRoot 'port/enhance/antialiasing/msaa.hlsl')).Replace("`r`n", "`n")
+    }
+    $hasher = [Security.Cryptography.SHA256]::Create()
+    $sourceHash = -join ($hasher.ComputeHash($utf8.GetBytes($source)) | ForEach-Object { $_.ToString('x2') })
+    $hasher.Dispose()
     foreach ($format in @('spirv', 'dxil')) {
-        $binary = Join-Path $outputRoot "scene.$format"
+        $binary = Join-Path $outputRoot "$program.$format"
         $arguments = @('-T', 'cs_6_0', '-E', 'main', '-O3', '-Qstrip_debug', '-Fo', $binary)
         if ($format -eq 'spirv') { $arguments += @('-spirv', '-fspv-target-env=vulkan1.0') }
-        & $compiler @arguments 'port/gfx/shaders/scene.hlsl'
-        if ($LASTEXITCODE -ne 0) { throw "Shader compilation failed: $format" }
+        & $compiler @arguments $shaderPath
+        if ($LASTEXITCODE -ne 0) { throw "Shader compilation failed: $program $format" }
         $bytes = [IO.File]::ReadAllBytes($binary)
         $text = New-Object Text.StringBuilder
         [void]$text.Append("/* Normalized source SHA256: $sourceHash */`n/* Own HLSL; DXC v1.8.2505.1. */`n")
-        [void]$text.Append("_Alignas(4) static const unsigned char hm_scene_$format[] = {`n")
+        [void]$text.Append("_Alignas(4) static const unsigned char hm_${program}_$format[] = {`n")
         for ($i = 0; $i -lt $bytes.Length; $i++) {
             if ($i % 16 -eq 0) { [void]$text.Append('    ') }
             if ($i % 16 -ne 0) { [void]$text.Append(' ') }
@@ -46,7 +52,8 @@ try {
             if ($i % 16 -eq 15) { [void]$text.Append("`n") }
         }
         [void]$text.Append("`n};`n")
-        [IO.File]::WriteAllText((Join-Path $repoRoot "port/gfx/shaders/scene_$format.h"), $text.ToString(), $utf8)
+        [IO.File]::WriteAllText((Join-Path $repoRoot "$folder/${program}_$format.h"), $text.ToString(), $utf8)
+    }
     }
 } finally { Pop-Location }
 Write-Host 'Own SPIR-V/DXIL shader headers regenerated.'
