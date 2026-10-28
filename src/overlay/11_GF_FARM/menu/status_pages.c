@@ -505,10 +505,8 @@ static void status_draw_stamina_hud(void) {
     int i;
     u32 k;
 
-    if (game_state.globalFlags & (GLOBAL_FLAG_MENU_OPEN | GLOBAL_FLAG_PAUSED | GLOBAL_FLAG_TRANSITION)) {
-        return;
-    }
-    if (game_state.system.menuState != MENU_STATE_IDLE) {
+    /* Hide HUD only when full-screen menus/storage are open or during scene transitions */
+    if (game_state.globalFlags & (GLOBAL_FLAG_MENU_OPEN | GLOBAL_FLAG_TRANSITION)) {
         return;
     }
 
@@ -535,17 +533,17 @@ static void status_draw_stamina_hud(void) {
     if (active_hearts > 10)
         active_hearts = 10;
 
-    /* Compact window frame: top-left (14, 16), width 84, height 20 */
-    window_frame_draw_at(&current_frame->otTags[0][36], 1, base_x, base_y, 84, 20);
+    /* Compact window frame: top-left (14, 16), width 90, height 20 */
+    window_frame_draw_at(&current_frame->otTags[0][36], 1, base_x, base_y, 90, 20);
 
     /* Pete head icon: scaled down to fit sleekly and vertically centered */
     px = base_x + 5;
-    py = base_y + 5;
+    py = base_y + 3;
     anim_draw_ft4_cursor(&current_frame->otTags[0][35], &status_page_sprites[0], 0, 0, px, py, 0x900, 0, 0);
 
-    /* Hearts: authentic heart icon from status screen (animation 4), vertically centered */
-    hx = base_x + 18;
-    hy = base_y + 6;
+    /* Hearts: authentic heart icon from status screen (animation 4), with generous gap from Pete */
+    hx = base_x + 23;
+    hy = base_y + 5;
     for (i = 0; i < 10; i++) {
         s16 x = hx + i * 6;
         if (i < active_hearts) {

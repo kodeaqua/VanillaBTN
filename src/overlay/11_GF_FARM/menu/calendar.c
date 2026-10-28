@@ -316,15 +316,28 @@ static void farm_calendar_select_message(u_long *unused0, u_long *unused1, s16 y
                 const char *s = custom_event;
                 while (*s && p < custom_msg + 60) {
                     u16 c;
-                    if (*s >= 'A' && *s <= 'Z') c = *s - 'A';
-                    else if (*s >= 'a' && *s <= 'z') c = *s - 'a' + 26;
-                    else if (*s >= '0' && *s <= '9') c = 0x40 + *s - '0';
-                    else if (*s == '\'') c = 0x69;
-                    else if (*s == '-') c = 0x69;
-                    else if (*s == '!') c = 0x63;
-                    else if (*s == '?') c = 0x62;
-                    else if (*s == '.') c = 0x67;
-                    else c = 0xFFD;
+                    if (*s == '\'' && *(s + 1) == 's') {
+                        c = 0x51;
+                        s++;
+                    } else if (*s >= 'A' && *s <= 'Z') {
+                        c = *s - 'A';
+                    } else if (*s >= 'a' && *s <= 'z') {
+                        c = *s - 'a' + 0x20;
+                    } else if (*s >= '0' && *s <= '9') {
+                        c = *s - '0' + 0x40;
+                    } else if (*s == '\'') {
+                        c = 0x8C;
+                    } else if (*s == '.') {
+                        c = 0x6C;
+                    } else if (*s == '!') {
+                        c = 0x63;
+                    } else if (*s == '?') {
+                        c = 0x62;
+                    } else if (*s == '-') {
+                        c = 0x69;
+                    } else {
+                        c = 0xFFD;
+                    }
                     *p++ = c;
                     *sec++ = c;
                     s++;
