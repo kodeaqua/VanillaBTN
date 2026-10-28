@@ -2249,3 +2249,44 @@ fences as two-tiered shaded wooden rails with highlight/shadow behind the posts.
 Consequences: Vanilla parity maintained when options are OFF. All 115 unit tests
 pass. Interactive gameplay testing performed by the owner.
 
+<a id="adr-081"></a>
+
+## ADR-081: Controls Settings and Input Backends (Gamepad, Keyboard, Mouse)
+
+Date: 2026-10-28. Status: accepted.
+
+Context: The owner requested a dedicated Settings > Controls interface in the ESC
+Pause Menu with options for Gamepad, Keyboard, and Mouse:
+1. Controller / Gamepad: Auto-detecting and mapping standard controllers (Xbox,
+   PlayStation, Switch Pro, etc.) via SDL3 Gamepad API.
+2. Keyboard: Configurable layout presets (Arrows + ZX, WASD + JK, or Off) for
+   movement, tool usage, rucksack, whistle, eating, running, and menu navigation.
+3. Mouse: Support for mouse interaction with modes (Off, Action, Move & Act with
+   click-to-walk).
+
+Decision:
+1. Implement port/platform/controls_options.h and controls_options.c managing:
+   - controller_enabled (1 = Enabled, 0 = Off)
+   - keyboard_layout (0 = Arrows+ZX, 1 = WASD+JK, 2 = Off)
+   - mouse_mode (0 = Off, 1 = Action, 2 = Move & Act)
+   - Configuration is persisted under the "controls" object in
+     Documents/BackToNature/settings.json.
+2. Integrate into ESC Pause Menu:
+   - Added "Controls" subpage to Settings menu (HM_PAUSE_CONTROLS).
+   - Detailed status bar descriptions and button layout prompts are displayed when
+     highlighting rows.
+   - Menu navigation supports keyboard, gamepad buttons, and mouse clicks.
+3. Input handling in port/platform/game_host.c:
+   - Gamepad: SDL3 Gamepad events (SDL_EVENT_GAMEPAD_ADDED,
+     SDL_EVENT_GAMEPAD_REMOVED), analog stick axis sampling with deadzone + D-pad
+     mapping, face buttons and triggers mapped to native PS1 pad bits (HM_PAD_*
+     constants in port/psx/pad.h).
+   - Keyboard: Scancode mapping for both Arrow and WASD presets.
+   - Mouse: Left click (Cross / Action), Right click (Square / Tool use), Middle
+     click (Triangle / Rucksack), Wheel Up/Down (L1/R1 cycling). In Move & Act mode,
+     holding Left Click computes a directional vector from screen center to cursor
+     and sets D-pad direction bits.
+
+Consequences: Multi-input options are fully configurable and persistent without
+altering vanilla game logic. Unit tests cover controls options cycle,
+serialization, and pause menu navigation (116/116 unit tests passing).

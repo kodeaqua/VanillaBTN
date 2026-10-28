@@ -116,9 +116,13 @@ void hm_pause_draw(const hm_pause_assets *assets, u8 *rgba, const hm_pause_menu 
         for (size_t channel = 0; channel < 3; ++channel)
             rgba[pixel * 4 + channel] = (u8)((u32)rgba[pixel * 4 + channel] * 3 / 5);
     hm_canvas = rgba;
-    if (menu->page == HM_PAUSE_GRAPHICS || menu->page == HM_PAUSE_GAMEPLAY) {
+    if (menu->page == HM_PAUSE_GRAPHICS || menu->page == HM_PAUSE_GAMEPLAY ||
+        menu->page == HM_PAUSE_CONTROLS) {
         hm_pause_original_frame(NULL, 12, 8, 296, 28);
-        hm_center(assets, menu->page == HM_PAUSE_GRAPHICS ? "Settings - Graphics" : "Settings - Gameplay", 16);
+        const char *title = menu->page == HM_PAUSE_GRAPHICS ? "Settings - Graphics"
+                            : (menu->page == HM_PAUSE_GAMEPLAY ? "Settings - Gameplay"
+                                                               : "Settings - Controls");
+        hm_center(assets, title, 16);
         char range[16];
         snprintf(range, sizeof(range), "(%d-%d)", menu->first_visible + 1,
                  menu->first_visible + HM_PAUSE_VISIBLE_ROWS);
@@ -143,8 +147,8 @@ void hm_pause_draw(const hm_pause_assets *assets, u8 *rgba, const hm_pause_menu 
                 24, 218);
     } else {
         int root = menu->page == HM_PAUSE_ROOT;
-        int top = root ? 54 : 72;
-        hm_pause_original_frame(NULL, 68, top, 184, root ? 132 : 96);
+        int top = root ? 54 : 58;
+        hm_pause_original_frame(NULL, 68, top, 184, root ? 132 : 124);
         hm_center(assets, root ? "Paused" : "Settings", top + 12);
         hm_pause_line(NULL, 84, top + 32, 236, top + 32, FRAME_DARK, 0);
         int row_start = top + 44;
