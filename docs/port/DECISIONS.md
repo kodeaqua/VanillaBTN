@@ -2118,3 +2118,29 @@ check all seven helper IDs, and exercise young/adult dog pickup and put-down in
 four directions with both affection-cue states. These isolated calls use no disc,
 game loop or owner save. Actual gameplay revalidation stays with the owner.
 ADR-074 is reserved for the separately parked multilingual work.
+
+## ADR-076: FXAA post-process and GPU scene MSAA 2x/4x
+
+Date: 2026-10-28. Status: accepted.
+
+Context: The owner explicitly requested antialiasing options. FXAA operates on
+the composited frame image before presentation (final-image, any renderer).
+MSAA 2x/4x is GPU-scene-only: the compute shader samples each primitive at 2
+or 4 sub-pixel positions and resolves by averaging; Software rendering does not
+support MSAA and the menu guards the selection. Both modes are gated by
+HMBTN_ENH_ANTIALIASING. Runtime default is Off; the CMake option defaults OFF
+but Windows -Game builds enable it.
+
+Decision: Add port/enhance/antialiasing/ with a mode enum (Off/FXAA/MSAA2/
+MSAA4), scalar Q8 triangle-coverage reference, MSAA HLSL helpers (msaa.hlsl),
+and FXAA shader + precompiled blobs (fxaa.hlsl, fxaa_dxil.h, fxaa_spirv.h).
+Extend scene.hlsl with per-sample colour arrays and coverage masks; regenerate
+scene_dxil.h and scene_spirv.h. Add platform/fxaa.c SDL_GPU pipeline wrapper.
+Wire aa_capabilities bitmask at startup from actual device support. Guard MSAA
+when Software is selected with a user-visible menu notice.
+
+Consequences: Antialiasing modes are independently tested via the scalar
+coverage reference and round-trip settings tests. GPU probes cover FXAA and
+MSAA pipeline creation. The vanilla OFF path is unchanged; all 102 Windows
+Release tests pass. CPU raster performance is unaffected. Interactive gameplay
+coverage and device-specific AA quality remain owner-tested.
