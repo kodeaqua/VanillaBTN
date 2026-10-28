@@ -43,9 +43,10 @@ int hm_sound_bank_has_voices(s32 bank) {
     return 0;
 }
 u32 hm_sound_note_pitch(s32 note, s32 fine, s32 center, s32 shift) {
-    if (note < 0 || note > 127 || fine < 0 || fine > 127 || center < 0 || center > 127 ||
-        shift < 0 || shift > 127)
-        hm_runtime_error("hm_sound_note_pitch", "invalid note or fine tuning");
+    if (note < 0) note = 0; else if (note > 127) note = 127;
+    if (fine < 0) fine = 0; else if (fine > 127) fine = 127;
+    if (center < 0) center = 0; else if (center > 127) center = 127;
+    if (shift < 0) shift = 0; else if (shift > 127) shift = 127;
     s32 offset = (note - center) * 127 + fine - shift;
     s32 octave = offset >= 0 ? offset / 1524 : -1 - ((-1 - offset) / 1524);
     u32 fraction = (u32)(offset - octave * 1524);
@@ -79,17 +80,20 @@ void SsUtAllKeyOff(s32 mode) {
 }
 s32 SsUtKeyOnV(s32 voice, s32 bank, s32 program, s32 tone, s32 note, s32 fine, s32 left,
                s32 right) {
-    hm_spu_voice *state = hm_sound_voice(voice, "SsUtKeyOnV");
+    if (voice < 0 || voice >= 24)
+        return -1;
+    hm_spu_voice *state = hm_voices + voice;
     const hm_sound_bank *vab = hm_sound_bank_get(bank);
-    const u8 *definition = hm_sound_bank_tone(bank, (u32)program, (u32)tone);
-    if (!vab || !definition || note < 0 || note > 127 || fine < 0 || fine > 127 || left < 0 ||
-        left > 127 || right < 0 || right > 127)
-        hm_runtime_error("SsUtKeyOnV", "invalid bank, tone, note or volume");
+    const u8 *definition = vab ? hm_sound_bank_tone(bank, (u32)program, (u32)tone) : NULL;
+    if (!vab || !definition || note < 0 || note > 127 || fine < 0 || fine > 127)
+        return -1;
+    if (left < 0) left = 0; else if (left > 127) left = 127;
+    if (right < 0) right = 0; else if (right > 127) right = 127;
     u32 bytes;
     u32 sample = (u32)definition[22] | ((u32)definition[23] << 8);
     const u8 *data = hm_sound_bank_sample(bank, sample, &bytes);
     if (!data)
-        hm_runtime_error("SsUtKeyOnV", "invalid or incomplete sample asset");
+        return -1;
     hm_sound_samples_release(hm_voice_ids[voice].samples);
     hm_voice_ids[voice].samples = hm_sound_samples_retain(bank);
     const u8 *prog = vab->header + 32 + (u32)program * 16;
@@ -153,9 +157,11 @@ void SsUtKeyOff(s32 voice, s32 bank, s32 program, s32 tone, s32 note) {
         SsUtKeyOffV(voice);
 }
 void SsUtSetVVol(s32 voice, s32 left, s32 right) {
-    hm_spu_voice *state = hm_sound_voice(voice, "SsUtSetVVol");
-    if (left < 0 || left > 127 || right < 0 || right > 127)
-        hm_runtime_error("SsUtSetVVol", "invalid volume");
+    if (voice < 0 || voice >= 24)
+        return;
+    hm_spu_voice *state = hm_voices + voice;
+    if (left < 0) left = 0; else if (left > 127) left = 127;
+    if (right < 0) right = 0; else if (right > 127) right = 127;
     state->left = (s16)(left * 32767 / 127);
     state->right = (s16)(right * 32767 / 127);
 }

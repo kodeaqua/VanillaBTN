@@ -43,10 +43,12 @@ s32 MemCardAccept(s32 port) { return hm_card_request(port, 1); }
 s32 MemCardExist(s32 port) { return hm_card_request(port, 1); }
 s32 MemCardSync(s32 mode, s32 *command, s32 *result) {
     hm_card_require("MemCardSync");
-    if ((mode != 0 && mode != 1) || !command || !result)
-        hm_runtime_error("MemCardSync", "invalid completion query");
-    *command = hm_card_command;
-    *result = hm_card_result;
+    if (mode != 0 && mode != 1)
+        return -1;
+    if (command)
+        *command = hm_card_command;
+    if (result)
+        *result = hm_card_result;
     if (!hm_card_pending)
         return -1;
     hm_card_pending = 0;
@@ -69,11 +71,13 @@ s32 McxCardType(s32 port) {
 }
 s32 McxSync(s32 mode, s32 *command, s32 *result) {
     if (!hm_mcx_started)
-        hm_runtime_error("McxSync", "PocketStation controller is not started");
-    if ((mode != 0 && mode != 1) || !command || !result)
-        hm_runtime_error("McxSync", "invalid completion query");
-    *command = hm_mcx_command;
-    *result = hm_mcx_result;
+        return -1;
+    if (mode != 0 && mode != 1)
+        return -1;
+    if (command)
+        *command = hm_mcx_command;
+    if (result)
+        *result = hm_mcx_result;
     if (!hm_mcx_pending)
         return -1;
     hm_mcx_pending = 0;
