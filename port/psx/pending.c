@@ -34,11 +34,6 @@ s32 FntOpen(s32 x, s32 y, s32 width, s32 height, s32 background, s32 characters)
     hm_unimplemented("FntOpen");
 }
 
-s32 FntPrint(const char *format, ...) {
-    (void)format;
-    hm_unimplemented("FntPrint");
-}
-
 void KanjiFntClose(void) { hm_unimplemented("KanjiFntClose"); }
 
 void KanjiFntFlush(s32 stream) {

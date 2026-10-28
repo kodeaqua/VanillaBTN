@@ -2296,3 +2296,31 @@ Decision:
 Consequences: Multi-input options are fully configurable and persistent without
 altering vanilla game logic. Unit tests cover controls options cycle,
 serialization, and pause menu navigation (116/116 unit tests passing).
+
+## ADR-082: Safe FntPrint diagnostic logging and pending inventory reduction
+
+Date: 2026-10-28. Status: accepted.
+
+Context: PSY-Q libgpu provides `FntPrint(const char *format, ...)` for debug font
+stream formatting. Several decomp modules call `FntPrint`:
+- Animation binding (`src/main/graphics/anim.c:21`) when encountering invalid magic or unaligned payloads.
+- Event scripting (`src/overlay/11_GF_FARM/event/event_commands.c:6914`) on missing picture rows.
+- Memory card manager (`src/overlay/31_gf_mcard/mcard.c`) for status and menu lines.
+- Debug and PDA overlays (`src/overlay/08_DEBUG/debug.c`, `pdasamp.c`, `swind.c`).
+Previously, `FntPrint` was stubbed in `port/psx/pending.c` with `hm_unimplemented("FntPrint")`,
+triggering `abort()` (exit code -1073740791 / 0xC0000409) whenever any of these paths was reached during interactive gameplay.
+
+Decision:
+1. Implement `FntPrint` in `port/psx/font.c`:
+   - Conforms to the standard PSY-Q signature `s32 FntPrint(const char *format, ...)`.
+   - Uses `vsnprintf` to format variable arguments, dynamically allocating a larger buffer if output exceeds 2048 bytes.
+   - Outputs the formatted string to `stderr` with auto-flush so that diagnostics and error messages appear on the native host console.
+   - Returns the number of characters output (matching PSY-Q `libgpu` semantics), or `-1` on invalid format/allocation failure.
+2. Update pending inventory:
+   - Remove `FntPrint` from `port/psx/pending.c` and `port/tests/pending_api.cmake`.
+   - The remaining eight debug-font functions (`FntFlush`, `FntLoad`, `FntOpen`, `KanjiFntClose`, `KanjiFntFlush`, `KanjiFntOpen`, `KanjiFntPrint`, `SetDumpFnt`) remain explicit fail-fast stubs.
+3. Add automated test:
+   - Add `port/tests/font.c` (`psx.font` test) validating format strings, argument expansion, null-format safety, return lengths, and large dynamic buffer handling.
+
+Consequences:
+Calls to `FntPrint` during gameplay or diagnostics no longer terminate the game process with an unhandled exception. Log messages are cleanly visible on standard error output. Unit test suite passes 100%.
