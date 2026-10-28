@@ -2234,8 +2234,8 @@ Pause Menu -> Settings -> Gameplay:
 4. Connected wooden fence rails between adjacent lumber posts (double-rail ranch beams)
 5. Wild dog attacks toggle (vanilla Enabled by default)
 6. Smart bell herding (animals seek barn/coop doors when bell is rung)
-7. Stamina HUD: 10 dynamic hearts under clock showing stamina relative to max
-8. Widescreen HUD anchoring: preserve right margin padding seamlessly
+7. Stamina HUD: 10 dynamic hearts in top-left using authentic start menu Pete head and heart assets
+8. Top-right clock HUD: preserved in 4:3 safe frame to avoid UI buffer clipping
 9. Calendar events: festival names, villager birthdays, and livestock maturation
 10. Roaming horse: ride outside farm with location reset fallback to prevent corruption.
 
@@ -2245,6 +2245,9 @@ wild_dog=1 for vanilla parity). Keep options saved in settings.json under "gamep
 When splitting or moving stacked items in the rucksack menu, show the native-style
 quantity selector dialog with D-pad input (+-1, +-10) and item preview. Draw connected
 fences as two-tiered shaded wooden rails with highlight/shadow behind the posts.
+The clock HUD is preserved at base_x = 228 to avoid clipping against the 320-pixel UI buffer.
+The stamina HUD is positioned at top-left (14, 16) with dimensions (110, 32), drawing authentic
+Start Menu Pete head and heart sprites dynamically loaded from the disc status pack.
 
 Consequences: Vanilla parity maintained when options are OFF. All 115 unit tests
 pass. Interactive gameplay testing performed by the owner.
