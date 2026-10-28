@@ -11,6 +11,7 @@ option(HMBTN_ENH_SCALING "Build opt-in viewport-resolution rasterization" OFF)
 option(HMBTN_ENH_WIDESCREEN "Build opt-in expanded world viewport" OFF)
 option(HMBTN_ENH_FILTERING "Build opt-in per-texture bilinear filtering" OFF)
 option(HMBTN_ENH_ANTIALIASING "Build opt-in FXAA and GPU scene MSAA" OFF)
+option(HMBTN_ENH_GAMEPLAY "Build opt-in gameplay enhancements" OFF)
 option(HMBTN_GPU_RASTER "Build the shared native/enhanced GPU scene renderer" ON)
 
 if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
@@ -88,6 +89,13 @@ add_library(hmbtn_game_initial STATIC ${hm_game_sources} overlay/game_lifecycle.
 target_sources(hmbtn_game_initial PRIVATE compat/animal_actions.c)
 target_include_directories(hmbtn_game_initial PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/native_farm")
 target_link_libraries(hmbtn_game_initial PUBLIC hmbtn_game_options hmbtn_work_memory hmbtn_overlay)
+add_library(hmbtn_gameplay STATIC enhance/gameplay/gameplay.c)
+target_link_libraries(hmbtn_gameplay PUBLIC hmbtn_game_options)
+if(HMBTN_ENH_GAMEPLAY)
+    target_compile_definitions(hmbtn_gameplay PUBLIC HMBTN_ENH_GAMEPLAY=1)
+    target_compile_definitions(hmbtn_game_options INTERFACE HMBTN_ENH_GAMEPLAY=1)
+    target_link_libraries(hmbtn_game_initial PUBLIC hmbtn_gameplay)
+endif()
 # Keep the game's entry point separate from the host test runners. This source
 # is compiled into the archive only; no native game executable is linked yet.
 set_source_files_properties(../src/main/main.c PROPERTIES COMPILE_DEFINITIONS
@@ -299,6 +307,11 @@ if(HMBTN_BUILD_GPU_SPIKE OR HMBTN_BUILD_NATIVE_WINDOW)
             target_compile_definitions(hmbtn_native PRIVATE HMBTN_ENH_INTERPOLATION=1)
             target_link_libraries(hmbtn_native PRIVATE hmbtn_interpolation)
         endif()
+        if(HMBTN_ENH_GAMEPLAY)
+            target_compile_definitions(hmbtn_native PRIVATE HMBTN_ENH_GAMEPLAY=1)
+            target_sources(hmbtn_native PRIVATE platform/gameplay_options.c)
+            target_link_libraries(hmbtn_native PRIVATE hmbtn_gameplay)
+        endif()
         if(HMBTN_ENH_PAUSE_MENU)
             add_library(hmbtn_pause_art STATIC enhance/pause_menu/assets.c enhance/pause_menu/draw.c)
             target_link_libraries(hmbtn_pause_art PUBLIC hmbtn_pause_menu hmbtn_game_initial hmbtn_psx_pending)
@@ -332,6 +345,16 @@ if(HMBTN_BUILD_GPU_SPIKE OR HMBTN_BUILD_NATIVE_WINDOW)
                     hmbtn_psx_initial hmbtn_settings_json hmbtn_presentation_clock)
                 add_test(NAME platform.graphics_options COMMAND hmbtn_graphics_options_test
                     "${CMAKE_CURRENT_BINARY_DIR}/graphics-options-test")
+            endif()
+            if(HMBTN_ENH_GAMEPLAY)
+                add_executable(hmbtn_gameplay_options_test platform/tests/gameplay_options.c
+                    platform/gameplay_options.c platform/user_data.c)
+                target_link_libraries(hmbtn_gameplay_options_test PRIVATE hmbtn_gameplay
+                    hmbtn_game_initial hmbtn_psx_pending hmbtn_work_memory hmbtn_overlay
+                    hmbtn_software_raster hmbtn_gpu_scene hmbtn_texture_filter
+                    hmbtn_psx_initial hmbtn_settings_json SDL3::SDL3)
+                add_test(NAME platform.gameplay_options COMMAND hmbtn_gameplay_options_test
+                    "${CMAKE_CURRENT_BINARY_DIR}/gameplay-options-test")
             endif()
         endif()
     endif()

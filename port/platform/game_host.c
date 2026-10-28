@@ -32,6 +32,9 @@
 #include "enhance/pause_menu/canvas.h"
 #include "enhance/pause_menu/menu.h"
 #include "platform/graphics_options.h"
+#ifdef HMBTN_ENH_GAMEPLAY
+#include "platform/gameplay_options.h"
+#endif
 #ifdef HMBTN_ENH_ANTIALIASING
 #include "platform/fxaa.h"
 #define HM_HOST_AA 1
@@ -60,6 +63,9 @@ static hm_present_clock hm_presentation;
 #ifdef HMBTN_ENH_PAUSE_MENU
 static hm_pause_assets hm_assets;
 static hm_graphics_options hm_options;
+#ifdef HMBTN_ENH_GAMEPLAY
+static hm_gameplay_options hm_gameplay;
+#endif
 #ifdef HM_HOST_AA
 static hm_fxaa *hm_fxaa_output;
 #endif
@@ -515,6 +521,18 @@ static void hm_host_pause(void) {
 #endif
                 }
             }
+#ifdef HMBTN_ENH_GAMEPLAY
+            if (action == HM_PAUSE_CHANGE_GAMEPLAY) {
+                if (hm_gameplay_change(&hm_gameplay, menu.selected,
+                                       input == HM_PAUSE_LEFT ? -1 : 1)) {
+                    notice = hm_gameplay_save(&hm_gameplay) ? "" : "Cannot save settings";
+                }
+            }
+#else
+            if (action == HM_PAUSE_CHANGE_GAMEPLAY) {
+                notice = "Option unavailable";
+            }
+#endif
         }
         if (!running)
             break;
@@ -525,11 +543,20 @@ static void hm_host_pause(void) {
             hm_pause_canvas_extract(hm_pause_background, hm_pause_frozen, pause_width);
             if (value_dirty) {
                 value[0] = 0;
+                for (int i = 0; i < HM_PAUSE_GRAPHICS_ITEMS; ++i)
+                    rows[i][0] = 0;
                 if (menu.page == HM_PAUSE_GRAPHICS)
                     hm_graphics_value(&hm_options, menu.selected, value, sizeof(value));
                 if (menu.page == HM_PAUSE_GRAPHICS)
                     for (int i = 0; i < HM_PAUSE_GRAPHICS_ITEMS; ++i)
                         hm_graphics_row_value(&hm_options, i, rows[i], sizeof(rows[i]));
+#ifdef HMBTN_ENH_GAMEPLAY
+                if (menu.page == HM_PAUSE_GAMEPLAY)
+                    hm_gameplay_value(&hm_gameplay, menu.selected, value, sizeof(value));
+                if (menu.page == HM_PAUSE_GAMEPLAY)
+                    for (int i = 0; i < HM_PAUSE_GAMEPLAY_ITEMS; ++i)
+                        hm_gameplay_row_value(&hm_gameplay, i, rows[i], sizeof(rows[i]));
+#endif
                 value_dirty = 0;
             }
             view.notice = notice;
@@ -930,6 +957,9 @@ int hm_game_host_start(hm_disc *disc) {
         return 0;
     }
     hm_graphics_load(&hm_options);
+#ifdef HMBTN_ENH_GAMEPLAY
+    hm_gameplay_load(&hm_gameplay);
+#endif
     if (!hm_graphics_apply(hm_window, &hm_options)) {
         hm_graphics_defaults(&hm_options);
         if (!hm_graphics_apply(hm_window, &hm_options))

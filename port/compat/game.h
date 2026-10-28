@@ -13,6 +13,10 @@
 #include "compat/work_memory.h"
 #include <libetc.h>
 
+#ifdef HMBTN_ENH_GAMEPLAY
+#include "enhance/gameplay/gameplay.h"
+#endif
+
 typedef u8 hm_psx_u_char;
 typedef u16 hm_psx_u_short;
 typedef u32 hm_psx_u_long;

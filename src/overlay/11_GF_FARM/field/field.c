@@ -1033,6 +1033,12 @@ void field_draw_grid(void) {
             }
             anim_draw_sprt_cursor(&current_frame->ot[result.depth >> 2],
                           &game_state.work.sprites[sprite], attr, 0, result.x, result.y + lift);
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+            /* PORT: Draw connecting rails between adjacent lumber fences - see docs/port/DECISIONS.md#adr-080 */
+            if (hm_gameplay_connect_fences() && game_state.fieldTiles[row].rows[col].value == ITEM_LUMBER) {
+                hm_gameplay_draw_fence_connections(row, col, result.x, result.y + lift, result.depth);
+            }
+#endif
         }
     }
 }
@@ -1517,6 +1523,11 @@ static void field_tile_season_result(FarmFieldTile *tile) {
 
 /* Turn the lumber at *p into field lumber, with a 1 in `range` chance. */
 static void field_tile_roll_to_lumber(u16 *p, u32 range) {
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+    /* PORT: Prevent lumber from decaying when durable fences is enabled - see docs/port/DECISIONS.md#adr-080 */
+    if (hm_gameplay_durable_fences())
+        return;
+#endif
     if (range && *p == ITEM_LUMBER && rand_range((u16)range) == 0) *p = FIELD_TILE_LUMBER;
 }
 

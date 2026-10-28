@@ -116,9 +116,9 @@ void hm_pause_draw(const hm_pause_assets *assets, u8 *rgba, const hm_pause_menu 
         for (size_t channel = 0; channel < 3; ++channel)
             rgba[pixel * 4 + channel] = (u8)((u32)rgba[pixel * 4 + channel] * 3 / 5);
     hm_canvas = rgba;
-    if (menu->page == HM_PAUSE_GRAPHICS) {
+    if (menu->page == HM_PAUSE_GRAPHICS || menu->page == HM_PAUSE_GAMEPLAY) {
         hm_pause_original_frame(NULL, 12, 8, 296, 28);
-        hm_center(assets, "Settings - Graphics", 16);
+        hm_center(assets, menu->page == HM_PAUSE_GRAPHICS ? "Settings - Graphics" : "Settings - Gameplay", 16);
         char range[16];
         snprintf(range, sizeof(range), "(%d-%d)", menu->first_visible + 1,
                  menu->first_visible + HM_PAUSE_VISIBLE_ROWS);

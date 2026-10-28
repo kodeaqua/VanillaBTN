@@ -1,8 +1,8 @@
 #ifndef HMBTN_PAUSE_MENU_H
 #define HMBTN_PAUSE_MENU_H
 
-typedef enum { HM_PAUSE_ROOT, HM_PAUSE_SETTINGS, HM_PAUSE_GRAPHICS } hm_pause_page;
-enum { HM_PAUSE_GRAPHICS_ITEMS = 11, HM_PAUSE_VISIBLE_ROWS = 7 };
+typedef enum { HM_PAUSE_ROOT, HM_PAUSE_SETTINGS, HM_PAUSE_GRAPHICS, HM_PAUSE_GAMEPLAY } hm_pause_page;
+enum { HM_PAUSE_GRAPHICS_ITEMS = 11, HM_PAUSE_GAMEPLAY_ITEMS = 9, HM_PAUSE_VISIBLE_ROWS = 7 };
 typedef enum {
     HM_PAUSE_UP,
     HM_PAUSE_DOWN,
@@ -15,7 +15,8 @@ typedef enum {
     HM_PAUSE_NONE,
     HM_PAUSE_RESUME,
     HM_PAUSE_EXIT,
-    HM_PAUSE_CHANGE_GRAPHICS
+    HM_PAUSE_CHANGE_GRAPHICS,
+    HM_PAUSE_CHANGE_GAMEPLAY
 } hm_pause_action;
 typedef struct {
     hm_pause_page page;
