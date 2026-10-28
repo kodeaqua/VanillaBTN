@@ -1,5 +1,5 @@
 # Clang-audited native farm inventory; see ADR-073.
-hm_farm_state_headers("1351deb2268d3e60834663c0ea2967ee003b9359e64bca952d557affd75524ca")
+hm_farm_state_headers("a0f7eacfe925424c9b727173395a712a05e6b18c216962693793085cf5cb4d2e")
 hm_farm_state_unit("animals/animal_actions.c" "ab7ea1a0d5071aeaa51b04be09df99076e7887c1f22bcfe6d09c43e6cdfb50c8")
 hm_farm_state_unit("animals/animals.c" "8760ba084c04a72c208b741a160e1c77db5037eca6381b8b1456fa5b81f96468")
 hm_farm_state_unit("animals/chicken.c" "faffabc4d203a160b503b3e7e417f4ad6c0663766bc9c27ce19c426f164b9a8a")

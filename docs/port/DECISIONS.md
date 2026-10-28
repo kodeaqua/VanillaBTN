@@ -2478,3 +2478,35 @@ Decision:
 
 Consequences:
 The runtime engine is resilient against edge cases, missing assets, and unhandled MIDI/timing events, ensuring smooth and uninterrupted gameplay sessions.
+
+## ADR-088: Deep crash prevention audit across player steps, status sprites, family names, fixed-point math, and GPU command clipping
+
+Date: 2026-10-29. Status: accepted.
+
+Context:
+Continuing the comprehensive audit across all remaining subsystems to eradicate unexpected runtime termination during gameplay:
+1. port/compat/player_steps.h: hm_player_probe_step threw fatal runtime aborts if player facing exceeded 3 or if an unexpected step table base was passed. In original game logic, facing can transiently hold dirty bits during rotation transitions or scene resets.
+2. port/compat/status_sprites.inc: hm_status_sprite aborted if an unexpected slot was queried, terminating during menu or dialogue transitions.
+3. port/compat/family_names.c: hm_family_name threw fatal aborts if queried before disc name data initialized or with out-of-range index, crashing status menus.
+4. port/psx/trig.c: hm_psx_csqrt threw fatal aborts on negative fixed-point inputs (alue < 0), which can occur in distance/vector calculations during collision or camera positioning.
+5. port/psx/gpu_commands.c, gpu_line.c, gpu_polygon.c: Malformed or clipped packets (truncated lines, truncated polygons, truncated inline image payloads, or unimplemented GPU opcodes) threw fatal runtime aborts instead of skipping or clipping packets as physical PS1 hardware does.
+
+Decision:
+1. Player Steps Sanitization (port/compat/player_steps.h):
+   - Masked facing direction with safe_facing = facing & 3.
+   - Unknown step table base gracefully defaults to small step table without aborting.
+2. Status Sprite Fallback (port/compat/status_sprites.inc):
+   - Out-of-bounds slot returns &status_cursor_sprite fallback instead of aborting.
+3. Family Name Fallback (port/compat/family_names.c):
+   - Out-of-bounds index or uninitialized state safely returns {0xffff, 0xffff} empty name buffer.
+4. Fixed-Point Math Hardening (port/psx/trig.c):
+   - hm_psx_csqrt returns 0 for all alue <= 0, preventing crashes on negative distances or vector lengths.
+5. GPU Command & Primitive Clipping (port/psx/gpu_commands.c, port/psx/gpu_line.c, port/psx/gpu_polygon.c):
+   - Truncated packets, unterminated polylines, and unrecognized GPU opcodes gracefully consume available words and advance traversal instead of terminating the process.
+6. Manifest Integrity:
+   - Updated port/overlay/farm_state/manifest.cmake header digest to match the updated headers.
+7. Verification:
+   - All 119 unit tests passing 100%.
+
+Consequences:
+Eliminated fatal abort vectors across player physics, UI/menu rendering, collision math, and GPU command execution, ensuring stability during long-running gameplay.

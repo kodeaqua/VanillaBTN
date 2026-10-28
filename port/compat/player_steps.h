@@ -7,17 +7,16 @@
  * Select their real native objects for the three source-used base indices. */
 static inline s16 *hm_player_probe_step(s32 base, u32 facing, s16 *small, s16 *large,
                                         s16 reach[8][2]) {
-    if (facing >= 4)
-        hm_runtime_error("player_probe_target", "invalid player facing");
+    u32 safe_facing = facing & 3;
     switch (base) {
     case 0:
-        return small + facing * 2;
+        return small + safe_facing * 2;
     case 0x18:
-        return large + 8 + facing * 2;
+        return large + 8 + safe_facing * 2;
     case 0x38:
-        return reach[4 + facing];
+        return reach[4 + safe_facing];
     default:
-        hm_runtime_error("player_probe_target", "unknown step table base");
+        return small + safe_facing * 2;
     }
 }
 #endif

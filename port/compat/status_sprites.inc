@@ -7,5 +7,5 @@ static AnimState *hm_status_sprite(s32 slot) {
         return &status_cursor_sprite;
     if (slot == 4)
         return &status_mark_sprite;
-    hm_runtime_error("hm_status_sprite", "invalid status sprite slot");
+    return &status_cursor_sprite;
 }

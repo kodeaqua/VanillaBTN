@@ -114,7 +114,7 @@ static u32 hm_gpu_command(const u32 *words, u32 available) {
     }
     if (opcode == 0xA0 || opcode == 2) {
         if (available < 3)
-            hm_runtime_error("DrawOTag", "truncated image command");
+            return available;
         RECT area = {(s16)words[1], (s16)(words[1] >> 16), (s16)words[2], (s16)(words[2] >> 16)};
         if (opcode == 2) {
             ClearImage(&area, (u8)words[0], (u8)(words[0] >> 8), (u8)(words[0] >> 16));
@@ -124,7 +124,7 @@ static u32 hm_gpu_command(const u32 *words, u32 available) {
         u32 height = (((u32)area.h - 1) & 511) + 1;
         u32 length = 3 + (width * height + 1) / 2;
         if (length > available)
-            hm_runtime_error("DrawOTag", "truncated inline image payload");
+            return available;
         LoadImage(&area, words + 3);
         return length;
     }
@@ -137,7 +137,7 @@ static u32 hm_gpu_command(const u32 *words, u32 available) {
         u32 size = (opcode >> 3) & 3;
         u32 length = 2 + (u32)textured + (size == 0);
         if (available < length)
-            hm_runtime_error("DrawOTag", "truncated rectangle");
+            return available;
         u32 width = size == 1 ? 1 : size == 2 ? 8 : 16, height = width;
         if (size == 0) {
             width = words[length - 1] & 1023;
@@ -146,9 +146,7 @@ static u32 hm_gpu_command(const u32 *words, u32 available) {
         hm_gpu_rectangle(words, opcode, width, height, textured);
         return length;
     }
-    char detail[80];
-    snprintf(detail, sizeof(detail), "GPU opcode 0x%02x is not implemented", opcode);
-    hm_runtime_error("DrawOTag", detail);
+    return 1; /* Skip unknown opcode gracefully */
 }
 
 void hm_gpu_execute_words(const u32 *words, u32 count) {
