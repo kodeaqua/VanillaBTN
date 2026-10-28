@@ -62,12 +62,6 @@ void hm_game_draw_ot(u32 *table) {
 }
 u32 *hm_game_clear_ot(u32 *table, s32 count) {
     if (current_frame && table == current_frame->ot) {
-        static u64 last_scene_key = 0;
-        u64 current_scene_key = ((u64)(u16)main_scene << 48) | ((u64)(u16)farm_area.mode.area << 32);
-        if (current_scene_key != last_scene_key) {
-            last_scene_key = current_scene_key;
-            hm_gpu_links_reset();
-        }
         hm_packet_identity_reset();
         hm_pgxp_frame_begin();
     }
