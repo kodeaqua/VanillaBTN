@@ -7,7 +7,9 @@
 #include "psx/pad.h"
 #include "psx/timing.h"
 #ifdef HMBTN_SDL_HOST
+#include "platform/disc_locator.h"
 #include "platform/game_host.h"
+#include "platform/user_data.h"
 #endif
 #include <limits.h>
 #include <stdio.h>
@@ -56,30 +58,66 @@ static int hm_read_at(void *context, u64 offset, void *destination, size_t bytes
            fread(destination, 1, bytes, file) == bytes;
 }
 
-int main(int argc, char **argv) {
-    if (argc != 2) {
-        fprintf(stderr, "Usage: hmbtn_boot_probe <original USA BIN track>\n");
-        return 1;
-    }
-    FILE *file = fopen(argv[1], "rb");
+typedef struct {
+    FILE *file;
+    hm_disc *disc;
+} hm_disc_slot;
+
+/* Open and validate one candidate BIN. On success the slot owns the open file. */
+static int hm_open_disc(void *context, const char *path, int verbose) {
+    hm_disc_slot *slot = context;
+    FILE *file = fopen(path, "rb");
     if (!file || fseek(file, 0, SEEK_END)) {
-        fprintf(stderr, "Cannot open the disc image\n");
+        if (verbose)
+            fprintf(stderr, "Cannot open the disc image\n");
         if (file)
             fclose(file);
-        return 1;
+        return 0;
     }
     long bytes = ftell(file);
     if (bytes < 0) {
         fclose(file);
-        return 1;
+        return 0;
     }
-    hm_disc disc;
-    hm_disc_result status = hm_disc_mount(&disc, (hm_disc_stream){file, (u64)bytes, hm_read_at});
+    hm_disc_result status =
+        hm_disc_mount(slot->disc, (hm_disc_stream){file, (u64)bytes, hm_read_at});
     if (status != HM_DISC_OK) {
-        fprintf(stderr, "%s\n", hm_disc_error(status));
+        if (verbose)
+            fprintf(stderr, "%s\n", hm_disc_error(status));
         fclose(file);
+        return 0;
+    }
+    slot->file = file;
+    return 1;
+}
+
+int main(int argc, char **argv) {
+    hm_disc disc;
+    hm_disc_slot slot = {NULL, &disc};
+#ifdef HMBTN_SDL_HOST
+    if (argc > 2) {
+        fprintf(stderr, "Usage: hmbtn_native [original USA BIN track]\n");
         return 1;
     }
+    /* Settings hold the remembered disc path; the host reuses this running user data. */
+    if (!hm_user_data_start()) {
+        fprintf(stderr, "Cannot open Documents/BackToNature\n");
+        return 1;
+    }
+    if (!hm_disc_locate(argc == 2 ? argv[1] : NULL, hm_open_disc, &slot)) {
+        hm_user_data_stop();
+        return 1;
+    }
+#else
+    if (argc != 2) {
+        fprintf(stderr, "Usage: hmbtn_boot_probe <original USA BIN track>\n");
+        return 1;
+    }
+    if (!hm_open_disc(&slot, argv[1], 1))
+        return 1;
+#endif
+    FILE *file = slot.file;
+    hm_disc_result status;
     status = hm_family_names_load(&disc);
     if (status != HM_DISC_OK) {
         fprintf(stderr, "Cannot read original family text: %s\n", hm_disc_error(status));
