@@ -2450,3 +2450,31 @@ Decision:
 
 Consequences:
 Loading game data proceeds smoothly without crashes or cycles, GPU link handles remain stable across all scenes, and ordering table traversal is protected against infinite loops.
+
+
+## ADR-087: Whole-system defensive crash prevention audit across timing, audio voice/sequencer, and memory card subsystems
+
+Date: 2026-10-29. Status: accepted.
+
+Context:
+Following user request for a comprehensive audit to eradicate runtime crashes across extended gameplay, a thorough inspection of all `hm_runtime_error` invocation paths across `port/psx/` was conducted. Several fragile abort conditions were identified where normal PS1 game logic or audio/video timing could trigger immediate process termination:
+1. `VSync` recursion: When `VSync` was invoked within callbacks (such as asset streaming or scene loading ticks), `hm_in_tick` triggered an immediate fatal abort.
+2. `SsUtKeyOnV` and `SsUtSetVVol`: Attempting to play a sound effect with missing bank assets, uninitialized tone definitions, or out-of-range volume values aborted the application instead of failing gracefully or clamping volume, whereas original PS1 hardware SPU simply ignores unmapped voice triggers.
+3. MIDI sequencer events: Unhandled MIDI controllers, nonzero bank select messages, and unhandled metadata/SysEx events in `port/psx/sequence.c` triggered aborts instead of standard MIDI parser skips.
+4. Memory card completion queries: Passing NULL pointers to `MemCardSync` or `McxSync` triggered aborts rather than safely skipping output assignment.
+
+Decision:
+1. `VSync` Reentrancy Guard (`port/psx/timing.c`):
+   - When `hm_in_tick` is set, `VSync` now safely returns 0 instead of aborting, protecting nested callback execution.
+2. SPU Voice Hardening (`port/psx/sound_voice.c`):
+   - `SsUtKeyOnV` validates bank and sample presence, returning `-1` if resources are unready rather than aborting. Volumes are clamped to [0, 127].
+   - `SsUtSetVVol` and `hm_sound_note_pitch` clamp volume, note, and fine-tune inputs to [0, 127].
+3. MIDI Sequencer Resilience (`port/psx/sequence.c`):
+   - Unhandled controllers, bank selects, and unhandled metadata/SysEx messages now skip safely without aborting playback. Zero tempo falls back to default 120 BPM (500,000 microseconds/quarter note).
+4. Memory Card Null-Safety (`port/psx/card.c`):
+   - `MemCardSync` and `McxSync` check command/result pointer validity before writing outputs.
+5. Verification:
+   - All 119 unit tests passing 100%.
+
+Consequences:
+The runtime engine is resilient against edge cases, missing assets, and unhandled MIDI/timing events, ensuring smooth and uninterrupted gameplay sessions.

@@ -37,8 +37,10 @@ s32 VSync(s32 mode) {
         return (s32)(u32)hm_ticks;
     if (mode == 1)
         return hm_host.scanlines ? hm_host.scanlines(hm_host.context) : 0;
-    if (mode < 0 || hm_in_tick)
-        hm_runtime_error("VSync", "invalid wait or recursive VBlank wait");
+    if (mode < 0)
+        hm_runtime_error("VSync", "invalid wait");
+    if (hm_in_tick)
+        return 0; /* Guard against recursive VBlank callbacks safely without aborting */
     s32 count = mode == 0 ? 1 : mode;
     for (s32 i = 0; i < count; ++i) {
         hm_in_tick = 1;
