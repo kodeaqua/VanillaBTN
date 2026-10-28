@@ -2091,3 +2091,30 @@ initialization assertion rerun under ASan separately. No gameplay, disc or owner
 saves are used by these fixtures. Matching sources are unchanged, adding no guards.
 Actual title-to-load-to-farm return remains owner-tested; other platforms and full
 playthrough parity are not established.
+
+## ADR-075: native actor aliases must follow expanded animation pointers
+
+Date: 2026-10-28. Status: accepted.
+
+Context: The owner's put-down-dog crash was captured in text_sprite_draw. The
+dog's AnimState.partLists pointer had its low word pair overwritten with
+0x0000ffff. Pickup calls farm_action_begin through a local PS1-padded view whose
+cue is at 0xa8. Native animation pointers expand FarmActor: its cue moves to
+0xc8, and partLists now occupies 0xa8. The old reset therefore corrupts the
+sprite while held; drawing after put-down exposes it. Audit also found a helper
+number read through FarmObjectRecord at PS1 offset 0xac, where native pointer
+data now resides; FarmHelper.number is at 0xd0.
+
+Decision: Rename the original native farm_action_begin symbol and supply a
+port-layer implementation using the real FarmActor fields. Keep its item/flag,
+task, speed, cue and pending-room behavior. A checked native player wrapper
+replaces only the helper-number expression with an accessor for FarmHelper.
+Preserve farm snapshot providers and existing per-source SDK definitions. Keep
+matching source, original struct definitions and save encoding unchanged.
+
+Consequences: The correction applies with enhancements OFF as well as ON. Tests
+reproduce the original pointer overwrite, verify four native actor prefixes,
+check all seven helper IDs, and exercise young/adult dog pickup and put-down in
+four directions with both affection-cue states. These isolated calls use no disc,
+game loop or owner save. Actual gameplay revalidation stays with the owner.
+ADR-074 is reserved for the separately parked multilingual work.
