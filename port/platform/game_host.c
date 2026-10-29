@@ -1252,20 +1252,20 @@ int hm_game_host_start(hm_disc *disc) {
     hm_device = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL |
                                         SDL_GPU_SHADERFORMAT_MSL,
                                     false, NULL);
-#if defined(__ANDROID__)
-    if (!hm_device) {
-        __android_log_print(ANDROID_LOG_ERROR, "VanillaBTN", "SDL_CreateGPUDevice failed: %s", SDL_GetError());
-    } else if (!hm_window) {
-        __android_log_print(ANDROID_LOG_ERROR, "VanillaBTN", "SDL_CreateWindow failed: %s", SDL_GetError());
-    } else if (!SDL_ClaimWindowForGPUDevice(hm_device, hm_window)) {
-        __android_log_print(ANDROID_LOG_ERROR, "VanillaBTN", "SDL_ClaimWindowForGPUDevice failed: %s", SDL_GetError());
-    } else {
-        __android_log_print(ANDROID_LOG_INFO, "VanillaBTN", "GPU Device created and claimed successfully (Driver: %s)", SDL_GetGPUDeviceDriver(hm_device));
-    }
-#endif
     if (!hm_window || !hm_device || !SDL_ClaimWindowForGPUDevice(hm_device, hm_window) ||
-        !SDL_SetGPUAllowedFramesInFlight(hm_device, 2))
+        !SDL_SetGPUAllowedFramesInFlight(hm_device, 2)) {
+#if defined(__ANDROID__)
+        __android_log_print(ANDROID_LOG_ERROR, "VanillaBTN",
+            "GPU Init failed! window=%p, device=%p, error=%s",
+            (void*)hm_window, (void*)hm_device, SDL_GetError());
+#endif
         return 0;
+    }
+#if defined(__ANDROID__)
+    __android_log_print(ANDROID_LOG_INFO, "VanillaBTN",
+        "GPU Device created and claimed successfully (Driver: %s)",
+        SDL_GetGPUDeviceDriver(hm_device));
+#endif
     if (!hm_host_image_size(HM_SCAN_WIDTH, HM_SCAN_HEIGHT))
         return 0;
     if (!hm_audio_output_start()) {
