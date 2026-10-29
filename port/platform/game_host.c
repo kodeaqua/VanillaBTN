@@ -915,14 +915,6 @@ static void hm_host_present_scanout(u64 tick) {
                 (unsigned long long)tick, state->display_enabled, area->x, area->y, area->w,
                 area->h);
     }
-#ifdef __ANDROID__
-    if (tick % 60 == 0) {
-        __android_log_print(ANDROID_LOG_INFO, "VanillaBTN",
-            "Presenting scanout tick %llu: enabled=%d area=%d,%d %dx%d (output=%ux%u)",
-            (unsigned long long)tick, state->display_enabled, area->x, area->y, area->w,
-            area->h, output_width, output_height);
-    }
-#endif
     if (!area->w || !area->h)
         return;
     if (area->w < 0 || area->w > HM_SCAN_WIDTH || area->h < 0 || area->h > HM_SCAN_HEIGHT) {
@@ -940,6 +932,14 @@ static void hm_host_present_scanout(u64 tick) {
     if (native_filtered.pixels) {
         output_width = native_filtered.width;
         output_height = native_filtered.height;
+    }
+#endif
+#ifdef __ANDROID__
+    if (tick % 60 == 0) {
+        __android_log_print(ANDROID_LOG_INFO, "VanillaBTN",
+            "Presenting scanout tick %llu: enabled=%d area=%d,%d %dx%d (output=%ux%u)",
+            (unsigned long long)tick, state->display_enabled, area->x, area->y, area->w,
+            area->h, output_width, output_height);
     }
 #endif
     if (!hm_host_image_size(output_width, output_height)) {
