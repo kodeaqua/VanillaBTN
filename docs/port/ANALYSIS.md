@@ -813,3 +813,5 @@ HMBTN_PORT guard under ADR-106: src/main/text/text.c terminates fast text glyph 
 HMBTN_PORT guards under ADR-107: src/overlay/11_GF_FARM/menu/storage_swap.c prevents cross-swapping between tools and items in rucksack reorganize screen under mouse and controller input.
 
 HMBTN_PORT guards under ADR-108: src/overlay/11_GF_FARM/field/field.c and src/overlay/11_GF_FARM/field/greenhouse.c cast position->vz to (s16) to prevent 64-bit unsigned promotion sign loss for negative world Z coordinates.
+
+HMBTN_PORT guard under ADR-109: src/main/text/text.c pauses dialogue typing instantly at TEXT_CODE_PAGE_MARK and TEXT_CODE_PAGE_END when Fast Text is active, preventing text_phase corruption and ensuring page breaks and choices advance cleanly on user confirm input.
