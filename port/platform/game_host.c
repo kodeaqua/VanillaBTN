@@ -1035,14 +1035,6 @@ static void hm_host_tick(void *context, u64 tick) {
             }
         }
     }
-#ifdef HMBTN_ENH_GAMEPLAY
-    if (hm_gameplay_auto_run() && (held & (HM_PAD_UP | HM_PAD_DOWN | HM_PAD_LEFT | HM_PAD_RIGHT))) {
-        if (held & HM_PAD_CIRCLE)
-            held &= ~HM_PAD_CIRCLE;
-        else
-            held |= HM_PAD_CIRCLE;
-    }
-#endif
     if (hm_replay_enabled)
         held = hm_input_replay_sample(&hm_replay, tick);
 #ifdef HMBTN_ENH_PAUSE_MENU
