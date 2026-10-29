@@ -1,14 +1,16 @@
 package io.github.kodeaqua.vanillabtn
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.provider.Settings
 import android.system.Os
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import androidx.appcompat.app.AlertDialog
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
@@ -21,17 +23,12 @@ import java.io.File
 class MainActivity : SDLActivity() {
 
     private var foundDiscFile: File? = null
+    private var targetDataDir: File? = null
     private var gamepadOverlay: VirtualGamepadView? = null
 
     override fun getLibraries(): Array<String> {
-        return arrayOf(
-            "SDL3",
-            "VanillaBTN"
-        )
-    }
-
-    override fun getMainSharedObject(): String {
-        return "libVanillaBTN.so"
+        // SDL3 is statically bundled inside libVanillaBTN.so
+        return arrayOf("VanillaBTN")
     }
 
     override fun getMainFunction(): String {
@@ -45,28 +42,46 @@ class MainActivity : SDLActivity() {
         controller.hide(WindowInsetsCompat.Type.systemBars())
         controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
 
-        // Check storage directory
-        val docsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-        val vanillaDir = File(docsDir, "VanillaBTN")
-        if (!vanillaDir.exists()) {
-            vanillaDir.mkdirs()
+        // Request storage permissions if needed
+        checkStoragePermissions()
+
+        // Resolve user data directory (Internal Storage -> Documents/VanillaBTN)
+        val primaryDocs = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+        val primaryDir = File(primaryDocs, "VanillaBTN")
+        val altDir = File(Environment.getExternalStorageDirectory(), "Documents/VanillaBTN")
+        val appSpecificDir = getExternalFilesDir(null)?.let { File(it, "VanillaBTN") }
+
+        val dirCandidates = listOfNotNull(primaryDir, altDir, appSpecificDir)
+        targetDataDir = dirCandidates.firstOrNull { it.exists() } ?: primaryDir
+        targetDataDir?.let {
+            if (!it.exists()) {
+                it.mkdirs()
+            }
+            try {
+                Os.setenv("HMBTN_USER_DATA_DIR", it.absolutePath, true)
+            } catch (_: Exception) {}
         }
 
-        try {
-            Os.setenv("HMBTN_USER_DATA_DIR", vanillaDir.absolutePath, true)
-        } catch (_: Exception) {}
-
         // Scan for game disc (.bin / .cue)
-        val candidates = listOf(
+        val discCandidates = listOf(
             "game.cue", "game.bin",
             "hmbtn.cue", "hmbtn.bin",
             "VanillaBTN.cue", "VanillaBTN.bin"
         )
-        foundDiscFile = candidates.map { File(vanillaDir, it) }.firstOrNull { it.exists() }
-        if (foundDiscFile == null) {
-            foundDiscFile = vanillaDir.listFiles()?.firstOrNull { file ->
-                val name = file.name.lowercase()
-                (name.endsWith(".bin") || name.endsWith(".cue")) && !name.endsWith(".hmc") && !name.endsWith(".tmp")
+
+        for (dir in dirCandidates) {
+            if (!dir.exists()) continue
+            foundDiscFile = discCandidates.map { File(dir, it) }.firstOrNull { it.exists() }
+            if (foundDiscFile == null) {
+                foundDiscFile = dir.listFiles()?.firstOrNull { file ->
+                    val name = file.name.lowercase()
+                    (name.endsWith(".bin") || name.endsWith(".cue")) &&
+                            !name.endsWith(".hmc") && !name.endsWith(".tmp")
+                }
+            }
+            if (foundDiscFile != null) {
+                targetDataDir = dir
+                break
             }
         }
 
@@ -80,10 +95,39 @@ class MainActivity : SDLActivity() {
 
         // If game disc is missing, show Material 3 Expressive Dialog immediately
         if (foundDiscFile == null) {
-            showMissingDiscDialog(vanillaDir.absolutePath)
+            showMissingDiscDialog(targetDataDir?.absolutePath ?: primaryDir.absolutePath)
         } else {
             // Attach Virtual Gamepad Overlay over SDL Surface
             setupGamepadOverlay()
+        }
+    }
+
+    private fun checkStoragePermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (!Environment.isExternalStorageManager()) {
+                try {
+                    val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                        data = Uri.parse("package:$packageName")
+                    }
+                    startActivity(intent)
+                } catch (_: Exception) {
+                    try {
+                        val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                        startActivity(intent)
+                    } catch (_: Exception) {}
+                }
+            }
+        } else {
+            val permissions = mutableListOf<String>()
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
+            }
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            }
+            if (permissions.isNotEmpty()) {
+                ActivityCompat.requestPermissions(this, permissions.toTypedArray(), 100)
+            }
         }
     }
 
@@ -109,13 +153,14 @@ class MainActivity : SDLActivity() {
     }
 
     private fun setupGamepadOverlay() {
+        val layout = mLayout ?: return
         val overlay = VirtualGamepadView(this)
         gamepadOverlay = overlay
         val params = FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.MATCH_PARENT
         )
-        mLayout.addView(overlay, params)
+        layout.addView(overlay, params)
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
