@@ -807,3 +807,9 @@ explicit row selection (move_steps_large for row 0, hop_steps for row 1).
 HMBTN_PORT guards changed under ADR-079: the eight widescreen UI-reserve checks in
 geometry/model.c now call hm_widescreen_prim_full instead of comparing against
 primStart + primSize. Their original (#else) behavior is unchanged.
+
+HMBTN_PORT guard under ADR-106: src/main/text/text.c terminates fast text glyph advancement at TEXT_CODE_PAGE_END instead of TEXT_CODE_PAGE_MARK so text_find_nth finds the page end and advances pages on user input.
+
+HMBTN_PORT guards under ADR-107: src/overlay/11_GF_FARM/menu/storage_swap.c prevents cross-swapping between tools and items in rucksack reorganize screen under mouse and controller input.
+
+HMBTN_PORT guards under ADR-108: src/overlay/11_GF_FARM/field/field.c and src/overlay/11_GF_FARM/field/greenhouse.c cast position->vz to (s16) to prevent 64-bit unsigned promotion sign loss for negative world Z coordinates.

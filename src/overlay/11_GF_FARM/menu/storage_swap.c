@@ -366,9 +366,11 @@ static void storage_swap_screen(void) {
             }
         }
         if (hovered_spot >= 0) {
-            if (storage_swap_cursor != hovered_spot) {
-                storage_swap_cursor = hovered_spot;
-                sound_play(5);
+            if (storage_swap_marked == SPOT_NONE || (storage_swap_marked < SPOT_HELD_ITEM) == (hovered_spot < SPOT_HELD_ITEM)) {
+                if (storage_swap_cursor != hovered_spot) {
+                    storage_swap_cursor = hovered_spot;
+                    sound_play(5);
+                }
             }
         }
         if (hm_mouse_consume_right_click()) {
@@ -414,7 +416,8 @@ static void storage_swap_screen(void) {
                     storage_swap_cursor = (storage_swap_marked < SPOT_HELD_ITEM) ? SPOT_HELD_TOOL : SPOT_HELD_ITEM;
                 }
 #if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
-                if (hm_gameplay_item_stacking()) {
+                if (hm_gameplay_item_stacking() &&
+                    (storage_swap_marked < SPOT_HELD_ITEM) == (storage_swap_cursor < SPOT_HELD_ITEM)) {
                     FarmStoredItem *src_it = storage_spot_item(storage_swap_marked);
                     FarmStoredItem *dst_it = storage_spot_item(storage_swap_cursor);
                     if (src_it != dst_it && src_it->id != 0 && src_it->count > 1 &&
@@ -499,6 +502,12 @@ static s32 storage_swap_spots(s32 from, s32 to) {
     if (from == to) {
         return 1;
     }
+#ifdef HMBTN_PORT
+    /* PORT: Do not allow crossing tools and items (e.g. via mouse selection) - see docs/port/DECISIONS.md#adr-107 */
+    if ((from < SPOT_HELD_ITEM) != (to < SPOT_HELD_ITEM)) {
+        return 1;
+    }
+#endif
     first = storage_spot_item(from);
     second = storage_spot_item(to);
     if (first->id == 0) {

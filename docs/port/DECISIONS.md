@@ -2984,3 +2984,83 @@ Decision:
 
 Consequences:
 Enhance Scaling delivers crisp high-definition 720p visuals on Android with stable frame rates and reduced thermal load. Hardware upscaling handles presentation to 1080p+ display panels efficiently. All unit tests pass 100%.
+
+## ADR-106: Fix dialogue advance on confirmation button press (X/Cross/Circle) with Fast Text
+
+Date: 2026-10-29. Status: accepted.
+
+Context:
+1. Dialogue Unresponsive to Confirmation Button (X/Cross):
+   - With Fast Text enabled (enhance.fast_text = true), when multi-page dialogues paused at a page break (displaying the flashing continue arrow), pressing the confirmation button (X/Cross or Circle) failed to advance to the next page, leaving dialogues permanently stuck on the current page.
+2. Root Cause Analysis:
+   - In ADR-104, when hm_gameplay_fast_text() was active, the draw loop clamped text_index = text_line_glyphs; break; upon encountering TEXT_CODE_PAGE_MARK (0xFFC).
+   - In the engine's text protocol, a page boundary consists of TEXT_CODE_PAGE_MARK (which triggers text_phase = TEXT_STATE_PAGE_BREAK) followed immediately by TEXT_CODE_PAGE_END (0xFFB) (the boundary delimiter past which text_next_page steps).
+   - When the player pressed Confirm (Cross/Circle), text_advance_glyph() incremented text_index by 1.
+   - Subsequently, text_next_page() performed a forward search: p = text_find_nth(text_current, TEXT_CODE_PAGE_END, 1, level) where level = text_index.
+   - In text_find_nth, the search aborts with if (limit != 0 && length >= limit) break;. Because text_index was clamped at TEXT_CODE_PAGE_MARK, limit equaled the exact index of TEXT_CODE_PAGE_END. The loop aborted at length >= limit before evaluating *entry == code, returning NULL.
+   - Consequently, text_next_page() never stepped text_current past TEXT_CODE_PAGE_END, locking the dialogue on Page 1 permanently.
+
+Decision:
+1. Relocate Fast Text Draw Termination to TEXT_CODE_PAGE_END (src/main/text/text.c):
+   - At TEXT_CODE_PAGE_MARK, permit the loop to set text_phase = TEXT_STATE_PAGE_BREAK and continue walking to TEXT_CODE_PAGE_END.
+   - At TEXT_CODE_PAGE_END, clamp text_index = text_line_glyphs; break;.
+   - This ensures text_line_glyphs and text_index strictly include TEXT_CODE_PAGE_END in their counted length.
+   - When the player presses Confirm, text_find_nth evaluates length < limit (index_of_page_end < text_index), successfully matching TEXT_CODE_PAGE_END and advancing text_current = p + 1.
+2. Preserved Vanilla Parity:
+   - When hm_gameplay_fast_text() is 0, the original decompilation code executes identically.
+
+Consequences:
+Multi-page dialogues, Mayor Thomas cutscene, NPC interactions, and choices advance seamlessly upon pressing X/Cross or Circle with Fast Text enabled. All unit tests pass 100%.
+
+## ADR-107: Enforce strict separation between Tools and Items in Rucksack Organise Screen
+
+Date: 2026-10-29. Status: accepted.
+
+Context:
+1. Tool and Item Cross-Transfer via Mouse Action:
+   - In the rucksack reorganize screen (src/overlay/11_GF_FARM/menu/storage_swap.c), the left column contains Tool slots (Held Tool spot 0, Rucksack Tools spots 1..8) and the right column contains Item slots (Held Item spot 9, Rucksack Items spots 10..17).
+   - In original vanilla game navigation, the d-pad next_spot routing tables strictly constrain cursor movement so that when a slot is marked, the cursor can never navigate across to the opposite column.
+   - However, with modern Mouse Action enabled, players could hover and click across columns (e.g. marking a Tool in spot 1 and clicking an Item slot in spot 10). Because storage_swap_spots only checked item compatibility with held slots, it permitted cross-swapping tools into item columns and items into tool slots.
+
+Decision:
+1. Category Guard in storage_swap_spots (src/overlay/11_GF_FARM/menu/storage_swap.c):
+   - Reject any swap where (from < SPOT_HELD_ITEM) != (to < SPOT_HELD_ITEM).
+   - Returning 1 (refused) triggers sound_play(2) (error buzz) and prevents swapping across tool and item columns.
+2. Category Guard in Quantity Split (storage_swap_screen):
+   - When checking for multi-item quantity split dialog (SWAP_QTY), enforce (storage_swap_marked < SPOT_HELD_ITEM) == (storage_swap_cursor < SPOT_HELD_ITEM) so stacked items cannot trigger quantity splitting into empty tool slots.
+3. Category Hover Guard for Mouse (storage_swap_screen):
+   - While a slot is marked (storage_swap_marked != SPOT_NONE), prevent the mouse from moving the cursor to opposite-category slots, preserving the same focused selection behavior as the vanilla d-pad.
+4. Manifest Hash Recalculation:
+   - Recalculated the normalized SHA-256 hash for src/overlay/11_GF_FARM/menu/storage_swap.c and updated port/overlay/farm_state/manifest.cmake.
+
+Consequences:
+Tools and items cannot cross into each other's slots under any control method (mouse, keyboard, or gamepad). The authentic rucksack inventory structure is preserved. All unit tests pass 100%.
+
+
+## ADR-108: Fix Field/Greenhouse coordinate sign loss and Tile Targeting visibility
+
+Date: 2026-10-29. Status: accepted.
+
+Context:
+1. Field and Greenhouse Coordinate Calculation Bug:
+   - In \src/overlay/11_GF_FARM/field/field.c\ line 439 and \src/overlay/11_GF_FARM/field/greenhouse.c\ line 92, the Z position calculation cast \position->vz\ to \(u16)\.
+   - In 64-bit and standard C integer promotion, casting negative coordinates (such as \z = -400\) to \(u16)\ converts them to positive values (Ʃ36\). Subtracting this in awZ = 1600 - (u16)position->vz\ resulted in \-63536\, producing a negative row index (ow = -159\) and returning error status 2 (out of bounds).
+   - Because the outdoor farm grid extends from Z = +1600 down to Z = -8400, over 80% of the farm field (any row >= 4) has negative Z coordinates, causing coordinate lookups to fail.
+2. Tile Targeting Visibility and Ordering Table Depth:
+   - In \port/enhance/gameplay/gameplay.c\, \hm_gameplay_draw_tile_targeting()\ computed \ot_idx = (avg_depth >> 2) + 2\. In PS1 reverse ordering tables (\ClearOTagR\), higher OT indices are drawn first (background), which placed the targeting polygon behind the opaque ground terrain.
+   - The semi-transparent quad fill lacked a preceding \DR_TPAGE\ packet specifying semi-transparency rate ABR 0 (50% background + 50% foreground), causing inconsistent blending across graphics backends.
+   - Targeting was limited to location 1 (farm) and 6 (greenhouse), failing to highlight cells when digging in the mine (\PLACE_MINE\ 0x37 / \PLACE_MINE_43\ 0x43).
+
+Decision:
+1. Coordinate Sign Preservation under HMBTN_PORT:
+   - In \src/overlay/11_GF_FARM/field/field.c\, cast to \(s16)position->vz\ under \#ifdef HMBTN_PORT\, keeping \#else\ exact for matching.
+   - In \src/overlay/11_GF_FARM/field/greenhouse.c\, cast to \(s16)position->vz\ under \#ifdef HMBTN_PORT\.
+   - Updated normalized SHA-256 hashes in \port/overlay/farm_state/manifest.cmake\.
+2. Tile Targeting Layering and Projection:
+   - Place targeting primitives in front of ground terrain by indexing \ot_idx = (avg_depth >> 2) - 2\.
+   - Elevate vertex height slightly (\player->position.vy - 4\) to prevent z-fighting with terrain.
+   - Emit a \DR_TPAGE\ packet with \GetTPage(0, 0, 0, 0)\ into \ot[ot_idx]\ before the \POLY_F4\ primitive to guarantee semi-transparency blending.
+   - Added support for the mine grid (\MINE_ORIGIN_X\ -2000, \MINE_ORIGIN_Z\ 2000, 10x10 cells).
+
+Consequences:
+Tile targeting renders clearly and accurately across farm, greenhouse, and mine environments. All field and greenhouse coordinate conversions correctly handle all negative world coordinates. Unit test suite passes 100%.
