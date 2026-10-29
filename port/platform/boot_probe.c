@@ -2,6 +2,7 @@
  * unsupported runtime calls must stop here with their named error. */
 #include "platform/input_replay.h"
 #include "compat/family_names.h"
+#include "platform/crash_handler.h"
 #include "overlay/game_lifecycle.h"
 #include "psx/cd_runtime.h"
 #include "psx/pad.h"
@@ -92,6 +93,7 @@ static int hm_open_disc(void *context, const char *path, int verbose) {
 }
 
 int main(int argc, char **argv) {
+    hm_crash_handler_install();
     hm_disc disc;
     hm_disc_slot slot = {NULL, &disc};
 #ifdef HMBTN_SDL_HOST
@@ -167,3 +169,15 @@ int main(int argc, char **argv) {
     fclose(file);
     return result;
 }
+
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+    (void)hInstance;
+    (void)hPrevInstance;
+    (void)lpCmdLine;
+    (void)nCmdShow;
+    return main(__argc, __argv);
+}
+#endif
