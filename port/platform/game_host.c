@@ -1,4 +1,7 @@
 #include "farm_state.h"
+#if defined(__ANDROID__)
+#include <android/log.h>
+#endif
 #include "platform/gpu_present.h"
 #ifdef HMBTN_ENH_WIDESCREEN
 #include "enhance/widescreen/widescreen.h"
@@ -1249,6 +1252,17 @@ int hm_game_host_start(hm_disc *disc) {
     hm_device = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL |
                                         SDL_GPU_SHADERFORMAT_MSL,
                                     false, NULL);
+#if defined(__ANDROID__)
+    if (!hm_device) {
+        __android_log_print(ANDROID_LOG_ERROR, "VanillaBTN", "SDL_CreateGPUDevice failed: %s", SDL_GetError());
+    } else if (!hm_window) {
+        __android_log_print(ANDROID_LOG_ERROR, "VanillaBTN", "SDL_CreateWindow failed: %s", SDL_GetError());
+    } else if (!SDL_ClaimWindowForGPUDevice(hm_device, hm_window)) {
+        __android_log_print(ANDROID_LOG_ERROR, "VanillaBTN", "SDL_ClaimWindowForGPUDevice failed: %s", SDL_GetError());
+    } else {
+        __android_log_print(ANDROID_LOG_INFO, "VanillaBTN", "GPU Device created and claimed successfully (Driver: %s)", SDL_GetGPUDeviceDriver(hm_device));
+    }
+#endif
     if (!hm_window || !hm_device || !SDL_ClaimWindowForGPUDevice(hm_device, hm_window) ||
         !SDL_SetGPUAllowedFramesInFlight(hm_device, 2))
         return 0;
