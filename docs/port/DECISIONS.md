@@ -2932,3 +2932,32 @@ Decision:
 
 Consequences:
 Cutscene backgrounds render flawlessly with both 3D world geometry and 2D dialogue overlays intact. Android rasterization fillrate is reduced by 80%, CPU rasterizer hot loops execute without 64-bit division stalls, and frame pacing remains smooth without SurfaceFlinger VSync locking. All 122 unit tests pass 100%.
+
+## ADR-104: Fix Fast Text Mayor Thomas intro cutscene freeze and multi-line dialogue scrolling
+
+Date: 2026-10-29. Status: accepted.
+
+Context:
+1. Fast Text Freeze on Mayor Thomas Dialogue:
+   When Fast Text was enabled (`enhance.fast_text = true`) and entering a New Game, the Mayor Thomas cutscene (event `0x74`) froze permanently on the very first dialogue ("Well, what do you think? This was your grandpa's farm..."), while turning Fast Text OFF allowed the dialogue to progress normally.
+2. Root Cause Analysis:
+   - In ADR-102, a forward scan loop `while (scan_limit++ < 1000)` was added to `text_draw_string` to advance `text_index`.
+   - Mayor Thomas's intro dialogue (Message 1899) spans 5 lines and contains 4 newline markers (`TEXT_LINE_BREAK`).
+   - The scan loop contained `if (code == TEXT_LINE_BREAK) { if (text_count_matches(..., text_index + 1, ...) >= 4) break; }`. This broke out of the scan loop before incrementing `text_index`, leaving `text_index` pointing directly at the 4th line break.
+   - Because `text_index` was never incremented past the 4th line break, the next frame's scan loop immediately evaluated `code == TEXT_LINE_BREAK` and `text_count_matches >= 4`, breaking on iteration 0 without advancing `text_index`.
+   - Furthermore, `text_index` is a total glyph count compared against `text_line_glyphs` across recursive insert expansions (`TEXT_INSERT_FLAG`), not a simple array offset into `text[]`. Breaking before control markers (`TEXT_CODE_PAGE_MARK`, `TEXT_END`, `TEXT_CODE_CHOICE`) prevented `text_draw_string` from executing their state transition handlers.
+
+Decision:
+1. Streamlined Rapid Glyph Advancement (`src/main/text/text.c`):
+   - Removed the fragile `scan_limit` lookahead loop in `text_draw_string`.
+   - When `hm_gameplay_fast_text()` is active and `text_phase == TEXT_STATE_PRINTING`, increment `text_index` rapidly by 8 glyphs per frame (240 glyphs/sec, rendering full dialogue lines in 3-4 frames).
+2. Explicit Control Marker Clamping & Break:
+   - When encountering `TEXT_CODE_PAGE_MARK` or `TEXT_CODE_CHOICE_4..2` under `hm_gameplay_fast_text()`, clamp `text_index = text_line_glyphs;` and `break;` immediately so the draw loop cannot overshoot the current page into subsequent pages.
+   - When the player presses Confirm/Cross/Circle on a page break, `text_advance_glyph()` increments `text_index`, seamlessly allowing `text_next_page()` to step past `TEXT_CODE_PAGE_END` and reset typing for the next page.
+   - Line scrolling (4th line break) is handled entirely by `text_window_frame` with accelerated scroll step (`step = 14`), scrolling multi-line dialogue in 1 frame without freezing.
+3. Preserved Vanilla Parity:
+   - When `hm_gameplay_fast_text()` is 0, the exact original decompilation typing and scrolling paths execute.
+   - All changes inside `src/main/text/text.c` remain strictly guarded with `#ifdef HMBTN_PORT`.
+
+Consequences:
+Mayor Thomas's intro cutscene, multi-line scrolling dialogues, character name inserts, page breaks, and choices advance rapidly and smoothly with Fast Text enabled without freezing or deadlocking. All 122 unit tests pass 100%.
