@@ -11,7 +11,11 @@ typedef enum {
 } hm_pause_page;
 
 enum {
+#ifdef __ANDROID__
+    HM_PAUSE_GRAPHICS_ITEMS = 7,
+#else
     HM_PAUSE_GRAPHICS_ITEMS = 10,
+#endif
     HM_PAUSE_GAMEPLAY_ITEMS = 12,
     HM_PAUSE_CONTROLS_ITEMS = 3,
     HM_PAUSE_AUDIO_ITEMS = 3,

@@ -119,6 +119,10 @@ fail:
     return 0;
 }
 int hm_user_data_start(void) {
+    const char *env_dir = SDL_getenv("HMBTN_USER_DATA_DIR");
+    if (env_dir && *env_dir) {
+        return hm_user_data_start_at(env_dir);
+    }
     const char *documents = SDL_GetUserFolder(SDL_FOLDER_DOCUMENTS);
     char *root = NULL;
     if (!documents || SDL_asprintf(&root, "%s/VanillaBTN", documents) < 0)

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">VanillaBTN</string>
+    <string name="game_disc_not_found_title">File Game Tidak Ditemukan</string>
+    <string name="game_disc_not_found_message">Silakan taruh file disc Harvest Moon: Back to Nature (.bin / .cue) di folder berikut:\n\nPenyimpanan Internal > Documents > VanillaBTN\n\nNama file yang didukung: game.bin, hmbtn.bin, VanillaBTN.bin, atau nama file disc asli kamu.</string>
+    <string name="action_exit">Keluar</string>
+    <string name="action_open_folder">Buka Folder</string>
+    <string name="permission_storage_needed">Izin penyimpanan diperlukan untuk membaca data save dan file game disc.</string>
+</resources>

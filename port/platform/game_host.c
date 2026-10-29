@@ -649,7 +649,12 @@ static void hm_host_pause(void) {
                 exit(0);
             }
             if (action == HM_PAUSE_CHANGE_GRAPHICS) {
-                if (hm_graphics_change(hm_device, hm_window, &hm_options, menu.selected,
+#ifdef __ANDROID__
+                int g_item = menu.selected + 3;
+#else
+                int g_item = menu.selected;
+#endif
+                if (hm_graphics_change(hm_device, hm_window, &hm_options, g_item,
                                        input == HM_PAUSE_LEFT ? -1 : 1)) {
 #ifdef HMBTN_ENH_WIDESCREEN
                     int changed_w, changed_h;
@@ -702,11 +707,18 @@ static void hm_host_pause(void) {
                 value[0] = 0;
                 for (int i = 0; i < HM_PAUSE_MAX_VIEW_ITEMS; ++i)
                     rows[i][0] = 0;
-                if (menu.page == HM_PAUSE_GRAPHICS)
+                if (menu.page == HM_PAUSE_GRAPHICS) {
+#ifdef __ANDROID__
+                    int g_item = menu.selected + 3;
+                    hm_graphics_value(&hm_options, g_item, value, sizeof(value));
+                    for (int i = 0; i < HM_PAUSE_GRAPHICS_ITEMS; ++i)
+                        hm_graphics_row_value(&hm_options, i + 3, rows[i], sizeof(rows[i]));
+#else
                     hm_graphics_value(&hm_options, menu.selected, value, sizeof(value));
-                if (menu.page == HM_PAUSE_GRAPHICS)
                     for (int i = 0; i < HM_PAUSE_GRAPHICS_ITEMS; ++i)
                         hm_graphics_row_value(&hm_options, i, rows[i], sizeof(rows[i]));
+#endif
+                }
 #ifdef HMBTN_ENH_GAMEPLAY
                 if (menu.page == HM_PAUSE_GAMEPLAY)
                     hm_gameplay_value(&hm_gameplay, menu.selected, value, sizeof(value));

@@ -3,9 +3,15 @@
 
 static const char *const hm_root_items[] = {"Resume", "Settings", "Exit Game"};
 static const char *const hm_settings_items[] = {"Graphics", "Gameplay", "Controls", "Audio"};
+#ifdef __ANDROID__
+static const char *const hm_graphics_items[] = {
+    "Enhance Scaling", "Widescreen Mode", "Anti-Aliasing",
+    "Filtering",       "VSync",           "FPS Limit",     "Interpolation"};
+#else
 static const char *const hm_graphics_items[] = {
     "Monitor",   "Window Mode", "Resolution", "Enhance Scaling", "Widescreen Mode", "Anti-Aliasing",
     "Filtering", "VSync",       "FPS Limit",  "Interpolation"};
+#endif
 static const char *const hm_gameplay_items[] = {
     "Walk Crops", "Item Stacking", "Durable Fences", "Connect Fences", "Wild Dog Attacks",
     "Smart Bell", "Stamina HUD",   "Calendar Events","Roaming Horse",  "Fast Text",

@@ -4,6 +4,9 @@ project(hmbtn_port LANGUAGES C)
 if(WIN32)
     enable_language(RC)
 endif()
+if(ANDROID)
+    enable_language(CXX)
+endif()
 
 # Output test, probe, and benchmark executables to tests/
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests")
@@ -36,6 +39,9 @@ target_include_directories(hmbtn_port_options INTERFACE "${CMAKE_CURRENT_SOURCE_
 target_compile_options(hmbtn_port_options INTERFACE
     -Wall -Wextra -fno-strict-aliasing -fwrapv -fno-delete-null-pointer-checks
     -fvisibility=hidden "$<$<CONFIG:Release>:-O2>")
+if(ANDROID)
+    target_compile_options(hmbtn_port_options INTERFACE -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -Wno-fortify-source)
+endif()
 if(HMBTN_SANITIZERS)
     target_compile_options(hmbtn_port_options INTERFACE -fsanitize=address,undefined
         -fno-sanitize-recover=all -fno-omit-frame-pointer)
@@ -311,18 +317,30 @@ if(HMBTN_BUILD_GPU_SPIKE OR HMBTN_BUILD_NATIVE_WINDOW)
         target_link_libraries(hmbtn_gpu_spike PRIVATE hmbtn_port_options SDL3::SDL3)
     endif()
     if(HMBTN_BUILD_NATIVE_WINDOW)
-        add_executable(hmbtn_native platform/boot_probe.c platform/game_host.c platform/input_replay.c
-            platform/audio_output.c platform/audio_ring.c platform/user_data.c platform/disc_locator.c
-            platform/version.c platform/crash_handler.c)
-        set_target_properties(hmbtn_native PROPERTIES
-            OUTPUT_NAME "VanillaBTN"
-            RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-        if(WIN32)
-            target_sources(hmbtn_native PRIVATE packaging/windows/hmbtn.rc)
-            target_link_options(hmbtn_native PRIVATE "$<$<CONFIG:Release>:-mwindows>")
-            target_link_libraries(hmbtn_native PRIVATE user32)
+        if(ANDROID)
+            add_library(hmbtn_native SHARED platform/boot_probe.c platform/game_host.c platform/input_replay.c
+                platform/audio_output.c platform/audio_ring.c platform/user_data.c platform/disc_locator.c
+                platform/version.c platform/crash_handler.c)
+            set_target_properties(hmbtn_native PROPERTIES
+                OUTPUT_NAME "VanillaBTN"
+                LINKER_LANGUAGE CXX)
+            target_link_libraries(hmbtn_native PRIVATE log android c++_static)
+            target_link_options(hmbtn_native PRIVATE "-Wl,-z,max-page-size=16384")
+            target_compile_definitions(hmbtn_native PRIVATE HMBTN_SDL_HOST=1)
+        else()
+            add_executable(hmbtn_native platform/boot_probe.c platform/game_host.c platform/input_replay.c
+                platform/audio_output.c platform/audio_ring.c platform/user_data.c platform/disc_locator.c
+                platform/version.c platform/crash_handler.c)
+            set_target_properties(hmbtn_native PROPERTIES
+                OUTPUT_NAME "VanillaBTN"
+                RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+            if(WIN32)
+                target_sources(hmbtn_native PRIVATE packaging/windows/hmbtn.rc)
+                target_link_options(hmbtn_native PRIVATE "$<$<CONFIG:Release>:-mwindows>")
+                target_link_libraries(hmbtn_native PRIVATE user32)
+            endif()
+            target_compile_definitions(hmbtn_native PRIVATE SDL_MAIN_HANDLED HMBTN_SDL_HOST=1)
         endif()
-        target_compile_definitions(hmbtn_native PRIVATE SDL_MAIN_HANDLED HMBTN_SDL_HOST=1)
         target_link_libraries(hmbtn_native PRIVATE hmbtn_game_initial hmbtn_psx_pending SDL3::SDL3)
         target_link_libraries(hmbtn_native PRIVATE hmbtn_settings_json hmbtn_gpu_presentation)
         target_link_libraries(hmbtn_native PRIVATE hmbtn_presentation_clock)

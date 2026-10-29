@@ -1,0 +1,73 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace 'io.github.kodeaqua.vanillabtn'
+    compileSdk 35
+    ndkVersion '27.2.12479018'
+
+    defaultConfig {
+        applicationId "io.github.kodeaqua.vanillabtn"
+        minSdk 26
+        targetSdk 35
+        versionCode 900
+        versionName "0.9.0"
+
+        externalNativeBuild {
+            cmake {
+                targets "hmbtn_native"
+                arguments "-DHMBTN_PORT=ON",
+                          "-DHMBTN_BUILD_NATIVE_WINDOW=ON",
+                          "-DBUILD_TESTING=OFF",
+                          "-DHMBTN_BUILD_GPU_SPIKE=OFF",
+                          "-DHMBTN_ENH_GAMEPLAY=ON",
+                          "-DHMBTN_ENH_PAUSE_MENU=ON",
+                          "-DHMBTN_ENH_WIDESCREEN=ON",
+                          "-DHMBTN_ENH_SCALING=ON",
+                          "-DHMBTN_ENH_INTERPOLATION=ON",
+                          "-DHMBTN_ENH_PGXP=ON",
+                          "-DHMBTN_ENH_DITHERING=ON",
+                          "-DANDROID_STL=c++_static"
+                abiFilters "arm64-v8a"
+                cFlags "-march=armv8-a -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -Wno-fortify-source"
+            }
+        }
+        ndk {
+            abiFilters "arm64-v8a"
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            debuggable true
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    externalNativeBuild {
+        cmake {
+            path file("../../../../port/CMakeLists.txt")
+            version "3.31.6"
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.15.0'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'com.google.android.material:material:1.12.0'
+}

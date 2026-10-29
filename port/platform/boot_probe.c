@@ -92,7 +92,12 @@ static int hm_open_disc(void *context, const char *path, int verbose) {
     return 1;
 }
 
+#if defined(__ANDROID__)
+#include <SDL3/SDL_main.h>
+SDLMAIN_DECLSPEC int SDL_main(int argc, char **argv) {
+#else
 int main(int argc, char **argv) {
+#endif
     hm_crash_handler_install();
     hm_disc disc;
     hm_disc_slot slot = {NULL, &disc};
