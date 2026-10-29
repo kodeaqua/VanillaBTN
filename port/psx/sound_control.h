@@ -11,8 +11,12 @@ typedef struct {
     s32 sequences, tracks, reserved, tick_mode;
     s32 master_left, master_right, serial_left, serial_right;
     int initialized, started, mono, reverb;
+    int bgm_volume, sfx_volume;
     const void *table;
 } hm_sound_control;
 const hm_sound_control *hm_sound_configuration(void);
+void hm_sound_set_volumes(int bgm_percent, int sfx_percent);
+int hm_sound_get_bgm_volume(void);
+int hm_sound_get_sfx_volume(void);
 
 #endif

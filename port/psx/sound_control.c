@@ -7,7 +7,7 @@
 #include <libsnd.h>
 #include <string.h>
 
-static hm_sound_control hm_sound;
+static hm_sound_control hm_sound = {.bgm_volume = 100, .sfx_volume = 100};
 
 const hm_sound_control *hm_sound_configuration(void) { return &hm_sound; }
 
@@ -21,8 +21,12 @@ void SsInit(void) {
     hm_sound_voices_reset();
     hm_sound_banks_reset();
     hm_reverb_reset();
+    int prev_bgm = hm_sound.bgm_volume;
+    int prev_sfx = hm_sound.sfx_volume;
     memset(&hm_sound, 0, sizeof(hm_sound));
     hm_sound.initialized = 1;
+    hm_sound.bgm_volume = prev_bgm ? prev_bgm : 100;
+    hm_sound.sfx_volume = prev_sfx ? prev_sfx : 100;
 }
 
 void SsSetTableSize(void *table, s32 sequences, s32 tracks) {
@@ -133,4 +137,17 @@ s32 SpuGetKeyStatus(u32 voices) {
         if (voices & (1u << i))
             result |= hm_sound_voice_status(i);
     return result;
+}
+
+void hm_sound_set_volumes(int bgm_percent, int sfx_percent) {
+    if (bgm_percent < 0) bgm_percent = 0; else if (bgm_percent > 100) bgm_percent = 100;
+    if (sfx_percent < 0) sfx_percent = 0; else if (sfx_percent > 100) sfx_percent = 100;
+    hm_sound.bgm_volume = bgm_percent;
+    hm_sound.sfx_volume = sfx_percent;
+}
+int hm_sound_get_bgm_volume(void) {
+    return hm_sound.bgm_volume;
+}
+int hm_sound_get_sfx_volume(void) {
+    return hm_sound.sfx_volume;
 }

@@ -17,4 +17,5 @@ void hm_sound_sequence_register(const void *data, u32 bytes);
 void hm_sound_sequences_reset(void);
 void hm_sound_sequence_tick(void);
 void hm_sound_sequence_forget_voice(u32 voice);
+int hm_sound_sequence_voice_active(u32 voice);
 #endif

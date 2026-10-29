@@ -97,6 +97,11 @@ void hm_sound_sequence_forget_voice(u32 voice) {
         hm_runtime_error("SEQ voice ownership", "invalid voice");
     hm_seq_owners[voice].sequence = -1;
 }
+int hm_sound_sequence_voice_active(u32 voice) {
+    if (voice >= 24)
+        return 0;
+    return hm_seq_owners[voice].sequence >= 0;
+}
 static void hm_seq_release(s32 sequence, s32 channel, s32 note) {
     for (u32 i = 0; i < 24; ++i)
         if (hm_seq_owners[i].sequence == sequence &&

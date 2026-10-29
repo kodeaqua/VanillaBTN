@@ -346,7 +346,7 @@ if(HMBTN_BUILD_GPU_SPIKE OR HMBTN_BUILD_NATIVE_WINDOW)
             target_link_libraries(hmbtn_pause_art PUBLIC hmbtn_pause_menu hmbtn_game_initial hmbtn_psx_pending)
             add_executable(hmbtn_pause_assets_probe EXCLUDE_FROM_ALL analysis/pause_assets_probe.c)
             target_link_libraries(hmbtn_pause_assets_probe PRIVATE hmbtn_pause_art)
-            target_sources(hmbtn_native PRIVATE platform/graphics_options.c platform/controls_options.c)
+            target_sources(hmbtn_native PRIVATE platform/graphics_options.c platform/controls_options.c platform/audio_options.c)
             target_compile_definitions(hmbtn_native PRIVATE HMBTN_ENH_PAUSE_MENU=1)
             target_link_libraries(hmbtn_native PRIVATE hmbtn_pause_menu hmbtn_pause_art)
             if(BUILD_TESTING)
@@ -359,6 +359,12 @@ if(HMBTN_BUILD_GPU_SPIKE OR HMBTN_BUILD_NATIVE_WINDOW)
                     hmbtn_psx_initial hmbtn_settings_json SDL3::SDL3)
                 add_test(NAME platform.controls_options COMMAND hmbtn_controls_options_test
                     "${CMAKE_CURRENT_BINARY_DIR}/controls-options-test")
+                add_executable(hmbtn_audio_options_test platform/tests/audio_options.c
+                    platform/audio_options.c platform/user_data.c)
+                target_link_libraries(hmbtn_audio_options_test PRIVATE
+                    hmbtn_psx_initial hmbtn_settings_json SDL3::SDL3)
+                add_test(NAME platform.audio_options COMMAND hmbtn_audio_options_test
+                    "${CMAKE_CURRENT_BINARY_DIR}/audio-options-test")
             endif()
         endif()
         if(BUILD_TESTING)
