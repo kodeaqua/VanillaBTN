@@ -29,6 +29,9 @@
 #include "text_bank.h"
 #include "texture_pack.h"
 #include "ui_icons.h"
+#ifdef HMBTN_PORT
+#include "platform/mouse_input.h"
+#endif
 #if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
 #include "enhance/gameplay/gameplay.h"
 #endif
@@ -698,6 +701,20 @@ static s32 item_select_input(void) {
     if (idle != ITEM_NOT_HELD || menu_phase_is_result() == 0) {
         return 0;
     }
+#ifdef HMBTN_PORT
+    /* PORT: Modern mouse storage right-click cancel - see docs/port/DECISIONS.md#adr-100 */
+    if (hm_mouse_consume_right_click()) {
+        if (item_held_x == idle) {
+            menu_begin_close();
+            item_result_state = ITEM_RESULT_CLOSING;
+            sound_play(SOUND_MENU_OPEN_CLOSE);
+            return 0;
+        }
+        sound_play(SOUND_MENU_CANCEL);
+        item_held_x = idle;
+        return 0;
+    }
+#endif
     flags = input_pad1->pressed;
     if (flags & PAD_TRIANGLE) {
         if (item_row_at(item_cursor_x, item_cursor_y)->id != 0) {
@@ -1055,6 +1072,45 @@ static void item_cursor_move(s32 count) {
     u32 pad;
     u32 buttons;
 
+#ifdef HMBTN_PORT
+    /* PORT: Modern mouse storage navigation - see docs/port/DECISIONS.md#adr-100 */
+    int mouse_vx, mouse_vy;
+    if (hm_mouse_get_pos(&mouse_vx, &mouse_vy)) {
+        int rucksack_limit = (game_state.player.rucksackLevel == 0) ? 2 : ((game_state.player.rucksackLevel == 1) ? 4 : 8);
+        int hovered_marker = -1;
+        if (hm_mouse_in_rect(mouse_vx, mouse_vy, item_markers[0].x - 6, item_markers[0].y - 6, 28, 28)) {
+            hovered_marker = 0;
+        }
+        for (s32 m = 1; m <= 8; m++) {
+            if (m <= rucksack_limit) {
+                if (hm_mouse_in_rect(mouse_vx, mouse_vy, item_markers[m].x - 6, item_markers[m].y - 6, 28, 28)) {
+                    hovered_marker = m;
+                    break;
+                }
+            }
+        }
+        if (hovered_marker < 0) {
+            for (s32 m = 9; m <= 16; m++) {
+                if (hm_mouse_in_rect(mouse_vx, mouse_vy, item_markers[m].x - 6, item_markers[m].y - 6, 28, 28)) {
+                    hovered_marker = m;
+                    break;
+                }
+            }
+        }
+        if (hovered_marker >= 0 && item_cursor_x != hovered_marker) {
+            item_cursor_x = hovered_marker;
+            sound_play(SOUND_MENU_CURSOR);
+        }
+        int wheel = hm_mouse_consume_wheel();
+        if (wheel > 0) {
+            sound_play(SOUND_MENU_CURSOR);
+            delta += count / 8 - 1;
+        } else if (wheel < 0) {
+            sound_play(SOUND_MENU_CURSOR);
+            delta++;
+        }
+    }
+#endif
     if (menu_phase_is_result() != 0) {
         pad = input_pad1->triggered;
         if (pad & PAD_ARROWS_MASK) {

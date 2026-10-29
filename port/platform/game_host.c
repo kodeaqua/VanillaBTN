@@ -29,6 +29,7 @@
 #include "platform/user_data.h"
 #include "platform/version.h"
 #include "platform/window_icon.h"
+#include "platform/mouse_input.h"
 #ifdef HMBTN_ENH_PAUSE_MENU
 #include "enhance/pause_menu/assets.h"
 #include "enhance/pause_menu/canvas.h"
@@ -503,6 +504,104 @@ static void hm_host_pause(void) {
                 default:
                     continue;
                 }
+            } else if (event.type == SDL_EVENT_MOUSE_MOTION) {
+                int win_w = 0, win_h = 0;
+                if (SDL_GetWindowSizeInPixels(hm_window, &win_w, &win_h) && win_w > 0 && win_h > 0) {
+                    int vx, vy;
+                    if (hm_mouse_calc_virtual_pos(event.motion.x, event.motion.y, win_w, win_h, &vx, &vy)) {
+                        if (menu.page == HM_PAUSE_GRAPHICS || menu.page == HM_PAUSE_GAMEPLAY ||
+                            menu.page == HM_PAUSE_CONTROLS || menu.page == HM_PAUSE_AUDIO) {
+                            if (vx >= 20 && vx < 300 && vy >= 45 && vy < 45 + HM_PAUSE_VISIBLE_ROWS * 20) {
+                                int row = (vy - 45) / 20;
+                                int idx = menu.first_visible + row;
+                                if (idx < hm_pause_count(&menu) && menu.selected != idx) {
+                                    menu.selected = idx;
+                                    value_dirty = 1;
+                                }
+                            }
+                        } else {
+                            int root = menu.page == HM_PAUSE_ROOT;
+                            int top = root ? 54 : 38;
+                            int row_start = top + (root ? 44 : 42);
+                            int count = hm_pause_count(&menu);
+                            if (vx >= 80 && vx < 240) {
+                                for (int i = 0; i < count; ++i) {
+                                    int ry = row_start + i * 24 - 4;
+                                    if (vy >= ry && vy < ry + 22) {
+                                        if (menu.selected != i) {
+                                            menu.selected = i;
+                                            value_dirty = 1;
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                continue;
+            } else if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+                if (event.button.button == SDL_BUTTON_RIGHT) {
+                    input = HM_PAUSE_BACK;
+                } else if (event.button.button == SDL_BUTTON_LEFT) {
+                    int win_w = 0, win_h = 0;
+                    if (SDL_GetWindowSizeInPixels(hm_window, &win_w, &win_h) && win_w > 0 && win_h > 0) {
+                        int vx, vy;
+                        if (hm_mouse_calc_virtual_pos(event.button.x, event.button.y, win_w, win_h, &vx, &vy)) {
+                            if (menu.page == HM_PAUSE_GRAPHICS || menu.page == HM_PAUSE_GAMEPLAY ||
+                                menu.page == HM_PAUSE_CONTROLS || menu.page == HM_PAUSE_AUDIO) {
+                                if (vx >= 20 && vx < 300 && vy >= 45 && vy < 45 + HM_PAUSE_VISIBLE_ROWS * 20) {
+                                    int row = (vy - 45) / 20;
+                                    int idx = menu.first_visible + row;
+                                    if (idx < hm_pause_count(&menu)) {
+                                        menu.selected = idx;
+                                        if (vx >= 192) {
+                                            input = (vx < 246) ? HM_PAUSE_LEFT : HM_PAUSE_RIGHT;
+                                        } else {
+                                            input = HM_PAUSE_CONFIRM;
+                                        }
+                                    } else {
+                                        continue;
+                                    }
+                                } else {
+                                    continue;
+                                }
+                            } else {
+                                int root = menu.page == HM_PAUSE_ROOT;
+                                int top = root ? 54 : 38;
+                                int row_start = top + (root ? 44 : 42);
+                                int count = hm_pause_count(&menu);
+                                int found = 0;
+                                if (vx >= 80 && vx < 240) {
+                                    for (int i = 0; i < count; ++i) {
+                                        int ry = row_start + i * 24 - 4;
+                                        if (vy >= ry && vy < ry + 22) {
+                                            menu.selected = i;
+                                            input = HM_PAUSE_CONFIRM;
+                                            found = 1;
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (!found)
+                                    continue;
+                            }
+                        } else {
+                            continue;
+                        }
+                    } else {
+                        continue;
+                    }
+                } else {
+                    continue;
+                }
+            } else if (event.type == SDL_EVENT_MOUSE_WHEEL) {
+                if (event.wheel.y > 0)
+                    input = HM_PAUSE_UP;
+                else if (event.wheel.y < 0)
+                    input = HM_PAUSE_DOWN;
+                else
+                    continue;
             } else if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat) {
                 switch (event.key.key) {
                 case SDLK_ESCAPE:
@@ -911,6 +1010,12 @@ static void hm_host_events(void) {
     if (SDL_GetWindowSizeInPixels(hm_window, &output_w, &output_h))
         hm_widescreen_configure(hm_options.widescreen, output_w, output_h);
 #endif
+    int current_win_w = 0, current_win_h = 0;
+    float current_mx = 0.0f, current_my = 0.0f;
+    if (SDL_GetWindowSizeInPixels(hm_window, &current_win_w, &current_win_h) && current_win_w > 0 && current_win_h > 0) {
+        SDL_GetMouseState(&current_mx, &current_my);
+        hm_mouse_update_pos(current_mx, current_my, current_win_w, current_win_h);
+    }
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         if (event.type == SDL_EVENT_QUIT) {
@@ -918,6 +1023,22 @@ static void hm_host_events(void) {
             exit(0);
         }
         hm_host_display_event(event.type);
+        if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+            if (event.button.button == SDL_BUTTON_LEFT)
+                hm_mouse_button_down(HM_MOUSE_BTN_LEFT);
+            else if (event.button.button == SDL_BUTTON_RIGHT)
+                hm_mouse_button_down(HM_MOUSE_BTN_RIGHT);
+        } else if (event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+            if (event.button.button == SDL_BUTTON_LEFT)
+                hm_mouse_button_up(HM_MOUSE_BTN_LEFT);
+            else if (event.button.button == SDL_BUTTON_RIGHT)
+                hm_mouse_button_up(HM_MOUSE_BTN_RIGHT);
+        } else if (event.type == SDL_EVENT_MOUSE_WHEEL) {
+            if (event.wheel.y > 0)
+                hm_mouse_wheel(1);
+            else if (event.wheel.y < 0)
+                hm_mouse_wheel(-1);
+        }
         if (event.type == SDL_EVENT_GAMEPAD_ADDED) {
             if (!hm_active_gamepad)
                 hm_active_gamepad = SDL_OpenGamepad(event.gdevice.which);
