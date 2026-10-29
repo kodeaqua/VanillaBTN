@@ -100,19 +100,19 @@ class VirtualGamepadView(context: Context) : View(context) {
     private val buttons = mutableListOf<PadButton>()
 
     init {
-        // PS1 Action Buttons
-        buttons.add(PadButton("X", KeyEvent.KEYCODE_BUTTON_A))        // Cross (South)
-        buttons.add(PadButton("O", KeyEvent.KEYCODE_BUTTON_B))        // Circle (East)
-        buttons.add(PadButton("□", KeyEvent.KEYCODE_BUTTON_X))        // Square (West)
-        buttons.add(PadButton("△", KeyEvent.KEYCODE_BUTTON_Y))        // Triangle (North)
+        // PS1 Action Buttons mapped to standard keyboard keys recognized by game host
+        buttons.add(PadButton("X", KeyEvent.KEYCODE_X))         // Cross
+        buttons.add(PadButton("O", KeyEvent.KEYCODE_D))         // Circle
+        buttons.add(PadButton("□", KeyEvent.KEYCODE_Z))         // Square
+        buttons.add(PadButton("△", KeyEvent.KEYCODE_W))         // Triangle
 
         // Shoulders
-        buttons.add(PadButton("L1", KeyEvent.KEYCODE_BUTTON_L1, isRect = true))
-        buttons.add(PadButton("R1", KeyEvent.KEYCODE_BUTTON_R1, isRect = true))
+        buttons.add(PadButton("L1", KeyEvent.KEYCODE_A, isRect = true))
+        buttons.add(PadButton("R1", KeyEvent.KEYCODE_S, isRect = true))
 
         // System
-        buttons.add(PadButton("SELECT", KeyEvent.KEYCODE_BUTTON_SELECT, isRect = true))
-        buttons.add(PadButton("START", KeyEvent.KEYCODE_BUTTON_START, isRect = true))
+        buttons.add(PadButton("SELECT", KeyEvent.KEYCODE_DEL, isRect = true))
+        buttons.add(PadButton("START", KeyEvent.KEYCODE_ENTER, isRect = true))
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -131,47 +131,49 @@ class VirtualGamepadView(context: Context) : View(context) {
         for (btn in buttons) {
             btn.radius = btnRadius
             when (btn.keyCode) {
-                KeyEvent.KEYCODE_BUTTON_A -> { // Cross (South)
+                KeyEvent.KEYCODE_X -> { // Cross (South)
                     btn.cx = btnCenterX
                     btn.cy = btnCenterY + spacing
                 }
-                KeyEvent.KEYCODE_BUTTON_B -> { // Circle (East)
+                KeyEvent.KEYCODE_D -> { // Circle (East)
                     btn.cx = btnCenterX + spacing
                     btn.cy = btnCenterY
                 }
-                KeyEvent.KEYCODE_BUTTON_X -> { // Square (West)
+                KeyEvent.KEYCODE_Z -> { // Square (West)
                     btn.cx = btnCenterX - spacing
                     btn.cy = btnCenterY
                 }
-                KeyEvent.KEYCODE_BUTTON_Y -> { // Triangle (North)
+                KeyEvent.KEYCODE_W -> { // Triangle (North)
                     btn.cx = btnCenterX
                     btn.cy = btnCenterY - spacing
                 }
-                KeyEvent.KEYCODE_BUTTON_L1 -> {
+                KeyEvent.KEYCODE_A -> { // L1
                     btn.isRect = true
                     val rw = 70f * density
                     val rh = 34f * density
                     btn.rect = RectF(20f * density, 16f * density, 20f * density + rw, 16f * density + rh)
                 }
-                KeyEvent.KEYCODE_BUTTON_R1 -> {
+                KeyEvent.KEYCODE_S -> { // R1
                     btn.isRect = true
                     val rw = 70f * density
                     val rh = 34f * density
                     btn.rect = RectF(w - 20f * density - rw, 16f * density, w - 20f * density, 16f * density + rh)
                 }
-                KeyEvent.KEYCODE_BUTTON_SELECT -> {
+                KeyEvent.KEYCODE_DEL -> { // SELECT (Bottom center)
                     btn.isRect = true
-                    val rw = 60f * density
-                    val rh = 26f * density
-                    val cx = w * 0.42f
-                    btn.rect = RectF(cx - rw / 2, 16f * density, cx + rw / 2, 16f * density + rh)
+                    val rw = 72f * density
+                    val rh = 32f * density
+                    val cx = w * 0.40f
+                    val cy = h - 34f * density
+                    btn.rect = RectF(cx - rw / 2, cy - rh / 2, cx + rw / 2, cy + rh / 2)
                 }
-                KeyEvent.KEYCODE_BUTTON_START -> {
+                KeyEvent.KEYCODE_ENTER -> { // START (Bottom center)
                     btn.isRect = true
-                    val rw = 60f * density
-                    val rh = 26f * density
-                    val cx = w * 0.58f
-                    btn.rect = RectF(cx - rw / 2, 16f * density, cx + rw / 2, 16f * density + rh)
+                    val rw = 72f * density
+                    val rh = 32f * density
+                    val cx = w * 0.60f
+                    val cy = h - 34f * density
+                    btn.rect = RectF(cx - rw / 2, cy - rh / 2, cx + rw / 2, cy + rh / 2)
                 }
             }
         }
@@ -297,12 +299,12 @@ class VirtualGamepadView(context: Context) : View(context) {
 
     private fun isHit(btn: PadButton, x: Float, y: Float): Boolean {
         return if (btn.isRect) {
-            val expand = 8f * density
+            val expand = 14f * density
             x >= btn.rect.left - expand && x <= btn.rect.right + expand &&
             y >= btn.rect.top - expand && y <= btn.rect.bottom + expand
         } else {
             val dist = hypot(x - btn.cx, y - btn.cy)
-            dist <= btn.radius + (8f * density)
+            dist <= btn.radius + (14f * density)
         }
     }
 

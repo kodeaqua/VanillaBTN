@@ -1005,9 +1005,9 @@ static void hm_host_present_scanout(u64 tick) {
             u32 sy = (u32)(source_area.y + (int)y);
             for (u32 x = 0; x < output_width; ++x) {
                 u16 color = hm_vram_pixel(sx + x, sy);
-                u32 r = ((color >> 0) & 31) * 255 / 31;
-                u32 g = ((color >> 5) & 31) * 255 / 31;
-                u32 b = ((color >> 10) & 31) * 255 / 31;
+                u32 r = ((color & 31) << 3) | ((color & 31) >> 2);
+                u32 g = (((color >> 5) & 31) << 3) | (((color >> 5) & 31) >> 2);
+                u32 b = (((color >> 10) & 31) << 3) | (((color >> 10) & 31) >> 2);
                 out_words[x] = 0xFF000000 | (r << 0) | (g << 8) | (b << 16);
             }
         }
@@ -1275,6 +1275,23 @@ static void hm_host_tick(void *context, u64 tick) {
             }
         }
     }
+#ifdef __ANDROID__
+    const bool *android_keys = SDL_GetKeyboardState(NULL);
+    if (android_keys[SDL_SCANCODE_RETURN]) held |= HM_PAD_START;
+    if (android_keys[SDL_SCANCODE_BACKSPACE]) held |= HM_PAD_SELECT;
+    if (android_keys[SDL_SCANCODE_X]) held |= HM_PAD_CROSS;
+    if (android_keys[SDL_SCANCODE_D]) held |= HM_PAD_CIRCLE;
+    if (android_keys[SDL_SCANCODE_Z]) held |= HM_PAD_SQUARE;
+    if (android_keys[SDL_SCANCODE_W]) held |= HM_PAD_TRIANGLE;
+    if (android_keys[SDL_SCANCODE_A]) held |= HM_PAD_L1;
+    if (android_keys[SDL_SCANCODE_S]) held |= HM_PAD_R1;
+    if (android_keys[SDL_SCANCODE_Q]) held |= HM_PAD_L2;
+    if (android_keys[SDL_SCANCODE_E]) held |= HM_PAD_R2;
+    if (android_keys[SDL_SCANCODE_UP]) held |= HM_PAD_UP;
+    if (android_keys[SDL_SCANCODE_DOWN]) held |= HM_PAD_DOWN;
+    if (android_keys[SDL_SCANCODE_LEFT]) held |= HM_PAD_LEFT;
+    if (android_keys[SDL_SCANCODE_RIGHT]) held |= HM_PAD_RIGHT;
+#endif
     if (hm_replay_enabled)
         held = hm_input_replay_sample(&hm_replay, tick);
 #ifdef HMBTN_ENH_PAUSE_MENU
