@@ -113,10 +113,6 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/compat/actor_layout.cmake")
 add_library(hmbtn_game_initial STATIC ${hm_game_sources} overlay/game_lifecycle.c overlay/farm_state.c gfx/game_frame.c gfx/field_identity.c compat/async_wait.c compat/asset_wait.c compat/view_context.c compat/save_codec.c compat/villager_sprites.c compat/family_names.c enhance/widescreen/game_buffers.c enhance/widescreen/title_background.c enhance/widescreen/menu_background.c)
 target_sources(hmbtn_game_initial PRIVATE compat/animal_actions.c)
 target_include_directories(hmbtn_game_initial PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/native_farm")
-target_link_libraries(hmbtn_game_initial PUBLIC hmbtn_game_options hmbtn_work_memory hmbtn_overlay hmbtn_pgxp hmbtn_mouse_input)
-if(HMBTN_ENH_PGXP)
-    target_compile_definitions(hmbtn_game_options INTERFACE HMBTN_ENH_PGXP=1)
-endif()
 add_library(hmbtn_mouse_input STATIC platform/mouse_input.c)
 target_link_libraries(hmbtn_mouse_input PUBLIC hmbtn_port_options)
 
@@ -125,7 +121,11 @@ target_link_libraries(hmbtn_gameplay PUBLIC hmbtn_game_options)
 if(HMBTN_ENH_GAMEPLAY)
     target_compile_definitions(hmbtn_gameplay PUBLIC HMBTN_ENH_GAMEPLAY=1)
     target_compile_definitions(hmbtn_game_options INTERFACE HMBTN_ENH_GAMEPLAY=1)
-    target_link_libraries(hmbtn_game_initial PUBLIC hmbtn_gameplay)
+endif()
+
+target_link_libraries(hmbtn_game_initial PUBLIC hmbtn_game_options hmbtn_work_memory hmbtn_overlay hmbtn_pgxp hmbtn_mouse_input hmbtn_gameplay)
+if(HMBTN_ENH_PGXP)
+    target_compile_definitions(hmbtn_game_options INTERFACE HMBTN_ENH_PGXP=1)
 endif()
 # Keep the game's entry point separate from the host test runners. This source
 # is compiled into the archive only; no native game executable is linked yet.

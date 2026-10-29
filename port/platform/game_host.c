@@ -1286,14 +1286,24 @@ int hm_game_host_start(hm_disc *disc) {
     hm_gameplay_load(&hm_gameplay);
 #endif
     if (!hm_graphics_apply(hm_window, &hm_options)) {
+#if defined(__ANDROID__)
+        __android_log_print(ANDROID_LOG_ERROR, "VanillaBTN", "hm_graphics_apply failed! error=%s", SDL_GetError());
+#endif
         hm_graphics_defaults(&hm_options);
         if (!hm_graphics_apply(hm_window, &hm_options))
             return 0;
     }
     if (!hm_graphics_swapchain(hm_device, hm_window, &hm_options)) {
+#if defined(__ANDROID__)
+        __android_log_print(ANDROID_LOG_ERROR, "VanillaBTN", "hm_graphics_swapchain initial failed! error=%s", SDL_GetError());
+#endif
         hm_options.vsync = 1;
-        if (!hm_graphics_swapchain(hm_device, hm_window, &hm_options))
+        if (!hm_graphics_swapchain(hm_device, hm_window, &hm_options)) {
+#if defined(__ANDROID__)
+            __android_log_print(ANDROID_LOG_ERROR, "VanillaBTN", "hm_graphics_swapchain fallback failed! error=%s", SDL_GetError());
+#endif
             return 0;
+        }
     }
 #endif
 #if defined(HMBTN_ENH_WIDESCREEN) && defined(HMBTN_ENH_PAUSE_MENU)
