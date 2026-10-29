@@ -217,6 +217,13 @@ int hm_graphics_apply(SDL_Window *window, const hm_graphics_options *o) {
             break;
         }
     }
+    if (!ok && modes && count > 0) {
+        ok = SDL_SetWindowFullscreenMode(window, modes[0]) &&
+             SDL_SetWindowFullscreen(window, true);
+    }
+    if (!ok) {
+        ok = SDL_SetWindowFullscreen(window, true);
+    }
     SDL_free(modes);
     return ok;
 #endif

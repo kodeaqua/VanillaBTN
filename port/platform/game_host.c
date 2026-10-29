@@ -772,8 +772,14 @@ static void hm_host_pause(void) {
                 }
             }
             if (action == HM_PAUSE_CHANGE_AUDIO) {
-                if (hm_audio_change(&hm_audio, menu.selected,
-                                    input == HM_PAUSE_LEFT ? -1 : 1)) {
+                int dir = (input == HM_PAUSE_LEFT) ? -1 : 1;
+                if (input == HM_PAUSE_CONFIRM && menu.selected < 2) {
+                    if (menu.selected == 0 && hm_audio.bgm_volume >= 100)
+                        dir = -10;
+                    else if (menu.selected == 1 && hm_audio.sfx_volume >= 100)
+                        dir = -10;
+                }
+                if (hm_audio_change(&hm_audio, menu.selected, dir)) {
                     notice = hm_audio_save(&hm_audio) ? "" : "Cannot save settings";
                 }
             }
