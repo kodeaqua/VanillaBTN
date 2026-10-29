@@ -64,6 +64,13 @@ int main(int argc, char **argv) {
     CHECK(opt.bgm_volume == 100);
     CHECK(hm_sound_get_bgm_volume() == 100);
 
+    /* Check helper descriptions fit 34-char font box */
+    for (int i = 0; i < 3; ++i) {
+        char desc[128];
+        hm_audio_value(&opt, i, desc, sizeof(desc));
+        CHECK(strlen(desc) <= 34);
+    }
+
     SDL_free(root);
     SDL_Quit();
     return 0;

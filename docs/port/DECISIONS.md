@@ -2722,3 +2722,31 @@ Decision:
 
 Consequences:
 The in-game pause menu renders without visual clipping, correctly routes all subpages including Audio, and presents clear, standard control prompts.
+
+## ADR-098: Audit fixes for helper text bounds, pause menu WASD navigation, and targeting elevation
+
+Date: 2026-10-29. Status: accepted.
+
+Context:
+A comprehensive audit across engine and platform layers identified four subtle UX and robustness issues:
+1. Controls and Audio helper detail descriptions exceeded the 34-35 character limit of the Pause Menu detail box (x = 24 to 304), causing trailing words to be clipped mid-sentence. In addition, punctuation characters like '+', '&', ':', and ',' are not in the pause font glyph set and rendered as blank spaces.
+2. The Pause Menu keyboard navigation handler only recognized arrow keys and 'X' / 'Enter', leaving players using the WASD keyboard preset unable to navigate with 'W', 'A', 'S', 'D' or confirm/cancel with 'K' / 'J'.
+3. Tile targeting grid 3D projection assumed a constant ground elevation ('ground_y = 0'). In areas with vertical offsets or player elevation (such as greenhouses or slopes), this produced vertical projection misalignment.
+4. Defensive GPU primitive buffer headroom checks were missing prior to allocating quad and line primitives in 'hm_gameplay_draw_tool_charge_gauge' and 'hm_gameplay_draw_tile_targeting'.
+
+Decision:
+1. Helper Description Optimization ('port/platform/audio_options.c', 'port/platform/controls_options.c'):
+   - Shortened all Audio and Controls detail helper strings to <= 34 characters.
+   - Cleaned up string formatting to avoid unsupported punctuation ('Arrows ZX', 'WASD JK', 'Move-Act').
+   - Added unit test validation in 'port/platform/tests/audio_options.c' and 'controls_options.c' verifying all descriptions fit within the 34-character limit.
+2. Full WASD & Action Key Menu Navigation ('port/platform/game_host.c'):
+   - Mapped 'SDLK_W' to 'HM_PAUSE_UP', 'SDLK_S' to 'HM_PAUSE_DOWN', 'SDLK_A' to 'HM_PAUSE_LEFT', and 'SDLK_D' to 'HM_PAUSE_RIGHT'.
+   - Mapped 'SDLK_K' to 'HM_PAUSE_CONFIRM' and 'SDLK_J' to 'HM_PAUSE_BACK'.
+3. Adaptive Ground Elevation & Defensive Buffer Capacity ('port/enhance/gameplay/gameplay.c'):
+   - Updated tile targeting vertex projection to use 's16 ground_y = (s16)player->position.vy;'.
+   - Added bounds checks ensuring 'current_frame->primCursor.bytes + required_size < current_frame->primBuffer + FRAME_PRIM_SIZE' before primitive allocation.
+4. Verification:
+   - All 120 unit tests pass 100%.
+
+Consequences:
+Helper descriptions display cleanly without word truncation, WASD keyboard navigation works seamlessly across all pause menu screens, and ground targeting accurately follows terrain height without primitive buffer overflow risks.
