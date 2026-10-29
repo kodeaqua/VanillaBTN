@@ -19,6 +19,8 @@ void hm_gameplay_defaults(hm_gameplay_options *options) {
     options->calendar_events = 0;
     options->roaming_horse = 0;
     options->fast_text = 0;
+    options->tool_charge_gauge = 0;
+    options->tile_targeting = 0;
 }
 
 void hm_gameplay_load(hm_gameplay_options *options) {
@@ -54,6 +56,10 @@ void hm_gameplay_load(hm_gameplay_options *options) {
             options->roaming_horse = (val_len == 4 && !memcmp(val, "true", 4));
         if (hm_json_property(object, length, "fast_text", &val, &val_len) == 1)
             options->fast_text = (val_len == 4 && !memcmp(val, "true", 4));
+        if (hm_json_property(object, length, "tool_charge_gauge", &val, &val_len) == 1)
+            options->tool_charge_gauge = (val_len == 4 && !memcmp(val, "true", 4));
+        if (hm_json_property(object, length, "tile_targeting", &val, &val_len) == 1)
+            options->tile_targeting = (val_len == 4 && !memcmp(val, "true", 4));
     }
     free(text);
     hm_gameplay_set_active(options);
@@ -84,6 +90,10 @@ int hm_gameplay_save(const hm_gameplay_options *options) {
                                           options->roaming_horse ? "true" : "false");
     ok &= hm_user_data_set_nested_setting("enhance", "fast_text",
                                           options->fast_text ? "true" : "false");
+    ok &= hm_user_data_set_nested_setting("enhance", "tool_charge_gauge",
+                                          options->tool_charge_gauge ? "true" : "false");
+    ok &= hm_user_data_set_nested_setting("enhance", "tile_targeting",
+                                          options->tile_targeting ? "true" : "false");
     return ok;
 }
 
@@ -121,6 +131,12 @@ int hm_gameplay_change(hm_gameplay_options *options, int item, int direction) {
         break;
     case 9:
         options->fast_text = !options->fast_text;
+        break;
+    case 10:
+        options->tool_charge_gauge = !options->tool_charge_gauge;
+        break;
+    case 11:
+        options->tile_targeting = !options->tile_targeting;
         break;
     default:
         return 0;
@@ -163,6 +179,12 @@ void hm_gameplay_value(const hm_gameplay_options *options, int item, char *text,
     case 9:
         snprintf(text, capacity, "Display dialogue text instantly without typing delay");
         break;
+    case 10:
+        snprintf(text, capacity, "Show visual charge meter above Pete while charging tools");
+        break;
+    case 11:
+        snprintf(text, capacity, "Highlight targeted farm tile grid with isometric projection");
+        break;
     default:
         text[0] = 0;
         break;
@@ -202,6 +224,12 @@ void hm_gameplay_row_value(const hm_gameplay_options *options, int item, char *t
         break;
     case 9:
         snprintf(text, capacity, "%s", options->fast_text ? "On" : "Off");
+        break;
+    case 10:
+        snprintf(text, capacity, "%s", options->tool_charge_gauge ? "On" : "Off");
+        break;
+    case 11:
+        snprintf(text, capacity, "%s", options->tile_targeting ? "On" : "Off");
         break;
     default:
         text[0] = 0;

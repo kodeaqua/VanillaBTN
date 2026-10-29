@@ -4193,6 +4193,17 @@ void player_draw(VECTOR *position, s32 unused)
     {
         player_draw_slow_trail(player);
     }
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
+    /* PORT: Tool charge visual indicator & tile targeting grid highlight - see docs/port/DECISIONS.md#adr-096 */
+    if (hm_gameplay_tool_charge_gauge())
+    {
+        hm_gameplay_draw_tool_charge_gauge(player, depth, hand_screen.x, hand_screen.y);
+    }
+    if (hm_gameplay_tile_targeting())
+    {
+        hm_gameplay_draw_tile_targeting(player, depth);
+    }
+#endif
 }
 
 static void player_draw_riding_cow(FarmPlayer *player)
