@@ -189,6 +189,11 @@ static SDL_DisplayID hm_display(int ordinal) {
     return result;
 }
 int hm_graphics_apply(SDL_Window *window, const hm_graphics_options *o) {
+#ifdef __ANDROID__
+    (void)window;
+    (void)o;
+    return 1;
+#else
     SDL_DisplayID display = hm_display(o->monitor);
     if (!display || o->mode < 0 || o->mode > 2 || o->width < 320 || o->height < 240)
         return 0;
@@ -214,6 +219,7 @@ int hm_graphics_apply(SDL_Window *window, const hm_graphics_options *o) {
     }
     SDL_free(modes);
     return ok;
+#endif
 }
 hm_present_rate hm_graphics_present_rate(const hm_graphics_options *o) {
     if (o->fps_numerator == -1)
@@ -223,10 +229,14 @@ hm_present_rate hm_graphics_present_rate(const hm_graphics_options *o) {
 }
 int hm_graphics_swapchain(SDL_GPUDevice *device, SDL_Window *window, const hm_graphics_options *o) {
     SDL_GPUPresentMode mode = o->vsync ? SDL_GPU_PRESENTMODE_VSYNC : SDL_GPU_PRESENTMODE_IMMEDIATE;
+#ifndef __ANDROID__
     if (o->vsync && SDL_WindowSupportsGPUPresentMode(device, window, SDL_GPU_PRESENTMODE_MAILBOX))
         mode = SDL_GPU_PRESENTMODE_MAILBOX;
-    return SDL_WindowSupportsGPUPresentMode(device, window, mode) &&
-           SDL_SetGPUSwapchainParameters(device, window, SDL_GPU_SWAPCHAINCOMPOSITION_SDR, mode);
+#endif
+    if (!SDL_WindowSupportsGPUPresentMode(device, window, mode)) {
+        mode = SDL_GPU_PRESENTMODE_VSYNC;
+    }
+    return SDL_SetGPUSwapchainParameters(device, window, SDL_GPU_SWAPCHAINCOMPOSITION_SDR, mode);
 }
 static int hm_refresh_rate(const SDL_DisplayMode *mode, hm_present_rate *rate) {
     if (!mode)
