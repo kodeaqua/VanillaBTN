@@ -22,7 +22,8 @@ static u32 hm_interpolate(u32 a, u32 b, u32 c, const s64 weight[3], s64 area) {
     return ((u32)weight[0] * a + (u32)weight[1] * b + (u32)weight[2] * c + uarea / 2u) / uarea;
 }
 static void hm_triangle(hm_vertex a, hm_vertex b, hm_vertex c, u32 opcode, u16 clut) {
-    const DRAWENV *draw = &hm_gpu_environment_state()->draw;
+    const hm_gpu_environment *state = hm_gpu_environment_state();
+    const DRAWENV *draw = &state->draw;
     s64 area = hm_edge(&a, &b, c.x, c.y);
     if (!area)
         return;
@@ -70,7 +71,22 @@ static void hm_triangle(hm_vertex a, hm_vertex b, hm_vertex c, u32 opcode, u16 c
         return;
     int edge0 = hm_top_left(&b, &c), edge1 = hm_top_left(&c, &a), edge2 = hm_top_left(&a, &b);
     static const s8 dither[4][4] = {{-4, 0, -3, 1}, {2, -2, 3, -1}, {-3, 1, -4, 0}, {3, -1, 2, -2}};
-    int textured = (opcode & 4) != 0, raw = textured && (opcode & 1);
+    int textured = (opcode & 4) != 0, raw = textured && (opcode & 1), semi = (opcode & 2) != 0;
+    u32 page = draw->tpage, depth = (page >> 7) & 3u;
+    if (textured && depth == 3u)
+        hm_runtime_error("DrawOTag", "reserved texture depth");
+    hm_vram_context *vram = hm_vram_mutable_state();
+    u16 (*vram_pixels)[HM_VRAM_WIDTH] = vram->pixels;
+    u16 set_mask = vram->set_mask, check_mask = vram->check_mask;
+    u32 blend_mode = (page >> 5) & 3u;
+    int check_disp = !draw->dfe && state->display_enabled;
+    s32 disp_x0 = state->display.disp.x, disp_y0 = state->display.disp.y;
+    s32 disp_x1 = disp_x0 + state->display.disp.w, disp_y1 = disp_y0 + state->display.disp.h;
+    u32 page_x = (page & 15u) * 64u, page_y = (page & 16u) * 16u;
+    u32 mask_x = (256u - (u32)draw->tw.w) & 248u;
+    u32 mask_y = (256u - (u32)draw->tw.h) & 248u;
+    u32 tw_x = (u32)draw->tw.x & mask_x, tw_y = (u32)draw->tw.y & mask_y;
+    u32 clut_x = (clut & 63u) * 16u, clut_y = (clut >> 6) & 511u;
     int dithering = hm_dither_enabled() && draw->dtd && ((opcode & 16) || (textured && !raw));
     int uniform_color = !(opcode & 16) ||
                         (a.color[0] == b.color[0] && a.color[0] == c.color[0] &&
@@ -87,19 +103,26 @@ static void hm_triangle(hm_vertex a, hm_vertex b, hm_vertex c, u32 opcode, u16 c
     s64 dx2 = -(s64)(b.y - a.y) * 2, dy2 = (s64)(b.x - a.x) * 2;
     for (s32 y = miny; y < maxy; ++y, row0 += dy0, row1 += dy1, row2 += dy2) {
         s64 weight[3] = {row0, row1, row2};
+        u16 *vram_row = vram_pixels[y];
+        u64 dirty_mask = 0;
+        int row_disp = check_disp && y >= disp_y0 && y < disp_y1;
         for (s32 x = minx; x < maxx; ++x, weight[0] += dx0, weight[1] += dx1, weight[2] += dx2) {
             if (weight[0] < 0 || (!weight[0] && !edge0) || weight[1] < 0 ||
                 (!weight[1] && !edge1) || weight[2] < 0 || (!weight[2] && !edge2))
                 continue;
+            if (row_disp && x >= disp_x0 && x < disp_x1)
+                continue;
             if (!textured && uniform_color && !dithering) {
-                hm_gpu_pixel(x, y, flat_untextured, (opcode & 2) != 0);
+                hm_gpu_fast_pixel(vram_row, &dirty_mask, x, flat_untextured, semi, blend_mode,
+                                  set_mask, check_mask);
                 continue;
             }
             u16 texel = 0;
             if (textured) {
                 u32 u = hm_interpolate(a.u, b.u, c.u, weight, area);
                 u32 v = hm_interpolate(a.v, b.v, c.v, weight, area);
-                texel = hm_gpu_texel(u, v, clut);
+                texel = hm_gpu_fast_texel((const u16(*)[HM_VRAM_WIDTH])vram_pixels, page_x, page_y,
+                                          depth, mask_x, mask_y, tw_x, tw_y, clut_x, clut_y, u, v);
                 if (!texel)
                     continue;
             }
@@ -119,8 +142,10 @@ static void hm_triangle(hm_vertex a, hm_vertex b, hm_vertex c, u32 opcode, u16 c
                         value = 255;
                     color |= (u16)((value >> 3) << (channel * 5));
                 }
-            hm_gpu_pixel(x, y, color, (opcode & 2) && (!textured || (texel & 0x8000)));
+            hm_gpu_fast_pixel(vram_row, &dirty_mask, x, color, semi && (!textured || (texel & 0x8000)),
+                              blend_mode, set_mask, check_mask);
         }
+        vram->dirty[(u32)y >> 4] |= dirty_mask;
     }
 }
 

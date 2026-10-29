@@ -38,7 +38,7 @@ target_compile_features(hmbtn_port_options INTERFACE c_std_11)
 target_include_directories(hmbtn_port_options INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_options(hmbtn_port_options INTERFACE
     -Wall -Wextra -fno-strict-aliasing -fwrapv -fno-delete-null-pointer-checks
-    -fvisibility=hidden "$<$<CONFIG:Release>:-O2>")
+    -fvisibility=hidden "$<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:-O3>")
 if(ANDROID)
     target_compile_options(hmbtn_port_options INTERFACE -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -Wno-fortify-source)
 endif()

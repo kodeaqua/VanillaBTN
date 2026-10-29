@@ -92,7 +92,7 @@ SDL_GPUTexture *hm_gpu_renderer_encode(hm_gpu_renderer *r, SDL_GPUCommandBuffer 
     }
     if (r->revision == scene->revision)
         return r->output;
-    void *mapped = SDL_MapGPUTransferBuffer(r->device, r->upload, true);
+    void *mapped = SDL_MapGPUTransferBuffer(r->device, r->upload, false);
     if (!mapped)
         return NULL;
     SDL_memcpy(mapped, scene->words, scene->bytes);
@@ -102,9 +102,9 @@ SDL_GPUTexture *hm_gpu_renderer_encode(hm_gpu_renderer *r, SDL_GPUCommandBuffer 
         return NULL;
     SDL_GPUTransferBufferLocation source = {.transfer_buffer = r->upload};
     SDL_GPUBufferRegion destination = {.buffer = r->buffer, .size = (u32)scene->bytes};
-    SDL_UploadToGPUBuffer(copy, &source, &destination, true);
+    SDL_UploadToGPUBuffer(copy, &source, &destination, false);
     SDL_EndGPUCopyPass(copy);
-    SDL_GPUStorageTextureReadWriteBinding output = {.texture = r->output, .cycle = true};
+    SDL_GPUStorageTextureReadWriteBinding output = {.texture = r->output, .cycle = false};
     SDL_GPUComputePass *compute = SDL_BeginGPUComputePass(command, &output, 1, NULL, 0);
     if (!compute)
         return NULL;

@@ -6,7 +6,11 @@
 
 static hm_vram_context hm_default_vram;
 static hm_vram_context *hm_context = &hm_default_vram;
+static u64 hm_vram_gen = 1;
 const hm_vram_context *hm_vram_state(void) { return hm_context; }
+hm_vram_context *hm_vram_mutable_state(void) { return hm_context; }
+u64 hm_vram_generation(void) { return hm_vram_gen; }
+void hm_vram_bump_generation(void) { ++hm_vram_gen; }
 int hm_vram_is_native(void) { return hm_context == &hm_default_vram; }
 #define hm_vram (hm_context->pixels)
 #define hm_dirty (hm_context->dirty)
@@ -25,8 +29,10 @@ void hm_vram_snapshot(hm_vram_context *destination) {
 }
 
 void hm_vram_reset(void) {
-    if (hm_vram_is_native())
+    if (hm_vram_is_native()) {
+        ++hm_vram_gen;
         hm_render_invalidate();
+    }
     memset(hm_vram, 0, sizeof(hm_vram));
     memset(hm_dirty, 255, sizeof(hm_dirty));
     hm_set_mask = hm_check_mask = 0;
@@ -76,6 +82,7 @@ static void hm_vram_area(const RECT *area, const void *pixels, const char *api) 
 static void hm_vram_transfer(u32 x, u32 y, u32 width, u32 height) {
     if (!hm_vram_is_native())
         return;
+    ++hm_vram_gen;
     x &= 1023;
     y &= 511;
     u32 first_w = width < 1024 - x ? width : 1024 - x;

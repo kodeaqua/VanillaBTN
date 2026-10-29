@@ -76,7 +76,8 @@ static u16 hm_gpu_color(u32 rgb) {
 }
 
 static void hm_gpu_rectangle(const u32 *words, u32 opcode, u32 width, u32 height, int textured) {
-    const DRAWENV *draw = &hm_gpu_environment_state()->draw;
+    const hm_gpu_environment *state = hm_gpu_environment_state();
+    const DRAWENV *draw = &state->draw;
     s32 x0 = hm_signed11(words[1]) + draw->ofs[0];
     s32 y0 = hm_signed11(words[1] >> 16) + draw->ofs[1];
     s32 clip_x0 = draw->clip.x > 0 ? draw->clip.x : 0;
@@ -89,30 +90,59 @@ static void hm_gpu_rectangle(const u32 *words, u32 opcode, u32 width, u32 height
     s32 y_end = y0 + (s32)height > clip_y1 ? clip_y1 - y0 : (s32)height;
     if (x_start >= x_end || y_start >= y_end)
         return;
+    u32 page = draw->tpage, depth = (page >> 7) & 3u;
+    if (textured && depth == 3u)
+        hm_runtime_error("DrawOTag", "reserved texture depth");
+    hm_vram_context *vram = hm_vram_mutable_state();
+    u16 (*vram_pixels)[HM_VRAM_WIDTH] = vram->pixels;
+    u16 set_mask = vram->set_mask, check_mask = vram->check_mask;
+    u32 blend_mode = (page >> 5) & 3u;
+    int check_disp = !draw->dfe && state->display_enabled;
+    s32 disp_x0 = state->display.disp.x, disp_y0 = state->display.disp.y;
+    s32 disp_x1 = disp_x0 + state->display.disp.w, disp_y1 = disp_y0 + state->display.disp.h;
     u16 color = hm_gpu_color(words[0]);
-    u32 u0 = textured ? (words[2] & 255) : 0;
-    u32 v0 = textured ? ((words[2] >> 8) & 255) : 0;
+    u32 u0 = textured ? (words[2] & 255u) : 0;
+    u32 v0 = textured ? ((words[2] >> 8) & 255u) : 0;
     u16 clut = textured ? (u16)(words[2] >> 16) : 0;
-    u32 light_r = words[0] & 255, light_g = (words[0] >> 8) & 255, light_b = (words[0] >> 16) & 255;
-    for (s32 y = y_start; y < y_end; ++y)
+    u32 page_x = (page & 15u) * 64u, page_y = (page & 16u) * 16u;
+    u32 mask_x = (256u - (u32)draw->tw.w) & 248u;
+    u32 mask_y = (256u - (u32)draw->tw.h) & 248u;
+    u32 tw_x = (u32)draw->tw.x & mask_x, tw_y = (u32)draw->tw.y & mask_y;
+    u32 clut_x = (clut & 63u) * 16u, clut_y = (clut >> 6) & 511u;
+    u32 light_r = words[0] & 255u, light_g = (words[0] >> 8) & 255u,
+        light_b = (words[0] >> 16) & 255u;
+    int semi = (opcode & 2) != 0, raw = (opcode & 1) != 0;
+    for (s32 y = y_start; y < y_end; ++y) {
+        s32 py = y0 + y;
+        u16 *vram_row = vram_pixels[py];
+        u64 dirty_mask = 0;
+        int row_disp = check_disp && py >= disp_y0 && py < disp_y1;
         for (s32 x = x_start; x < x_end; ++x) {
+            s32 px = x0 + x;
+            if (row_disp && px >= disp_x0 && px < disp_x1)
+                continue;
             u16 pixel = color;
-            int blend = (opcode & 2) != 0;
+            int blend = semi;
             if (textured) {
-                pixel = hm_gpu_texel(u0 + (u32)x, v0 + (u32)y, clut);
+                pixel = hm_gpu_fast_texel((const u16(*)[HM_VRAM_WIDTH])vram_pixels, page_x, page_y,
+                                          depth, mask_x, mask_y, tw_x, tw_y, clut_x, clut_y,
+                                          u0 + (u32)x, v0 + (u32)y);
                 if (!pixel)
                     continue;
                 blend = blend && (pixel & 0x8000);
-                if (!(opcode & 1)) {
-                    u32 r = ((pixel & 31) * light_r) / 128;
-                    u32 g = (((pixel >> 5) & 31) * light_g) / 128;
-                    u32 b = (((pixel >> 10) & 31) * light_b) / 128;
-                    pixel = (u16)((pixel & 0x8000) | (r > 31 ? 31 : r) |
-                                  ((g > 31 ? 31 : g) << 5) | ((b > 31 ? 31 : b) << 10));
+                if (!raw) {
+                    u32 r = ((pixel & 31u) * light_r) / 128u;
+                    u32 g = (((pixel >> 5) & 31u) * light_g) / 128u;
+                    u32 b = (((pixel >> 10) & 31u) * light_b) / 128u;
+                    pixel = (u16)((pixel & 0x8000u) | (r > 31u ? 31u : r) |
+                                  ((g > 31u ? 31u : g) << 5) | ((b > 31u ? 31u : b) << 10));
                 }
             }
-            hm_gpu_pixel(x0 + x, y0 + y, pixel, blend);
+            hm_gpu_fast_pixel(vram_row, &dirty_mask, px, pixel, blend, blend_mode, set_mask,
+                              check_mask);
         }
+        vram->dirty[(u32)py >> 4] |= dirty_mask;
+    }
 }
 
 static u32 hm_gpu_command(const u32 *words, u32 available) {
@@ -181,6 +211,7 @@ void DrawOTag(u32 *table) {
     if (!table || ((uintptr_t)table & 3))
         hm_runtime_error("DrawOTag", "null or unaligned OT");
     if (hm_vram_is_native()) {
+        hm_vram_bump_generation();
         const RECT *clip = &hm_gpu_environment_state()->draw.clip;
         hm_render_direct_draw(clip->x, clip->y, (u32)clip->w, (u32)clip->h);
     }
