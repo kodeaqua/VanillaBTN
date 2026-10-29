@@ -8,7 +8,7 @@ static const char *const hm_graphics_items[] = {
     "Filtering", "VSync",       "FPS Limit",  "Interpolation"};
 static const char *const hm_gameplay_items[] = {
     "Walk Crops", "Item Stacking", "Durable Fences", "Connect Fences", "Wild Dog Attacks",
-    "Smart Bell", "Stamina HUD",   "Calendar Events","Roaming Horse"};
+    "Smart Bell", "Stamina HUD",   "Calendar Events","Roaming Horse",  "Auto Run"};
 static const char *const hm_controls_items[] = {"Gamepad", "Keyboard", "Mouse"};
 
 void hm_pause_open(hm_pause_menu *menu) {

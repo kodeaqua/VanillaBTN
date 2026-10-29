@@ -19,6 +19,7 @@ int hm_gameplay_smart_bell(void);
 int hm_gameplay_stamina_hud(void);
 int hm_gameplay_calendar_events(void);
 int hm_gameplay_roaming_horse(void);
+int hm_gameplay_auto_run(void);
 
 void hm_gameplay_set_active(const void *options_ptr);
 

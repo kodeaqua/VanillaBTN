@@ -2545,3 +2545,26 @@ Decision:
 
 Consequences:
 Eliminated fatal abort paths during save/sleep cycles, diary transfers, CD stream transitions, audio volume fading, and memory card operations.
+
+## ADR-090: Modern movement stack with Auto-Run toggle and inverted walk control
+
+Date: 2026-10-29. Status: accepted.
+
+Context:
+In original PS1 Harvest Moon: Back to Nature, walking is the default movement speed, requiring players to continuously hold Circle (or the mapped button/key) throughout hours of farming, foraging, and town exploration. In modern farming/RPG games (such as Stardew Valley or modern Story of Seasons), running is standard behavior, reducing finger fatigue and enhancing pacing.
+
+Decision:
+1. Auto-Run Setting (`port/enhance/gameplay/`, `port/platform/gameplay_options.c`):
+   - Added `auto_run` to `hm_gameplay_options` (key: `enhance.auto_run` in `settings.json`), accessible via Pause Menu -> Gameplay -> "Auto Run".
+   - Runtime setting defaults OFF (`0`) in adherence to AGENTS.md vanilla fidelity.
+2. Platform Input Injection (`port/platform/game_host.c`):
+   - When `hm_gameplay_auto_run()` is active and directional movement is detected (D-pad, analog stick, or keyboard arrows/WASD), `HM_PAD_CIRCLE` is automatically injected into the sampled pad state so Pete runs by default.
+   - Holding the Circle button while moving reverses the behavior, allowing Pete to walk carefully when precision movement is needed (e.g. harvesting crops, lining up tool swings).
+   - Zero edits to matching `src/overlay/11_GF_FARM/people/player.c`.
+3. Pause Menu UI & Tests:
+   - Expanded Gameplay settings menu to 10 items (`HM_PAUSE_GAMEPLAY_ITEMS = 10`).
+   - Updated `port/tests/pause_menu.c` and `port/platform/tests/gameplay_options.c`.
+   - All 119 unit tests passing 100%.
+
+Consequences:
+Players enjoy seamless, modern movement across farm and town environments without button holding fatigue, while retaining complete vanilla behavior when toggled OFF.
