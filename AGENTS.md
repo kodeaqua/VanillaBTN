@@ -25,7 +25,7 @@ override this one for their subtree.
 - The owner performs interactive gameplay testing. Agents handle implementation,
   builds and isolated technical/unit checks; do not launch gameplay or replay
   sessions unless the owner explicitly requests them.
-- Windows user data belongs in the active user's Documents/BackToNature folder,
+- Windows user data belongs in the active user's Documents/VanillaBTN folder,
   resolved through the OS user-folder API (including redirected Documents).
   Store saves under saves/ and configuration at settings.json. Do not hardcode
   a username or use AppData for these files. This overrides the default pref-path

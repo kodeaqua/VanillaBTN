@@ -103,7 +103,7 @@ int main(int argc, char **argv) {
     }
     /* Settings hold the remembered disc path; the host reuses this running user data. */
     if (!hm_user_data_start()) {
-        fprintf(stderr, "Cannot open Documents/BackToNature\n");
+        fprintf(stderr, "Cannot open Documents/VanillaBTN\n");
         return 1;
     }
     if (!hm_disc_locate(argc == 2 ? argv[1] : NULL, hm_open_disc, &slot)) {

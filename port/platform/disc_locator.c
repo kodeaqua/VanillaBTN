@@ -153,7 +153,7 @@ int hm_disc_locate(const char *argument, hm_disc_try try, void *context) {
         static const char message[] =
             "Original USA disc image not found. Put the Harvest Moon: Back to Nature (USA) .bin "
             "next to the game executable, or start the game with the path to the .bin as its "
-            "argument. The chosen path is remembered in Documents/BackToNature/settings.json.";
+            "argument. The chosen path is remembered in Documents/VanillaBTN/settings.json.";
         fprintf(stderr, "%s\n", message);
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Back to Nature", message, NULL);
     }
