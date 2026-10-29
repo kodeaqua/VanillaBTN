@@ -845,9 +845,11 @@ static void hm_host_present_scanout(u64 tick) {
                             .pixels[((u32)area->y + y) * interpolated.stride + (u32)area->x + x];
 #endif
             u8 *out = pixels + (y * output_width + x) * 4;
+            s32 dither_val = (s32)(((x * 13u + y * 7u) ^ (x * y)) & 3u) - 1;
             for (u32 channel = 0; channel < 3; ++channel) {
                 u32 component = (color >> (channel * 5)) & 31;
-                out[channel] = (u8)((component << 3) | (component >> 2));
+                s32 byte_val = (s32)((component << 3) | (component >> 2)) + dither_val;
+                out[channel] = (u8)(byte_val < 0 ? 0 : byte_val > 255 ? 255 : byte_val);
             }
             out[3] = 255;
         }

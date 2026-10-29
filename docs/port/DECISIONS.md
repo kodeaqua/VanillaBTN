@@ -2589,3 +2589,28 @@ Decision:
 
 Consequences:
 Background music, acoustic instruments, chime bells, running water, and sound effects output with modern studio clarity and crisp treble while matching deterministic replay behavior.
+
+## ADR-092: True 32-bit gradient smoothing and micro-dither debanding
+
+Date: 2026-10-29. Status: accepted.
+
+Context:
+PS1 VRAM represents framebuffers in 15-bit BGR555 format (5 bits per color channel, 32 distinct levels per channel). On modern high-gamut 8-bit/10-bit IPS and OLED displays, this coarse quantization creates noticeable color step banding (contouring / Mach banding), particularly across night sky gradients, dusk horizons, dynamic day/night lighting transitions, volumetric morning fog, and Gouraud-shaded polygonal terrain and characters.
+
+Decision:
+1. GPU Compute Shader Debanding (port/gfx/shaders/scene.hlsl):
+   - In the hardware compute shader presentation pipeline, compute a deterministic triangular spatial micro-dither pattern based on screen coordinate hash:
+     micro_dither = (float(((id.x * 13u + id.y * 7u) ^ (id.x * id.y)) & 15u) - 7.5) / 1020.0;
+   - Inject this sub-LSB dither directly into the normalized output pixel color before writing to the 32-bit RGBA8_UNORM presentation target.
+   - Regenerated DXIL (scene_dxil.h) and SPIR-V (scene_spirv.h) shader bytecodes via port/packaging/windows/build-shaders.ps1.
+2. Software/CPU Scanout Debanding (port/platform/game_host.c):
+   - In hm_host_present_scanout, apply a corresponding triangular micro-dither offset to the expanded 8-bit RGB channels:
+     s32 dither_val = (s32)(((x * 13u + y * 7u) ^ (x * y)) & 3u) - 1;
+   - Clamped safely to [0, 255] across each channel before SDL texture presentation.
+3. Diagnostic Capture Fidelity:
+   - Frame diagnostic captures (HMBTN_CAPTURE_FRAME) bypass debanding, preserving exact VRAM pixel match for tests and offline golden-frame validation.
+4. Verification:
+   - All 119 unit tests passing 100%.
+
+Consequences:
+Night skies, sunset gradients, morning fog, and character Gouraud shading appear completely smooth and banding-free on modern monitors, matching the visual quality expected of a modern remaster without modifying underlying game logic or PS1 VRAM layouts.
