@@ -15,4 +15,6 @@ void hm_spu_voice_start(hm_spu_voice *voice, const void *data, u32 bytes, u32 pi
 void hm_spu_voice_mix(hm_spu_voice voices[24], s16 *stereo, u32 frames);
 void hm_spu_voice_mix_reverb(hm_spu_voice voices[24], s16 *stereo, u32 frames);
 s16 hm_spu_gaussian(const s16 recent[4], u32 fraction);
+void hm_spu_set_hq(int enabled);
+int hm_spu_get_hq(void);
 #endif
