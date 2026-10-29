@@ -17,5 +17,6 @@ void hm_replay_group(int world);
 void hm_replay_begin(const RECT *area);
 void hm_replay_command(const u32 *words, u32 available, int after);
 u32 hm_replay_consume(const u32 *words, u32 available);
+int hm_replay_has_consumer(void);
 void hm_replay_motion(const u32 *previous, const u32 *current, u32 count, u32 alpha);
 #endif

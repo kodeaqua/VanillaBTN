@@ -79,28 +79,39 @@ static void hm_gpu_rectangle(const u32 *words, u32 opcode, u32 width, u32 height
     const DRAWENV *draw = &hm_gpu_environment_state()->draw;
     s32 x0 = hm_signed11(words[1]) + draw->ofs[0];
     s32 y0 = hm_signed11(words[1] >> 16) + draw->ofs[1];
+    s32 clip_x0 = draw->clip.x > 0 ? draw->clip.x : 0;
+    s32 clip_y0 = draw->clip.y > 0 ? draw->clip.y : 0;
+    s32 clip_x1 = draw->clip.x + draw->clip.w < 1024 ? draw->clip.x + draw->clip.w : 1024;
+    s32 clip_y1 = draw->clip.y + draw->clip.h < 512 ? draw->clip.y + draw->clip.h : 512;
+    s32 x_start = x0 < clip_x0 ? clip_x0 - x0 : 0;
+    s32 y_start = y0 < clip_y0 ? clip_y0 - y0 : 0;
+    s32 x_end = x0 + (s32)width > clip_x1 ? clip_x1 - x0 : (s32)width;
+    s32 y_end = y0 + (s32)height > clip_y1 ? clip_y1 - y0 : (s32)height;
+    if (x_start >= x_end || y_start >= y_end)
+        return;
     u16 color = hm_gpu_color(words[0]);
-    for (u32 y = 0; y < height; ++y)
-        for (u32 x = 0; x < width; ++x) {
+    u32 u0 = textured ? (words[2] & 255) : 0;
+    u32 v0 = textured ? ((words[2] >> 8) & 255) : 0;
+    u16 clut = textured ? (u16)(words[2] >> 16) : 0;
+    u32 light_r = words[0] & 255, light_g = (words[0] >> 8) & 255, light_b = (words[0] >> 16) & 255;
+    for (s32 y = y_start; y < y_end; ++y)
+        for (s32 x = x_start; x < x_end; ++x) {
             u16 pixel = color;
             int blend = (opcode & 2) != 0;
             if (textured) {
-                pixel = hm_gpu_texel((words[2] & 255) + x, ((words[2] >> 8) & 255) + y,
-                                     (u16)(words[2] >> 16));
+                pixel = hm_gpu_texel(u0 + (u32)x, v0 + (u32)y, clut);
                 if (!pixel)
                     continue;
                 blend = blend && (pixel & 0x8000);
                 if (!(opcode & 1)) {
-                    u16 mixed = pixel & 0x8000;
-                    for (u32 channel = 0; channel < 3; ++channel) {
-                        u32 light = (words[0] >> (channel * 8)) & 255;
-                        u32 value = ((pixel >> (channel * 5)) & 31) * light / 128;
-                        mixed |= (u16)((value > 31 ? 31 : value) << (channel * 5));
-                    }
-                    pixel = mixed;
+                    u32 r = ((pixel & 31) * light_r) / 128;
+                    u32 g = (((pixel >> 5) & 31) * light_g) / 128;
+                    u32 b = (((pixel >> 10) & 31) * light_b) / 128;
+                    pixel = (u16)((pixel & 0x8000) | (r > 31 ? 31 : r) |
+                                  ((g > 31 ? 31 : g) << 5) | ((b > 31 ? 31 : b) << 10));
                 }
             }
-            hm_gpu_pixel(x0 + (s32)x, y0 + (s32)y, pixel, blend);
+            hm_gpu_pixel(x0 + x, y0 + y, pixel, blend);
         }
 }
 

@@ -16,7 +16,11 @@ static void SDLCALL hm_audio_callback(void *context, const SDL_AudioSpec *spec, 
                        (u32)spec->channels, (u32)spec->freq);
 }
 int hm_audio_output_start(void) {
+#if defined(__ANDROID__)
+    hm_audio_ring_init(&hm_audio, 2940);
+#else
     hm_audio_ring_init(&hm_audio, 1470);
+#endif
     SDL_AudioSpec desired = {.format = SDL_AUDIO_F32, .channels = 2, .freq = 44100};
     hm_audio_device = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &desired);
     if (!hm_audio_device ||

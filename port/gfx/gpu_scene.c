@@ -157,7 +157,9 @@ static void hm_scene_add(hm_gpu_scene *s, u32 *p, int x0, int y0, int x1, int y1
         s->failure = "primitive capacity";
         return;
     }
-    memcpy(s->primitives[s->count], p, HM_SCENE_STRIDE * sizeof(*p));
+    u32 *dst_prim =
+        s->packed + HM_SCENE_HEADER + 1024 * 512 / 2 + (size_t)s->count * HM_SCENE_STRIDE;
+    memcpy(dst_prim, p, HM_SCENE_STRIDE * sizeof(*p));
     u32 bx0 = (u32)(x0 - s->area.x) / 16, by0 = (u32)(y0 - s->area.y) / 16;
     u32 bx1 = (u32)(x1 - 1 - s->area.x) / 16, by1 = (u32)(y1 - 1 - s->area.y) / 16;
     for (u32 y = by0; y <= by1; ++y)
@@ -496,8 +498,15 @@ static u32 hm_scene_consume(void *context, const u32 *w, u32 available) {
             skip = 1;
         }
     }
-    if (!length || length > available)
+    if (!length || length > available) {
+        if (op != 0 && op != 1 && !(op >= 0xe1 && op <= 0xe6)) {
+            hm_gpu_scene *s = context;
+            if (s->begun && !s->failure)
+                s->failure = "inline VRAM transfer";
+            return available;
+        }
         return 0;
+    }
     hm_scene_command(context, w, length, 0);
     hm_gpu_scene *s = context;
     s->motion_previous = s->motion_current = NULL;
@@ -558,8 +567,12 @@ int hm_gpu_scene_end(hm_gpu_scene *s, hm_replay_sink previous, hm_gpu_scene_data
     s->packed[13] = s->native.w;
     s->packed[14] = s->background;
     s->packed[15] = s->multisamples == 2 || s->multisamples == 4 ? s->multisamples : 1;
-    memcpy(s->packed + primitives, s->primitives, s->count * HM_SCENE_STRIDE * sizeof(u32));
-    memcpy(s->packed + bins, s->bins, s->tiles_x * s->tiles_y * HM_SCENE_BIN_WORDS * sizeof(u32));
+    u32 num_bins = s->tiles_x * s->tiles_y;
+    for (u32 i = 0; i < num_bins; ++i) {
+        u32 bin_words = s->bins[i][0] + 1;
+        memcpy(s->packed + bins + (size_t)i * HM_SCENE_BIN_WORDS, s->bins[i],
+               bin_words * sizeof(u32));
+    }
     *data = (hm_gpu_scene_data){s->packed, (size_t)total * sizeof(u32), ++s->revision, s->width,
                                 s->height};
     return 1;

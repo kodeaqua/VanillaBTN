@@ -11,6 +11,7 @@ typedef struct {
     int texture_linear;
     u64 revision;
     int logical_x[4096], logical_y[4096];
+    s32 q8_x[4096], q8_y[4096];
     const hm_gpu_environment *environment;
     const hm_vram_context *vram;
 } hm_software_surface;

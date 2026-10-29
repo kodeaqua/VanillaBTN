@@ -251,13 +251,19 @@ class VirtualGamepadView(context: Context) : View(context) {
             }
 
             MotionEvent.ACTION_MOVE -> {
+                var changed = false
                 for (i in 0 until event.pointerCount) {
                     val pid = event.getPointerId(i)
                     val px = event.getX(i)
                     val py = event.getY(i)
 
                     if (stickActive && pid == stickPointerId) {
+                        val oldX = stickKnobX
+                        val oldY = stickKnobY
                         updateAnalogStick(px, py)
+                        if (stickKnobX != oldX || stickKnobY != oldY) {
+                            changed = true
+                        }
                     } else {
                         // Track buttons
                         for (btn in buttons) {
@@ -267,12 +273,15 @@ class VirtualGamepadView(context: Context) : View(context) {
                                     btn.pressed = false
                                     btn.pointerId = -1
                                     SDLActivity.onNativeKeyUp(btn.keyCode)
+                                    changed = true
                                 }
                             }
                         }
                     }
                 }
-                invalidate()
+                if (changed) {
+                    invalidate()
+                }
                 return true
             }
 

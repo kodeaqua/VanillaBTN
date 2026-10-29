@@ -2,7 +2,7 @@
 #define HMBTN_PLATFORM_AUDIO_RING_H
 #include "compat/types.h"
 #include <stdatomic.h>
-enum { HM_AUDIO_RING_FRAMES = 8192 };
+enum { HM_AUDIO_RING_FRAMES = 32768 };
 typedef struct {
     s16 samples[HM_AUDIO_RING_FRAMES][2];
     atomic_uint read, write;

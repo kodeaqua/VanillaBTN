@@ -325,9 +325,12 @@ static int hm_interpolation_execute(u64 ns, const hm_render_frame *live,
     u64 start = f->meta.tick * 1000000000ull / 60;
     u64 elapsed = ns > start ? ns - start : 0;
     u32 alpha = elapsed >= 33333334 ? 65536 : (u32)(elapsed * 60 * 65536 / 2000000000ull);
-    s->work = f->before;
+    int fast_vram = !view && hm_replay_has_consumer();
+    u16 saved_set = f->before.set_mask, saved_check = f->before.check_mask;
+    if (!fast_vram)
+        s->work = f->before;
     s->environment = f->env;
-    hm_vram_context *saved_vram = hm_vram_bind(&s->work);
+    hm_vram_context *saved_vram = hm_vram_bind(fast_vram ? &f->before : &s->work);
     hm_gpu_environment *saved_env = hm_gpu_environment_bind(&s->environment);
     hm_replay_begin(&area);
     for (u32 i = 0; i < f->count; ++i) {
@@ -360,6 +363,10 @@ static int hm_interpolation_execute(u64 ns, const hm_render_frame *live,
     hm_replay_group(0);
     hm_gpu_environment_bind(saved_env);
     hm_vram_bind(saved_vram);
+    if (fast_vram) {
+        f->before.set_mask = saved_set;
+        f->before.check_mask = saved_check;
+    }
     if (view)
         *view = (hm_interpolated_view){&s->work.pixels[0][0], 1024, area};
     return 1;
