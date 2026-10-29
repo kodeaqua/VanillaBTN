@@ -1,7 +1,7 @@
 # Configure, build and package VanillaBTN for Android.
 param(
     [ValidateSet('Debug', 'Release')]
-    [string]$BuildType = 'Debug'
+    [string]$BuildType = 'Release'
 )
 
 $ErrorActionPreference = 'Stop'
