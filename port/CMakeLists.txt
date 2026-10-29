@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.24)
 project(hmbtn_port LANGUAGES C)
 
+if(WIN32)
+    enable_language(RC)
+endif()
+
+# Output test, probe, and benchmark executables to tests/
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests")
+
 include(CTest)
 option(HMBTN_SANITIZERS "Enable address and undefined-behavior sanitizers" OFF)
 option(HMBTN_BUILD_GPU_SPIKE "Build the local SDL_GPU presentation validation" OFF)
@@ -302,7 +309,16 @@ if(HMBTN_BUILD_GPU_SPIKE OR HMBTN_BUILD_NATIVE_WINDOW)
     endif()
     if(HMBTN_BUILD_NATIVE_WINDOW)
         add_executable(hmbtn_native platform/boot_probe.c platform/game_host.c platform/input_replay.c
-            platform/audio_output.c platform/audio_ring.c platform/user_data.c platform/disc_locator.c)
+            platform/audio_output.c platform/audio_ring.c platform/user_data.c platform/disc_locator.c
+            platform/version.c platform/crash_handler.c)
+        set_target_properties(hmbtn_native PROPERTIES
+            OUTPUT_NAME "VanillaBTN"
+            RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+        if(WIN32)
+            target_sources(hmbtn_native PRIVATE packaging/windows/hmbtn.rc)
+            target_link_options(hmbtn_native PRIVATE "$<$<CONFIG:Release>:-mwindows>")
+            target_link_libraries(hmbtn_native PRIVATE user32)
+        endif()
         target_compile_definitions(hmbtn_native PRIVATE SDL_MAIN_HANDLED HMBTN_SDL_HOST=1)
         target_link_libraries(hmbtn_native PRIVATE hmbtn_game_initial hmbtn_psx_pending SDL3::SDL3)
         target_link_libraries(hmbtn_native PRIVATE hmbtn_settings_json hmbtn_gpu_presentation)
@@ -379,6 +395,13 @@ if(HMBTN_BUILD_GPU_SPIKE OR HMBTN_BUILD_NATIVE_WINDOW)
                 hmbtn_settings_json)
             add_test(NAME platform.disc_locator COMMAND hmbtn_disc_locator_test
                 "${CMAKE_CURRENT_BINARY_DIR}/disc-locator-test")
+            add_executable(hmbtn_version_test platform/tests/version_test.c
+                platform/version.c platform/crash_handler.c)
+            target_link_libraries(hmbtn_version_test PRIVATE hmbtn_port_options)
+            if(WIN32)
+                target_link_libraries(hmbtn_version_test PRIVATE user32)
+            endif()
+            add_test(NAME platform.version COMMAND hmbtn_version_test)
             if(HMBTN_ENH_ANTIALIASING)
                 add_executable(hmbtn_graphics_options_test platform/tests/graphics_options.c
                     platform/graphics_options.c platform/user_data.c)

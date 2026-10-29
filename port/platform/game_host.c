@@ -27,6 +27,8 @@
 #include "platform/input_replay.h"
 #include "platform/presentation_clock.h"
 #include "platform/user_data.h"
+#include "platform/version.h"
+#include "platform/window_icon.h"
 #ifdef HMBTN_ENH_PAUSE_MENU
 #include "enhance/pause_menu/assets.h"
 #include "enhance/pause_menu/canvas.h"
@@ -1101,7 +1103,16 @@ int hm_game_host_start(hm_disc *disc) {
                                  NULL);
         return 0;
     }
-    hm_window = SDL_CreateWindow("Harvest Moon: Back to Nature - native bring-up", 640, 480, 0);
+    hm_window = SDL_CreateWindow(hm_version_window_title(), 640, 480, 0);
+    if (hm_window) {
+        SDL_Surface *icon = SDL_CreateSurfaceFrom(
+            HMBTN_ICON_WIDTH, HMBTN_ICON_HEIGHT, SDL_PIXELFORMAT_RGBA32,
+            (void *)hm_window_icon_rgba, HMBTN_ICON_WIDTH * 4);
+        if (icon) {
+            SDL_SetWindowIcon(hm_window, icon);
+            SDL_DestroySurface(icon);
+        }
+    }
     hm_device = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL |
                                         SDL_GPU_SHADERFORMAT_MSL,
                                     false, NULL);

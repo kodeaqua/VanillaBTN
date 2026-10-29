@@ -1,4 +1,5 @@
 /build/
+/dist/
 __pycache__/
 /sdk/psyq-4.7/
 /sdk/include/

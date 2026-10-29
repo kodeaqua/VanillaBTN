@@ -2750,3 +2750,40 @@ Decision:
 
 Consequences:
 Helper descriptions display cleanly without word truncation, WASD keyboard navigation works seamlessly across all pause menu screens, and ground targeting accurately follows terrain height without primitive buffer overflow risks.
+
+## ADR-099: Project rebranding to VanillaBTN, icon integration, single-window release, and automated packaging
+
+Date: 2026-10-29. Status: accepted.
+
+Context:
+As the native port reached mature stability and feature parity, the owner decided to detach from upstream fork status and establish an independent project identity named VanillaBTN. In addition, user feedback highlighted that:
+1. Running the release executable opened two windows (an extraneous command prompt console window alongside the SDL game window).
+2. The build folder contained over 120 test binaries mixed with the game binary, causing user confusion.
+3. The executable lacked an application icon and version metadata.
+4. When fatal crashes occur in release mode, a visual platform dialog was required, while debug builds should output directly to console stderr.
+
+Decision:
+1. Brand & Executable Renaming:
+   - Updated executable target to produce `VanillaBTN.exe` (`OUTPUT_NAME "VanillaBTN"`).
+   - Updated window title to `VanillaBTN v0.9.0`.
+   - Updated root license to MIT License while acknowledging CC0 decompilation upstream roots.
+2. Windows Application Icon & Metadata (`port/packaging/windows/hmbtn.rc`, `hmbtn.ico`, `port/platform/window_icon.h`):
+   - Created multi-resolution Windows ICO (16x16 up to 256x256) embedded via PE resource script.
+   - Set runtime SDL3 window and taskbar icon using high-resolution RGBA surface.
+   - Populated FileVersion (0.9.0.0), ProductVersion (0.9.0), and company metadata in Windows Explorer Details.
+3. Subsystem Mode (No Console Pop-up in Release):
+   - Configured release builds on Windows with `-mwindows` (GUI subsystem) and `WinMain` entrypoint.
+   - Debug builds retain console subsystem (`-mconsole`) for development diagnostics and sanitizers.
+4. Adaptive Crash Handler (`port/platform/crash_handler.c`):
+   - Catches fatal exceptions (Access Violation, Illegal Instruction, Stack Overflow, etc.).
+   - In Release mode, displays a native modal `MessageBoxA` with exception code and fault address.
+   - In Debug mode, outputs formatted diagnostics to `stderr`.
+5. Binary Segregation & Automated Distribution ZIP:
+   - Configured CMake to output all test and probe binaries to `build/port/windows-release/tests/`.
+   - The game binary resides cleanly in `build/port/windows-release/bin/VanillaBTN.exe`.
+   - Added automated packaging step in `build.ps1` producing `dist/VanillaBTN-windows-x64-v0.9.0.zip` containing `VanillaBTN.exe` and `README.txt`.
+6. Verification:
+   - 121/121 unit tests pass 100%.
+
+Consequences:
+Players receive a clean, branded standalone game package that launches directly into the game window with custom cow icon branding, clear version info, and isolated tests.
