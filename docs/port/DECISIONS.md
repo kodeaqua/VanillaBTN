@@ -2699,3 +2699,26 @@ Decision:
 
 Consequences:
 Players enjoy accurate, modern tool charge timing and precise grid feedback when tilling, watering, and harvesting.
+
+
+## ADR-097: Fix pause menu settings frame bounds, subpage routing, and navigation prompt layout
+
+Date: 2026-10-29. Status: accepted.
+
+Context:
+1. In the Pause Menu -> Settings page, adding a 4th menu item ("Audio") caused the row and its selection frame to protrude outside the bottom border of the window, as the frame was statically sized at 124px height (intended for only 3 items).
+2. Entering the Audio subpage failed to draw the full settings page because HM_PAUSE_AUDIO was omitted from the subpage condition in hm_pause_draw().
+3. The prompt footer rendered "X Confirm   D Back" alongside "ESC Back", presenting duplicate back prompts and displaying an unmapped and counter-intuitive "D" key.
+4. The pagination text (1-7) was drawn unconditionally, including on 3-item menus (Controls, Audio).
+5. The values array in hm_pause_view was capped at 10 items (HM_PAUSE_GRAPHICS_ITEMS), causing buffer overflow hazards on 12-item menus.
+
+Decision:
+1. Resized HM_PAUSE_SETTINGS window frame: set top to 38, height to 148, ensuring all 4 items (Graphics, Gameplay, Controls, Audio) fit comfortably inside with generous margin.
+2. Included HM_PAUSE_AUDIO in draw.c subpage rendering with title "Settings - Audio".
+3. Streamlined prompts: eliminated "D Back", replaced with "Enter or X Confirm" and "ESC Resume" / "ESC Back". On subpages, prompt is "Left Right Change   ESC Back".
+4. Render pagination indicator (d-d) only when item count exceeds HM_PAUSE_VISIBLE_ROWS (7).
+5. Expanded hm_pause_view.values and row buffers to HM_PAUSE_MAX_VIEW_ITEMS (16).
+6. Removed SDLK_D from HM_PAUSE_BACK, added SDLK_BACKSPACE for back, and SDLK_SPACE / SDLK_KP_ENTER for confirm.
+
+Consequences:
+The in-game pause menu renders without visual clipping, correctly routes all subpages including Audio, and presents clear, standard control prompts.

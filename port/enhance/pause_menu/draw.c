@@ -117,16 +117,19 @@ void hm_pause_draw(const hm_pause_assets *assets, u8 *rgba, const hm_pause_menu 
             rgba[pixel * 4 + channel] = (u8)((u32)rgba[pixel * 4 + channel] * 3 / 5);
     hm_canvas = rgba;
     if (menu->page == HM_PAUSE_GRAPHICS || menu->page == HM_PAUSE_GAMEPLAY ||
-        menu->page == HM_PAUSE_CONTROLS) {
+        menu->page == HM_PAUSE_CONTROLS || menu->page == HM_PAUSE_AUDIO) {
         hm_pause_original_frame(NULL, 12, 8, 296, 28);
         const char *title = menu->page == HM_PAUSE_GRAPHICS ? "Settings - Graphics"
                             : (menu->page == HM_PAUSE_GAMEPLAY ? "Settings - Gameplay"
-                                                               : "Settings - Controls");
+                            : (menu->page == HM_PAUSE_CONTROLS ? "Settings - Controls"
+                                                               : "Settings - Audio"));
         hm_center(assets, title, 16);
-        char range[16];
-        snprintf(range, sizeof(range), "(%d-%d)", menu->first_visible + 1,
-                 menu->first_visible + HM_PAUSE_VISIBLE_ROWS);
-        hm_text(assets, range, 256, 16);
+        if (hm_pause_count(menu) > HM_PAUSE_VISIBLE_ROWS) {
+            char range[16];
+            snprintf(range, sizeof(range), "(%d-%d)", menu->first_visible + 1,
+                     menu->first_visible + HM_PAUSE_VISIBLE_ROWS);
+            hm_text(assets, range, 256, 16);
+        }
         hm_pause_original_frame(NULL, 12, 40, 296, 156);
         int first = menu->first_visible;
         hm_pause_original_frame(NULL, 20, 45 + (menu->selected - first) * 20, 280, 20);
@@ -143,15 +146,16 @@ void hm_pause_draw(const hm_pause_assets *assets, u8 *rgba, const hm_pause_menu 
         hm_pause_original_frame(NULL, 12, 200, 296, 32);
         hm_text(assets, view ? view->detail : NULL, 24, 205);
         hm_text(assets,
-                view && view->notice && *view->notice ? view->notice : "Left Right Change   D Back",
+                view && view->notice && *view->notice ? view->notice : "Left Right Change   ESC Back",
                 24, 218);
     } else {
         int root = menu->page == HM_PAUSE_ROOT;
-        int top = root ? 54 : 58;
-        hm_pause_original_frame(NULL, 68, top, 184, root ? 132 : 124);
+        int top = root ? 54 : 38;
+        int height = root ? 132 : 148;
+        hm_pause_original_frame(NULL, 68, top, 184, height);
         hm_center(assets, root ? "Paused" : "Settings", top + 12);
         hm_pause_line(NULL, 84, top + 32, 236, top + 32, FRAME_DARK, 0);
-        int row_start = top + 44;
+        int row_start = top + (root ? 44 : 42);
         hm_pause_original_frame(NULL, 80, row_start + menu->selected * 24 - 4, 160, 22);
         for (int i = 0; i < hm_pause_count(menu); ++i) {
             int y = row_start + i * 24;
@@ -161,8 +165,8 @@ void hm_pause_draw(const hm_pause_assets *assets, u8 *rgba, const hm_pause_menu 
         }
         const u16 *font_prompt =
             assets && assets->font_light[0] ? assets->font_light : (assets ? assets->font : NULL);
-        hm_center_font(font_prompt, "X Confirm   D Back", 204);
-        hm_center_font(font_prompt, root ? "ESC Resume" : "ESC Back", 220);
+        hm_center_font(font_prompt, "Enter or X Confirm", 202);
+        hm_center_font(font_prompt, root ? "ESC Resume" : "ESC Back", 218);
     }
     hm_canvas = NULL;
 }
