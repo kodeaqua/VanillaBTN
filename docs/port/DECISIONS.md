@@ -2961,3 +2961,26 @@ Decision:
 
 Consequences:
 Mayor Thomas's intro cutscene, multi-line scrolling dialogues, character name inserts, page breaks, and choices advance rapidly and smoothly with Fast Text enabled without freezing or deadlocking. All 122 unit tests pass 100%.
+
+## ADR-105: Cap Enhance Scaling and SurfaceView backing buffer to 720p on Android
+
+Date: 2026-10-29. Status: accepted.
+
+Context:
+1. Android Enhance Scaling and Presentation Resolution:
+   - On mobile displays with FHD/QHD panels (e.g. 1080p, 2400x1080), executing Enhance Scaling and GPU compute/blit passes at native panel resolution (1080p+) stresses mobile TBDR GPUs (such as Qualcomm Adreno 610/685) with over 2.5 million pixels per frame, risking thermal throttling and battery drain.
+   - Conversely, capping scaling at 480p left high-DPI smartphone displays slightly soft when Enhance Scaling was turned ON.
+2. User Request:
+   - Specifically cap Android Enhance Scaling to 720p maximum resolution.
+
+Decision:
+1. Cap Enhance Scaling Target Resolution to 720p on Android (port/platform/game_host.c):
+   - In hm_host_scaling_prepare and hm_host_gpu_present, enforce an Android resolution ceiling of 720p:
+     - 16:9 Widescreen: clamped to 1280x720.
+     - 4:3 Standard: clamped to 960x720.
+2. Configure Android SurfaceView Backing Buffer to 720p (SDLSurface.java):
+   - In surfaceChanged, when device display height exceeds 720p, set holder.setFixedSize(targetW, targetH) with targetH = 720 and targetW = Math.round(720.0f * aspect) (e.g. 1600x720 for 20:9 displays or 1280x720 for 16:9).
+   - The device Hardware Composer / Display Processor (HWC) upscales the 720p surface to the native 1080p+ panel in hardware with 0% GPU execution cost.
+
+Consequences:
+Enhance Scaling delivers crisp high-definition 720p visuals on Android with stable frame rates and reduced thermal load. Hardware upscaling handles presentation to 1080p+ display panels efficiently. All unit tests pass 100%.
