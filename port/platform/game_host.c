@@ -915,6 +915,14 @@ static void hm_host_present_scanout(u64 tick) {
                 (unsigned long long)tick, state->display_enabled, area->x, area->y, area->w,
                 area->h);
     }
+#ifdef __ANDROID__
+    if (tick % 60 == 0) {
+        __android_log_print(ANDROID_LOG_INFO, "VanillaBTN",
+            "Presenting scanout tick %llu: enabled=%d area=%d,%d %dx%d (output=%ux%u)",
+            (unsigned long long)tick, state->display_enabled, area->x, area->y, area->w,
+            area->h, output_width, output_height);
+    }
+#endif
     if (!area->w || !area->h)
         return;
     if (area->w < 0 || area->w > HM_SCAN_WIDTH || area->h < 0 || area->h > HM_SCAN_HEIGHT) {
@@ -1084,10 +1092,27 @@ static void hm_host_tick(void *context, u64 tick) {
         hm_game_host_stop();
         exit(0);
     }
+    hm_host_events();
+    Uint64 now = SDL_GetTicksNS();
+    Uint64 deadline = hm_start + tick * SDL_NS_PER_SECOND / 60;
+
+    /* Prevent simulation lag death spiral: if simulation has fallen behind real time
+     * by more than 50ms (e.g. disc I/O loading, OS background activity, or slow frame),
+     * rebase hm_start so we don't get trapped in a perpetual catch-up state that drops
+     * all visual presentation frames. */
+    if (now > deadline + SDL_NS_PER_SECOND / 20) {
+        hm_start = now - tick * SDL_NS_PER_SECOND / 60;
+        deadline = now;
+    }
+
+    if (hm_present_clock_due(&hm_presentation, now)) {
+        hm_host_present_scanout(tick);
+    }
+
     for (;;) {
         hm_host_events();
-        Uint64 now = SDL_GetTicksNS();
-        Uint64 deadline = hm_start + tick * SDL_NS_PER_SECOND / 60;
+        now = SDL_GetTicksNS();
+        deadline = hm_start + tick * SDL_NS_PER_SECOND / 60;
         /* Let an overdue simulation tick run before doing more visual work. */
         if (now >= deadline)
             break;
