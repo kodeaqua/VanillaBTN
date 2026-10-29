@@ -94,8 +94,21 @@ static int hm_open_disc(void *context, const char *path, int verbose) {
 
 #if defined(__ANDROID__)
 #include <SDL3/SDL_main.h>
+#include <SDL3/SDL_messagebox.h>
+#include <android/log.h>
+#define HM_ANDROID_LOG(...) do { \
+    __android_log_print(ANDROID_LOG_INFO, "VanillaBTN", __VA_ARGS__); \
+    const char *ud = hm_user_data_root(); \
+    if (ud && *ud) { \
+        char lp[512]; \
+        snprintf(lp, sizeof(lp), "%s/native.log", ud); \
+        FILE *lf = fopen(lp, "a"); \
+        if (lf) { fprintf(lf, __VA_ARGS__); fprintf(lf, "\n"); fclose(lf); } \
+    } \
+} while(0)
 SDLMAIN_DECLSPEC int SDL_main(int argc, char **argv) {
 #else
+#define HM_ANDROID_LOG(...)
 int main(int argc, char **argv) {
 #endif
     hm_crash_handler_install();
@@ -109,12 +122,23 @@ int main(int argc, char **argv) {
     /* Settings hold the remembered disc path; the host reuses this running user data. */
     if (!hm_user_data_start()) {
         fprintf(stderr, "Cannot open Documents/VanillaBTN\n");
+#if defined(__ANDROID__)
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "VanillaBTN",
+            "Cannot open Documents/VanillaBTN directory. Check storage permissions.", NULL);
+#endif
         return 1;
     }
+    HM_ANDROID_LOG("VanillaBTN native startup: user data initialized at %s", hm_user_data_root());
     if (!hm_disc_locate(argc == 2 ? argv[1] : NULL, hm_open_disc, &slot)) {
+        HM_ANDROID_LOG("Disc locate failed: USA disc image not found or failed validation");
+#if defined(__ANDROID__)
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "VanillaBTN",
+            "Disc validation failed.\n\nPlease ensure you have placed the original USA Track 1 BIN file (game.bin / hmbtn.bin) in Documents/VanillaBTN.", NULL);
+#endif
         hm_user_data_stop();
         return 1;
     }
+    HM_ANDROID_LOG("Disc located and mounted successfully");
 #else
     if (argc != 2) {
         fprintf(stderr, "Usage: hmbtn_boot_probe <original USA BIN track>\n");
@@ -128,6 +152,12 @@ int main(int argc, char **argv) {
     status = hm_family_names_load(&disc);
     if (status != HM_DISC_OK) {
         fprintf(stderr, "Cannot read original family text: %s\n", hm_disc_error(status));
+        HM_ANDROID_LOG("Cannot read original family text: %s", hm_disc_error(status));
+#if defined(__ANDROID__)
+        char errbuf[256];
+        snprintf(errbuf, sizeof(errbuf), "Cannot read game data from disc:\n%s", hm_disc_error(status));
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "VanillaBTN", errbuf, NULL);
+#endif
         fclose(file);
         return 1;
     }
@@ -156,16 +186,25 @@ int main(int argc, char **argv) {
 #endif
     puts("Validated USA disc; entering compiled native game C");
     fflush(stdout);
+    HM_ANDROID_LOG("Entering hm_game_host_start...");
 #ifdef HMBTN_SDL_HOST
     if (!hm_game_host_start(&disc)) {
         fprintf(stderr, "Cannot initialize native game window\n");
+        HM_ANDROID_LOG("hm_game_host_start failed! SDL_GetError: %s", SDL_GetError());
+#if defined(__ANDROID__)
+        char errbuf[512];
+        snprintf(errbuf, sizeof(errbuf), "Cannot initialize graphics/window:\n\n%s", SDL_GetError());
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "VanillaBTN Graphics Error", errbuf, NULL);
+#endif
         hm_game_host_stop();
         hm_cd_detach();
         fclose(file);
         return 1;
     }
 #endif
+    HM_ANDROID_LOG("hm_game_host_start succeeded! Initializing overlays...");
     hm_game_overlays_init();
+    HM_ANDROID_LOG("Calling hm_game_main()...");
     int result = hm_game_main();
 #ifdef HMBTN_SDL_HOST
     hm_game_host_stop();
@@ -174,6 +213,7 @@ int main(int argc, char **argv) {
     fclose(file);
     return result;
 }
+
 
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
