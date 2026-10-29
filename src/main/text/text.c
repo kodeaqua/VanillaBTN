@@ -1014,17 +1014,17 @@ static u8 *text_draw_string(u_long *ot, u8 *prim, u16 *text, s16 x, s16 y, s32 s
             {
                 text_phase = TEXT_STATE_PAGE_BREAK;
                 text_wrap_index = text_line_glyphs;
-#ifdef HMBTN_PORT
-                if (hm_gameplay_fast_text())
-                {
-                    text_index = text_line_glyphs;
-                    break;
-                }
-#endif
             }
         }
         else if (*text == TEXT_CODE_PAGE_END)
         {
+#ifdef HMBTN_PORT
+            if (hm_gameplay_fast_text())
+            {
+                text_index = text_line_glyphs;
+                break;
+            }
+#endif
         }
         else if (*text >= TEXT_CODE_CHOICE_4 && *text <= TEXT_CODE_CHOICE_2)
         {

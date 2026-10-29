@@ -89,7 +89,12 @@ s32 greenhouse_world_to_cell(VECTOR *position, s16 *column, s16 *row) {
 
     copy = *position;
     *column = position->vx + 1620;
+#ifdef HMBTN_PORT
+    /* PORT: Fix sign loss for negative Z coordinates in 64-bit integer promotion - see docs/port/DECISIONS.md#adr-108 */
+    rawZ = 1220 - (s16)position->vz;
+#else
     rawZ = 1220 - (u16)position->vz;
+#endif
     *row = rawZ;
     x = *column;
     *column = x / 400;

@@ -580,7 +580,11 @@ void hm_gameplay_draw_tile_targeting(const void *player_ptr, s32 depth) {
         return;
 
     s16 place = farm_area.mode.place.location;
-    if (place != 1 && place != 6)
+    u16 place_val = farm_area.mode.place.value;
+    int is_farm = (place == 1);
+    int is_greenhouse = (place == 6);
+    int is_mine = (place_val == 0x37 || place_val == 0x43);
+    if (!is_farm && !is_greenhouse && !is_mine)
         return;
 
     static const struct { s16 x; s16 z; } steps[8] = {
@@ -601,34 +605,46 @@ void hm_gameplay_draw_tile_targeting(const void *player_ptr, s32 depth) {
     target_pos.vz = player->position.vz + steps[facing].z;
 
     s16 col = -1, row = -1;
-    if (place == 1) {
-        field_world_to_cell(&target_pos, &col, &row);
+    if (is_farm) {
+        if (field_world_to_cell(&target_pos, &col, &row) != 0)
+            return;
         if (col < 0 || col >= FIELD_COLS || row < 0 || row >= FIELD_ROWS)
             return;
-    } else {
-        greenhouse_world_to_cell(&target_pos, &col, &row);
+    } else if (is_greenhouse) {
+        if (greenhouse_world_to_cell(&target_pos, &col, &row) != 0)
+            return;
         if (col < 0 || col >= GREENHOUSE_SIZE || row < 0 || row >= GREENHOUSE_SIZE)
+            return;
+    } else {
+        col = (s16)((target_pos.vx - (-2000)) / 400);
+        row = (s16)((2000 - target_pos.vz) / 400);
+        if (col < 0 || col >= 10 || row < 0 || row >= 10)
             return;
     }
 
     s32 x0, x1, z0, z1;
-    if (place == 1) {
+    if (is_farm) {
         x0 = (s32)col * FIELD_CELL_SIZE - 4400;
         x1 = (s32)(col + 1) * FIELD_CELL_SIZE - 4400;
         z0 = 1600 - (s32)row * FIELD_CELL_SIZE;
         z1 = 1600 - (s32)(row + 1) * FIELD_CELL_SIZE;
-    } else {
+    } else if (is_greenhouse) {
         x0 = (s32)col * FIELD_CELL_SIZE - 1620;
         x1 = (s32)(col + 1) * FIELD_CELL_SIZE - 1620;
         z0 = 1220 - (s32)row * FIELD_CELL_SIZE;
         z1 = 1220 - (s32)(row + 1) * FIELD_CELL_SIZE;
+    } else {
+        x0 = (s32)col * 400 - 2000;
+        x1 = (s32)(col + 1) * 400 - 2000;
+        z0 = 2000 - (s32)row * 400;
+        z1 = 2000 - (s32)(row + 1) * 400;
     }
 
-    s16 ground_y = (s16)player->position.vy;
-    SVECTOR v0 = { (s16)x0, ground_y, (s16)z0 };
-    SVECTOR v1 = { (s16)x1, ground_y, (s16)z0 };
-    SVECTOR v2 = { (s16)x0, ground_y, (s16)z1 };
-    SVECTOR v3 = { (s16)x1, ground_y, (s16)z1 };
+    s16 ground_y = (s16)(player->position.vy - 4);
+    SVECTOR v0 = { (s16)x0, ground_y, (s16)z0, 0 };
+    SVECTOR v1 = { (s16)x1, ground_y, (s16)z0, 0 };
+    SVECTOR v2 = { (s16)x0, ground_y, (s16)z1, 0 };
+    SVECTOR v3 = { (s16)x1, ground_y, (s16)z1, 0 };
 
     FarmScreenXY s0, s1, s2, s3;
     s32 d0 = gte_project_vertex(&s0, &v0);
@@ -640,14 +656,20 @@ void hm_gameplay_draw_tile_targeting(const void *player_ptr, s32 depth) {
         return;
 
     s32 avg_depth = (d0 + d1 + d2 + d3) >> 2;
-    s32 ot_idx = (avg_depth >> 2) + 2;
+    s32 ot_idx = (avg_depth >> 2) - 2;
     if (ot_idx < 1)
         ot_idx = 1;
     if (ot_idx >= FRAME_OT_DEPTH)
         ot_idx = FRAME_OT_DEPTH - 1;
 
-    if (current_frame->primCursor.bytes + sizeof(POLY_F4) + 4 * sizeof(LINE_F2) >= current_frame->primBuffer + FRAME_PRIM_SIZE)
+    if (current_frame->primCursor.bytes + sizeof(DR_TPAGE) + sizeof(POLY_F4) + 4 * sizeof(LINE_F2) >= current_frame->primBuffer + FRAME_PRIM_SIZE)
         return;
+
+    /* Ensure semi-transparency blend mode is active (ABR = 0: 50% B + 50% F) */
+    DR_TPAGE *tpage = (DR_TPAGE *)current_frame->primCursor.bytes;
+    current_frame->primCursor.bytes += sizeof(DR_TPAGE);
+    setDrawTPage(tpage, 0, 1, GetTPage(0, 0, 0, 0));
+    AddPrim(&current_frame->ot[ot_idx], tpage);
 
     /* Semi-transparent cyan quad fill */
     POLY_F4 *fill = (POLY_F4 *)current_frame->primCursor.bytes;
