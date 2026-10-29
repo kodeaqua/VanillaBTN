@@ -135,3 +135,22 @@ Filtering now supports three selectable modes in Pause Menu > Settings > Graphic
 
 Additionally, FXAA is now bypassed during Pause Menu presentation to keep UI text, dialogue, and font pixel art perfectly crisp.
 PGXP geometry stabilization, 32-bit clean dithering bypass, and GPU rendering are now auto-applied defaults, simplifying the Graphics menu to 10 essential controls.
+
+## Recent Enhancements & Fixes (2026-10-29 to 2026-10-30)
+
+### Fast Text Dialogue Flow (ADR-106 & ADR-109)
+Fast Text provides instant dialogue text typing while strictly preserving game control codes and timing events:
+- At TEXT_CODE_PAGE_MARK and TEXT_CODE_PAGE_END, Fast Text immediately pauses text advancement and locks 	ext_phase = TEXT_STATE_PAGE_BREAK.
+- Prevents subsequent glyph evaluations from overwriting the phase back to TEXT_STATE_PRINTING.
+- Displays the red blinking advance prompt at page breaks, ensuring player Confirm (X / Circle) presses cleanly step pages or open choices without dialogue freezing.
+- When Fast Text is disabled (0), original vanilla PS1 typing speed and behavior execute identically.
+
+### Rucksack Tool/Item Category Protection (ADR-107)
+Enforces authentic inventory categorization in the rucksack reorganize screen:
+- Disallows cross-swapping between Tool slots (left column) and Item slots (right column) under mouse clicks and controller navigation.
+- Disallows splitting stacked items into empty tool slots.
+- Restricts mouse hover cursor tracking to the marked category until a swap is confirmed or cancelled.
+
+### Android Platform Optimization & 720p Resolution Cap (ADR-105)
+- Enhance Scaling on Android is capped at a maximum internal resolution of 720p (1280x720) to balance visual crispness with battery life, thermal throttling, and sustained 60 FPS performance on mobile GPUs.
+- Android builds feature touch controls, Storage Access Framework (SAF) disc selection, and automatic audio device management.

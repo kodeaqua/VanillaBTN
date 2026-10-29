@@ -14,9 +14,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File port/packaging/windows/build
 powershell -NoProfile -ExecutionPolicy Bypass -File port/packaging/windows/run.ps1 -DiscPath 'D:/Games/Harvest Moon USA.bin'
 ```
 
-The executable is build/port/windows-release/hmbtn_native.exe. It finds the disc in
+The executable is dist/VanillaBTN-windows-x64/VanillaBTN.exe. It finds the disc in
 this order: an explicit path argument (used alone, never replaced by a fallback);
-the `disc_path` remembered in Documents/BackToNature/settings.json; then each
+the `disc_path` remembered in Documents/VanillaBTN/settings.json; then each
 `*.bin` next to the executable, in name order. Every candidate is validated
 against the USA disc, and a working path is stored as an absolute `disc_path`.
 If none validates, a message box explains how to supply it. run.ps1 accepts
@@ -32,7 +32,7 @@ dialogue with X.
 The owner performs interactive gameplay validation. Development checks use
 isolated unit tests; no automated gameplay is run without a new owner request.
 
-Native Windows builds now initialize the active user's Documents/BackToNature
+Native Windows builds now initialize the active user's Documents/VanillaBTN
 directory through SDL's user-folder API. Redirected Documents (including OneDrive)
 is respected. The directory contains:
 
@@ -168,7 +168,7 @@ The reported sleep-without-save access violation maps to the animal record scan,
 where native pointers were truncated to 32 bits. ADR-058 fixes that scan and its
 native action record clearing. ADR-059 separately replaces PS1-offset state
 packing with explicit fixed-width save spans. Original checksums, shifts, card
-file size and Documents/BackToNature storage remain unchanged.
+file size and Documents/VanillaBTN storage remain unchanged.
 
 Isolated regressions reproduce both old faults and pass after the fixes. The
 codec fixture writes/reopens/reads a synthetic in-memory card and restores named
