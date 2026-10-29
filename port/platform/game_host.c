@@ -1097,8 +1097,8 @@ int hm_game_host_start(hm_disc *disc) {
         return 0;
     /* The launcher starts user data first to read the remembered disc path. */
     if (!hm_user_data_root() && !hm_user_data_start()) {
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Back to Nature",
-                                 "Cannot open Documents/BackToNature. Check folder permissions and "
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "VanillaBTN",
+                                 "Cannot open Documents/VanillaBTN. Check folder permissions and "
                                  "close any other game instance.",
                                  NULL);
         return 0;

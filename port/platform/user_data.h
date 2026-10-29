@@ -2,7 +2,7 @@
 #define HMBTN_PLATFORM_USER_DATA_H
 #include <stddef.h>
 
-/* The desktop root is the user's Documents/BackToNature directory. */
+/* The desktop root is the user's Documents/VanillaBTN directory. */
 int hm_user_data_start(void);
 /* Explicit roots are for isolated filesystem tests, never a game-side override. */
 int hm_user_data_start_at(const char *root);

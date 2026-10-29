@@ -16,7 +16,7 @@ To build the native Windows game executable and run the test suite:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File port/packaging/windows/build.ps1 -Preset windows-release -Game
 ```
 
-This provisions project-local tools (LLVM-MinGW, CMake, Ninja) and requires no WSL, Docker, or PSX SDK. User saves and configuration are stored under `%USERPROFILE%\Documents\BackToNature\`.
+This provisions project-local tools (LLVM-MinGW, CMake, Ninja) and requires no WSL, Docker, or PSX SDK. User saves and configuration are stored under `%USERPROFILE%\Documents\VanillaBTN\`.
 
 #### Features & Enhancements
 - **Vanilla Parity**: Exact native PS1 simulation and logic by default.

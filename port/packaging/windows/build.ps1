@@ -69,7 +69,7 @@ Kontrol Default:
 
 Penyimpanan Save & Konfigurasi:
 - Save game dan settings.json tersimpan otomatis di:
-  Documents\BackToNature\
+  Documents\VanillaBTN\
 
 Crash Reporting:
 - Jika terjadi crash tidak terduga, dialog pesan error akan muncul menampilkan kode dan alamat fault.

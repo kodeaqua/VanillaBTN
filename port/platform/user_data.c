@@ -2,6 +2,7 @@
 #include "platform/settings_json.h"
 #include "psx/card.h"
 #include <SDL3/SDL.h>
+#include <stdio.h>
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -120,8 +121,19 @@ fail:
 int hm_user_data_start(void) {
     const char *documents = SDL_GetUserFolder(SDL_FOLDER_DOCUMENTS);
     char *root = NULL;
-    if (!documents || SDL_asprintf(&root, "%s/BackToNature", documents) < 0)
+    if (!documents || SDL_asprintf(&root, "%s/VanillaBTN", documents) < 0)
         return 0;
+
+    /* Seamless migration: if VanillaBTN does not exist yet but BackToNature exists, migrate it */
+    char *old_root = NULL;
+    if (SDL_asprintf(&old_root, "%s/BackToNature", documents) >= 0) {
+        SDL_PathInfo new_info, old_info;
+        if (!SDL_GetPathInfo(root, &new_info) && SDL_GetPathInfo(old_root, &old_info)) {
+            rename(old_root, root);
+        }
+        SDL_free(old_root);
+    }
+
     int ok = hm_user_data_start_at(root);
     SDL_free(root);
     return ok;
