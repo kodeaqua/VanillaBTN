@@ -186,8 +186,8 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char **argv) {
 int main(int argc, char **argv) {
 #endif
     hm_crash_handler_install();
-    hm_disc disc;
-    hm_disc_slot slot = {.file = NULL, .disc = &disc};
+    static hm_disc disc;
+    static hm_disc_slot slot = {.file = NULL, .disc = &disc};
 #ifdef HMBTN_SDL_HOST
     if (argc > 2) {
         fprintf(stderr, "Usage: hmbtn_native [original USA BIN track]\n");

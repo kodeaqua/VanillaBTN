@@ -7,4 +7,5 @@
 void hm_gpu_present_image(SDL_GPUCommandBuffer *command, SDL_GPUTexture *image, u32 image_width,
                           u32 image_height, SDL_GPUTexture *target, Uint32 width, Uint32 height,
                           int linear, int expanded, int widescreen);
+void hm_gpu_present_invalidate(void);
 #endif

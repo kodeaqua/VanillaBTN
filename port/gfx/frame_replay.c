@@ -159,12 +159,9 @@ int hm_frame_replay_draw(hm_frame_replay *s, const hm_render_frame *live) {
     hm_captured_frame *f = hm_capture_select(s, live);
     if (!f)
         return 0;
-    int fast_vram = hm_replay_has_consumer();
-    u16 saved_set = f->before.set_mask, saved_check = f->before.check_mask;
-    if (!fast_vram)
-        s->work = f->before;
+    s->work = f->before;
     s->env = f->env;
-    hm_vram_context *vram = hm_vram_bind(fast_vram ? &f->before : &s->work);
+    hm_vram_context *vram = hm_vram_bind(&s->work);
     hm_gpu_environment *env = hm_gpu_environment_bind(&s->env);
     hm_replay_begin(&f->env.draw.clip);
     u32 at = 0;
@@ -180,9 +177,5 @@ int hm_frame_replay_draw(hm_frame_replay *s, const hm_render_frame *live) {
     hm_replay_group(0);
     hm_gpu_environment_bind(env);
     hm_vram_bind(vram);
-    if (fast_vram) {
-        f->before.set_mask = saved_set;
-        f->before.check_mask = saved_check;
-    }
     return 1;
 }

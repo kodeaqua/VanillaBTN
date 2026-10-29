@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 struct hm_gpu_scene {
+    u32 primitives[HM_SCENE_PRIMITIVES][HM_SCENE_STRIDE];
     u32 bins[HM_SCENE_BINS][HM_SCENE_BIN_WORDS];
     u32 packed[HM_SCENE_MAX_WORDS];
     u32 width, height, count, tiles_x, tiles_y;
@@ -22,7 +23,7 @@ struct hm_gpu_scene {
     const u32 *motion_previous, *motion_current;
     u32 motion_count, motion_alpha;
 };
-_Static_assert(HM_SCENE_STRIDE * sizeof(u32) == 160, "GPU descriptor ABI");
+_Static_assert(sizeof(((hm_gpu_scene *)0)->primitives[0]) == 160, "GPU descriptor ABI");
 static int hm_scene_signed(u32 n) { return (int)((n & 2047) ^ 1024) - 1024; }
 static s64 hm_scene_floor(s64 n, s64 d) { return n >= 0 ? n / d : -((-n + d - 1) / d); }
 static s64 hm_scene_coordinate(hm_gpu_scene *s, u32 word, int shift, u32 fallback, int offset) {
@@ -93,27 +94,20 @@ static int hm_scene_texture_bounds(hm_gpu_scene *s, const u32 *p, u32 u, u32 v, 
         width = 256;
     if (height > 256)
         height = 256;
-    if (!mx && !my && u + width <= 256 && v + height <= 256) {
-        x0 = (int)(u >> (2 - depth));
-        x1 = (int)((u + width - 1) >> (2 - depth));
-        y0 = (int)v;
-        y1 = (int)(v + height - 1);
-    } else {
-        for (u32 i = 0; i < width; ++i) {
-            u32 mapped = ((((u + i) & 255) & ~mx) | (p[5] & mx)) & 255;
-            int x = (int)(mapped >> (2 - depth));
-            if (x < x0)
-                x0 = x;
-            if (x > x1)
-                x1 = x;
-        }
-        for (u32 i = 0; i < height; ++i) {
-            int y = (int)(((((v + i) & 255) & ~my) | (p[6] & my)) & 255);
-            if (y < y0)
-                y0 = y;
-            if (y > y1)
-                y1 = y;
-        }
+    for (u32 i = 0; i < width; ++i) {
+        u32 mapped = ((((u + i) & 255) & ~mx) | (p[5] & mx)) & 255;
+        int x = (int)(mapped >> (2 - depth));
+        if (x < x0)
+            x0 = x;
+        if (x > x1)
+            x1 = x;
+    }
+    for (u32 i = 0; i < height; ++i) {
+        int y = (int)(((((v + i) & 255) & ~my) | (p[6] & my)) & 255);
+        if (y < y0)
+            y0 = y;
+        if (y > y1)
+            y1 = y;
     }
     if (hm_scene_overlap((p[2] & 15) * 64 + x0, (p[2] & 16) * 16 + y0, x1 - x0 + 1, y1 - y0 + 1,
                          &s->native)) {
@@ -163,9 +157,7 @@ static void hm_scene_add(hm_gpu_scene *s, u32 *p, int x0, int y0, int x1, int y1
         s->failure = "primitive capacity";
         return;
     }
-    u32 *dst_prim =
-        s->packed + HM_SCENE_HEADER + 1024 * 512 / 2 + (size_t)s->count * HM_SCENE_STRIDE;
-    memcpy(dst_prim, p, HM_SCENE_STRIDE * sizeof(*p));
+    memcpy(s->primitives[s->count], p, HM_SCENE_STRIDE * sizeof(*p));
     u32 bx0 = (u32)(x0 - s->area.x) / 16, by0 = (u32)(y0 - s->area.y) / 16;
     u32 bx1 = (u32)(x1 - 1 - s->area.x) / 16, by1 = (u32)(y1 - 1 - s->area.y) / 16;
     for (u32 y = by0; y <= by1; ++y)
@@ -394,7 +386,7 @@ static void hm_scene_line_segment(hm_gpu_scene *s, u32 xy0, u32 xy1, u32 c0, u32
         u32 before = s->count;
         hm_scene_rectangle(s, p, 3);
         if (s->count == before + 1)
-            (s->packed + HM_SCENE_HEADER + 1024 * 512 / 2 + (size_t)before * HM_SCENE_STRIDE)[34] = 1;
+            s->primitives[before][34] = 1;
         return;
     }
     for (int at = 0;; ++at) {
@@ -504,15 +496,8 @@ static u32 hm_scene_consume(void *context, const u32 *w, u32 available) {
             skip = 1;
         }
     }
-    if (!length || length > available) {
-        if (op != 0 && op != 1 && !(op >= 0xe1 && op <= 0xe6)) {
-            hm_gpu_scene *s = context;
-            if (s->begun && !s->failure)
-                s->failure = "inline VRAM transfer";
-            return available;
-        }
+    if (!length || length > available)
         return 0;
-    }
     hm_scene_command(context, w, length, 0);
     hm_gpu_scene *s = context;
     s->motion_previous = s->motion_current = NULL;
@@ -555,6 +540,7 @@ int hm_gpu_scene_end(hm_gpu_scene *s, hm_replay_sink previous, hm_gpu_scene_data
         return 0;
     u32 primitives = HM_SCENE_HEADER + 1024 * 512 / 2,
         bins = primitives + s->count * HM_SCENE_STRIDE;
+    u32 total = bins + s->tiles_x * s->tiles_y * HM_SCENE_BIN_WORDS;
     memset(s->packed, 0, HM_SCENE_HEADER * sizeof(u32));
     s->packed[0] = s->width;
     s->packed[1] = s->height;
@@ -572,22 +558,9 @@ int hm_gpu_scene_end(hm_gpu_scene *s, hm_replay_sink previous, hm_gpu_scene_data
     s->packed[13] = s->native.w;
     s->packed[14] = s->background;
     s->packed[15] = s->multisamples == 2 || s->multisamples == 4 ? s->multisamples : 1;
-    u32 num_bins = s->tiles_x * s->tiles_y;
-    u32 empty_bin = bins + num_bins;
-    s->packed[empty_bin] = 0;
-    u32 cursor = empty_bin + 1;
-    for (u32 i = 0; i < num_bins; ++i) {
-        u32 count = s->bins[i][0];
-        if (!count) {
-            s->packed[bins + i] = empty_bin;
-        } else {
-            s->packed[bins + i] = cursor;
-            u32 bin_words = count + 1;
-            memcpy(s->packed + cursor, s->bins[i], bin_words * sizeof(u32));
-            cursor += bin_words;
-        }
-    }
-    *data = (hm_gpu_scene_data){s->packed, (size_t)cursor * sizeof(u32), ++s->revision, s->width,
+    memcpy(s->packed + primitives, s->primitives, s->count * HM_SCENE_STRIDE * sizeof(u32));
+    memcpy(s->packed + bins, s->bins, s->tiles_x * s->tiles_y * HM_SCENE_BIN_WORDS * sizeof(u32));
+    *data = (hm_gpu_scene_data){s->packed, (size_t)total * sizeof(u32), ++s->revision, s->width,
                                 s->height};
     return 1;
 }

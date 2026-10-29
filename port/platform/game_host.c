@@ -202,6 +202,10 @@ static hm_present_rate hm_host_present_rate(void) {
 }
 static void hm_host_reset_presentation(void) {
     hm_scanout_cached_vram_gen = 0;
+    hm_gpu_present_invalidate();
+#ifdef HMBTN_GPU_RASTER
+    hm_gpu_cached_serial = 0;
+#endif
     if (!hm_present_clock_init(&hm_presentation, SDL_GetTicksNS(), hm_host_present_rate())) {
         SDL_SetError("Invalid presentation rate");
         hm_host_fail();
@@ -307,7 +311,7 @@ static int hm_host_submit(u32 image_width, u32 image_height, int linear, int wid
                                          .rows_per_layer = image_height};
     SDL_GPUTextureRegion region = {
         .texture = hm_texture, .w = image_width, .h = image_height, .d = 1};
-    SDL_UploadToGPUTexture(copy, &source, &region, false);
+    SDL_UploadToGPUTexture(copy, &source, &region, true);
     SDL_EndGPUCopyPass(copy);
     hm_host_blit(command, hm_texture, image_width, image_height, swapchain, width, height, linear,
                  wide);
@@ -406,6 +410,12 @@ static int hm_host_gpu_present(const RECT *native_area) {
             return 0;
         }
         hm_gpu_cached_serial = cache_serial;
+    } else {
+#ifdef __ANDROID__
+        /* Skip redundant compute shader dispatch and swapchain blit on ticks where
+         * the game did not issue a new DrawOTag and interpolation is inactive. */
+        return 1;
+#endif
     }
     SDL_GPUCommandBuffer *command = SDL_AcquireGPUCommandBuffer(hm_device);
     if (!command)
@@ -419,6 +429,7 @@ static int hm_host_gpu_present(const RECT *native_area) {
     }
     if (!swapchain) {
         SDL_CancelGPUCommandBuffer(command);
+        hm_gpu_cached_serial = 0;
         return 1;
     }
     SDL_GPUTexture *image = hm_gpu_renderer_encode(hm_gpu_output, command, &hm_gpu_cached);
@@ -744,7 +755,7 @@ static void hm_host_pause(void) {
         if (!running)
             break;
         if (hm_present_clock_due(&hm_presentation, SDL_GetTicksNS())) {
-            u8 *pixels = SDL_MapGPUTransferBuffer(hm_device, hm_upload, false);
+            u8 *pixels = SDL_MapGPUTransferBuffer(hm_device, hm_upload, true);
             if (!pixels)
                 hm_host_fail();
             hm_pause_canvas_extract(hm_pause_background, hm_pause_frozen, pause_width);
@@ -1016,7 +1027,7 @@ static void hm_host_present_scanout(u64 tick) {
         need_upload = 0;
     }
     if (need_upload) {
-        u8 *pixels = SDL_MapGPUTransferBuffer(hm_device, hm_upload, false);
+        u8 *pixels = SDL_MapGPUTransferBuffer(hm_device, hm_upload, true);
         if (!pixels)
             hm_host_fail();
         u16 backdrop = state->display_enabled ? hm_gpu_background(&state->draw) : 0;
@@ -1036,9 +1047,6 @@ static void hm_host_present_scanout(u64 tick) {
                     out_words[x] = 0xFF000000u | (r << 0) | (g << 8) | (b << 16);
                 }
             }
-            hm_scanout_cached_vram_gen = current_vram_gen;
-            hm_scanout_cached_area = source_area;
-            hm_scanout_cached_enabled = state->display_enabled;
         } else {
             hm_scanout_cached_vram_gen = 0;
             for (u32 y = 0; y < output_height; ++y)
@@ -1112,8 +1120,18 @@ static void hm_host_present_scanout(u64 tick) {
     int submit_linear = 0;
 #endif
     if (need_upload) {
-        hm_host_submit(output_width, output_height, submit_linear, submit_wide);
+        if (hm_host_submit(output_width, output_height, submit_linear, submit_wide) &&
+            direct_vram_scanout) {
+            hm_scanout_cached_vram_gen = current_vram_gen;
+            hm_scanout_cached_area = source_area;
+            hm_scanout_cached_enabled = state->display_enabled;
+        }
     } else {
+#ifdef __ANDROID__
+        /* On Android, SurfaceFlinger retains the last presented buffer; skip duplicate
+         * swapchain blits on VBlank ticks where the game did not modify VRAM. */
+        return;
+#else
         SDL_GPUCommandBuffer *command = SDL_AcquireGPUCommandBuffer(hm_device);
         if (!command)
             hm_host_fail();
@@ -1132,6 +1150,7 @@ static void hm_host_present_scanout(u64 tick) {
                      submit_linear, submit_wide);
         if (!SDL_SubmitGPUCommandBuffer(command))
             hm_host_fail();
+#endif
     }
 }
 

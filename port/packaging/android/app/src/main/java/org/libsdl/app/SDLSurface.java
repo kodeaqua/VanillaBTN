@@ -58,6 +58,23 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
         mDisplay = ((WindowManager)context.getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay();
         mSensorManager = (SensorManager)context.getSystemService(Context.SENSOR_SERVICE);
 
+        // Cap SurfaceView hardware buffer to 720p height so Android's dedicated HWC display
+        // scaler handles final upscaling to 1080p+/1440p screens with zero Adreno GMEM/fillrate cost.
+        try {
+            if (Build.VERSION.SDK_INT >= 17) {
+                DisplayMetrics realMetrics = new DisplayMetrics();
+                mDisplay.getRealMetrics(realMetrics);
+                int devW = Math.max(realMetrics.widthPixels, realMetrics.heightPixels);
+                int devH = Math.min(realMetrics.widthPixels, realMetrics.heightPixels);
+                if (devH > 720 && devW > 720) {
+                    int targetH = 720;
+                    int targetW = ((devW * 720) / devH) & ~1;
+                    getHolder().setFixedSize(targetW, targetH);
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
         setOnGenericMotionListener(SDLActivity.getMotionListener());
 
         // Some arbitrary defaults to avoid a potential division by zero
@@ -78,7 +95,7 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
         setOnApplyWindowInsetsListener(this);
         setOnKeyListener(this);
         setOnTouchListener(this);
-        enableSensor(Sensor.TYPE_ACCELEROMETER, true);
+        enableSensor(Sensor.TYPE_ACCELEROMETER, false);
     }
 
     public Surface getNativeSurface() {
@@ -217,19 +234,21 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
 
     private float getNormalizedX(float x)
     {
-        if (mWidth <= 1) {
+        float w = getWidth() > 1 ? getWidth() : mWidth;
+        if (w <= 1) {
             return 0.5f;
         } else {
-            return (x / (mWidth - 1));
+            return (x / (w - 1));
         }
     }
 
     private float getNormalizedY(float y)
     {
-        if (mHeight <= 1) {
+        float h = getHeight() > 1 ? getHeight() : mHeight;
+        if (h <= 1) {
             return 0.5f;
         } else {
-            return (y / (mHeight - 1));
+            return (y / (h - 1));
         }
     }
 

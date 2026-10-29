@@ -18,8 +18,7 @@ static int hm_top_left(const hm_vertex *a, const hm_vertex *b) {
     return b->y < a->y || (b->y == a->y && b->x > a->x);
 }
 static u32 hm_interpolate(u32 a, u32 b, u32 c, const s64 weight[3], s64 area) {
-    u32 uarea = (u32)area;
-    return ((u32)weight[0] * a + (u32)weight[1] * b + (u32)weight[2] * c + uarea / 2u) / uarea;
+    return (u32)((weight[0] * a + weight[1] * b + weight[2] * c + area / 2) / area);
 }
 static void hm_triangle(hm_vertex a, hm_vertex b, hm_vertex c, u32 opcode, u16 clut) {
     const hm_gpu_environment *state = hm_gpu_environment_state();
@@ -73,8 +72,6 @@ static void hm_triangle(hm_vertex a, hm_vertex b, hm_vertex c, u32 opcode, u16 c
     static const s8 dither[4][4] = {{-4, 0, -3, 1}, {2, -2, 3, -1}, {-3, 1, -4, 0}, {3, -1, 2, -2}};
     int textured = (opcode & 4) != 0, raw = textured && (opcode & 1), semi = (opcode & 2) != 0;
     u32 page = draw->tpage, depth = (page >> 7) & 3u;
-    if (textured && depth == 3u)
-        hm_runtime_error("DrawOTag", "reserved texture depth");
     hm_vram_context *vram = hm_vram_mutable_state();
     u16 (*vram_pixels)[HM_VRAM_WIDTH] = vram->pixels;
     u16 set_mask = vram->set_mask, check_mask = vram->check_mask;
