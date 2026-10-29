@@ -229,8 +229,6 @@ hm_present_rate hm_graphics_present_rate(const hm_graphics_options *o) {
 }
 int hm_graphics_swapchain(SDL_GPUDevice *device, SDL_Window *window, const hm_graphics_options *o) {
     SDL_GPUPresentMode mode = o->vsync ? SDL_GPU_PRESENTMODE_VSYNC : SDL_GPU_PRESENTMODE_IMMEDIATE;
-    if (o->vsync && SDL_WindowSupportsGPUPresentMode(device, window, SDL_GPU_PRESENTMODE_MAILBOX))
-        mode = SDL_GPU_PRESENTMODE_MAILBOX;
     if (!SDL_WindowSupportsGPUPresentMode(device, window, mode)) {
         if (SDL_WindowSupportsGPUPresentMode(device, window, SDL_GPU_PRESENTMODE_MAILBOX))
             mode = SDL_GPU_PRESENTMODE_MAILBOX;

@@ -34,7 +34,8 @@ typedef struct {
     hm_vram_context work;
     hm_gpu_environment environment;
     int maps[2][HASH];
-    int current, capturing, world, ready;
+    int current, capturing, world, ready, work_valid;
+    u64 work_tick;
     int parents[COMMANDS], bad_mesh[COMMANDS];
     u32 vertex_gen;
     hm_mesh_vertex vertices[VERTEX_HASH];
@@ -54,7 +55,7 @@ static void transfer(void *opaque, s32 x, s32 y, u32 width, u32 height) {
 
 static void invalidate(void *opaque) {
     interpolation *s = opaque;
-    s->ready = s->capturing = 0;
+    s->ready = s->capturing = s->work_valid = 0;
     s->frames[0].complete = s->frames[1].complete = 0;
 }
 static void begin(void *opaque, const hm_render_frame *meta) {
@@ -64,7 +65,7 @@ static void begin(void *opaque, const hm_render_frame *meta) {
     f->meta = *meta;
     f->count = f->used = 0;
     f->complete = f->has_vram_transfer = 0;
-    s->ready = s->world = 0;
+    s->ready = s->world = s->work_valid = 0;
     s->capturing = meta->eligible;
     if (!s->capturing)
         return;
@@ -285,16 +286,17 @@ static void end(void *opaque) {
         return;
     s->capturing = 0;
     f->complete = f->count != 0;
+    if (f->complete)
+        make_map(f, s->maps[s->current]);
     if (!f->complete || !p->complete || f->meta.key != p->meta.key ||
         f->meta.tick != p->meta.tick + 2 || f->env.draw.clip.w != p->env.draw.clip.w ||
         f->env.draw.clip.h != p->env.draw.clip.h)
         return;
-    make_map(p, s->maps[0]);
-    make_map(f, s->maps[1]);
+    const int *p_map = s->maps[s->current ^ 1], *f_map = s->maps[s->current];
     for (u32 i = 0; i < f->count; ++i) {
         command *c = &f->commands[i];
-        int previous = find(p, s->maps[0], c);
-        if (previous >= 0 && find(f, s->maps[1], c) == (int)i &&
+        int previous = find(p, (int *)p_map, c);
+        if (previous >= 0 && find(f, (int *)f_map, c) == (int)i &&
             compatible(p, &p->commands[previous], f, c))
             c->previous = previous;
     }
@@ -340,7 +342,19 @@ static int hm_interpolation_execute(u64 ns, const hm_render_frame *live,
     u32 alpha = elapsed >= 33333334 ? 65536 : (u32)(elapsed * 60 * 65536 / 2000000000ull);
     hm_vram_context *target_vram = &f->before;
     if (view || f->has_vram_transfer) {
-        s->work = f->before;
+        if (f->has_vram_transfer || !s->work_valid || s->work_tick != f->meta.tick) {
+            s->work = f->before;
+            s->work_valid = 1;
+            s->work_tick = f->meta.tick;
+        } else {
+            for (int y = 0; y < area.h; ++y)
+                memcpy(&s->work.pixels[area.y + y][area.x],
+                       &f->before.pixels[area.y + y][area.x],
+                       (size_t)area.w * sizeof(u16));
+            memcpy(s->work.dirty, f->before.dirty, sizeof(s->work.dirty));
+            s->work.set_mask = f->before.set_mask;
+            s->work.check_mask = f->before.check_mask;
+        }
         target_vram = &s->work;
     }
     s->environment = f->env;

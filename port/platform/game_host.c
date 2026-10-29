@@ -204,6 +204,7 @@ static hm_present_rate hm_host_present_rate(void) {
 static u64 hm_android_last_vram_gen;
 static RECT hm_android_last_area;
 static int hm_android_last_enabled;
+static char hm_perf_notice[64];
 #endif
 static void hm_host_reset_presentation(void) {
     hm_scanout_cached_vram_gen = 0;
@@ -820,6 +821,10 @@ static void hm_host_pause(void) {
                 value_dirty = 0;
             }
             view.notice = notice;
+#ifdef __ANDROID__
+            if (!*notice && hm_perf_notice[0])
+                view.notice = hm_perf_notice;
+#endif
             hm_pause_draw(&hm_assets, hm_pause_background, &menu, &view);
             hm_pause_canvas_compose(pixels, hm_pause_frozen, pause_width, hm_pause_background);
             SDL_UnmapGPUTransferBuffer(hm_device, hm_upload);
@@ -925,7 +930,11 @@ static int hm_host_present_scanout(u64 tick) {
     ) {
         int filter = 0;
 #if defined(HMBTN_ENH_FILTERING) && defined(HMBTN_ENH_PAUSE_MENU)
+#ifdef __ANDROID__
+        filter = hm_options.linear == 2 ? 2 : 0;
+#else
         filter = hm_options.linear;
+#endif
 #endif
         hm_software_output_filter(hm_native_output, filter);
         RECT output_area = *area;
@@ -952,14 +961,27 @@ static int hm_host_present_scanout(u64 tick) {
 #endif
 #ifdef HMBTN_ENH_INTERPOLATION
     hm_interpolated_view interpolated = {0};
-    if (state->display_enabled &&
-        hm_interpolation_render(SDL_GetTicksNS() - hm_start, &live, &interpolated))
-        area = &interpolated.area;
+    int interp_sink_bound = 0;
+#ifdef HMBTN_ENH_SCALING
+    interp_sink_bound |= scaling_active;
+#endif
+#if defined(HMBTN_ENH_FILTERING) || defined(HMBTN_ENH_WIDESCREEN)
+    interp_sink_bound |= native_filter_active;
+#endif
+    int interp_replayed = 0;
+    if (state->display_enabled) {
+        if (interp_sink_bound) {
+            interp_replayed = hm_interpolation_replay(SDL_GetTicksNS() - hm_start, &live);
+        } else if (hm_interpolation_render(SDL_GetTicksNS() - hm_start, &live, &interpolated)) {
+            area = &interpolated.area;
+            interp_replayed = 1;
+        }
+    }
 #endif
 #ifdef HMBTN_ENH_SCALING
     if (scaling_active) {
 #ifdef HMBTN_ENH_INTERPOLATION
-        if (!interpolated.pixels)
+        if (!interp_replayed)
 #endif
             hm_scaling_replay(&live);
         hm_scaling_end(previous_sink, &scaled);
@@ -968,7 +990,7 @@ static int hm_host_present_scanout(u64 tick) {
 #if defined(HMBTN_ENH_FILTERING) || defined(HMBTN_ENH_WIDESCREEN)
     if (native_filter_active) {
 #ifdef HMBTN_ENH_INTERPOLATION
-        if (!interpolated.pixels)
+        if (!interp_replayed)
 #endif
             hm_software_output_replay(hm_native_output, &live);
         hm_software_output_end(hm_native_output, native_previous, &native_filtered);
@@ -1213,21 +1235,23 @@ static void hm_perf_tick_enter(Uint64 now) {
         return;
     double ticks = hm_perf.ticks ? (double)hm_perf.ticks : 1.0;
     double presents = hm_perf.presents ? (double)hm_perf.presents : 1.0;
+    double game_avg = hm_perf.game_ns / ticks / 1e6;
+    double present_avg = hm_perf.present_ns / presents / 1e6;
+    snprintf(hm_perf_notice, sizeof(hm_perf_notice), "FPS %u  Game %.1fms  Present %.1fms",
+             hm_perf.presents, game_avg, present_avg);
     __android_log_print(ANDROID_LOG_INFO, "VanillaBTN",
                         "perf: ticks=%u presents=%u gpu=%u rebases=%u | game avg=%.2f max=%.2f ms"
                         " | present avg=%.2f max=%.2f ms | wait=%.0f%%",
                         hm_perf.ticks, hm_perf.presents, hm_perf.gpu_presents, hm_perf.rebases,
-                        hm_perf.game_ns / ticks / 1e6, hm_perf.game_max / 1e6,
-                        hm_perf.present_ns / presents / 1e6, hm_perf.present_max / 1e6,
+                        game_avg, hm_perf.game_max / 1e6, present_avg, hm_perf.present_max / 1e6,
                         100.0 * (double)hm_perf.wait_ns / (double)elapsed);
     u32 log_sec = hm_perf.log_sec + 1;
-    if (log_sec >= 5) {
+    if (log_sec >= 2) {
         fprintf(stderr,
                 "perf: ticks=%u presents=%u gpu=%u rebases=%u | game avg=%.2f max=%.2f ms"
                 " | present avg=%.2f max=%.2f ms | wait=%.0f%%\n",
                 hm_perf.ticks, hm_perf.presents, hm_perf.gpu_presents, hm_perf.rebases,
-                hm_perf.game_ns / ticks / 1e6, hm_perf.game_max / 1e6,
-                hm_perf.present_ns / presents / 1e6, hm_perf.present_max / 1e6,
+                game_avg, hm_perf.game_max / 1e6, present_avg, hm_perf.present_max / 1e6,
                 100.0 * (double)hm_perf.wait_ns / (double)elapsed);
         log_sec = 0;
     }
@@ -1236,8 +1260,12 @@ static void hm_perf_tick_enter(Uint64 now) {
         (hm_perf_stats){.window_start = now, .last_exit = last_exit, .log_sec = log_sec};
 }
 static int hm_host_frame_dirty(int interp_active) {
-    if (interp_active)
+#ifdef HMBTN_ENH_INTERPOLATION
+    if (interp_active && hm_game_render_frame().eligible)
         return 1;
+#else
+    (void)interp_active;
+#endif
     const hm_gpu_environment *state = hm_gpu_environment_state();
     const RECT *area = &state->display.disp;
     return hm_vram_generation() != hm_android_last_vram_gen ||
@@ -1366,12 +1394,10 @@ static void hm_host_tick(void *context, u64 tick) {
 #endif
     int presented_this_tick = 0;
 #ifdef __ANDROID__
-    if (hm_host_frame_dirty(interp_active) && hm_present_clock_due(&hm_presentation, now)) {
+    if (hm_host_frame_dirty(interp_active)) {
         if (hm_host_present_timed(tick)) {
             hm_host_mark_frame_presented();
             presented_this_tick = 1;
-        } else {
-            hm_presentation.next_ns = now + 1000000;
         }
     }
 #else
@@ -1389,13 +1415,10 @@ static void hm_host_tick(void *context, u64 tick) {
         if (now >= deadline)
             break;
 #ifdef __ANDROID__
-        if ((interp_active || !presented_this_tick) && hm_host_frame_dirty(interp_active) &&
-            hm_present_clock_due(&hm_presentation, now)) {
+        if (!presented_this_tick && hm_host_frame_dirty(interp_active)) {
             if (hm_host_present_timed(tick)) {
                 hm_host_mark_frame_presented();
                 presented_this_tick = 1;
-            } else {
-                hm_presentation.next_ns = now + 1000000;
             }
         }
 #else
@@ -1411,11 +1434,10 @@ static void hm_host_tick(void *context, u64 tick) {
         if (now >= deadline)
             break;
 #ifdef __ANDROID__
-        Uint64 next_present = (!interp_active && (presented_this_tick || !hm_host_frame_dirty(0)))
-                                  ? deadline
-                                  : (hm_presentation.unlimited ? now + 2000000
-                                                               : hm_presentation.next_ns);
-        Uint64 wake = next_present < deadline ? next_present : deadline;
+        Uint64 wake = (!presented_this_tick && hm_host_frame_dirty(interp_active) &&
+                       now + 1000000 < deadline)
+                          ? now + 1000000
+                          : deadline;
         if (wake > now) {
             SDL_DelayNS(wake - now);
             hm_perf.wait_ns += SDL_GetTicksNS() - now;
@@ -1634,7 +1656,7 @@ int hm_game_host_start(hm_disc *disc) {
         "GPU Device created and claimed successfully (Driver: %s)",
         SDL_GetGPUDeviceDriver(hm_device));
 #endif
-    if (!hm_host_image_size(HM_SCAN_WIDTH, HM_SCAN_HEIGHT))
+    if (!hm_host_image_size(320, 240))
         return 0;
     if (!hm_audio_output_start()) {
         fprintf(stderr, "Native audio: %s\n", SDL_GetError());

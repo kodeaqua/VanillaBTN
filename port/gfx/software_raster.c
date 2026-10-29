@@ -427,6 +427,41 @@ static void hm_software_command(void *context, const u32 *w, u32 available, int 
             }
     }
 }
+static u32 hm_software_consume(void *context, const u32 *w, u32 available) {
+    hm_software_surface *s = context;
+    if (!s->begun || !available || hm_vram_is_native())
+        return 0;
+    u32 op = w[0] >> 24, length = 0;
+    if (op >= 0x20 && op <= 0x3f) {
+        u32 n = op & 8 ? 4 : 3;
+        length = 1 + n + ((op & 4) ? n : 0) + ((op & 16) ? n - 1 : 0);
+    } else if (op >= 0x60 && op <= 0x7f) {
+        length = 2 + ((op & 4) ? 1 : 0) + (((op >> 3) & 3) == 0);
+    } else if (op >= 0x40 && op <= 0x5f) {
+        u32 at = 2;
+        int shaded = (op & 16) != 0, poly = (op & 8) != 0, skip = 0;
+        while (at < available) {
+            if (poly && skip && (w[at] & 0xf000f000u) == 0x50005000u) {
+                length = at + 1;
+                break;
+            }
+            if (shaded)
+                ++at;
+            if (at >= available)
+                break;
+            ++at;
+            if (!poly) {
+                length = at;
+                break;
+            }
+            skip = 1;
+        }
+    }
+    if (!length || length > available)
+        return 0;
+    hm_software_command(context, w, length, 0);
+    return length;
+}
 hm_replay_sink hm_software_sink(hm_software_surface *s) {
-    return (hm_replay_sink){s, hm_software_begin, hm_software_command, NULL, NULL};
+    return (hm_replay_sink){s, hm_software_begin, hm_software_command, hm_software_consume, NULL};
 }
