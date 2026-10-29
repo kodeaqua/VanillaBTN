@@ -14,6 +14,9 @@ typedef struct {
 hm_vram_context *hm_vram_bind(hm_vram_context *context);
 void hm_vram_snapshot(hm_vram_context *destination);
 const hm_vram_context *hm_vram_state(void);
+hm_vram_context *hm_vram_mutable_state(void);
+u64 hm_vram_generation(void);
+void hm_vram_bump_generation(void);
 int hm_vram_is_native(void);
 void hm_vram_reset(void);
 u16 hm_vram_pixel(u32 x, u32 y);

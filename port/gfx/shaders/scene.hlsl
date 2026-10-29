@@ -51,7 +51,7 @@ void main(uint3 id:SV_DispatchThreadID){
         load_word(14):vram(logical.x,logical.y);
     uint samples=load_word(15);if(samples!=2&&samples!=4)samples=1;
     uint sample_colors[4]={color,color,color,color};
-    uint bin=load_word(9)+uint((local.y/16)*int(load_word(6))+local.x/16)*257;
+    uint bin=load_word(load_word(9)+uint((local.y/16)*int(load_word(6))+local.x/16));
     uint count=load_word(bin);
     [loop]for(uint item=0;item<count;++item){
         uint p=load_word(8)+load_word(bin+1+item)*40,op=word(p,1),flags=word(p,4);
@@ -158,12 +158,12 @@ void main(uint3 id:SV_DispatchThreadID){
             int3 back=int3(background&31,(background>>5)&31,(background>>10)&31),front=int3(source&31,(source>>5)&31,(source>>10)&31);
             uint mode=(word(p,2)>>5)&3;int3 mixed=mode==0?back/2+front/2:mode==1?back+front:mode==2?back-front:back+front/4;
             mixed=clamp(mixed,0,31);result=(source&32768)|uint(mixed.x|(mixed.y<<5)|(mixed.z<<10));}
-        sample_colors[blend_sample]=result|((flags&4)?32768:0);}
-    }
-    uint3 sum=0;
-    [loop]for(uint resolve_sample=0;resolve_sample<samples;++resolve_sample){
-        uint pixel=sample_colors[resolve_sample];uint3 value=uint3(pixel&31,(pixel>>5)&31,(pixel>>10)&31);
-        sum+=(value<<3)|(value>>2);}
-    uint3 c=(sum+samples/2)/samples;
-    output_image[id.xy]=float4(float3(c)/255.0,1.0);
-}
+        if(flags&4)result|=32768;
+        sample_colors[blend_sample]=result;}}
+    uint3 c=0;
+    [loop]for(uint out_sample=0;out_sample<samples;++out_sample){
+        uint s=sample_colors[out_sample];
+        uint3 v=uint3(s&31,(s>>5)&31,(s>>10)&31);
+        c+=(v<<3)|(v>>2);}
+    c=(c+samples/2)/samples;
+    output_image[id.xy]=float4(float3(c)/255.0,1.0);}
