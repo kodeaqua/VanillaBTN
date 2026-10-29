@@ -11,7 +11,7 @@ typedef struct {
     hm_gpu_environment env;
     hm_vram_context before;
     u32 words[HM_REPLAY_WORDS], used;
-    int complete;
+    int complete, has_vram_transfer;
     u32 group_offset[64], group_world[64], groups;
     u64 serial;
 } hm_captured_frame;
@@ -69,7 +69,7 @@ static void hm_capture_begin(void *context, const hm_render_frame *meta) {
     f->meta = *meta;
     f->env = *hm_gpu_environment_state();
     f->used = f->groups = 0;
-    f->complete = 0;
+    f->complete = f->has_vram_transfer = 0;
     f->serial = ++s->serial;
     hm_vram_snapshot(&f->before);
     s->capturing = 1;
@@ -96,6 +96,11 @@ static void hm_capture_packet(void *context, const u32 *words, u32 count) {
     if (count > HM_REPLAY_WORDS - f->used) {
         s->capturing = 0;
         return;
+    }
+    if (count) {
+        u32 op = words[0] >> 24;
+        if (op == 0x02 || op == 0xA0)
+            f->has_vram_transfer = 1;
     }
     memcpy(f->words + f->used, words, count * sizeof(*words));
     f->used += count;
@@ -159,9 +164,13 @@ int hm_frame_replay_draw(hm_frame_replay *s, const hm_render_frame *live) {
     hm_captured_frame *f = hm_capture_select(s, live);
     if (!f)
         return 0;
-    s->work = f->before;
+    hm_vram_context *target_vram = &f->before;
+    if (f->has_vram_transfer) {
+        s->work = f->before;
+        target_vram = &s->work;
+    }
     s->env = f->env;
-    hm_vram_context *vram = hm_vram_bind(&s->work);
+    hm_vram_context *vram = hm_vram_bind(target_vram);
     hm_gpu_environment *env = hm_gpu_environment_bind(&s->env);
     hm_replay_begin(&f->env.draw.clip);
     u32 at = 0;

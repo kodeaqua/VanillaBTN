@@ -39,8 +39,16 @@ static int hm_replace(const char *directory, const char *name, const void *data,
     bool ok = file && SDL_WriteIO(file, data, bytes) == bytes && SDL_FlushIO(file);
     if (file && !SDL_CloseIO(file))
         ok = false;
-    if (ok)
-        ok = SDL_RenamePath(temporary, path);
+    if (ok && !SDL_RenamePath(temporary, path)) {
+        SDL_RemovePath(path);
+        if (!SDL_RenamePath(temporary, path)) {
+            SDL_IOStream *direct = SDL_IOFromFile(path, "wb");
+            ok = direct && SDL_WriteIO(direct, data, bytes) == bytes && SDL_FlushIO(direct);
+            if (direct && !SDL_CloseIO(direct))
+                ok = false;
+            SDL_RemovePath(temporary);
+        }
+    }
     if (!ok && file)
         SDL_RemovePath(temporary);
     SDL_free(temporary);

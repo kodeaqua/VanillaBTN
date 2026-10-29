@@ -94,20 +94,31 @@ static int hm_scene_texture_bounds(hm_gpu_scene *s, const u32 *p, u32 u, u32 v, 
         width = 256;
     if (height > 256)
         height = 256;
-    for (u32 i = 0; i < width; ++i) {
-        u32 mapped = ((((u + i) & 255) & ~mx) | (p[5] & mx)) & 255;
-        int x = (int)(mapped >> (2 - depth));
-        if (x < x0)
-            x0 = x;
-        if (x > x1)
-            x1 = x;
+    u32 u_base = u & 255, v_base = v & 255;
+    if (!mx && u_base + width <= 256) {
+        x0 = (int)(u_base >> (2 - depth));
+        x1 = (int)((u_base + width - 1) >> (2 - depth));
+    } else {
+        for (u32 i = 0; i < width; ++i) {
+            u32 mapped = ((((u + i) & 255) & ~mx) | (p[5] & mx)) & 255;
+            int x = (int)(mapped >> (2 - depth));
+            if (x < x0)
+                x0 = x;
+            if (x > x1)
+                x1 = x;
+        }
     }
-    for (u32 i = 0; i < height; ++i) {
-        int y = (int)(((((v + i) & 255) & ~my) | (p[6] & my)) & 255);
-        if (y < y0)
-            y0 = y;
-        if (y > y1)
-            y1 = y;
+    if (!my && v_base + height <= 256) {
+        y0 = (int)v_base;
+        y1 = (int)(v_base + height - 1);
+    } else {
+        for (u32 i = 0; i < height; ++i) {
+            int y = (int)(((((v + i) & 255) & ~my) | (p[6] & my)) & 255);
+            if (y < y0)
+                y0 = y;
+            if (y > y1)
+                y1 = y;
+        }
     }
     if (hm_scene_overlap((p[2] & 15) * 64 + x0, (p[2] & 16) * 16 + y0, x1 - x0 + 1, y1 - y0 + 1,
                          &s->native)) {
