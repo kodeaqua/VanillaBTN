@@ -468,9 +468,9 @@ static void hm_host_pause(void) {
     int running = 1;
     const char *notice = "";
     char value[128] = "";
-    char rows[HM_PAUSE_GRAPHICS_ITEMS][32] = {{0}};
+    char rows[HM_PAUSE_MAX_VIEW_ITEMS][32] = {{0}};
     hm_pause_view view = {.detail = value};
-    for (int i = 0; i < HM_PAUSE_GRAPHICS_ITEMS; ++i)
+    for (int i = 0; i < HM_PAUSE_MAX_VIEW_ITEMS; ++i)
         view.values[i] = rows[i];
     int value_dirty = 1;
     while (running) {
@@ -504,11 +504,13 @@ static void hm_host_pause(void) {
             } else if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat) {
                 switch (event.key.key) {
                 case SDLK_ESCAPE:
-                case SDLK_D:
+                case SDLK_BACKSPACE:
                     input = HM_PAUSE_BACK;
                     break;
                 case SDLK_RETURN:
+                case SDLK_KP_ENTER:
                 case SDLK_X:
+                case SDLK_SPACE:
                     input = HM_PAUSE_CONFIRM;
                     break;
                 case SDLK_UP:
@@ -591,7 +593,7 @@ static void hm_host_pause(void) {
             hm_pause_canvas_extract(hm_pause_background, hm_pause_frozen, pause_width);
             if (value_dirty) {
                 value[0] = 0;
-                for (int i = 0; i < HM_PAUSE_GRAPHICS_ITEMS; ++i)
+                for (int i = 0; i < HM_PAUSE_MAX_VIEW_ITEMS; ++i)
                     rows[i][0] = 0;
                 if (menu.page == HM_PAUSE_GRAPHICS)
                     hm_graphics_value(&hm_options, menu.selected, value, sizeof(value));
