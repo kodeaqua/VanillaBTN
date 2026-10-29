@@ -47,32 +47,32 @@ try {
             Copy-Item -Path $gameExe -Destination (Join-Path $distDir "VanillaBTN.exe") -Force
 
             $readmeContent = @"
-VanillaBTN - Harvest Moon: Back to Nature Native Port (v0.9.0)
-==============================================================
+VanillaBTN - Harvest Moon: Back to Nature Native PC Port (v0.9.0)
+==================================================================
 
-Petunjuk Menjalankan Game:
-1. Klik ganda 'VanillaBTN.exe' untuk memulai.
-2. Pada peluncuran pertama, pilih file disc image original PS1 Back to Nature (.bin/.cue atau .iso).
-3. Game langsung berjalan mulus dalam satu window mandiri (Release mode).
+How to Play:
+1. Double-click 'VanillaBTN.exe' to launch the game.
+2. On first launch, select your legally owned original PS1 Back to Nature disc image (.bin/.cue or .iso).
+3. The game launches directly in clean single-window mode (Release mode).
 
-Fitur & Peningkatan Opsional (dapat diatur lewat menu ESC):
-- Tampilan Widescreen 16:9 & Fullscreen scaling halus.
-- In-game Pause Menu (Grafis, Kontrol, Audio BGM/SFX terpisah, Gameplay).
-- Fitur QoL: 10-Hati Stamina HUD, Tool Charge Gauge, Tile Targeting Grid, Fast Text, dsb.
+Optional Quality of Life Features (Configurable via ESC Pause Menu):
+- 16:9 Widescreen display and smooth fullscreen viewport scaling.
+- Dedicated in-game pause menu (Graphics, Controls, independent BGM/SFX Audio, Gameplay).
+- Tasteful QoL: 10-heart Stamina HUD, Tool Charge Meter, Tile Targeting Grid, Fast Text, etc.
 
-Kontrol Default:
-- Gamepad: Left Stick / D-Pad (Bergerak), Tombol A (Aksi), Tombol X (Tool).
+Default Controls:
+- Gamepad: Left Stick / D-Pad (Move), Button A (Action), Button X (Tool).
 - Keyboard:
-  * Preset A: Tombol Panah (Bergerak), X (Aksi), Z (Tool).
-  * Preset B: W/A/S/D (Bergerak), K (Aksi), J (Tool).
-- ESC: Membuka In-Game Pause Menu & Pengaturan.
+  * Preset A: Arrow Keys (Move), X Key (Action), Z Key (Tool).
+  * Preset B: W/A/S/D (Move), K Key (Action), J Key (Tool).
+- ESC: Open In-Game Pause Menu & Settings.
 
-Penyimpanan Save & Konfigurasi:
-- Save game dan settings.json tersimpan otomatis di:
+Saves & Settings Storage:
+- Saves and settings.json are stored cleanly in:
   Documents\VanillaBTN\
 
-Crash Reporting:
-- Jika terjadi crash tidak terduga, dialog pesan error akan muncul menampilkan kode dan alamat fault.
+Crash Diagnostics:
+- In the unlikely event of an unexpected crash, a native dialog box will display the fault code and address for easy reporting.
 "@
             Set-Content -Path (Join-Path $distDir "README.txt") -Value $readmeContent -Encoding UTF8
 
