@@ -49,6 +49,7 @@
 #endif
 #include "psx/gpu_environment.h"
 #include "psx/pad.h"
+#include "psx/spu_voice.h"
 #include "psx/timing.h"
 #include "psx/vram.h"
 #include <SDL3/SDL.h>
@@ -1098,6 +1099,7 @@ int hm_game_host_start(hm_disc *disc) {
         fprintf(stderr, "Native audio: %s\n", SDL_GetError());
         return 0;
     }
+    hm_spu_set_hq(1); /* Modern high-fidelity Cubic Hermite audio resampling */
 #ifdef HMBTN_ENH_PAUSE_MENU
     hm_pause_enabled = hm_pause_config_enabled();
     if (hm_pause_enabled && !hm_pause_assets_load(&hm_assets, disc)) {

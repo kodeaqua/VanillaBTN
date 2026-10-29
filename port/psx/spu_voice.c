@@ -21,6 +21,30 @@ s16 hm_spu_gaussian(const s16 recent[4], u32 fraction) {
     return hm_voice_clamp(out);
 }
 
+static int hm_spu_hq_interpolation = 0;
+void hm_spu_set_hq(int enabled) {
+    hm_spu_hq_interpolation = enabled != 0;
+}
+int hm_spu_get_hq(void) {
+    return hm_spu_hq_interpolation;
+}
+
+static s16 hm_spu_cubic_hermite(const s16 recent[4], u32 fraction) {
+    float t = (float)(fraction & 4095) / 4096.0f;
+    float p0 = (float)recent[3];
+    float p1 = (float)recent[2];
+    float p2 = (float)recent[1];
+    float p3 = (float)recent[0];
+
+    float c0 = p1;
+    float c1 = 0.5f * (p2 - p0);
+    float c2 = p0 - 2.5f * p1 + 2.0f * p2 - 0.5f * p3;
+    float c3 = 0.5f * (p3 - p0) + 1.5f * (p1 - p2);
+
+    float val = ((c3 * t + c2) * t + c1) * t + c0;
+    return hm_voice_clamp((s32)val);
+}
+
 static void hm_voice_block(hm_spu_voice *voice) {
     if (voice->block > voice->bytes || voice->bytes - voice->block < 16)
         hm_runtime_error("SPU voice", "sample block exceeds bank asset");
@@ -69,8 +93,9 @@ static void hm_voice_mix(hm_spu_voice voices[24], s16 *stereo, u32 frames, int r
             hm_spu_voice *voice = voices + i;
             if (voice->envelope.phase == HM_ADSR_OFF)
                 continue;
-            s32 sample = hm_voice_floor(hm_spu_gaussian(voice->recent, voice->fraction) *
-                                        hm_spu_adsr_tick(&voice->envelope));
+            s16 interp = hm_spu_hq_interpolation ? hm_spu_cubic_hermite(voice->recent, voice->fraction)
+                                                  : hm_spu_gaussian(voice->recent, voice->fraction);
+            s32 sample = hm_voice_floor(interp * hm_spu_adsr_tick(&voice->envelope));
             s32 l = hm_voice_floor(sample * voice->left), r = hm_voice_floor(sample * voice->right);
             left += l;
             right += r;

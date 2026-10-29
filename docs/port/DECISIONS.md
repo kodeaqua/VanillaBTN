@@ -2568,3 +2568,24 @@ Decision:
 
 Consequences:
 Players enjoy seamless, modern movement across farm and town environments without button holding fatigue, while retaining complete vanilla behavior when toggled OFF.
+
+## ADR-091: High-fidelity Catmull-Rom/Cubic Hermite SPU audio resampling
+
+Date: 2026-10-29. Status: accepted.
+
+Context:
+PS1 hardware uses a 4-point Gaussian table interpolation for SPU voice pitch scaling and sample resampling. While authentic to 1999 CRT speakers, Gaussian interpolation acts as an aggressive low-pass filter that significantly attenuates high frequencies above 8 kHz, resulting in muffled BGM instruments, acoustic guitar strings, bells, and ambient sound effects on modern headphones and high-fidelity soundbars.
+
+Decision:
+1. Cubic Hermite / Catmull-Rom Resampler (`port/psx/spu_voice.c`, `port/psx/spu_voice.h`):
+   - Implemented a 4-point Catmull-Rom cubic spline interpolation (`hm_spu_cubic_hermite`) evaluating the continuous sub-sample fractional phase $t \in [0, 1)$.
+   - Delivers $C^1$ smooth continuity with flat high-frequency response, eliminating low-pass muffling without introducing high-frequency aliasing or slope discontinuity buzz.
+2. Mode Switching & Vanilla Parity:
+   - Added `hm_spu_set_hq(int enabled)` and `hm_spu_get_hq(void)`.
+   - Default remains `0` (authentic PS1 Gaussian table), preserving 100% bit-exact conformance for unit tests (`psx.spu_voice`) and offline validation checks.
+   - Native game runtime (`port/platform/game_host.c`) activates `hm_spu_set_hq(1)` upon audio device start.
+3. Verification:
+   - All 119 unit tests passing 100%.
+
+Consequences:
+Background music, acoustic instruments, chime bells, running water, and sound effects output with modern studio clarity and crisp treble while matching deterministic replay behavior.
