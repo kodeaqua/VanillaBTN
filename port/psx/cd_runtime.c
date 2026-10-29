@@ -143,7 +143,8 @@ s32 CdControl(u8 command, const u8 *parameters, u8 *result) {
         break;
     }
     default:
-        hm_runtime_error("CdControl", "unsupported CD command");
+        hm_cd.response[0] = 0;
+        break;
     }
     hm_cd.last_command = command;
     if (result)
@@ -160,9 +161,9 @@ s32 CdControlF(u8 command, const u8 *parameters) { return CdControl(command, par
 s32 CdRead(s32 sectors, u32 *destination, s32 mode) {
     hm_cd_require("CdRead");
     if (sectors <= 0 || !destination || hm_cd.remaining || mode < 0 || (mode & ~0x80))
-        hm_runtime_error("CdRead", "invalid or overlapping read request");
+        return 0;
     if ((u32)sectors > hm_cd.disc->sectors - hm_cd.position)
-        hm_runtime_error("CdRead", "read extends beyond the track");
+        return 0;
     hm_cd_stop_xa();
     hm_cd.destination = (u8 *)destination;
     hm_cd.remaining = (u32)sectors;

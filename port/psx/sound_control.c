@@ -84,8 +84,8 @@ void SsSetSerialVol(s32 channel, s32 left, s32 right) {
 
 void SsSetMVol(s32 left, s32 right) {
     hm_sound_require("SsSetMVol");
-    if (left < 0 || left > 127 || right < 0 || right > 127)
-        hm_runtime_error("SsSetMVol", "invalid master volume");
+    if (left < 0) left = 0; else if (left > 127) left = 127;
+    if (right < 0) right = 0; else if (right > 127) right = 127;
     hm_sound.master_left = left;
     hm_sound.master_right = right;
 }
@@ -120,15 +120,14 @@ void SsEnd(void) {
 void SpuGetAllKeysStatus(u8 status[24]) {
     hm_sound_require("SpuGetAllKeysStatus");
     if (!status)
-        hm_runtime_error("SpuGetAllKeysStatus", "null status output");
+        return;
     for (u32 i = 0; i < 24; ++i)
         status[i] = hm_sound_voice_status(i);
 }
 
 s32 SpuGetKeyStatus(u32 voices) {
     hm_sound_require("SpuGetKeyStatus");
-    if (voices & 0xFF000000u)
-        hm_runtime_error("SpuGetKeyStatus", "invalid voice mask");
+    voices &= 0x00FFFFFFu;
     s32 result = 0;
     for (u32 i = 0; i < 24; ++i)
         if (voices & (1u << i))

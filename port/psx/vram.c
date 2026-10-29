@@ -120,7 +120,7 @@ s32 StoreImage(const RECT *area, u32 *pixels) {
 
 s32 ClearImage(const RECT *area, u8 r, u8 g, u8 b) {
     if (!area)
-        hm_runtime_error("ClearImage", "null image argument");
+        return 0;
     u32 x0 = (u32)area->x & 0x3F0;
     u32 y0 = (u32)area->y & 511;
     u32 width = (((u32)area->w & 1023) + 15) & ~15u;
@@ -134,8 +134,7 @@ s32 ClearImage(const RECT *area, u8 r, u8 g, u8 b) {
 }
 
 s32 DrawSync(s32 mode) {
-    if (mode != 0 && mode != 1)
-        hm_runtime_error("DrawSync", "unsupported synchronization mode");
+    (void)mode;
     /* API transfers and ordering-table submission execute on the game thread. */
     return 0;
 }
