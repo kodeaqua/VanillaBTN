@@ -10,6 +10,7 @@ import android.os.Environment
 import android.provider.Settings
 import android.system.Os
 import android.util.Log
+import android.view.KeyEvent
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.core.app.ActivityCompat
@@ -153,6 +154,24 @@ class MainActivity : SDLActivity() {
             // Attach Virtual Gamepad Overlay over SDL Surface
             setupGamepadOverlay()
         }
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode == KeyEvent.KEYCODE_BACK) {
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                onNativeKeyDown(KeyEvent.KEYCODE_ESCAPE)
+            } else if (event.action == KeyEvent.ACTION_UP) {
+                onNativeKeyUp(KeyEvent.KEYCODE_ESCAPE)
+            }
+            return true
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onBackPressed() {
+        onNativeKeyDown(KeyEvent.KEYCODE_ESCAPE)
+        onNativeKeyUp(KeyEvent.KEYCODE_ESCAPE)
     }
 
     private fun resolveBinFromCue(cueFile: File): File? {

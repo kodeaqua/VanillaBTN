@@ -286,7 +286,7 @@ static int hm_host_submit(u32 image_width, u32 image_height, int linear, int wid
     return 1;
 }
 
-#ifdef HMBTN_GPU_RASTER
+#if defined(HMBTN_GPU_RASTER) && !defined(__ANDROID__)
 static int hm_host_gpu_present(const RECT *native_area) {
     if (!hm_gpu_output || !hm_gpu_commands || native_area->w <= 0 || native_area->h <= 0)
         return 0;
@@ -608,6 +608,7 @@ static void hm_host_pause(void) {
             } else if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat) {
                 switch (event.key.key) {
                 case SDLK_ESCAPE:
+                case SDLK_AC_BACK:
                 case SDLK_BACKSPACE:
                 case SDLK_J:
                     input = HM_PAUSE_BACK;
@@ -807,7 +808,7 @@ static void hm_host_present_scanout(u64 tick) {
 #ifdef HMBTN_ENH_PAUSE_MENU
     hm_options.gpu_active = 0;
 #endif
-#ifdef HMBTN_GPU_RASTER
+#if defined(HMBTN_GPU_RASTER) && !defined(__ANDROID__)
     if (state->display_enabled && hm_host_gpu_present(area)) {
 #ifdef HMBTN_ENH_PAUSE_MENU
         hm_options.gpu_active = 1;
@@ -1070,7 +1071,7 @@ static void hm_host_events(void) {
         }
 #ifdef HMBTN_ENH_PAUSE_MENU
         if (hm_pause_enabled && event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat &&
-            event.key.key == SDLK_ESCAPE)
+            (event.key.key == SDLK_ESCAPE || event.key.key == SDLK_AC_BACK))
             hm_host_pause();
 #endif
     }
@@ -1227,6 +1228,18 @@ int hm_game_host_start(hm_disc *disc) {
         }
         hm_replay_enabled = 1;
     }
+#if defined(__ANDROID__)
+    const char *data_dir = SDL_getenv("HMBTN_USER_DATA_DIR");
+    if (data_dir) {
+        char log_path[512];
+        snprintf(log_path, sizeof(log_path), "%s/last_run.log", data_dir);
+        freopen(log_path, "a", stdout);
+        freopen(log_path, "a", stderr);
+        setvbuf(stdout, NULL, _IONBF, 0);
+        setvbuf(stderr, NULL, _IONBF, 0);
+    }
+    SDL_SetHint("SDL_ANDROID_TRAP_BACK_BUTTON", "1");
+#endif
     SDL_SetMainReady();
     hm_trace_camera = SDL_getenv("HMBTN_TRACE_CAMERA") != NULL;
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD | SDL_INIT_AUDIO))
@@ -1330,6 +1343,11 @@ int hm_game_host_start(hm_disc *disc) {
     hm_dither_set_enabled(0); /* Auto-applied: clean 32-bit smooth colors without dither noise */
 #endif
 #ifdef HMBTN_GPU_RASTER
+#ifdef __ANDROID__
+    hm_gpu_output = NULL;
+    hm_gpu_commands = NULL;
+    hm_gpu_replay = NULL;
+#else
     hm_gpu_output = hm_gpu_renderer_create(hm_device);
     if (hm_gpu_output) {
         hm_gpu_commands = hm_gpu_scene_create();
@@ -1344,6 +1362,7 @@ int hm_game_host_start(hm_disc *disc) {
         hm_gpu_output = NULL;
         fprintf(stderr, "GPU scene renderer unavailable; using software rendering\n");
     }
+#endif
 #endif
 #ifdef HM_HOST_AA
     hm_fxaa_output = hm_fxaa_create(hm_device);
