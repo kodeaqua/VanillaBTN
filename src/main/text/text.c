@@ -942,7 +942,7 @@ static u8 *text_draw_string(u_long *ot, u8 *prim, u16 *text, s16 x, s16 y, s32 s
             if (text_phase == TEXT_STATE_PRINTING)
             {
 #ifdef HMBTN_PORT
-                /* PORT: Instant dialogue text advancement - see docs/port/DECISIONS.md#adr-094 */
+                /* PORT: Rapid dialogue text advancement - see docs/port/DECISIONS.md#adr-094 */
                 if (hm_gameplay_fast_text())
                 {
                     if (text_blip_toggle == 0)
@@ -950,37 +950,7 @@ static u8 *text_draw_string(u_long *ot, u8 *prim, u16 *text, s16 x, s16 y, s32 s
                         sound_play(SOUND_TEXT_BLIP);
                         text_blip_toggle = 1;
                     }
-                    u32 scan_limit = 0;
-                    while (scan_limit++ < 1000)
-                    {
-                        u16 code = text[text_index];
-                        if (code == TEXT_END || code == TEXT_CODE_PAGE_MARK ||
-                            code == TEXT_CODE_PAGE_END)
-                        {
-                            break;
-                        }
-                        if (code >= TEXT_CODE_CHOICE_4 && code <= TEXT_CODE_CHOICE_2)
-                        {
-                            break;
-                        }
-                        if (code >= TEXT_CODE_WAIT_FIRST && code <= TEXT_CODE_WAIT_LAST)
-                        {
-                            break;
-                        }
-                        if (code == TEXT_LINE_BREAK)
-                        {
-                            if (text_no_scroll == 0 &&
-                                text_count_matches(text, TEXT_LINE_BREAK, text_index + 1, 0) >= 4)
-                            {
-                                break;
-                            }
-                        }
-                        text_index++;
-                    }
-                    if (text_index == 0)
-                    {
-                        text_index = 1;
-                    }
+                    text_index += 8;
                 }
                 else
 #endif
@@ -1044,6 +1014,13 @@ static u8 *text_draw_string(u_long *ot, u8 *prim, u16 *text, s16 x, s16 y, s32 s
             {
                 text_phase = TEXT_STATE_PAGE_BREAK;
                 text_wrap_index = text_line_glyphs;
+#ifdef HMBTN_PORT
+                if (hm_gameplay_fast_text())
+                {
+                    text_index = text_line_glyphs;
+                    break;
+                }
+#endif
             }
         }
         else if (*text == TEXT_CODE_PAGE_END)
@@ -1051,6 +1028,13 @@ static u8 *text_draw_string(u_long *ot, u8 *prim, u16 *text, s16 x, s16 y, s32 s
         }
         else if (*text >= TEXT_CODE_CHOICE_4 && *text <= TEXT_CODE_CHOICE_2)
         {
+#ifdef HMBTN_PORT
+            if (hm_gameplay_fast_text())
+            {
+                text_index = text_line_glyphs;
+                break;
+            }
+#endif
         }
         else if (*text >= TEXT_CODE_FACE_FIRST && *text <= TEXT_CODE_FACE_LAST)
         {
