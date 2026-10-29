@@ -1187,11 +1187,6 @@ static int hm_host_present_scanout(u64 tick) {
         }
         return 0;
     } else {
-#ifdef __ANDROID__
-        /* On Android, SurfaceFlinger retains the last presented buffer; skip duplicate
-         * swapchain blits on VBlank ticks where the game did not modify VRAM. */
-        return 0;
-#else
         SDL_GPUCommandBuffer *command = SDL_AcquireGPUCommandBuffer(hm_device);
         if (!command)
             hm_host_fail();
@@ -1211,7 +1206,6 @@ static int hm_host_present_scanout(u64 tick) {
         if (!SDL_SubmitGPUCommandBuffer(command))
             hm_host_fail();
         return 1;
-#endif
     }
 }
 

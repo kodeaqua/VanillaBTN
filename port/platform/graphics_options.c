@@ -235,6 +235,13 @@ hm_present_rate hm_graphics_present_rate(const hm_graphics_options *o) {
                             : (hm_present_rate){30, 1};
 }
 int hm_graphics_swapchain(SDL_GPUDevice *device, SDL_Window *window, const hm_graphics_options *o) {
+#ifdef __ANDROID__
+    /* On mobile Vulkan, prefer triple-buffering non-blocking MAILBOX mode to prevent
+     * SurfaceFlinger VSync stalls on high-refresh (90Hz/120Hz) panels. */
+    SDL_GPUPresentMode mode = SDL_GPU_PRESENTMODE_MAILBOX;
+    if (!SDL_WindowSupportsGPUPresentMode(device, window, mode))
+        mode = o->vsync ? SDL_GPU_PRESENTMODE_VSYNC : SDL_GPU_PRESENTMODE_IMMEDIATE;
+#else
     SDL_GPUPresentMode mode = o->vsync ? SDL_GPU_PRESENTMODE_VSYNC : SDL_GPU_PRESENTMODE_IMMEDIATE;
     if (!SDL_WindowSupportsGPUPresentMode(device, window, mode)) {
         if (SDL_WindowSupportsGPUPresentMode(device, window, SDL_GPU_PRESENTMODE_MAILBOX))
@@ -242,6 +249,7 @@ int hm_graphics_swapchain(SDL_GPUDevice *device, SDL_Window *window, const hm_gr
         else
             mode = SDL_GPU_PRESENTMODE_VSYNC;
     }
+#endif
     return SDL_SetGPUSwapchainParameters(device, window, SDL_GPU_SWAPCHAINCOMPOSITION_SDR, mode);
 }
 static int hm_refresh_rate(const SDL_DisplayMode *mode, hm_present_rate *rate) {
