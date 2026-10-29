@@ -60,6 +60,8 @@ int main(void) {
     CHECK(!strcmp(hm_pause_label(&menu, 7), "Calendar Events"));
     CHECK(!strcmp(hm_pause_label(&menu, 8), "Roaming Horse"));
     CHECK(!strcmp(hm_pause_label(&menu, 9), "Fast Text"));
+    CHECK(!strcmp(hm_pause_label(&menu, 10), "Tool Charge Bar"));
+    CHECK(!strcmp(hm_pause_label(&menu, 11), "Tile Targeting"));
     for (int i = 0; i < HM_PAUSE_GAMEPLAY_ITEMS; ++i) {
         CHECK(menu.selected == i);
         CHECK(hm_pause_handle(&menu, HM_PAUSE_RIGHT) == HM_PAUSE_CHANGE_GAMEPLAY);

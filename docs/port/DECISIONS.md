@@ -2675,3 +2675,27 @@ Decision:
 
 Consequences:
 Players have independent, fine-grained control over music and sound effects volume directly from the in-game pause menu.
+
+
+## ADR-096: Tool charge visual indicator and tile targeting grid highlight
+
+Date: 2026-10-29. Status: accepted.
+
+Context:
+In original Harvest Moon: Back to Nature, charging tools (holding Square) provides no visual progress meter, requiring players to count animation frames or estimate tiers based solely on subtle character tint changes. Furthermore, the 3D isometric view on farm and greenhouse fields can lead to aiming misjudgments when hoeing, watering, or placing objects without grid feedback.
+
+Decision:
+1. Tool Charge Visual Indicator:
+   - Added 	ool_charge_gauge setting (default OFF for vanilla parity) toggleable in Pause Menu -> Gameplay -> Tool Charge Bar.
+   - During tool charging modes (Sickle, Hoe, Ax, Hammer, Watering Can), hm_gameplay_draw_tool_charge_gauge() renders a sleek 40px HUD progress bar above Pete's head.
+   - Bar fill reflects tier thresholds (Base: Iron Grey, Level 1: Copper Bronze, Level 2: Silver Ice Blue, Level 3: Gold, Level 4+: Mystrile Cyan) with notch tick dividers and a pulsing white shimmer at full charge.
+2. Tile Targeting Grid Highlight:
+   - Added 	ile_targeting setting (default OFF) toggleable in Pause Menu -> Gameplay -> Tile Targeting.
+   - In farm and greenhouse locations, hm_gameplay_draw_tile_targeting() calculates the targeted cell from Pete's facing direction and projects the 4 world corners to screen space using gte_project_vertex.
+   - Renders a semi-transparent cyan quad fill (POLY_F4 with SetSemiTrans) and 4 crisp border lines (LINE_F2). Ordered at (avg_depth >> 2) + 2 so Pete and foreground objects naturally render on top of the ground highlight.
+3. Verification:
+   - All 120 unit tests pass 100%.
+   - Overlay manifest integrity updated and verified.
+
+Consequences:
+Players enjoy accurate, modern tool charge timing and precise grid feedback when tilling, watering, and harvesting.

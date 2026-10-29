@@ -6,6 +6,7 @@
 #include "field.h"
 #include "main.h"
 #include "prim.h"
+#include "model.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -24,6 +25,8 @@ typedef struct {
     int calendar_events;
     int roaming_horse;
     int fast_text;
+    int tool_charge_gauge;
+    int tile_targeting;
 } hm_gameplay_runtime_options;
 
 static hm_gameplay_runtime_options active_options = {
@@ -37,6 +40,8 @@ static hm_gameplay_runtime_options active_options = {
     .calendar_events = 0,
     .roaming_horse = 0,
     .fast_text = 0,
+    .tool_charge_gauge = 0,
+    .tile_targeting = 0,
 };
 
 int hm_gameplay_walk_through_crops(void) {
@@ -76,6 +81,14 @@ int hm_gameplay_roaming_horse(void) {
 }
 int hm_gameplay_fast_text(void) {
     return active_options.fast_text;
+}
+
+int hm_gameplay_tool_charge_gauge(void) {
+    return active_options.tool_charge_gauge;
+}
+
+int hm_gameplay_tile_targeting(void) {
+    return active_options.tile_targeting;
 }
 
 
@@ -433,5 +446,231 @@ void hm_gameplay_horse_safety_check(void) {
                 game_state.player.stateFlags &= ~(PLAYER_FLAG_RIDING_COW | PLAYER_FLAG_RIDING);
             }
         }
+    }
+}
+
+extern s32 greenhouse_world_to_cell(VECTOR *position, s16 *column, s16 *row);
+
+void hm_gameplay_draw_tool_charge_gauge(const void *player_ptr, s32 depth, s16 screen_x, s16 screen_y) {
+    if (!active_options.tool_charge_gauge)
+        return;
+    const FarmPlayer *player = player_ptr ? (const FarmPlayer *)player_ptr : &game_state.player;
+    if (!player)
+        return;
+
+    /* Sickle, Hoe, Ax, Hammer, Watering Can (0x16 to 0x1E) */
+    if (player->mode < 0x16 || player->mode > 0x1E || ((player->mode - 0x16) & 1) != 0)
+        return;
+    if (player->toolCharge <= 0)
+        return;
+
+    int max_level = player->held[HELD_TOOL].modifier;
+    if (max_level < 1)
+        max_level = 1;
+    if (max_level > 5)
+        max_level = 5;
+
+    int max_charge = max_level * 20;
+    int cur_charge = player->toolCharge;
+    if (cur_charge > max_charge)
+        cur_charge = max_charge;
+
+    int cur_level = cur_charge / 20;
+
+    s16 bar_w = 40;
+    s16 bar_h = 5;
+    s16 bar_x = screen_x - (bar_w / 2);
+    s16 bar_y = screen_y - 48;
+
+    s32 ot_idx = (depth >> 2) - 2;
+    if (ot_idx < 1)
+        ot_idx = 1;
+    if (ot_idx >= FRAME_OT_DEPTH)
+        ot_idx = FRAME_OT_DEPTH - 1;
+
+    /* Outer dark border */
+    POLY_F4 *border = (POLY_F4 *)current_frame->primCursor.bytes;
+    current_frame->primCursor.bytes += sizeof(POLY_F4);
+    SetPolyF4(border);
+    setRGB0(border, 16, 16, 20);
+    border->x0 = bar_x - 1;         border->y0 = bar_y - 1;
+    border->x1 = bar_x + bar_w + 1; border->y1 = bar_y - 1;
+    border->x2 = bar_x - 1;         border->y2 = bar_y + bar_h + 1;
+    border->x3 = bar_x + bar_w + 1; border->y3 = bar_y + bar_h + 1;
+    AddPrim(&current_frame->ot[ot_idx], border);
+
+    /* Background */
+    POLY_F4 *bg = (POLY_F4 *)current_frame->primCursor.bytes;
+    current_frame->primCursor.bytes += sizeof(POLY_F4);
+    SetPolyF4(bg);
+    setRGB0(bg, 40, 42, 50);
+    bg->x0 = bar_x;         bg->y0 = bar_y;
+    bg->x1 = bar_x + bar_w; bg->y1 = bar_y;
+    bg->x2 = bar_x;         bg->y2 = bar_y + bar_h;
+    bg->x3 = bar_x + bar_w; bg->y3 = bar_y + bar_h;
+    AddPrim(&current_frame->ot[ot_idx], bg);
+
+    /* Fill progress */
+    s16 fill_w = (s16)((cur_charge * bar_w) / max_charge);
+    if (fill_w > bar_w)
+        fill_w = bar_w;
+
+    u8 r, g, b;
+    switch (cur_level) {
+    case 0:
+        r = 180; g = 190; b = 205; /* Base / Iron */
+        break;
+    case 1:
+        r = 220; g = 130; b = 40;  /* Copper */
+        break;
+    case 2:
+        r = 210; g = 230; b = 255; /* Silver */
+        break;
+    case 3:
+        r = 255; g = 215; b = 20;  /* Gold */
+        break;
+    default:
+        r = 50;  g = 185; b = 255; /* Mystrile */
+        break;
+    }
+
+    if (cur_charge >= max_charge && (game_state.frameCount & 4) != 0) {
+        r = 255; g = 255; b = 255;
+    }
+
+    if (fill_w > 0) {
+        POLY_F4 *fill = (POLY_F4 *)current_frame->primCursor.bytes;
+        current_frame->primCursor.bytes += sizeof(POLY_F4);
+        SetPolyF4(fill);
+        setRGB0(fill, r, g, b);
+        fill->x0 = bar_x;          fill->y0 = bar_y;
+        fill->x1 = bar_x + fill_w; fill->y1 = bar_y;
+        fill->x2 = bar_x;          fill->y2 = bar_y + bar_h;
+        fill->x3 = bar_x + fill_w; fill->y3 = bar_y + bar_h;
+        AddPrim(&current_frame->ot[ot_idx], fill);
+    }
+
+    /* Notch dividers */
+    for (int i = 1; i < max_level; ++i) {
+        s16 notch_x = bar_x + (s16)((i * bar_w) / max_level);
+        LINE_F2 *notch = (LINE_F2 *)current_frame->primCursor.bytes;
+        current_frame->primCursor.bytes += sizeof(LINE_F2);
+        setlen(notch, 3);
+        notch->code = 0x40;
+        setRGB0(notch, 25, 25, 30);
+        notch->x0 = notch_x; notch->y0 = bar_y;
+        notch->x1 = notch_x; notch->y1 = bar_y + bar_h - 1;
+        AddPrim(&current_frame->ot[ot_idx], notch);
+    }
+}
+
+void hm_gameplay_draw_tile_targeting(const void *player_ptr, s32 depth) {
+    if (!active_options.tile_targeting)
+        return;
+    const FarmPlayer *player = player_ptr ? (const FarmPlayer *)player_ptr : &game_state.player;
+    if (!player)
+        return;
+
+    if (game_state.globalFlags & (GLOBAL_FLAG_MENU_OPEN | GLOBAL_FLAG_TRANSITION))
+        return;
+    if (player->stateFlags & (PLAYER_FLAG_AIRBORNE | PLAYER_FLAG_ASLEEP))
+        return;
+
+    s16 place = farm_area.mode.place.location;
+    if (place != 1 && place != 6)
+        return;
+
+    static const struct { s16 x; s16 z; } steps[8] = {
+        {   0, -400 }, /* DOWN */
+        {-400,    0 }, /* LEFT */
+        {   0,  400 }, /* UP */
+        { 400,    0 }, /* RIGHT */
+        {   0, -300 },
+        {-300,    0 },
+        {   0,  300 },
+        { 300,    0 },
+    };
+
+    u8 facing = player->facing38 & 7;
+    VECTOR target_pos;
+    target_pos.vx = player->position.vx + steps[facing].x;
+    target_pos.vy = player->position.vy;
+    target_pos.vz = player->position.vz + steps[facing].z;
+
+    s16 col = -1, row = -1;
+    if (place == 1) {
+        field_world_to_cell(&target_pos, &col, &row);
+        if (col < 0 || col >= FIELD_COLS || row < 0 || row >= FIELD_ROWS)
+            return;
+    } else {
+        greenhouse_world_to_cell(&target_pos, &col, &row);
+        if (col < 0 || col >= GREENHOUSE_SIZE || row < 0 || row >= GREENHOUSE_SIZE)
+            return;
+    }
+
+    s32 x0, x1, z0, z1;
+    if (place == 1) {
+        x0 = (s32)col * FIELD_CELL_SIZE - 4400;
+        x1 = (s32)(col + 1) * FIELD_CELL_SIZE - 4400;
+        z0 = 1600 - (s32)row * FIELD_CELL_SIZE;
+        z1 = 1600 - (s32)(row + 1) * FIELD_CELL_SIZE;
+    } else {
+        x0 = (s32)col * FIELD_CELL_SIZE - 1620;
+        x1 = (s32)(col + 1) * FIELD_CELL_SIZE - 1620;
+        z0 = 1220 - (s32)row * FIELD_CELL_SIZE;
+        z1 = 1220 - (s32)(row + 1) * FIELD_CELL_SIZE;
+    }
+
+    s16 ground_y = 0;
+    SVECTOR v0 = { (s16)x0, ground_y, (s16)z0 };
+    SVECTOR v1 = { (s16)x1, ground_y, (s16)z0 };
+    SVECTOR v2 = { (s16)x0, ground_y, (s16)z1 };
+    SVECTOR v3 = { (s16)x1, ground_y, (s16)z1 };
+
+    FarmScreenXY s0, s1, s2, s3;
+    s32 d0 = gte_project_vertex(&s0, &v0);
+    s32 d1 = gte_project_vertex(&s1, &v1);
+    s32 d2 = gte_project_vertex(&s2, &v2);
+    s32 d3 = gte_project_vertex(&s3, &v3);
+
+    if (d0 <= 0 || d1 <= 0 || d2 <= 0 || d3 <= 0)
+        return;
+
+    s32 avg_depth = (d0 + d1 + d2 + d3) >> 2;
+    s32 ot_idx = (avg_depth >> 2) + 2;
+    if (ot_idx < 1)
+        ot_idx = 1;
+    if (ot_idx >= FRAME_OT_DEPTH)
+        ot_idx = FRAME_OT_DEPTH - 1;
+
+    /* Semi-transparent cyan quad fill */
+    POLY_F4 *fill = (POLY_F4 *)current_frame->primCursor.bytes;
+    current_frame->primCursor.bytes += sizeof(POLY_F4);
+    SetPolyF4(fill);
+    SetSemiTrans(fill, 1);
+    setRGB0(fill, 35, 130, 215);
+    fill->x0 = s0.x; fill->y0 = s0.y;
+    fill->x1 = s1.x; fill->y1 = s1.y;
+    fill->x2 = s2.x; fill->y2 = s2.y;
+    fill->x3 = s3.x; fill->y3 = s3.y;
+    AddPrim(&current_frame->ot[ot_idx], fill);
+
+    /* 4 Border lines */
+    struct { s16 ax; s16 ay; s16 bx; s16 by; } edges[4] = {
+        { s0.x, s0.y, s1.x, s1.y },
+        { s1.x, s1.y, s3.x, s3.y },
+        { s3.x, s3.y, s2.x, s2.y },
+        { s2.x, s2.y, s0.x, s0.y },
+    };
+
+    for (int i = 0; i < 4; ++i) {
+        LINE_F2 *line = (LINE_F2 *)current_frame->primCursor.bytes;
+        current_frame->primCursor.bytes += sizeof(LINE_F2);
+        setlen(line, 3);
+        line->code = 0x40;
+        setRGB0(line, 140, 220, 255);
+        line->x0 = edges[i].ax; line->y0 = edges[i].ay;
+        line->x1 = edges[i].bx; line->y1 = edges[i].by;
+        AddPrim(&current_frame->ot[ot_idx], line);
     }
 }

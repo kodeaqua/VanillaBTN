@@ -14,6 +14,8 @@ typedef struct {
     int calendar_events;    /* 0 = Off, 1 = On */
     int roaming_horse;      /* 0 = Off, 1 = On */
     int fast_text;          /* 0 = Off, 1 = On */
+    int tool_charge_gauge;  /* 0 = Off, 1 = On */
+    int tile_targeting;     /* 0 = Off, 1 = On */
 } hm_gameplay_options;
 
 void hm_gameplay_defaults(hm_gameplay_options *options);

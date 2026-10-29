@@ -20,11 +20,15 @@ int hm_gameplay_stamina_hud(void);
 int hm_gameplay_calendar_events(void);
 int hm_gameplay_roaming_horse(void);
 int hm_gameplay_fast_text(void);
+int hm_gameplay_tool_charge_gauge(void);
+int hm_gameplay_tile_targeting(void);
 
 void hm_gameplay_set_active(const void *options_ptr);
 
 /* Visual & logic helpers */
 void hm_gameplay_draw_fence_connections(s16 row, s16 col, s16 x, s16 y, s32 depth);
+void hm_gameplay_draw_tool_charge_gauge(const void *player_ptr, s32 depth, s16 screen_x, s16 screen_y);
+void hm_gameplay_draw_tile_targeting(const void *player_ptr, s32 depth);
 void hm_gameplay_smart_bell_ring(void);
 void hm_gameplay_smart_bell_tick(void);
 int hm_gameplay_calendar_has_event(s16 season, s16 day);
