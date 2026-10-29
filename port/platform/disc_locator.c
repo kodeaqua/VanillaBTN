@@ -147,7 +147,12 @@ int hm_disc_locate_in(const char *argument, const char *directory, hm_disc_try t
 }
 
 int hm_disc_locate(const char *argument, hm_disc_try try, void *context) {
+    const char *env_disc = SDL_getenv("HMBTN_DISC_PATH");
+    if (env_disc && *env_disc && try(context, env_disc, 1))
+        return 1;
     if (hm_disc_locate_in(argument, SDL_GetBasePath(), try, context))
+        return 1;
+    if (hm_disc_locate_in(NULL, hm_user_data_root(), try, context))
         return 1;
     if (!argument) {
         static const char message[] =

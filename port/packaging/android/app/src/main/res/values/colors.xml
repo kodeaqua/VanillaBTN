@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="md_theme_primary">#2E6A38</color>
+    <color name="md_theme_onPrimary">#FFFFFF</color>
+    <color name="md_theme_primaryContainer">#B3F2B3</color>
+    <color name="md_theme_onPrimaryContainer">#002107</color>
+    <color name="md_theme_surface">#F7FBF1</color>
+    <color name="md_theme_onSurface">#181D17</color>
+    <color name="md_theme_surfaceVariant">#DDE5D6</color>
+    <color name="md_theme_onSurfaceVariant">#41493E</color>
+    <color name="md_theme_outline">#71796D</color>
+    <color name="gamepad_button_bg">#44000000</color>
+    <color name="gamepad_button_pressed">#88000000</color>
+    <color name="gamepad_analog_base">#33000000</color>
+    <color name="gamepad_analog_knob">#88FFFFFF</color>
+</resources>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">VanillaBTN</string>
+    <string name="game_disc_not_found_title">Game Disc Not Found</string>
+    <string name="game_disc_not_found_message">Please place your Harvest Moon: Back to Nature game disc image (.bin / .cue) into:\n\nInternal Storage > Documents > VanillaBTN\n\nAccepted filenames: game.bin, hmbtn.bin, VanillaBTN.bin, or your disc image name.</string>
+    <string name="action_exit">Exit</string>
+    <string name="action_open_folder">Open Folder</string>
+    <string name="permission_storage_needed">Storage access is required to load save data and game disc image.</string>
+</resources>

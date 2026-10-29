@@ -2825,3 +2825,48 @@ Decision:
 
 Consequences:
 Players enjoy seamless, modern point-and-click mouse controls across menus, storage management, dialogues, and world gameplay while preserving full vanilla logic parity.
+
+
+<a id="adr-101"></a>
+
+## ADR-101: Native Android bring-up with Material 3 Expressive UI, dynamic floating virtual analog stick, and direct launch flow
+
+Date: 2026-10-29. Status: accepted.
+
+Context:
+To expand VanillaBTN beyond desktop environments to mobile devices (Phase 7 / Platform roadmap), a native Android application package (`.apk`) was required. Key user requirements and mobile UX considerations included:
+1. Modern Material 3 Expressive UI framework, built cleanly with Kotlin without clutter or bloat.
+2. Package identifier `io.github.kodeaqua.vanillabtn` and application label `VanillaBTN`.
+3. SDK versions: `minSdk 26` (Android 8.0 Oreo), `compileSdk 35`, and `targetSdk 35` (Android 15).
+4. Full Android adaptive icons and density-specific mipmaps (`mdpi` through `xxxhdpi`) featuring the pastoral cow identity.
+5. Self-contained native binary distribution: `libVanillaBTN.so` with statically bundled SDL3 (`arm64-v8a`), strictly adhering to 16 KB page-size alignment (`-Wl,-z,max-page-size=16384`).
+6. User data and storage: Internal storage `Documents/VanillaBTN/` for saves (`saves/`), configuration (`settings.json`), and game disc images (`game.cue`/`game.bin`, `hmbtn.cue`/`hmbtn.bin`, or `VanillaBTN.cue`/`VanillaBTN.bin`).
+7. Clean direct launch flow:
+   - On launch, the app inspects `Documents/VanillaBTN/` for disc images.
+   - If found, it launches directly into native gameplay without splash or submenus.
+   - If missing, an Expressive Material 3 AlertDialog instructs the player with the exact directory path and provides an Exit button.
+8. Multilanguage support: English (`values/strings.xml`) and Indonesian (`values-in/strings.xml`).
+9. Mobile touch controls:
+   - Dynamic floating virtual analog stick: appears dynamically on left thumb touch-down, with clamped radius to prevent hand drift, smoothly mapping to 8-way directional inputs.
+   - PS1 action buttons (Cross, Circle, Square, Triangle, L1, R1, Start, Select) positioned ergonomically on the right.
+   - Direct touch pass-through: center touches pass directly to the native pointer handler, enabling direct taps on pause menu options, dialogue choices, and storage without needing virtual buttons.
+   - Mobile pause menu adjustments: Desktop-specific settings (Monitor, Window Mode, Resolution) hidden automatically on Android.
+
+Decision:
+1. Android Application Architecture (`port/packaging/android/`):
+   - Configured Gradle 9.6.0 with OpenJDK 25 and Android Gradle Plugin 8.9.0.
+   - Set up CMake 3.31.6 integration targeting NDK `r27c` (`27.2.12479018`).
+   - Implemented `MainActivity.kt` extending `SDLActivity`, managing sticky immersive full-screen flags and disc verification.
+   - Created `VirtualGamepadView.kt` hosting the dynamic floating stick and action buttons with multitouch pointer ID tracking.
+2. Native Library & 16 KB Page Alignment (`port/CMakeLists.txt`):
+   - Configured `hmbtn_native` as a shared library (`libVanillaBTN.so`) on Android linking `android`, `log`, and `c++_static`.
+   - Enabled `-Wl,-z,max-page-size=16384` to ensure ELF program headers are aligned to 16 KB boundaries for Android 15+.
+   - Added `-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -Wno-fortify-source` to maintain compatibility with legacy decomp header copying idioms without compiler interference.
+3. Pause Menu Tailoring (`port/enhance/pause_menu/menu.c`, `port/platform/game_host.c`):
+   - Guarded desktop-exclusive items (Monitor, Window Mode, Resolution) behind `#ifndef __ANDROID__`, presenting a streamlined 7-item Graphics menu on mobile.
+4. Packaging & Automated Delivery:
+   - Implemented `port/packaging/android/build.ps1` automating Gradle compilation, APK extraction, and output to `dist/VanillaBTN-android-v0.9.0.apk`.
+   - Windows native build script and 122 unit tests remain 100% passing and unaffected.
+
+Consequences:
+VanillaBTN builds and runs natively on Android with zero emulation overhead, compliant with modern Android 15 specifications, featuring an intuitive floating virtual stick and direct-to-game launch experience.
