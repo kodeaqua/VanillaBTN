@@ -32,6 +32,7 @@
 #include "villager.h"
 #ifdef HMBTN_PORT
 #include "platform/mouse_input.h"
+extern int hm_gameplay_fast_text(void);
 #endif
 
 /* Textured sprite primitive. */
@@ -736,7 +737,11 @@ static TextWindowResult text_window_frame(u_long *ot, u16 *text, s16 x, s16 y, s
             result = TEXT_WINDOW_SCROLLING;
 #ifdef HMBTN_PORT
             /* PORT: Faster text scroll - see docs/port/DECISIONS.md#adr-094 */
-            if (hm_gameplay_fast_text() || (held & (PAD_CIRCLE | PAD_CROSS)))
+            if (hm_gameplay_fast_text())
+            {
+                step = 14;
+            }
+            else if (held & (PAD_CIRCLE | PAD_CROSS))
             {
                 step = 2;
             }
@@ -936,6 +941,49 @@ static u8 *text_draw_string(u_long *ot, u8 *prim, u16 *text, s16 x, s16 y, s32 s
             text_line_glyphs = 0;
             if (text_phase == TEXT_STATE_PRINTING)
             {
+#ifdef HMBTN_PORT
+                /* PORT: Instant dialogue text advancement - see docs/port/DECISIONS.md#adr-094 */
+                if (hm_gameplay_fast_text())
+                {
+                    if (text_blip_toggle == 0)
+                    {
+                        sound_play(SOUND_TEXT_BLIP);
+                        text_blip_toggle = 1;
+                    }
+                    u32 scan_limit = 0;
+                    while (scan_limit++ < 1000)
+                    {
+                        u16 code = text[text_index];
+                        if (code == TEXT_END || code == TEXT_CODE_PAGE_MARK ||
+                            code == TEXT_CODE_PAGE_END)
+                        {
+                            break;
+                        }
+                        if (code >= TEXT_CODE_CHOICE_4 && code <= TEXT_CODE_CHOICE_2)
+                        {
+                            break;
+                        }
+                        if (code >= TEXT_CODE_WAIT_FIRST && code <= TEXT_CODE_WAIT_LAST)
+                        {
+                            break;
+                        }
+                        if (code == TEXT_LINE_BREAK)
+                        {
+                            if (text_no_scroll == 0 &&
+                                text_count_matches(text, TEXT_LINE_BREAK, text_index + 1, 0) >= 4)
+                            {
+                                break;
+                            }
+                        }
+                        text_index++;
+                    }
+                    if (text_index == 0)
+                    {
+                        text_index = 1;
+                    }
+                }
+                else
+#endif
                 if (vsync_elapsed(text_glyph_interval, &text_glyph_timer, 1) == mode)
                 {
                     if (text_blip_toggle != 0)

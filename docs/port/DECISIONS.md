@@ -2870,3 +2870,32 @@ Decision:
 
 Consequences:
 VanillaBTN builds and runs natively on Android with zero emulation overhead, compliant with modern Android 15 specifications, featuring an intuitive floating virtual stick and direct-to-game launch experience.
+
+
+## ADR-102: Audit fixes for Fast Text instant rendering, pause menu font '%' glyph, audio volume cycling, and exclusive fullscreen fallback
+
+Date: 2026-10-29. Status: accepted.
+
+Context:
+1. Fast Text Dialogue: ADR-094 introduced `fast_text`, but calling `text_set_speed(0)` only set the glyph tick interval to 0. In original engine code, `vsync_elapsed` still incremented `text_index` by only 1 per frame, resulting in the exact same 30 char/sec speed as holding Circle/Cross rather than displaying dialogue text instantly. In addition, line scrolling stepped at 2 pixels/frame rather than scrolling instantly.
+2. Pause Menu Font '%' Glyph: Pause menu audio options formatted volumes with `"%d%%"`, but `hm_text_font` lacked a glyph mapping for `%` because the original PS1 font atlas contains only digits, letters, and minimal punctuation (`!`, `?`, `-`, `(`, `)`, `.`), leaving empty trailing spaces (e.g. `"100 "`).
+3. Audio Volume Control Wrap: Audio volume sliders clamped at 0% and 100%. When at default 100%, pressing Confirm/Enter/Cross or tapping the row label on mobile passed direction +1, which clamped at 100% and did nothing.
+4. Exclusive Fullscreen Mode Fallback: When requesting exclusive fullscreen (`window_mode = 1`), if the configured resolution did not strictly match a discrete display mode reported by SDL, `hm_graphics_apply` failed and aborted entering fullscreen rather than falling back to desktop/native display mode.
+
+Decision:
+1. Instant Fast Text Dialogue (`src/main/text/text.c`):
+   - In `text_draw_string` when `hm_gameplay_fast_text()` is active, scan ahead from `text_index` across printable glyphs up to the end of the current page, choices, wait codes, or 4th line break, advancing `text_index` immediately so dialogue text renders instantly in a single frame.
+   - In `text_window_frame`, set scroll step to 14 pixels (`TEXT_LINE_HEIGHT`) under `hm_gameplay_fast_text()`, allowing multi-line dialogue to scroll instantly in 1 frame.
+   - Guaranteed vanilla bit-exact matching in `#else` branch when port mode is not compiled.
+2. Pause Menu '%' Glyph Synthesis (`port/enhance/pause_menu/draw.c`):
+   - Added custom 8x12 bitmap synthesis with 1px drop shadow for `%`, seamlessly blending with the authentic PS1 font presentation across BGM and SFX volume rows.
+3. Audio Volume Confirm Cycling (`port/platform/game_host.c`):
+   - When pressing Confirm/Enter or tapping the label of a volume row currently at 100%, cycle the volume to 0% (`dir = -10`) so players can cycle through volume levels smoothly with a single button or tap, while maintaining clamped slider behavior for Left/Right controls.
+4. Fullscreen Fallback (`port/platform/graphics_options.c`):
+   - Added automatic fallback to the primary display mode or borderless fullscreen if a discrete exclusive display mode is not found.
+5. Verification:
+   - 122/122 unit tests passing 100%.
+   - Windows native release build (`VanillaBTN.exe`) and Android release APK (`VanillaBTN-android-v0.9.0.apk`) verified.
+
+Consequences:
+Dialogue text displays instantly with Fast Text enabled, pause menu font renders `%` cleanly without missing characters, audio volume sliders cycle intuitively on Confirm/touch, and fullscreen mode gracefully handles varying monitor resolutions.

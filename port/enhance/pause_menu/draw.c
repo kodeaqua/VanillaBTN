@@ -64,6 +64,21 @@ static void hm_text_font(const u16 *font, const char *text, int x, int y) {
         return;
     for (; *text && x < 304; ++text, x += 8) {
         unsigned char c = (unsigned char)*text;
+        if (c == '%') {
+            static const u8 pct_map[12] = {
+                0x00, 0x00, 0x62, 0x64, 0x08, 0x10, 0x20, 0x46, 0x86, 0x00, 0x00, 0x00
+            };
+            for (int r = 0; r < 12; ++r) {
+                u8 row_bits = pct_map[r];
+                for (int col = 0; col < 8; ++col) {
+                    if (row_bits & (0x80 >> col)) {
+                        hm_put(x + col + 1, y + r + 1, 0x00101010);
+                        hm_put(x + col, y + r, 0x00EFEFEF);
+                    }
+                }
+            }
+            continue;
+        }
         unsigned glyph;
         if (c >= '0' && c <= '9')
             glyph = 0x40 + c - '0';
