@@ -3064,3 +3064,32 @@ Decision:
 
 Consequences:
 Tile targeting renders clearly and accurately across farm, greenhouse, and mine environments. All field and greenhouse coordinate conversions correctly handle all negative world coordinates. Unit test suite passes 100%.
+
+## ADR-109: Fix Tile Targeting cell validation and Fast Text page-break phase retention
+
+Date: 2026-10-30. Status: accepted.
+
+Context:
+1. Tile Targeting Cell Drop Bug (port/enhance/gameplay/gameplay.c):
+   - In hm_gameplay_draw_tile_targeting(), the code checked if (field_world_to_cell(&target_pos, &col, &row) != 0) return;.
+   - In Back to Nature, field_world_to_cell() returns 1 for free/open ground cells, 0 for occupied cells (e.g. rocks, wood, fences), and 2 or 3 for out-of-bounds coordinates.
+   - Checking != 0 immediately aborted and dropped all valid free cells across the farm field.
+   - Additionally, AddPrim prepends to the ordering table slot head. Adding tpage, then fill, then lines resulted in reverse GPU execution: lines -> fill -> tpage. This executed fill before tpage set semi-transparency ABR mode, and fill occluded perimeter border lines.
+2. Fast Text Page Break Overwrite and Page Advance Stalling (src/main/text/text.c):
+   - In text_draw_string(), when text_index stepped rapidly past TEXT_CODE_PAGE_MARK under Fast Text, the while (1) loop set text_phase = TEXT_STATE_PAGE_BREAK and text_wrap_index = text_line_glyphs.
+   - On the very next iteration, text_line_glyphs was incremented, making text_wrap_index != text_line_glyphs evaluate true. This immediately overwrote text_phase = TEXT_STATE_PRINTING.
+   - Because text_phase was corrupted back to TEXT_STATE_PRINTING, text_update_window() never entered TEXT_STATE_PAGE_BREAK, never showed the red advance prompt, and completely ignored Confirm/X button presses.
+   - In text_next_page(), text_find_nth(current, TEXT_CODE_PAGE_END, 1, level) passed level = text_index. When the search reached TEXT_CODE_PAGE_END, length >= limit triggered before checking the code, returning NULL and preventing page advancement.
+
+Decision:
+1. Tile Targeting Cell Validation and Primitive Submission (port/enhance/gameplay/gameplay.c):
+   - Remove != 0 return check on field_world_to_cell() and greenhouse_world_to_cell(); strictly validate bounding grid coordinates (0 <= col < FIELD_COLS, 0 <= row < FIELD_ROWS).
+   - Use fallback player->place.location / player->place.value for robust location detection.
+   - Reverse AddPrim submission order: submit lines first, then fill quad, then DR_TPAGE. At runtime, the GPU executes DR_TPAGE (setting ABR=0) -> fill quad -> crisp perimeter border lines.
+2. Fast Text Instant Pause and Clean Advance (src/main/text/text.c):
+   - At TEXT_CODE_PAGE_MARK and TEXT_CODE_PAGE_END, under hm_gameplay_fast_text(), set text_phase = TEXT_STATE_PAGE_BREAK, text_wrap_index = text_line_glyphs, text_index = text_line_glyphs, and break;. This preserves TEXT_STATE_PAGE_BREAK across frames.
+   - In text_next_page() and text_start_choice(), under HMBTN_PORT when hm_gameplay_fast_text() is active, search with limit 0 (unbounded) so text_find_nth matches the page end or choice marker instantly.
+   - When Fast Text is disabled (0), original vanilla decompilation code paths execute with 100% parity.
+
+Consequences:
+Tile targeting renders cyan highlight quads and crisp perimeter borders on all targeted tiles on the farm, in the greenhouse, and in mines. Fast Text displays dialogue swiftly, displays the blinking advance prompt at page breaks, and seamlessly advances pages or choices on X/Cross press. All 122 unit tests pass 100%.

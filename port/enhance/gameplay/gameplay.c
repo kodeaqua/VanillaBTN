@@ -579,8 +579,8 @@ void hm_gameplay_draw_tile_targeting(const void *player_ptr, s32 depth) {
     if (player->stateFlags & (PLAYER_FLAG_AIRBORNE | PLAYER_FLAG_ASLEEP))
         return;
 
-    s16 place = farm_area.mode.place.location;
-    u16 place_val = farm_area.mode.place.value;
+    s16 place = player->place.location ? player->place.location : farm_area.mode.place.location;
+    u16 place_val = player->place.value ? player->place.value : farm_area.mode.place.value;
     int is_farm = (place == 1);
     int is_greenhouse = (place == 6);
     int is_mine = (place_val == 0x37 || place_val == 0x43);
@@ -606,13 +606,11 @@ void hm_gameplay_draw_tile_targeting(const void *player_ptr, s32 depth) {
 
     s16 col = -1, row = -1;
     if (is_farm) {
-        if (field_world_to_cell(&target_pos, &col, &row) != 0)
-            return;
+        field_world_to_cell(&target_pos, &col, &row);
         if (col < 0 || col >= FIELD_COLS || row < 0 || row >= FIELD_ROWS)
             return;
     } else if (is_greenhouse) {
-        if (greenhouse_world_to_cell(&target_pos, &col, &row) != 0)
-            return;
+        greenhouse_world_to_cell(&target_pos, &col, &row);
         if (col < 0 || col >= GREENHOUSE_SIZE || row < 0 || row >= GREENHOUSE_SIZE)
             return;
     } else {
@@ -656,7 +654,7 @@ void hm_gameplay_draw_tile_targeting(const void *player_ptr, s32 depth) {
         return;
 
     s32 avg_depth = (d0 + d1 + d2 + d3) >> 2;
-    s32 ot_idx = (avg_depth >> 2) - 2;
+    s32 ot_idx = (avg_depth >> 2) + 1;
     if (ot_idx < 1)
         ot_idx = 1;
     if (ot_idx >= FRAME_OT_DEPTH)
@@ -669,7 +667,6 @@ void hm_gameplay_draw_tile_targeting(const void *player_ptr, s32 depth) {
     DR_TPAGE *tpage = (DR_TPAGE *)current_frame->primCursor.bytes;
     current_frame->primCursor.bytes += sizeof(DR_TPAGE);
     setDrawTPage(tpage, 0, 1, GetTPage(0, 0, 0, 0));
-    AddPrim(&current_frame->ot[ot_idx], tpage);
 
     /* Semi-transparent cyan quad fill */
     POLY_F4 *fill = (POLY_F4 *)current_frame->primCursor.bytes;
@@ -681,7 +678,6 @@ void hm_gameplay_draw_tile_targeting(const void *player_ptr, s32 depth) {
     fill->x1 = s1.x; fill->y1 = s1.y;
     fill->x2 = s2.x; fill->y2 = s2.y;
     fill->x3 = s3.x; fill->y3 = s3.y;
-    AddPrim(&current_frame->ot[ot_idx], fill);
 
     /* 4 Border lines */
     struct { s16 ax; s16 ay; s16 bx; s16 by; } edges[4] = {
@@ -691,6 +687,9 @@ void hm_gameplay_draw_tile_targeting(const void *player_ptr, s32 depth) {
         { s2.x, s2.y, s0.x, s0.y },
     };
 
+    /* Add to OT in order: lines first, then fill, then tpage.
+     * Since AddPrim prepends to the linked list head, GPU execution order is:
+     * tpage (sets ABR=0) -> fill (semi-transparent quad) -> lines (crisp perimeter borders). */
     for (int i = 0; i < 4; ++i) {
         LINE_F2 *line = (LINE_F2 *)current_frame->primCursor.bytes;
         current_frame->primCursor.bytes += sizeof(LINE_F2);
@@ -701,4 +700,6 @@ void hm_gameplay_draw_tile_targeting(const void *player_ptr, s32 depth) {
         line->x1 = edges[i].bx; line->y1 = edges[i].by;
         AddPrim(&current_frame->ot[ot_idx], line);
     }
+    AddPrim(&current_frame->ot[ot_idx], fill);
+    AddPrim(&current_frame->ot[ot_idx], tpage);
 }

@@ -1014,6 +1014,14 @@ static u8 *text_draw_string(u_long *ot, u8 *prim, u16 *text, s16 x, s16 y, s32 s
             {
                 text_phase = TEXT_STATE_PAGE_BREAK;
                 text_wrap_index = text_line_glyphs;
+#ifdef HMBTN_PORT
+                /* PORT: Fast text instant page pause - see docs/port/DECISIONS.md#adr-094 */
+                if (hm_gameplay_fast_text())
+                {
+                    text_index = text_line_glyphs;
+                    break;
+                }
+#endif
             }
         }
         else if (*text == TEXT_CODE_PAGE_END)
@@ -1021,6 +1029,8 @@ static u8 *text_draw_string(u_long *ot, u8 *prim, u16 *text, s16 x, s16 y, s32 s
 #ifdef HMBTN_PORT
             if (hm_gameplay_fast_text())
             {
+                text_phase = TEXT_STATE_PAGE_BREAK;
+                text_wrap_index = text_line_glyphs;
                 text_index = text_line_glyphs;
                 break;
             }
@@ -1675,7 +1685,18 @@ static void text_next_page(void)
     {
         level = index;
     }
+#ifdef HMBTN_PORT
+    if (hm_gameplay_fast_text())
+    {
+        p = text_find_nth(current, TEXT_CODE_PAGE_END, 1, 0);
+    }
+    else
+    {
+        p = text_find_nth(current, TEXT_CODE_PAGE_END, 1, level);
+    }
+#else
     p = text_find_nth(current, TEXT_CODE_PAGE_END, 1, level);
+#endif
     if (p)
     {
         text_current = p + 1;
@@ -1711,7 +1732,18 @@ static void text_start_choice(void)
     }
     for (i = 0; i < 3; i++)
     {
+#ifdef HMBTN_PORT
+        if (hm_gameplay_fast_text())
+        {
+            p = text_find_nth(text_current, text_page_breaks[i], 1, 0);
+        }
+        else
+        {
+            p = text_find_nth(text_current, text_page_breaks[i], 1, level);
+        }
+#else
         p = text_find_nth(text_current, text_page_breaks[i], 1, level);
+#endif
         if (p)
         {
             text_current = p + 1;
