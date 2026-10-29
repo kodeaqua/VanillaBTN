@@ -15,6 +15,14 @@
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <io.h>
+#include <windows.h>
+#else
+#include <sys/mman.h>
+#endif
 
 extern int hm_game_main(void);
 
@@ -53,16 +61,75 @@ static void hm_boot_tick(void *context, u64 tick) {
 }
 #endif
 
-static int hm_read_at(void *context, u64 offset, void *destination, size_t bytes) {
-    FILE *file = context;
-    return offset <= LONG_MAX && !fseek(file, (long)offset, SEEK_SET) &&
-           fread(destination, 1, bytes, file) == bytes;
-}
+enum { HM_DISC_CACHE_BYTES = 112 * 2352 };
 
 typedef struct {
     FILE *file;
     hm_disc *disc;
+    const u8 *mapped;
+    u64 size;
+#if defined(_WIN32)
+    HANDLE mapping;
+#endif
+    u8 cache[HM_DISC_CACHE_BYTES];
+    u64 cache_offset;
+    size_t cache_valid;
 } hm_disc_slot;
+
+static void hm_close_disc_slot(hm_disc_slot *slot) {
+    if (!slot)
+        return;
+#if defined(_WIN32)
+    if (slot->mapped)
+        UnmapViewOfFile(slot->mapped);
+    if (slot->mapping)
+        CloseHandle(slot->mapping);
+    slot->mapped = NULL;
+    slot->mapping = NULL;
+#else
+    if (slot->mapped && slot->mapped != MAP_FAILED)
+        munmap((void *)slot->mapped, (size_t)slot->size);
+    slot->mapped = NULL;
+#endif
+    if (slot->file) {
+        fclose(slot->file);
+        slot->file = NULL;
+    }
+    slot->cache_valid = 0;
+}
+
+static int hm_read_at(void *context, u64 offset, void *destination, size_t bytes) {
+    hm_disc_slot *slot = context;
+    if (offset > slot->size || bytes > slot->size - offset)
+        return 0;
+    if (slot->mapped) {
+        memcpy(destination, slot->mapped + offset, bytes);
+        return 1;
+    }
+    if (slot->cache_valid && offset >= slot->cache_offset &&
+        offset + bytes <= slot->cache_offset + slot->cache_valid) {
+        memcpy(destination, slot->cache + (offset - slot->cache_offset), bytes);
+        return 1;
+    }
+    if (bytes <= HM_DISC_CACHE_BYTES && offset <= LONG_MAX) {
+        if (fseek(slot->file, (long)offset, SEEK_SET) != 0)
+            return 0;
+        size_t to_read = (size_t)(slot->size - offset < HM_DISC_CACHE_BYTES
+                                      ? slot->size - offset
+                                      : HM_DISC_CACHE_BYTES);
+        size_t got = fread(slot->cache, 1, to_read, slot->file);
+        if (got < bytes) {
+            slot->cache_valid = 0;
+            return 0;
+        }
+        slot->cache_offset = offset;
+        slot->cache_valid = got;
+        memcpy(destination, slot->cache, bytes);
+        return 1;
+    }
+    return offset <= LONG_MAX && !fseek(slot->file, (long)offset, SEEK_SET) &&
+           fread(destination, 1, bytes, slot->file) == bytes;
+}
 
 /* Open and validate one candidate BIN. On success the slot owns the open file. */
 static int hm_open_disc(void *context, const char *path, int verbose) {
@@ -76,19 +143,35 @@ static int hm_open_disc(void *context, const char *path, int verbose) {
         return 0;
     }
     long bytes = ftell(file);
-    if (bytes < 0) {
-        fclose(file);
-        return 0;
-    }
-    hm_disc_result status =
-        hm_disc_mount(slot->disc, (hm_disc_stream){file, (u64)bytes, hm_read_at});
-    if (status != HM_DISC_OK) {
-        if (verbose)
-            fprintf(stderr, "%s\n", hm_disc_error(status));
+    if (bytes <= 0) {
         fclose(file);
         return 0;
     }
     slot->file = file;
+    slot->size = (u64)bytes;
+    slot->mapped = NULL;
+    slot->cache_valid = 0;
+#if defined(_WIN32)
+    slot->mapping = NULL;
+    HANDLE hfile = (HANDLE)_get_osfhandle(_fileno(file));
+    if (hfile != INVALID_HANDLE_VALUE) {
+        slot->mapping = CreateFileMappingA(hfile, NULL, PAGE_READONLY, 0, 0, NULL);
+        if (slot->mapping)
+            slot->mapped = (const u8 *)MapViewOfFile(slot->mapping, FILE_MAP_READ, 0, 0, 0);
+    }
+#else
+    void *map = mmap(NULL, (size_t)bytes, PROT_READ, MAP_PRIVATE, fileno(file), 0);
+    if (map != MAP_FAILED)
+        slot->mapped = (const u8 *)map;
+#endif
+    hm_disc_result status =
+        hm_disc_mount(slot->disc, (hm_disc_stream){slot, (u64)bytes, hm_read_at});
+    if (status != HM_DISC_OK) {
+        if (verbose)
+            fprintf(stderr, "%s\n", hm_disc_error(status));
+        hm_close_disc_slot(slot);
+        return 0;
+    }
     return 1;
 }
 
@@ -96,16 +179,7 @@ static int hm_open_disc(void *context, const char *path, int verbose) {
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL_messagebox.h>
 #include <android/log.h>
-#define HM_ANDROID_LOG(...) do { \
-    __android_log_print(ANDROID_LOG_INFO, "VanillaBTN", __VA_ARGS__); \
-    const char *ud = hm_user_data_root(); \
-    if (ud && *ud) { \
-        char lp[512]; \
-        snprintf(lp, sizeof(lp), "%s/native.log", ud); \
-        FILE *lf = fopen(lp, "a"); \
-        if (lf) { fprintf(lf, __VA_ARGS__); fprintf(lf, "\n"); fclose(lf); } \
-    } \
-} while(0)
+#define HM_ANDROID_LOG(...) __android_log_print(ANDROID_LOG_INFO, "VanillaBTN", __VA_ARGS__)
 SDLMAIN_DECLSPEC int SDL_main(int argc, char **argv) {
 #else
 #define HM_ANDROID_LOG(...)
@@ -113,7 +187,7 @@ int main(int argc, char **argv) {
 #endif
     hm_crash_handler_install();
     hm_disc disc;
-    hm_disc_slot slot = {NULL, &disc};
+    hm_disc_slot slot = {.file = NULL, .disc = &disc};
 #ifdef HMBTN_SDL_HOST
     if (argc > 2) {
         fprintf(stderr, "Usage: hmbtn_native [original USA BIN track]\n");
@@ -147,7 +221,6 @@ int main(int argc, char **argv) {
     if (!hm_open_disc(&slot, argv[1], 1))
         return 1;
 #endif
-    FILE *file = slot.file;
     hm_disc_result status;
     status = hm_family_names_load(&disc);
     if (status != HM_DISC_OK) {
@@ -158,7 +231,7 @@ int main(int argc, char **argv) {
         snprintf(errbuf, sizeof(errbuf), "Cannot read game data from disc:\n%s", hm_disc_error(status));
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "VanillaBTN", errbuf, NULL);
 #endif
-        fclose(file);
+        hm_close_disc_slot(&slot);
         return 1;
     }
     hm_cd_attach(&disc);
@@ -167,7 +240,7 @@ int main(int argc, char **argv) {
     const char *limit = getenv("HMBTN_BOOT_TICKS");
     if (replay && !hm_input_replay_load(&hm_replay, replay)) {
         fprintf(stderr, "Cannot load input replay\n");
-        fclose(file);
+        hm_close_disc_slot(&slot);
         return 1;
     }
     hm_boot_replay = replay != NULL;
@@ -178,7 +251,7 @@ int main(int argc, char **argv) {
         hm_boot_tick_limit = strtoull(limit, &end, 10);
         if (!*limit || *end || !hm_boot_tick_limit || hm_boot_tick_limit > 1000000) {
             fprintf(stderr, "Invalid diagnostic tick limit\n");
-            fclose(file);
+            hm_close_disc_slot(&slot);
             return 1;
         }
     }
@@ -198,7 +271,7 @@ int main(int argc, char **argv) {
 #endif
         hm_game_host_stop();
         hm_cd_detach();
-        fclose(file);
+        hm_close_disc_slot(&slot);
         return 1;
     }
 #endif
@@ -210,7 +283,7 @@ int main(int argc, char **argv) {
     hm_game_host_stop();
 #endif
     hm_cd_detach();
-    fclose(file);
+    hm_close_disc_slot(&slot);
     return result;
 }
 

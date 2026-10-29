@@ -178,17 +178,6 @@ static int hm_host_scaling_prepare(void) {
     if (!SDL_GetWindowSizeInPixels(hm_window, &w, &h) || w <= 0 || h <= 0)
         return 0;
     hm_host_output_size(&w, &h);
-#ifdef __ANDROID__
-    if (w > 854 || h > 480) {
-        if (hm_host_wide_active()) {
-            w = 854;
-            h = 480;
-        } else {
-            w = 640;
-            h = 480;
-        }
-    }
-#endif
 #ifdef HMBTN_ENH_FILTERING
     hm_scaling_filter(hm_options.linear);
 #endif
@@ -1503,7 +1492,7 @@ int hm_game_host_start(hm_disc *disc) {
     }
 #endif
 #if defined(HMBTN_ENH_PGXP)
-    hm_pgxp_set_enabled(1); /* Auto-applied: 3D subpixel precision without wobble */
+    hm_pgxp_set_enabled(hm_options.pgxp);
 #endif
 #if defined(HMBTN_ENH_DITHERING)
     hm_dither_set_enabled(0); /* Auto-applied: clean 32-bit smooth colors without dither noise */
