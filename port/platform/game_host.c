@@ -1083,6 +1083,62 @@ static void hm_host_present_scanout(u64 tick) {
 #endif
 }
 
+#ifdef __ANDROID__
+/* Once-per-second frame timing summary written to logcat (tag VanillaBTN).
+ * Measures where wall time goes so Android performance work is driven by data:
+ * game = guest code between VBlanks (logic, CPU rasterizer, SPU), present =
+ * scanout/GPU submission, wait = idle sleep inside the host tick. */
+typedef struct {
+    Uint64 window_start, last_exit;
+    Uint64 game_ns, game_max, present_ns, present_max, wait_ns;
+    u32 ticks, presents, gpu_presents, rebases;
+} hm_perf_stats;
+static hm_perf_stats hm_perf;
+static void hm_perf_tick_enter(Uint64 now) {
+    if (hm_perf.last_exit) {
+        Uint64 game = now - hm_perf.last_exit;
+        hm_perf.game_ns += game;
+        if (game > hm_perf.game_max)
+            hm_perf.game_max = game;
+        ++hm_perf.ticks;
+    }
+    if (!hm_perf.window_start)
+        hm_perf.window_start = now;
+    Uint64 elapsed = now - hm_perf.window_start;
+    if (elapsed < SDL_NS_PER_SECOND)
+        return;
+    double ticks = hm_perf.ticks ? (double)hm_perf.ticks : 1.0;
+    double presents = hm_perf.presents ? (double)hm_perf.presents : 1.0;
+    __android_log_print(ANDROID_LOG_INFO, "VanillaBTN",
+                        "perf: ticks=%u presents=%u gpu=%u rebases=%u | game avg=%.2f max=%.2f ms"
+                        " | present avg=%.2f max=%.2f ms | wait=%.0f%%",
+                        hm_perf.ticks, hm_perf.presents, hm_perf.gpu_presents, hm_perf.rebases,
+                        hm_perf.game_ns / ticks / 1e6, hm_perf.game_max / 1e6,
+                        hm_perf.present_ns / presents / 1e6, hm_perf.present_max / 1e6,
+                        100.0 * (double)hm_perf.wait_ns / (double)elapsed);
+    Uint64 last_exit = hm_perf.last_exit;
+    hm_perf = (hm_perf_stats){.window_start = now, .last_exit = last_exit};
+}
+#endif
+
+static void hm_host_present_timed(u64 tick) {
+#ifdef __ANDROID__
+    Uint64 begin = SDL_GetTicksNS();
+#endif
+    hm_host_present_scanout(tick);
+#ifdef __ANDROID__
+    Uint64 spent = SDL_GetTicksNS() - begin;
+    hm_perf.present_ns += spent;
+    if (spent > hm_perf.present_max)
+        hm_perf.present_max = spent;
+    ++hm_perf.presents;
+#ifdef HMBTN_ENH_PAUSE_MENU
+    if (hm_options.gpu_active)
+        ++hm_perf.gpu_presents;
+#endif
+#endif
+}
+
 static void hm_host_events(void) {
 #if defined(HMBTN_ENH_WIDESCREEN) && defined(HMBTN_ENH_PAUSE_MENU)
     int output_w, output_h;
@@ -1147,6 +1203,9 @@ static void hm_host_tick(void *context, u64 tick) {
         hm_game_host_stop();
         exit(0);
     }
+#ifdef __ANDROID__
+    hm_perf_tick_enter(SDL_GetTicksNS());
+#endif
     hm_host_events();
     Uint64 now = SDL_GetTicksNS();
     Uint64 deadline = hm_start + tick * SDL_NS_PER_SECOND / 60;
@@ -1158,10 +1217,13 @@ static void hm_host_tick(void *context, u64 tick) {
     if (now > deadline + SDL_NS_PER_SECOND / 20) {
         hm_start = now - tick * SDL_NS_PER_SECOND / 60;
         deadline = now;
+#ifdef __ANDROID__
+        ++hm_perf.rebases;
+#endif
     }
 
     if (hm_present_clock_due(&hm_presentation, now)) {
-        hm_host_present_scanout(tick);
+        hm_host_present_timed(tick);
     }
 
     for (;;) {
@@ -1172,15 +1234,19 @@ static void hm_host_tick(void *context, u64 tick) {
         if (now >= deadline)
             break;
         if (hm_present_clock_due(&hm_presentation, now))
-            hm_host_present_scanout(tick);
+            hm_host_present_timed(tick);
         now = SDL_GetTicksNS();
         /* A recoverable display error can exclude modal time from the epoch. */
         deadline = hm_start + tick * SDL_NS_PER_SECOND / 60;
         if (now >= deadline)
             break;
         Uint64 wake = hm_presentation.next_ns < deadline ? hm_presentation.next_ns : deadline;
-        if (wake > now)
+        if (wake > now) {
             SDL_DelayPrecise(wake - now);
+#ifdef __ANDROID__
+            hm_perf.wait_ns += SDL_GetTicksNS() - now;
+#endif
+        }
     }
     u16 held = 0;
     if (hm_controls.keyboard_layout == HM_KEYBOARD_LAYOUT_ARROWS) {
@@ -1302,6 +1368,9 @@ static void hm_host_tick(void *context, u64 tick) {
     }
 #endif
     hm_pad_sample(0, 1, held);
+#ifdef __ANDROID__
+    hm_perf.last_exit = SDL_GetTicksNS();
+#endif
 }
 
 int hm_game_host_start(hm_disc *disc) {

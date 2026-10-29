@@ -265,15 +265,10 @@ static int hm_refresh_rate(const SDL_DisplayMode *mode, hm_present_rate *rate) {
 hm_present_rate hm_graphics_effective_rate(SDL_Window *window, const hm_graphics_options *o) {
     hm_present_rate wanted = hm_graphics_present_rate(o), actual;
     if (o->vsync &&
-        hm_refresh_rate(SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(window)), &actual)) {
-#ifdef __ANDROID__
-        if (!o->fps_numerator && actual.numerator >= 50)
-            return actual;
-#endif
-        if (!wanted.numerator ||
-            (u64)actual.numerator * wanted.denominator < (u64)wanted.numerator * actual.denominator)
-            return actual;
-    }
+        hm_refresh_rate(SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(window)), &actual) &&
+        (!wanted.numerator ||
+         (u64)actual.numerator * wanted.denominator < (u64)wanted.numerator * actual.denominator))
+        return actual;
     return wanted;
 }
 void hm_graphics_sync_monitor(SDL_Window *window, hm_graphics_options *o) {
