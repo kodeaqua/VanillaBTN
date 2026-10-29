@@ -91,8 +91,6 @@ static void hm_gpu_rectangle(const u32 *words, u32 opcode, u32 width, u32 height
     if (x_start >= x_end || y_start >= y_end)
         return;
     u32 page = draw->tpage, depth = (page >> 7) & 3u;
-    if (textured && depth == 3u)
-        hm_runtime_error("DrawOTag", "reserved texture depth");
     hm_vram_context *vram = hm_vram_mutable_state();
     u16 (*vram_pixels)[HM_VRAM_WIDTH] = vram->pixels;
     u16 set_mask = vram->set_mask, check_mask = vram->check_mask;

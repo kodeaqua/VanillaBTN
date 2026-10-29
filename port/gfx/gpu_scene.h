@@ -9,7 +9,7 @@ enum {
     HM_SCENE_BINS = 2048,
     HM_SCENE_BIN_WORDS = 257,
     HM_SCENE_MAX_WORDS = HM_SCENE_HEADER + 1024 * 512 / 2 + HM_SCENE_STRIDE * HM_SCENE_PRIMITIVES +
-                         HM_SCENE_BINS * (HM_SCENE_BIN_WORDS + 1) + 1
+                         HM_SCENE_BINS * HM_SCENE_BIN_WORDS
 };
 typedef struct hm_gpu_scene hm_gpu_scene;
 typedef struct {

@@ -1,6 +1,7 @@
 #ifndef HMBTN_PSX_GPU_RASTER_H
 #define HMBTN_PSX_GPU_RASTER_H
 #include "compat/types.h"
+#include "psx/error.h"
 #include "psx/vram.h"
 
 static inline s32 hm_gpu_clamp31(s32 value) {
@@ -44,6 +45,8 @@ static inline void hm_gpu_fast_pixel(u16 *vram_row, u64 *dirty_row, s32 x, u16 c
 static inline u16 hm_gpu_fast_texel(const u16 (*vram_pixels)[HM_VRAM_WIDTH], u32 page_x, u32 page_y,
                                     u32 depth, u32 mask_x, u32 mask_y, u32 tw_x, u32 tw_y,
                                     u32 clut_x, u32 clut_y, u32 u, u32 v) {
+    if (depth == 3u)
+        hm_runtime_error("DrawOTag", "reserved texture depth");
     u = ((u & ~mask_x) | tw_x) & 255u;
     v = ((v & ~mask_y) | tw_y) & 255u;
     u32 ty = (page_y + v) & 511u;

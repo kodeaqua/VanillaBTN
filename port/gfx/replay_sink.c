@@ -63,7 +63,6 @@ u32 hm_replay_consume(const u32 *words, u32 available) {
 #endif
     return used;
 }
-int hm_replay_has_consumer(void) { return current.consume != 0; }
 void hm_replay_motion(const u32 *previous, const u32 *next, u32 count, u32 alpha) {
     if (current.motion)
         current.motion(current.context, previous, next, count, alpha);

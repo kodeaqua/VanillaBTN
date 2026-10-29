@@ -260,8 +260,15 @@ class VirtualGamepadView(context: Context) : View(context) {
                     if (stickActive && pid == stickPointerId) {
                         val oldX = stickKnobX
                         val oldY = stickKnobY
+                        val oldUp = activeDpadUp
+                        val oldDown = activeDpadDown
+                        val oldLeft = activeDpadLeft
+                        val oldRight = activeDpadRight
                         updateAnalogStick(px, py)
-                        if (stickKnobX != oldX || stickKnobY != oldY) {
+                        val dpadChanged = (oldUp != activeDpadUp || oldDown != activeDpadDown ||
+                                           oldLeft != activeDpadLeft || oldRight != activeDpadRight)
+                        val movedEnough = hypot(stickKnobX - oldX, stickKnobY - oldY) >= 4f * density
+                        if (dpadChanged || movedEnough) {
                             changed = true
                         }
                     } else {
