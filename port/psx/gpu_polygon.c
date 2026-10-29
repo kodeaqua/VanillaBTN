@@ -17,8 +17,11 @@ static s64 hm_edge(const hm_vertex *a, const hm_vertex *b, s32 x, s32 y) {
 static int hm_top_left(const hm_vertex *a, const hm_vertex *b) {
     return b->y < a->y || (b->y == a->y && b->x > a->x);
 }
-static u32 hm_interpolate(u32 a, u32 b, u32 c, const s64 weight[3], s64 area) {
-    return (u32)((weight[0] * a + weight[1] * b + weight[2] * c + area / 2) / area);
+static inline u32 hm_interpolate(u32 a, u32 b, u32 c, const s64 weight[3], s64 area, u64 inv_area) {
+    s64 num = weight[0] * a + weight[1] * b + weight[2] * c + area / 2;
+    if (num <= 0)
+        return 0;
+    return (u32)(((u64)num * inv_area) >> 32);
 }
 static void hm_triangle(hm_vertex a, hm_vertex b, hm_vertex c, u32 opcode, u16 clut) {
     const hm_gpu_environment *state = hm_gpu_environment_state();
@@ -32,6 +35,7 @@ static void hm_triangle(hm_vertex a, hm_vertex b, hm_vertex c, u32 opcode, u16 c
         c = temporary;
         area = -area;
     }
+    u64 inv_area = ((UINT64_C(1) << 32) + (u64)(area / 2)) / (u64)area;
     s32 minx = a.x, maxx = a.x, miny = a.y, maxy = a.y;
     const hm_vertex vertices[2] = {b, c};
     for (u32 i = 0; i < 2; ++i) {
@@ -116,8 +120,8 @@ static void hm_triangle(hm_vertex a, hm_vertex b, hm_vertex c, u32 opcode, u16 c
             }
             u16 texel = 0;
             if (textured) {
-                u32 u = hm_interpolate(a.u, b.u, c.u, weight, area);
-                u32 v = hm_interpolate(a.v, b.v, c.v, weight, area);
+                u32 u = hm_interpolate(a.u, b.u, c.u, weight, area, inv_area);
+                u32 v = hm_interpolate(a.v, b.v, c.v, weight, area, inv_area);
                 texel = hm_gpu_fast_texel((const u16(*)[HM_VRAM_WIDTH])vram_pixels, page_x, page_y,
                                           depth, mask_x, mask_y, tw_x, tw_y, clut_x, clut_y, u, v);
                 if (!texel)
@@ -128,7 +132,7 @@ static void hm_triangle(hm_vertex a, hm_vertex b, hm_vertex c, u32 opcode, u16 c
                 for (u32 channel = 0; channel < 3; ++channel) {
                     s32 value = uniform_color ? (s32)a.color[channel]
                                               : (s32)hm_interpolate(a.color[channel], b.color[channel],
-                                                                    c.color[channel], weight, area);
+                                                                    c.color[channel], weight, area, inv_area);
                     if (textured)
                         value = value * ((texel >> (channel * 5)) & 31) / 16;
                     if (dithering)

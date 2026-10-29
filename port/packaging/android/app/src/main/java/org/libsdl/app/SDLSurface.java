@@ -115,11 +115,31 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
             return;
         }
 
-        mWidth = width;
-        mHeight = height;
         int nDeviceWidth = width;
         int nDeviceHeight = height;
         float density = 1.0f;
+        try {
+            if (Build.VERSION.SDK_INT >= 17) {
+                DisplayMetrics realMetrics = new DisplayMetrics();
+                mDisplay.getRealMetrics(realMetrics);
+                nDeviceWidth = realMetrics.widthPixels;
+                nDeviceHeight = realMetrics.heightPixels;
+            }
+        } catch(Exception ignored) {}
+
+        if (nDeviceHeight > 540 && width == nDeviceWidth && height == nDeviceHeight) {
+            float aspect = (float) nDeviceWidth / (float) nDeviceHeight;
+            int targetH = 540;
+            int targetW = Math.round(540.0f * aspect);
+            if ((targetW & 1) != 0) targetW++;
+            if (width != targetW || height != targetH) {
+                holder.setFixedSize(targetW, targetH);
+                return;
+            }
+        }
+
+        mWidth = width;
+        mHeight = height;
         try
         {
             if (Build.VERSION.SDK_INT >= 17 /* Android 4.2 (JELLY_BEAN_MR1) */) {

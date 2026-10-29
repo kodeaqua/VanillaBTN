@@ -57,8 +57,6 @@ void main(uint3 id:SV_DispatchThreadID){
         uint p=load_word(8)+load_word(bin+1+item)*40,op=word(p,1),flags=word(p,4);
         int2 clip=int2(word(p,9),word(p,10)),clip_end=clip+int2(word(p,11),word(p,12));
         if(any(logical<clip)||any(logical>=clip_end))continue;
-        int2 display=int2(word(p,13),word(p,14)),display_end=display+int2(word(p,15),word(p,16));
-        if(!(flags&2)&&word(p,17)&&all(logical>=display)&&all(logical<display_end))continue;
         uint coverage=(1u<<samples)-1;
         [unroll]for(uint mask_sample=0;mask_sample<4;++mask_sample){if(mask_sample>=samples)break;
             if((flags&8)&&(sample_colors[mask_sample]&32768))coverage&=~(1u<<mask_sample);}
