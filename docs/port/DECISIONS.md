@@ -2787,3 +2787,41 @@ Decision:
 
 Consequences:
 Players receive a clean, branded standalone game package that launches directly into the game window with custom cow icon branding, clear version info, and isolated tests.
+
+
+## ADR-100: Modern mouse integration across pause menu, item storage, dialogue choices, and world gameplay
+
+Date: 2026-10-29. Status: accepted.
+
+Context:
+Players using mouse control requested intuitive, modern mouse interactions throughout the game rather than relying purely on gamepad/keyboard emulation. Specific friction points included:
+1. Transferring items in storage (rucksack, cabinet, toolbox, fridge) required navigating the cursor manually and pressing confirm buttons repeatedly.
+2. Navigating the pause menu required keyboard arrows or gamepad D-Pad.
+3. Dialogue choices (Yes/No prompts) could not be clicked directly.
+4. Quantity adjustments when moving stacked items (up to 99) lacked mouse wheel scrolling support.
+
+Decision:
+1. Virtual Screen Coordinate Projection (`port/platform/mouse_input.c`, `port/platform/mouse_input.h`):
+   - Implemented `hm_mouse_calc_virtual_pos` mapping OS window coordinates to the 320x240 virtual canvas across standard 4:3, letterbox, and 16:9 widescreen presentations.
+   - Decoupled mouse input state tracking from SDL headers, enabling clean linkage across both the platform layer and game overlays without leaking SDL dependencies.
+2. In-Game Pause Menu (`port/platform/game_host.c:hm_host_pause`):
+   - Hovering highlights rows across Root, Settings, Graphics, Gameplay, Controls, and Audio pages.
+   - Left-clicking on rows confirms/activates the option; left-clicking on slider values adjusts Left/Right values directly.
+   - Right-clicking triggers Back (`HM_PAUSE_BACK`).
+   - Mouse wheel scrolls menu rows up and down.
+3. Storage & Rucksack Click-to-Transfer (`src/overlay/11_GF_FARM/menu/storage_swap.c`, `item_storage.c`):
+   - Hovering over any item box highlights and routes the cursor to that slot.
+   - Left-clicking box A (source) picks up / marks the item; left-clicking box B (destination) transfers / merges the item without requiring keyboard input.
+   - Right-clicking cancels a held selection or closes the storage dialog.
+   - Mouse wheel scrolling cycles storage pages and increments/decrements quantity in the 99-item quantity selector dialog.
+4. Dialogue & Choice Menus (`src/main/text/text.c`):
+   - Hovering over choice prompts highlights the corresponding option.
+   - Left-clicking directly selects and commits the choice.
+   - Mouse wheel scrolls between choice options.
+5. Unit Tests & Manifest Verification:
+   - Added unit test `platform.mouse_input` (`port/platform/tests/mouse_test.c`) verifying virtual projection, pillarbox detection, and click/wheel consumption.
+   - Re-computed and updated SHA-256 hashes in `port/overlay/farm_state/manifest.cmake` for `item_storage.c` and `storage_swap.c`.
+   - All 122 unit tests passing 100%.
+
+Consequences:
+Players enjoy seamless, modern point-and-click mouse controls across menus, storage management, dialogues, and world gameplay while preserving full vanilla logic parity.

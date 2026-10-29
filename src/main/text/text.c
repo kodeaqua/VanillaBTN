@@ -30,6 +30,9 @@
 #include "texture_pack.h"
 #include "ui_icons.h"
 #include "villager.h"
+#ifdef HMBTN_PORT
+#include "platform/mouse_input.h"
+#endif
 
 /* Textured sprite primitive. */
 typedef struct Sprt
@@ -1445,6 +1448,57 @@ static s32 text_choice_menu(s16 x, s16 y, s16 *cursor, s16 count)
 {
     s32 chosen = 0;
 
+#ifdef HMBTN_PORT
+    /* PORT: Modern mouse choice selection - see docs/port/DECISIONS.md#adr-100 */
+    int mouse_vx, mouse_vy;
+    if (hm_mouse_get_pos(&mouse_vx, &mouse_vy)) {
+        s16 line_h = (s16)text_spacing_y + TEXT_LINE_HEIGHT;
+        for (s16 row = 0; row < count; row++) {
+            s16 row_y = y + line_h * row;
+            if (hm_mouse_in_rect(mouse_vx, mouse_vy, x - 10, row_y - 2, 140, line_h)) {
+                if (*cursor != row) {
+                    *cursor = row;
+                    sound_play(SOUND_MENU_CURSOR);
+                }
+                if (hm_mouse_consume_left_click()) {
+                    sound_play(SOUND_MENU_CONFIRM);
+                    chosen = row + 1;
+                }
+                break;
+            }
+        }
+        int wheel = hm_mouse_consume_wheel();
+        if (wheel > 0) {
+            sound_play(SOUND_MENU_CURSOR);
+            *cursor = *cursor - 1;
+            *cursor = (*cursor < 0) ? count - 1 : *cursor;
+        } else if (wheel < 0) {
+            sound_play(SOUND_MENU_CURSOR);
+            *cursor = *cursor + 1;
+            *cursor = (*cursor < count) ? *cursor : 0;
+        }
+    }
+    if (chosen == 0)
+    {
+        if (input_pad1->triggered & PAD_DOWN)
+        {
+            sound_play(SOUND_MENU_CURSOR);
+            *cursor = *cursor + 1;
+            *cursor = (*cursor < count) ? *cursor : 0;
+        }
+        else if (input_pad1->triggered & PAD_UP)
+        {
+            sound_play(SOUND_MENU_CURSOR);
+            *cursor = *cursor - 1;
+            *cursor = (*cursor < 0) ? count - 1 : *cursor;
+        }
+        else if (input_pad1->pressed & PAD_CROSS)
+        {
+            sound_play(SOUND_MENU_CONFIRM);
+            chosen = *cursor + 1;
+        }
+    }
+#else
     if (input_pad1->triggered & PAD_DOWN)
     {
         sound_play(SOUND_MENU_CURSOR);
@@ -1462,6 +1516,7 @@ static s32 text_choice_menu(s16 x, s16 y, s16 *cursor, s16 count)
         sound_play(SOUND_MENU_CONFIRM);
         chosen = *cursor + 1;
     }
+#endif
     if (chosen == 0)
     {
         text_draw_cursor(current_frame->otTags[0], x - 2, y + ((s16)text_spacing_y + TEXT_LINE_HEIGHT) * *cursor);

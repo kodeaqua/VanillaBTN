@@ -24,6 +24,7 @@
 #include "ui_icons.h"
 #if defined(HMBTN_PORT) && defined(HMBTN_ENH_GAMEPLAY)
 #include "enhance/gameplay/gameplay.h"
+#include "platform/mouse_input.h"
 #endif
 
 /* A frame rectangle. */
@@ -262,7 +263,22 @@ static void storage_swap_screen(void) {
         u16 num_buf[32];
         u16 *p;
 
-        if (input_pad1->triggered & PAD_RIGHT) {
+        int mouse_wheel = hm_mouse_consume_wheel();
+        if (mouse_wheel > 0) {
+            storage_swap_qty_cur++;
+            if (storage_swap_qty_cur > storage_swap_qty_max)
+                storage_swap_qty_cur = 1;
+            sound_play(5);
+        } else if (mouse_wheel < 0) {
+            storage_swap_qty_cur--;
+            if (storage_swap_qty_cur < 1)
+                storage_swap_qty_cur = storage_swap_qty_max;
+            sound_play(5);
+        } else if (hm_mouse_consume_right_click()) {
+            sound_play(1);
+            storage_swap_state = SWAP_BROWSE;
+            return;
+        } else if (input_pad1->triggered & PAD_RIGHT) {
             storage_swap_qty_cur++;
             if (storage_swap_qty_cur > storage_swap_qty_max)
                 storage_swap_qty_cur = 1;
@@ -325,6 +341,49 @@ static void storage_swap_screen(void) {
     menu_set_sound_enabled(0);
     text_set_input(0);
     menu_request_open(3, MSG_STORAGE_SWAP_HINT);
+#ifdef HMBTN_PORT
+    /* PORT: Modern mouse spot hover and transfer - see docs/port/DECISIONS.md#adr-100 */
+    int mouse_vx, mouse_vy;
+    if (hm_mouse_get_pos(&mouse_vx, &mouse_vy)) {
+        int rucksack_slots = math_int_pow(2, game_state.player.rucksackLevel + 1);
+        int hovered_spot = -1;
+        if (hm_mouse_in_rect(mouse_vx, mouse_vy, storage_spots[0].x - 6, storage_spots[0].y - 6, 28, 28)) {
+            hovered_spot = 0;
+        } else if (hm_mouse_in_rect(mouse_vx, mouse_vy, storage_spots[9].x - 6, storage_spots[9].y - 6, 28, 28)) {
+            hovered_spot = 9;
+        } else {
+            for (i = 0; i < rucksack_slots; i++) {
+                int tool_spot = i + SPOT_TOOL_FIRST;
+                if (hm_mouse_in_rect(mouse_vx, mouse_vy, storage_spots[tool_spot].x - 6, storage_spots[tool_spot].y - 6, 28, 28)) {
+                    hovered_spot = tool_spot;
+                    break;
+                }
+                int item_spot = i + SPOT_ITEM_FIRST;
+                if (hm_mouse_in_rect(mouse_vx, mouse_vy, storage_spots[item_spot].x - 6, storage_spots[item_spot].y - 6, 28, 28)) {
+                    hovered_spot = item_spot;
+                    break;
+                }
+            }
+        }
+        if (hovered_spot >= 0) {
+            if (storage_swap_cursor != hovered_spot) {
+                storage_swap_cursor = hovered_spot;
+                sound_play(5);
+            }
+        }
+        if (hm_mouse_consume_right_click()) {
+            if (storage_swap_marked == SPOT_NONE) {
+                menu_begin_close();
+                storage_swap_state = SWAP_LEAVE;
+                sound_play(3);
+                return;
+            } else {
+                sound_play(1);
+                storage_swap_marked = SPOT_NONE;
+            }
+        }
+    }
+#endif
     if (menu_phase_is_result() != 0) {
         if (input_pad1->pressed & PAD_TRIANGLE) {
             if (storage_swap_state == SWAP_BROWSE) {
