@@ -1,4 +1,4 @@
-# AGENTS.md — Harvest Moon: Back to Nature — Native Port
+# AGENTS.md — VanillaBTN — Native Port (Harvest Moon: Back to Nature)
 
 Instructions for Codex (and any other coding agent) working in this repository.
 Read this whole file before making changes. Nested `AGENTS.md` files (e.g. `port/AGENTS.md`)
@@ -6,8 +6,14 @@ override this one for their subtree.
 
 ## 0. Mission
 
-### Current owner overrides (2026-10-25 and 2026-10-26)
+### Current owner overrides (2026-10-25 to 2026-10-29)
 
+- **Pure Vanilla Essence & Anti-Bloat Policy**: This project strictly rejects out-of-place,
+  bloated, or game-breaking mods that ruin the authentic nostalgic essence of Harvest Moon:
+  Back to Nature. Any feature additions must remain tasteful, elegant, and 100% faithful to
+  the original game spirit. Enhancements default OFF at runtime to preserve pure vanilla parity.
+- Executable binary is named `VanillaBTN.exe`. Standalone release archive is produced at
+  `dist/VanillaBTN-windows-x64-v0.9.0.zip`.
 - Use 12 parallel build jobs (`cmake --build ... -j12`), as requested by the owner.
 - The owner paused multilingual work on 2026-10-28. Its WIP is preserved in the
   named stash for `port/indonesian-language`; current runtime fixes belong on
@@ -61,7 +67,7 @@ override this one for their subtree.
   is edited (e.g. `calendar.c`, `status_pages.c`), the SHA-256 hash of the normalized content
   (`\r\n` replaced with `\n`) MUST be recalculated and updated in `port/overlay/farm_state/manifest.cmake`.
   Failure to do so causes CMake configuration failure.
-- Active Executable Lock: If `hmbtn_native.exe` is currently running, linking will fail with
+- Active Executable Lock: If `VanillaBTN.exe` or `hmbtn_native.exe` is currently running, linking will fail with
   `Permission denied`. Never kill the user's running process without consent; check `Get-Process`
   first and ask the owner to close the game before compiling `-Game`.
 - Implemented Features:
@@ -72,7 +78,7 @@ override this one for their subtree.
      smart animal bell, 10-heart stamina HUD in top-left (visible during NPC dialogues, hides
      during fullscreen menus/storage), calendar NPC birthday/milestone dialogue info on X press,
      and roaming horse.
-  4. Unit test suite: 116 tests passing 100%.
+  4. Unit test suite: 121 tests passing 100%.
 
 These explicit owner decisions override conflicting roadmap, CI skeleton,
 workflow, and definition-of-done requirements below.
