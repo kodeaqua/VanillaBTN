@@ -13,7 +13,6 @@ typedef struct {
     int stamina_hud;        /* 0 = Off, 1 = On */
     int calendar_events;    /* 0 = Off, 1 = On */
     int roaming_horse;      /* 0 = Off, 1 = On */
-    int auto_run;           /* 0 = Off, 1 = On */
 } hm_gameplay_options;
 
 void hm_gameplay_defaults(hm_gameplay_options *options);

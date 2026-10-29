@@ -23,7 +23,6 @@ typedef struct {
     int stamina_hud;
     int calendar_events;
     int roaming_horse;
-    int auto_run;
 } hm_gameplay_runtime_options;
 
 static hm_gameplay_runtime_options active_options = {
@@ -36,7 +35,6 @@ static hm_gameplay_runtime_options active_options = {
     .stamina_hud = 0,
     .calendar_events = 0,
     .roaming_horse = 0,
-    .auto_run = 0,
 };
 
 int hm_gameplay_walk_through_crops(void) {
@@ -75,9 +73,6 @@ int hm_gameplay_roaming_horse(void) {
     return active_options.roaming_horse;
 }
 
-int hm_gameplay_auto_run(void) {
-    return active_options.auto_run;
-}
 
 void hm_gameplay_set_active(const void *options_ptr) {
     if (options_ptr) {

@@ -18,7 +18,6 @@ void hm_gameplay_defaults(hm_gameplay_options *options) {
     options->stamina_hud = 0;
     options->calendar_events = 0;
     options->roaming_horse = 0;
-    options->auto_run = 0;
 }
 
 void hm_gameplay_load(hm_gameplay_options *options) {
@@ -52,8 +51,6 @@ void hm_gameplay_load(hm_gameplay_options *options) {
             options->calendar_events = (val_len == 4 && !memcmp(val, "true", 4));
         if (hm_json_property(object, length, "roaming_horse", &val, &val_len) == 1)
             options->roaming_horse = (val_len == 4 && !memcmp(val, "true", 4));
-        if (hm_json_property(object, length, "auto_run", &val, &val_len) == 1)
-            options->auto_run = (val_len == 4 && !memcmp(val, "true", 4));
     }
     free(text);
     hm_gameplay_set_active(options);
@@ -82,8 +79,6 @@ int hm_gameplay_save(const hm_gameplay_options *options) {
                                           options->calendar_events ? "true" : "false");
     ok &= hm_user_data_set_nested_setting("enhance", "roaming_horse",
                                           options->roaming_horse ? "true" : "false");
-    ok &= hm_user_data_set_nested_setting("enhance", "auto_run",
-                                          options->auto_run ? "true" : "false");
     return ok;
 }
 
@@ -118,9 +113,6 @@ int hm_gameplay_change(hm_gameplay_options *options, int item, int direction) {
         break;
     case 8:
         options->roaming_horse = !options->roaming_horse;
-        break;
-    case 9:
-        options->auto_run = !options->auto_run;
         break;
     default:
         return 0;
@@ -160,9 +152,6 @@ void hm_gameplay_value(const hm_gameplay_options *options, int item, char *text,
     case 8:
         snprintf(text, capacity, "Allow riding horse outside the farm estate");
         break;
-    case 9:
-        snprintf(text, capacity, "Run automatically while moving; hold run button to walk");
-        break;
     default:
         text[0] = 0;
         break;
@@ -199,9 +188,6 @@ void hm_gameplay_row_value(const hm_gameplay_options *options, int item, char *t
         break;
     case 8:
         snprintf(text, capacity, "%s", options->roaming_horse ? "On" : "Off");
-        break;
-    case 9:
-        snprintf(text, capacity, "%s", options->auto_run ? "On" : "Off");
         break;
     default:
         text[0] = 0;

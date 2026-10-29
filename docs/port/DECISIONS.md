@@ -2614,3 +2614,21 @@ Decision:
 
 Consequences:
 Night skies, sunset gradients, morning fog, and character Gouraud shading appear completely smooth and banding-free on modern monitors, matching the visual quality expected of a modern remaster without modifying underlying game logic or PS1 VRAM layouts.
+
+## ADR-093: Revert auto-run toggle and pad injection
+
+Date: 2026-10-29. Status: accepted.
+
+Context:
+The experimental auto-run feature (ADR-090) injected HM_PAD_CIRCLE into sampled pad state during directional movement in game_host.c. However, this global injection caused directional navigation in menus (such as the Save/Load diary screen, dialogue choices, and rucksack inventory) to trigger unintended cancel/exit signals, creating the symptom of a stuck Circle button during data loading. The owner requested taking out the auto-run feature.
+
+Decision:
+1. Revert Pad Injection and Gameplay Option:
+   - Removed pad Circle injection from port/platform/game_host.c.
+   - Removed auto_run field, getters, and setters from port/enhance/gameplay/ and port/platform/gameplay_options.c.
+   - Reverted Pause Menu gameplay items back to 9 (HM_PAUSE_GAMEPLAY_ITEMS = 9).
+2. Verification:
+   - All unit tests updated and passing 100%.
+
+Consequences:
+Completely eliminated unintended Circle button presses in Save/Load screens, title screen, dialogues, and menus.

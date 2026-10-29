@@ -25,7 +25,6 @@ int main(int argc, char **argv) {
     CHECK(opt.stamina_hud == 0);
     CHECK(opt.calendar_events == 0);
     CHECK(opt.roaming_horse == 0);
-    CHECK(opt.auto_run == 0);
 
     CHECK(hm_gameplay_walk_through_crops() == 0);
     CHECK(hm_gameplay_item_stacking() == 0);
@@ -36,7 +35,6 @@ int main(int argc, char **argv) {
     CHECK(hm_gameplay_stamina_hud() == 0);
     CHECK(hm_gameplay_calendar_events() == 0);
     CHECK(hm_gameplay_roaming_horse() == 0);
-    CHECK(hm_gameplay_auto_run() == 0);
 
     char val[64];
     hm_gameplay_row_value(&opt, 0, val, sizeof(val));
@@ -68,9 +66,6 @@ int main(int argc, char **argv) {
     CHECK(opt.roaming_horse == 1);
     CHECK(hm_gameplay_roaming_horse() == 1);
 
-    CHECK(hm_gameplay_change(&opt, 9, 1) == 1);
-    CHECK(opt.auto_run == 1);
-    CHECK(hm_gameplay_auto_run() == 1);
 
     /* Test save & load persistence */
     CHECK(hm_gameplay_save(&opt) == 1);
@@ -83,7 +78,6 @@ int main(int argc, char **argv) {
     CHECK(loaded.stamina_hud == 1);
     CHECK(loaded.calendar_events == 1);
     CHECK(loaded.roaming_horse == 1);
-    CHECK(loaded.auto_run == 1);
 
     hm_gameplay_defaults(&opt);
     hm_gameplay_set_active(&opt);
@@ -93,7 +87,6 @@ int main(int argc, char **argv) {
     CHECK(hm_gameplay_stamina_hud() == 0);
     CHECK(hm_gameplay_calendar_events() == 0);
     CHECK(hm_gameplay_roaming_horse() == 0);
-    CHECK(hm_gameplay_auto_run() == 0);
 
     SDL_free(root);
     SDL_Quit();
