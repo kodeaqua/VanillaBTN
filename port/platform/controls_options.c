@@ -47,10 +47,10 @@ void hm_controls_row_value(const hm_controls_options *opt, int item, char *out, 
     case 1:
         switch (opt->keyboard_layout) {
         case HM_KEYBOARD_LAYOUT_ARROWS:
-            snprintf(out, size, "Arrows + ZX");
+            snprintf(out, size, "Arrows ZX");
             break;
         case HM_KEYBOARD_LAYOUT_WASD:
-            snprintf(out, size, "WASD + JK");
+            snprintf(out, size, "WASD JK");
             break;
         default:
             snprintf(out, size, "Off");
@@ -63,7 +63,7 @@ void hm_controls_row_value(const hm_controls_options *opt, int item, char *out, 
             snprintf(out, size, "Action");
             break;
         case HM_MOUSE_MODE_MOVE:
-            snprintf(out, size, "Move & Act");
+            snprintf(out, size, "Move-Act");
             break;
         default:
             snprintf(out, size, "Off");
@@ -82,17 +82,17 @@ void hm_controls_value(const hm_controls_options *opt, int item, char *out, size
     switch (item) {
     case 0:
         if (opt->controller_enabled)
-            snprintf(out, size, "LS/D-Pad Move, A Action, X Tool, Y Bag, B Eat, RB Run");
+            snprintf(out, size, "Standard gamepad controller");
         else
             snprintf(out, size, "Controller/Gamepad input disabled");
         break;
     case 1:
         switch (opt->keyboard_layout) {
         case HM_KEYBOARD_LAYOUT_ARROWS:
-            snprintf(out, size, "Arrows Move, X Action, Z Tool, W Bag, D Eat, S Swap, A Whistle");
+            snprintf(out, size, "Preset A - Arrows and ZX");
             break;
         case HM_KEYBOARD_LAYOUT_WASD:
-            snprintf(out, size, "WASD Move, K Action, J Tool, I Bag, L Eat, U Swap, O Whistle");
+            snprintf(out, size, "Preset B - WASD and JK");
             break;
         default:
             snprintf(out, size, "Keyboard input disabled");
@@ -102,10 +102,10 @@ void hm_controls_value(const hm_controls_options *opt, int item, char *out, size
     case 2:
         switch (opt->mouse_mode) {
         case HM_MOUSE_MODE_ACTION:
-            snprintf(out, size, "L-Click Action, R-Click Tool, M-Click Bag, Wheel Swap");
+            snprintf(out, size, "Mouse Action and Tool mode");
             break;
         case HM_MOUSE_MODE_MOVE:
-            snprintf(out, size, "Hold L-Click to Move, R-Click Tool, M-Click Bag, Wheel Swap");
+            snprintf(out, size, "Mouse Move and Action mode");
             break;
         default:
             snprintf(out, size, "Mouse input disabled");

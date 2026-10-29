@@ -505,24 +505,30 @@ static void hm_host_pause(void) {
                 switch (event.key.key) {
                 case SDLK_ESCAPE:
                 case SDLK_BACKSPACE:
+                case SDLK_J:
                     input = HM_PAUSE_BACK;
                     break;
                 case SDLK_RETURN:
                 case SDLK_KP_ENTER:
                 case SDLK_X:
+                case SDLK_K:
                 case SDLK_SPACE:
                     input = HM_PAUSE_CONFIRM;
                     break;
                 case SDLK_UP:
+                case SDLK_W:
                     input = HM_PAUSE_UP;
                     break;
                 case SDLK_DOWN:
+                case SDLK_S:
                     input = HM_PAUSE_DOWN;
                     break;
                 case SDLK_LEFT:
+                case SDLK_A:
                     input = HM_PAUSE_LEFT;
                     break;
                 case SDLK_RIGHT:
+                case SDLK_D:
                     input = HM_PAUSE_RIGHT;
                     break;
                 default:

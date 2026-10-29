@@ -97,13 +97,13 @@ void hm_audio_value(const hm_audio_options *options, int item, char *text, size_
         return;
     switch (item) {
     case 0:
-        snprintf(text, capacity, "Background music volume level (0 to 100%%)");
+        snprintf(text, capacity, "BGM volume level (0 to 100)");
         break;
     case 1:
-        snprintf(text, capacity, "Sound effects and environmental volume level (0 to 100%%)");
+        snprintf(text, capacity, "Sound effects volume (0 to 100)");
         break;
     case 2:
-        snprintf(text, capacity, "Resampling algorithm: Studio Catmull-Rom or PS1 Gaussian");
+        snprintf(text, capacity, "Audio resampling quality mode");
         break;
     default:
         text[0] = 0;

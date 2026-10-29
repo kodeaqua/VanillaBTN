@@ -488,6 +488,9 @@ void hm_gameplay_draw_tool_charge_gauge(const void *player_ptr, s32 depth, s16 s
     if (ot_idx >= FRAME_OT_DEPTH)
         ot_idx = FRAME_OT_DEPTH - 1;
 
+    if (current_frame->primCursor.bytes + 3 * sizeof(POLY_F4) + 5 * sizeof(LINE_F2) >= current_frame->primBuffer + FRAME_PRIM_SIZE)
+        return;
+
     /* Outer dark border */
     POLY_F4 *border = (POLY_F4 *)current_frame->primCursor.bytes;
     current_frame->primCursor.bytes += sizeof(POLY_F4);
@@ -621,7 +624,7 @@ void hm_gameplay_draw_tile_targeting(const void *player_ptr, s32 depth) {
         z1 = 1220 - (s32)(row + 1) * FIELD_CELL_SIZE;
     }
 
-    s16 ground_y = 0;
+    s16 ground_y = (s16)player->position.vy;
     SVECTOR v0 = { (s16)x0, ground_y, (s16)z0 };
     SVECTOR v1 = { (s16)x1, ground_y, (s16)z0 };
     SVECTOR v2 = { (s16)x0, ground_y, (s16)z1 };
@@ -642,6 +645,9 @@ void hm_gameplay_draw_tile_targeting(const void *player_ptr, s32 depth) {
         ot_idx = 1;
     if (ot_idx >= FRAME_OT_DEPTH)
         ot_idx = FRAME_OT_DEPTH - 1;
+
+    if (current_frame->primCursor.bytes + sizeof(POLY_F4) + 4 * sizeof(LINE_F2) >= current_frame->primBuffer + FRAME_PRIM_SIZE)
+        return;
 
     /* Semi-transparent cyan quad fill */
     POLY_F4 *fill = (POLY_F4 *)current_frame->primCursor.bytes;

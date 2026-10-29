@@ -23,7 +23,7 @@ int main(int argc, char **argv) {
     hm_controls_row_value(&opt, 0, val, sizeof(val));
     CHECK(!strcmp(val, "Enabled"));
     hm_controls_row_value(&opt, 1, val, sizeof(val));
-    CHECK(!strcmp(val, "Arrows + ZX"));
+    CHECK(!strcmp(val, "Arrows ZX"));
     hm_controls_row_value(&opt, 2, val, sizeof(val));
     CHECK(!strcmp(val, "Off"));
 
@@ -35,7 +35,7 @@ int main(int argc, char **argv) {
     CHECK(hm_controls_change(&opt, 1, 1) == 1);
     CHECK(opt.keyboard_layout == HM_KEYBOARD_LAYOUT_WASD);
     hm_controls_row_value(&opt, 1, val, sizeof(val));
-    CHECK(!strcmp(val, "WASD + JK"));
+    CHECK(!strcmp(val, "WASD JK"));
 
     CHECK(hm_controls_change(&opt, 2, 1) == 1);
     CHECK(opt.mouse_mode == HM_MOUSE_MODE_ACTION);
@@ -50,6 +50,13 @@ int main(int argc, char **argv) {
     CHECK(loaded.controller_enabled == 0);
     CHECK(loaded.keyboard_layout == HM_KEYBOARD_LAYOUT_WASD);
     CHECK(loaded.mouse_mode == HM_MOUSE_MODE_ACTION);
+
+    /* Check helper descriptions fit 34-char font box */
+    for (int i = 0; i < 3; ++i) {
+        char desc[128];
+        hm_controls_value(&opt, i, desc, sizeof(desc));
+        CHECK(strlen(desc) <= 34);
+    }
 
     SDL_free(root);
     SDL_Quit();
