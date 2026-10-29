@@ -19,6 +19,7 @@ typedef struct {
 } command;
 typedef struct {
     int x, y, px, py, owner, known;
+    u32 gen;
 } hm_mesh_vertex;
 typedef struct {
     hm_render_frame meta;
@@ -26,7 +27,7 @@ typedef struct {
     hm_gpu_environment env;
     command commands[COMMANDS];
     u32 words[WORDS], count, used;
-    int complete;
+    int complete, has_vram_transfer;
 } frame;
 typedef struct {
     frame frames[2];
@@ -35,6 +36,7 @@ typedef struct {
     int maps[2][HASH];
     int current, capturing, world, ready;
     int parents[COMMANDS], bad_mesh[COMMANDS];
+    u32 vertex_gen;
     hm_mesh_vertex vertices[VERTEX_HASH];
 } interpolation;
 static interpolation *state;
@@ -61,7 +63,7 @@ static void begin(void *opaque, const hm_render_frame *meta) {
     frame *f = &s->frames[s->current];
     f->meta = *meta;
     f->count = f->used = 0;
-    f->complete = 0;
+    f->complete = f->has_vram_transfer = 0;
     s->ready = s->world = 0;
     s->capturing = meta->eligible;
     if (!s->capturing)
@@ -101,6 +103,11 @@ static void packet(void *opaque, const u32 *words, u32 count) {
     c->page = env->draw.tpage;
     c->dx = env->draw.ofs[0] - f->env.draw.ofs[0];
     c->dy = env->draw.ofs[1] - f->env.draw.ofs[1];
+    if (count) {
+        u32 op = words[0] >> 24;
+        if (op == 0x02 || op == 0xA0)
+            f->has_vram_transfer = 1;
+    }
     memcpy(f->words + f->used, words, count * sizeof(*words));
     f->used += count;
 }
@@ -215,7 +222,11 @@ static int hm_mesh_join(interpolation *s, int a, int b) {
     return a;
 }
 static void hm_mesh_cohere(interpolation *s, frame *f, frame *previous) {
-    memset(s->vertices, 0, sizeof(s->vertices));
+    u32 gen = ++s->vertex_gen;
+    if (!gen) {
+        memset(s->vertices, 0, sizeof(s->vertices));
+        gen = ++s->vertex_gen;
+    }
     for (u32 i = 0; i < f->count; ++i) {
         s->parents[i] = (int)i;
         s->bad_mesh[i] = 0;
@@ -235,14 +246,16 @@ static void hm_mesh_cohere(interpolation *s, frame *f, frame *previous) {
             int at = indices[vertex];
             int x = coordinate(words[at]) + c->dx, y = coordinate(words[at] >> 16) + c->dy;
             u32 slot = ((u32)x * 0x9e3779b1u ^ (u32)y * 0x85ebca6bu) & (VERTEX_HASH - 1);
-            while (s->vertices[slot].owner &&
+            while (s->vertices[slot].gen == gen &&
                    (s->vertices[slot].x != x || s->vertices[slot].y != y))
                 slot = (slot + 1) & (VERTEX_HASH - 1);
             hm_mesh_vertex *v = &s->vertices[slot];
-            if (!v->owner) {
+            if (v->gen != gen) {
+                v->gen = gen;
                 v->owner = (int)i + 1;
                 v->x = x;
                 v->y = y;
+                v->known = 0;
             }
             int root = hm_mesh_join(s, (int)i, v->owner - 1);
             if (old) {
@@ -325,9 +338,13 @@ static int hm_interpolation_execute(u64 ns, const hm_render_frame *live,
     u64 start = f->meta.tick * 1000000000ull / 60;
     u64 elapsed = ns > start ? ns - start : 0;
     u32 alpha = elapsed >= 33333334 ? 65536 : (u32)(elapsed * 60 * 65536 / 2000000000ull);
-    s->work = f->before;
+    hm_vram_context *target_vram = &f->before;
+    if (view || f->has_vram_transfer) {
+        s->work = f->before;
+        target_vram = &s->work;
+    }
     s->environment = f->env;
-    hm_vram_context *saved_vram = hm_vram_bind(&s->work);
+    hm_vram_context *saved_vram = hm_vram_bind(target_vram);
     hm_gpu_environment *saved_env = hm_gpu_environment_bind(&s->environment);
     hm_replay_begin(&area);
     for (u32 i = 0; i < f->count; ++i) {

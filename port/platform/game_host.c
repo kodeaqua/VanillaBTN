@@ -200,8 +200,16 @@ static hm_present_rate hm_host_present_rate(void) {
     return (hm_present_rate){60, 1};
 #endif
 }
+#ifdef __ANDROID__
+static u64 hm_android_last_vram_gen;
+static RECT hm_android_last_area;
+static int hm_android_last_enabled;
+#endif
 static void hm_host_reset_presentation(void) {
     hm_scanout_cached_vram_gen = 0;
+#ifdef __ANDROID__
+    hm_android_last_vram_gen = 0;
+#endif
     hm_gpu_present_invalidate();
 #ifdef HMBTN_GPU_RASTER
     hm_gpu_cached_serial = 0;
@@ -325,7 +333,22 @@ static int hm_host_gpu_present(const RECT *native_area) {
     if (!hm_gpu_output || !hm_gpu_commands || native_area->w <= 0 || native_area->h <= 0)
         return 0;
 #ifdef HMBTN_ENH_PAUSE_MENU
-    if (hm_options.renderer || !hm_host_needs_replay()) {
+    int need_gpu = hm_host_needs_replay();
+#ifdef __ANDROID__
+    /* On mobile TBDR GPUs (e.g. Adreno 610), the 1.5 MB ByteAddressBuffer compute
+     * shader has no L2 SSBO cache and is only worthwhile when high-res scaling,
+     * MSAA, PGXP, or xBR is enabled. Native-resolution Widescreen / Interpolation /
+     * Bilinear are 5x lighter on the 300 KB texture upload path. */
+    need_gpu = hm_options.scaling != 0 || hm_options.linear == 2
+#ifdef HM_HOST_AA
+               || hm_options.antialiasing >= HM_AA_MSAA2
+#endif
+#ifdef HMBTN_ENH_PGXP
+               || hm_options.pgxp != 0
+#endif
+        ;
+#endif
+    if (hm_options.renderer || !need_gpu) {
         hm_frame_replay_release(hm_gpu_replay);
         hm_gpu_replay = NULL;
         hm_gpu_cached_serial = 0;
@@ -353,13 +376,15 @@ static int hm_host_gpu_present(const RECT *native_area) {
             return 0;
         hm_host_output_size(&w, &h);
 #ifdef __ANDROID__
-        if (w > 1280 || h > 720) {
+        /* Cap internal scaling on Android to 2x native PS1 resolution (480p),
+         * reducing compute shader pixel invocations by 3x compared to 720p. */
+        if (w > 854 || h > 480) {
             if (hm_host_wide_active()) {
-                w = 1280;
-                h = 720;
+                w = 854;
+                h = 480;
             } else {
-                w = 960;
-                h = 720;
+                w = 640;
+                h = 480;
             }
         }
 #endif
@@ -414,7 +439,7 @@ static int hm_host_gpu_present(const RECT *native_area) {
 #ifdef __ANDROID__
         /* Skip redundant compute shader dispatch and swapchain blit on ticks where
          * the game did not issue a new DrawOTag and interpolation is inactive. */
-        return 1;
+        return 2;
 #endif
     }
     SDL_GPUCommandBuffer *command = SDL_AcquireGPUCommandBuffer(hm_device);
@@ -430,7 +455,7 @@ static int hm_host_gpu_present(const RECT *native_area) {
     if (!swapchain) {
         SDL_CancelGPUCommandBuffer(command);
         hm_gpu_cached_serial = 0;
-        return 1;
+        return -1;
     }
     SDL_GPUTexture *image = hm_gpu_renderer_encode(hm_gpu_output, command, &hm_gpu_cached);
     if (!image) {
@@ -815,7 +840,7 @@ static void hm_host_pause(void) {
 }
 #endif
 
-static void hm_host_present_scanout(u64 tick) {
+static int hm_host_present_scanout(u64 tick) {
     if (hm_trace_camera && tick % 120 == 0) {
         const FarmPlayer *player = &game_state.player;
         const FarmScroll *scroll = &farm_area.mode.scroll;
@@ -862,11 +887,14 @@ static void hm_host_present_scanout(u64 tick) {
     hm_options.gpu_active = 0;
 #endif
 #ifdef HMBTN_GPU_RASTER
-    if (state->display_enabled && hm_host_gpu_present(area)) {
+    if (state->display_enabled) {
+        int gpu_res = hm_host_gpu_present(area);
+        if (gpu_res != 0) {
 #ifdef HMBTN_ENH_PAUSE_MENU
-        hm_options.gpu_active = 1;
+            hm_options.gpu_active = 1;
 #endif
-        return;
+            return gpu_res == 1 ? 1 : 0;
+        }
     }
 #endif
 #if defined(HMBTN_ENH_SCALING) || defined(HMBTN_ENH_INTERPOLATION) ||                              \
@@ -969,7 +997,7 @@ static void hm_host_present_scanout(u64 tick) {
                 area->h);
     }
     if (!area->w || !area->h)
-        return;
+        return 0;
     if (area->w < 0 || area->w > HM_SCAN_WIDTH || area->h < 0 || area->h > HM_SCAN_HEIGHT) {
         SDL_SetError("unsupported display dimensions");
         hm_host_fail();
@@ -1049,13 +1077,17 @@ static void hm_host_present_scanout(u64 tick) {
             }
         } else {
             hm_scanout_cached_vram_gen = 0;
-            for (u32 y = 0; y < output_height; ++y)
+            for (u32 y = 0; y < output_height; ++y) {
+                u32 *out_words = (u32 *)(pixels + y * output_width * 4);
+                int source_y = area->y + (int)y;
+                int row_visible =
+                    source_y >= source_area.y && source_y < source_area.y + source_area.h;
+                const u16 *vram_row = vram_ctx->pixels[(u32)source_y & 511u];
                 for (u32 x = 0; x < output_width; ++x) {
                     u16 color = 0;
-                    int source_x = area->x + (int)x, source_y = area->y + (int)y;
-                    int source_visible = source_x >= source_area.x && source_y >= source_area.y &&
-                                         source_x < source_area.x + source_area.w &&
-                                         source_y < source_area.y + source_area.h;
+                    int source_x = area->x + (int)x;
+                    int source_visible = row_visible && source_x >= source_area.x &&
+                                         source_x < source_area.x + source_area.w;
 #ifdef HMBTN_ENH_SCALING
                     if (scaled.pixels)
                         color = scaled.pixels[(size_t)y * output_width + x];
@@ -1067,7 +1099,7 @@ static void hm_host_present_scanout(u64 tick) {
                     else
 #endif
                         color = state->display_enabled && source_visible
-                                    ? vram_ctx->pixels[(u32)source_y & 511u][(u32)source_x & 1023u]
+                                    ? vram_row[(u32)source_x & 1023u]
                                     : backdrop;
 #ifdef HMBTN_ENH_INTERPOLATION
                     if (interpolated.pixels && source_visible
@@ -1081,15 +1113,12 @@ static void hm_host_present_scanout(u64 tick) {
                         color = interpolated.pixels[((u32)area->y + y) * interpolated.stride +
                                                     (u32)area->x + x];
 #endif
-                    u8 *out = pixels + (y * output_width + x) * 4;
-                    s32 dither_val = (s32)(((x * 13u + y * 7u) ^ (x * y)) & 3u) - 1;
-                    for (u32 channel = 0; channel < 3; ++channel) {
-                        u32 component = (color >> (channel * 5)) & 31;
-                        s32 byte_val = (s32)((component << 3) | (component >> 2)) + dither_val;
-                        out[channel] = (u8)(byte_val < 0 ? 0 : byte_val > 255 ? 255 : byte_val);
-                    }
-                    out[3] = 255;
+                    u32 r = ((color & 31u) << 3) | ((color & 31u) >> 2);
+                    u32 g = (((color >> 5) & 31u) << 3) | (((color >> 5) & 31u) >> 2);
+                    u32 b = (((color >> 10) & 31u) << 3) | (((color >> 10) & 31u) >> 2);
+                    out_words[x] = 0xFF000000u | (r << 0) | (g << 8) | (b << 16);
                 }
+            }
         }
         if (capture) {
             SDL_Surface *surface =
@@ -1120,17 +1149,20 @@ static void hm_host_present_scanout(u64 tick) {
     int submit_linear = 0;
 #endif
     if (need_upload) {
-        if (hm_host_submit(output_width, output_height, submit_linear, submit_wide) &&
-            direct_vram_scanout) {
-            hm_scanout_cached_vram_gen = current_vram_gen;
-            hm_scanout_cached_area = source_area;
-            hm_scanout_cached_enabled = state->display_enabled;
+        if (hm_host_submit(output_width, output_height, submit_linear, submit_wide)) {
+            if (direct_vram_scanout) {
+                hm_scanout_cached_vram_gen = current_vram_gen;
+                hm_scanout_cached_area = source_area;
+                hm_scanout_cached_enabled = state->display_enabled;
+            }
+            return 1;
         }
+        return 0;
     } else {
 #ifdef __ANDROID__
         /* On Android, SurfaceFlinger retains the last presented buffer; skip duplicate
          * swapchain blits on VBlank ticks where the game did not modify VRAM. */
-        return;
+        return 0;
 #else
         SDL_GPUCommandBuffer *command = SDL_AcquireGPUCommandBuffer(hm_device);
         if (!command)
@@ -1144,12 +1176,13 @@ static void hm_host_present_scanout(u64 tick) {
         if (!swapchain) {
             if (!SDL_CancelGPUCommandBuffer(command))
                 hm_host_fail();
-            return;
+            return 0;
         }
         hm_host_blit(command, hm_texture, output_width, output_height, swapchain, win_w, win_h,
                      submit_linear, submit_wide);
         if (!SDL_SubmitGPUCommandBuffer(command))
             hm_host_fail();
+        return 1;
 #endif
     }
 }
@@ -1162,7 +1195,7 @@ static void hm_host_present_scanout(u64 tick) {
 typedef struct {
     Uint64 window_start, last_exit;
     Uint64 game_ns, game_max, present_ns, present_max, wait_ns;
-    u32 ticks, presents, gpu_presents, rebases;
+    u32 ticks, presents, gpu_presents, rebases, log_sec;
 } hm_perf_stats;
 static hm_perf_stats hm_perf;
 static void hm_perf_tick_enter(Uint64 now) {
@@ -1187,27 +1220,58 @@ static void hm_perf_tick_enter(Uint64 now) {
                         hm_perf.game_ns / ticks / 1e6, hm_perf.game_max / 1e6,
                         hm_perf.present_ns / presents / 1e6, hm_perf.present_max / 1e6,
                         100.0 * (double)hm_perf.wait_ns / (double)elapsed);
+    u32 log_sec = hm_perf.log_sec + 1;
+    if (log_sec >= 5) {
+        fprintf(stderr,
+                "perf: ticks=%u presents=%u gpu=%u rebases=%u | game avg=%.2f max=%.2f ms"
+                " | present avg=%.2f max=%.2f ms | wait=%.0f%%\n",
+                hm_perf.ticks, hm_perf.presents, hm_perf.gpu_presents, hm_perf.rebases,
+                hm_perf.game_ns / ticks / 1e6, hm_perf.game_max / 1e6,
+                hm_perf.present_ns / presents / 1e6, hm_perf.present_max / 1e6,
+                100.0 * (double)hm_perf.wait_ns / (double)elapsed);
+        log_sec = 0;
+    }
     Uint64 last_exit = hm_perf.last_exit;
-    hm_perf = (hm_perf_stats){.window_start = now, .last_exit = last_exit};
+    hm_perf =
+        (hm_perf_stats){.window_start = now, .last_exit = last_exit, .log_sec = log_sec};
+}
+static int hm_host_frame_dirty(int interp_active) {
+    if (interp_active)
+        return 1;
+    const hm_gpu_environment *state = hm_gpu_environment_state();
+    const RECT *area = &state->display.disp;
+    return hm_vram_generation() != hm_android_last_vram_gen ||
+           state->display_enabled != hm_android_last_enabled ||
+           area->x != hm_android_last_area.x || area->y != hm_android_last_area.y ||
+           area->w != hm_android_last_area.w || area->h != hm_android_last_area.h;
+}
+static void hm_host_mark_frame_presented(void) {
+    const hm_gpu_environment *state = hm_gpu_environment_state();
+    hm_android_last_vram_gen = hm_vram_generation();
+    hm_android_last_enabled = state->display_enabled;
+    hm_android_last_area = state->display.disp;
 }
 #endif
 
-static void hm_host_present_timed(u64 tick) {
+static int hm_host_present_timed(u64 tick) {
 #ifdef __ANDROID__
     Uint64 begin = SDL_GetTicksNS();
 #endif
-    hm_host_present_scanout(tick);
+    int presented = hm_host_present_scanout(tick);
 #ifdef __ANDROID__
-    Uint64 spent = SDL_GetTicksNS() - begin;
-    hm_perf.present_ns += spent;
-    if (spent > hm_perf.present_max)
-        hm_perf.present_max = spent;
-    ++hm_perf.presents;
+    if (presented) {
+        Uint64 spent = SDL_GetTicksNS() - begin;
+        hm_perf.present_ns += spent;
+        if (spent > hm_perf.present_max)
+            hm_perf.present_max = spent;
+        ++hm_perf.presents;
 #ifdef HMBTN_ENH_PAUSE_MENU
-    if (hm_options.gpu_active)
-        ++hm_perf.gpu_presents;
+        if (hm_options.gpu_active)
+            ++hm_perf.gpu_presents;
 #endif
+    }
 #endif
+    return presented;
 }
 
 static void hm_host_poll_events(void) {
@@ -1301,10 +1365,21 @@ static void hm_host_tick(void *context, u64 tick) {
     interp_active = hm_options.interpolation != 0;
 #endif
     int presented_this_tick = 0;
+#ifdef __ANDROID__
+    if (hm_host_frame_dirty(interp_active) && hm_present_clock_due(&hm_presentation, now)) {
+        if (hm_host_present_timed(tick)) {
+            hm_host_mark_frame_presented();
+            presented_this_tick = 1;
+        } else {
+            hm_presentation.next_ns = now + 1000000;
+        }
+    }
+#else
     if (hm_present_clock_due(&hm_presentation, now)) {
         hm_host_present_timed(tick);
         presented_this_tick = 1;
     }
+#endif
 
     for (;;) {
         hm_host_poll_events();
@@ -1313,16 +1388,39 @@ static void hm_host_tick(void *context, u64 tick) {
         /* Let an overdue simulation tick run before doing more visual work. */
         if (now >= deadline)
             break;
+#ifdef __ANDROID__
+        if ((interp_active || !presented_this_tick) && hm_host_frame_dirty(interp_active) &&
+            hm_present_clock_due(&hm_presentation, now)) {
+            if (hm_host_present_timed(tick)) {
+                hm_host_mark_frame_presented();
+                presented_this_tick = 1;
+            } else {
+                hm_presentation.next_ns = now + 1000000;
+            }
+        }
+#else
         if ((interp_active || !presented_this_tick) &&
             hm_present_clock_due(&hm_presentation, now)) {
             hm_host_present_timed(tick);
             presented_this_tick = 1;
         }
+#endif
         now = SDL_GetTicksNS();
         /* A recoverable display error can exclude modal time from the epoch. */
         deadline = hm_start + tick * SDL_NS_PER_SECOND / 60;
         if (now >= deadline)
             break;
+#ifdef __ANDROID__
+        Uint64 next_present = (!interp_active && (presented_this_tick || !hm_host_frame_dirty(0)))
+                                  ? deadline
+                                  : (hm_presentation.unlimited ? now + 2000000
+                                                               : hm_presentation.next_ns);
+        Uint64 wake = next_present < deadline ? next_present : deadline;
+        if (wake > now) {
+            SDL_DelayNS(wake - now);
+            hm_perf.wait_ns += SDL_GetTicksNS() - now;
+        }
+#else
         Uint64 next_present = (!interp_active && presented_this_tick)
                                   ? deadline
                                   : (hm_presentation.unlimited ? now + 2000000
@@ -1330,10 +1428,8 @@ static void hm_host_tick(void *context, u64 tick) {
         Uint64 wake = next_present < deadline ? next_present : deadline;
         if (wake > now) {
             SDL_DelayPrecise(wake - now);
-#ifdef __ANDROID__
-            hm_perf.wait_ns += SDL_GetTicksNS() - now;
-#endif
         }
+#endif
     }
     u16 held = 0;
     if (hm_controls.keyboard_layout == HM_KEYBOARD_LAYOUT_ARROWS) {
@@ -1492,6 +1588,7 @@ int hm_game_host_start(hm_disc *disc) {
         setvbuf(stderr, NULL, _IONBF, 0);
     }
     SDL_SetHint("SDL_ANDROID_TRAP_BACK_BUTTON", "1");
+    SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_HIGH);
 #endif
     SDL_SetMainReady();
     hm_trace_camera = SDL_getenv("HMBTN_TRACE_CAMERA") != NULL;
@@ -1518,8 +1615,13 @@ int hm_game_host_start(hm_disc *disc) {
     hm_device = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL |
                                         SDL_GPU_SHADERFORMAT_MSL,
                                     false, NULL);
+#ifdef __ANDROID__
+    Uint32 allowed_frames_in_flight = 3;
+#else
+    Uint32 allowed_frames_in_flight = 2;
+#endif
     if (!hm_window || !hm_device || !SDL_ClaimWindowForGPUDevice(hm_device, hm_window) ||
-        !SDL_SetGPUAllowedFramesInFlight(hm_device, 2)) {
+        !SDL_SetGPUAllowedFramesInFlight(hm_device, allowed_frames_in_flight)) {
 #if defined(__ANDROID__)
         __android_log_print(ANDROID_LOG_ERROR, "VanillaBTN",
             "GPU Init failed! window=%p, device=%p, error=%s",

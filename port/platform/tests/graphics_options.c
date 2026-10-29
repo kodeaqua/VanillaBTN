@@ -15,12 +15,12 @@ int main(int argc, char **argv) {
     for(int mode=HM_AA_OFF;mode<HM_AA_COUNT;++mode) {
         options.antialiasing=mode;
         options.width=1280;options.height=720;options.mode=2;
-        options.linear=1;options.vsync=0;options.fps_numerator=-1;
+        options.linear=2;options.vsync=0;options.fps_numerator=-1;
         CHECK(hm_graphics_save(&options));
         hm_graphics_options loaded;
         hm_graphics_load(&loaded);
         CHECK(loaded.antialiasing==mode && loaded.width==1280 && loaded.height==720);
-        CHECK(loaded.mode==2 && loaded.linear==1 && loaded.vsync==0 && loaded.fps_numerator==-1);
+        CHECK(loaded.mode==2 && loaded.linear==2 && loaded.vsync==0 && loaded.fps_numerator==-1);
     }
     char json[2048];
     CHECK(hm_user_data_read_settings(json,sizeof(json))>0 && strstr(json,"\"unrelated\":42"));

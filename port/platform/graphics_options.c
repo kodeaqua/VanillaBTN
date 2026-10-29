@@ -44,7 +44,7 @@ void hm_graphics_load(hm_graphics_options *o) {
         if (candidate.monitor >= 0 && candidate.monitor < 64 && candidate.mode >= 0 &&
             candidate.mode <= 2 && candidate.width >= 320 && candidate.width <= 16384 &&
             candidate.height >= 240 && candidate.height <= 16384 && candidate.linear >= 0 &&
-            candidate.linear <= 1 && candidate.renderer >= 0 && candidate.renderer <= 1 &&
+            candidate.linear <= 2 && candidate.renderer >= 0 && candidate.renderer <= 1 &&
             candidate.vsync >= 0 && candidate.vsync <= 1 && candidate.fps_numerator >= -1 &&
             candidate.fps_denominator > 0 && candidate.fps_denominator <= 1000000 &&
             (candidate.fps_numerator <= 0 ||
@@ -232,7 +232,10 @@ int hm_graphics_swapchain(SDL_GPUDevice *device, SDL_Window *window, const hm_gr
     if (o->vsync && SDL_WindowSupportsGPUPresentMode(device, window, SDL_GPU_PRESENTMODE_MAILBOX))
         mode = SDL_GPU_PRESENTMODE_MAILBOX;
     if (!SDL_WindowSupportsGPUPresentMode(device, window, mode)) {
-        mode = SDL_GPU_PRESENTMODE_VSYNC;
+        if (SDL_WindowSupportsGPUPresentMode(device, window, SDL_GPU_PRESENTMODE_MAILBOX))
+            mode = SDL_GPU_PRESENTMODE_MAILBOX;
+        else
+            mode = SDL_GPU_PRESENTMODE_VSYNC;
     }
     return SDL_SetGPUSwapchainParameters(device, window, SDL_GPU_SWAPCHAINCOMPOSITION_SDR, mode);
 }
@@ -304,6 +307,19 @@ static int hm_rates(const hm_graphics_options *o, hm_present_rate rates[256]) {
             rates[used++] = rate;
     }
     SDL_free(modes);
+    const SDL_DisplayMode *current_mode = SDL_GetCurrentDisplayMode(display);
+    const SDL_DisplayMode *fallbacks[2] = {desktop, current_mode};
+    for (int i = 0; i < 2 && used < 256; ++i) {
+        hm_present_rate rate;
+        if (!fallbacks[i] || !hm_refresh_rate(fallbacks[i], &rate))
+            continue;
+        int duplicate = 0;
+        for (int j = 0; j < used; ++j)
+            if (hm_present_rate_equal(rate, rates[j]))
+                duplicate = 1;
+        if (!duplicate)
+            rates[used++] = rate;
+    }
     for (int i = 3; i < used; ++i) {
         hm_present_rate rate = rates[i];
         int j = i;
