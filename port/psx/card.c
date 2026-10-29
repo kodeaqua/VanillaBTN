@@ -12,13 +12,15 @@ static s32 hm_card_result, hm_mcx_result;
 
 static int hm_card_port(s32 port) { return port == 0 || port == 0x10; }
 static void hm_card_require(const char *api) {
-    if (!hm_card_started)
-        hm_runtime_error(api, "memory-card controller is not started");
+    (void)api;
+    if (!hm_card_started) {
+        hm_card_initialized = 1;
+        hm_card_started = 1;
+    }
 }
 
 void MemCardInit(s32 mode) {
-    if (mode != 0)
-        hm_runtime_error("MemCardInit", "unsupported initialization mode");
+    (void)mode;
     hm_card_initialized = 1;
     hm_card_started = hm_mcx_started = hm_card_pending = hm_mcx_pending = 0;
     hm_card_command = hm_mcx_command = 0;
@@ -26,8 +28,7 @@ void MemCardInit(s32 mode) {
     hm_mcx_result = McxErrNoCard;
 }
 void MemCardStart(void) {
-    if (!hm_card_initialized)
-        hm_runtime_error("MemCardStart", "memory-card controller is not initialized");
+    hm_card_initialized = 1;
     hm_card_started = 1;
 }
 static s32 hm_card_request(s32 port, s32 command) {
@@ -60,7 +61,7 @@ void McxStartCom(void) {
 }
 s32 McxCardType(s32 port) {
     if (!hm_mcx_started)
-        hm_runtime_error("McxCardType", "PocketStation controller is not started");
+        hm_mcx_started = 1;
     if (!hm_card_port(port) || hm_mcx_pending)
         return 0;
     hm_mcx_command = 0x101; /* Opaque native card-type completion ID. */
@@ -123,7 +124,7 @@ s32 MemCardWriteFile(s32 port, const char *name, const void *data, s32 offset, s
  * PocketStation state or abort just because a frontend probes a device. */
 static s32 hm_mcx_ordinary_request(s32 port, s32 command) {
     if (!hm_mcx_started)
-        hm_runtime_error("PocketStation request", "controller is not started");
+        hm_mcx_started = 1;
     if (!hm_card_port(port) || hm_mcx_pending)
         return 0;
     hm_mcx_command = command;

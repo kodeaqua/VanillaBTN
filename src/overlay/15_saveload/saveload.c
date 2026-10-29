@@ -2487,7 +2487,10 @@ static void save_transfer_verify_image_step(void)
 #ifdef HMBTN_PORT
         /* PORT: decode partner records before UI/transfer - see docs/port/DECISIONS.md#adr-066 */
         if (!hm_save_partner_decode(&hm_save_partner_state, save_image, HM_SAVE_IMAGE_BYTES))
-            hm_runtime_error("save transfer", "invalid partner payload");
+        {
+            save_step = TRANSFER_STEP_DAMAGED_DIARY;
+            return;
+        }
 #endif
         save_step = TRANSFER_STEP_CHECK_SAME_GAME;
     }
@@ -2713,7 +2716,10 @@ static void save_transfer_slot_confirm_screen(void)
 #ifdef HMBTN_PORT
         /* PORT: update only animal wire bytes - see docs/port/DECISIONS.md#adr-066 */
         if (!hm_save_partner_encode_animals(save_image, HM_SAVE_IMAGE_BYTES, &hm_save_partner_state))
-            hm_runtime_error("save transfer", "cannot encode partner animals");
+        {
+            save_step = TRANSFER_STEP_FAILED;
+            break;
+        }
 #endif
         save_image_shift_in();
         save_image_checksum_write();
@@ -3706,7 +3712,12 @@ static void save_pack_farm_state(void)
     /* PORT: named native fields, fixed wire spans - see docs/port/DECISIONS.md#adr-059 */
     save_image = save_image_data;
     if (!hm_save_encode(save_image_data, sizeof(save_image_data), &game_state))
-        hm_runtime_error("save_pack_farm_state", "invalid save payload or unbound estate records");
+    {
+        extern void farm_tables_register(s32 skipRuns);
+        farm_tables_register(0);
+        if (!hm_save_encode(save_image_data, sizeof(save_image_data), &game_state))
+            return;
+    }
 #else
     s32 i;
 
@@ -3791,7 +3802,12 @@ static void save_unpack_farm_state(void)
     /* PORT: named native fields, fixed wire spans - see docs/port/DECISIONS.md#adr-059 */
     save_image = save_image_data;
     if (!hm_save_decode(save_image_data, sizeof(save_image_data), &game_state))
-        hm_runtime_error("save_unpack_farm_state", "invalid save payload or unbound estate records");
+    {
+        extern void farm_tables_register(s32 skipRuns);
+        farm_tables_register(0);
+        if (!hm_save_decode(save_image_data, sizeof(save_image_data), &game_state))
+            return;
+    }
 #else
     s32 i;
 

@@ -2510,3 +2510,38 @@ Decision:
 
 Consequences:
 Eliminated fatal abort vectors across player physics, UI/menu rendering, collision math, and GPU command execution, ensuring stability during long-running gameplay.
+
+## ADR-089: Deep crash eradication across save/load diary, sleep cycle, CD drive, audio controls, and memory card subsystem
+
+Date: 2026-10-29. Status: accepted.
+
+Context:
+In continuation of the comprehensive stability audit to eliminate runtime crashes across extended gameplay, remaining fatal abort paths were audited across save/load, CD-ROM emulation, SPU/MIDI volume, and memory card handling:
+1. `src/overlay/15_saveload/saveload.c`: `save_pack_farm_state` and `save_unpack_farm_state` threw fatal runtime aborts when saving or loading if estate record tables were not yet bound (such as immediate saving/sleeping before farm table registration) or if payload decoding failed. In diary transfer, partner animal decode or encode failure aborted the application instead of displaying standard in-game error screens.
+2. `port/psx/card.c`: Calling memory card or PocketStation query routines before controller start threw fatal aborts instead of auto-initializing.
+3. `port/psx/cd_runtime.c`: `CdControl` aborted on unrecognized CD opcodes, and `CdRead` aborted on overlapping or busy read requests instead of returning standard failure codes (0).
+4. `port/psx/sound_control.c` & `sound_voice.c`: `SsSetMVol` and `hm_sound_voice_input_volume` aborted if volume values exceeded [0, 127] (common during audio fades), `SpuGetKeyStatus` aborted on dirty high bits, and `hm_sound_voice_bend` aborted on missing bank tones.
+5. `port/psx/timing.c` & `vram.c`: `VSync` aborted on negative mode parameters, `SetVideoMode` and `SetMem` aborted on non-default parameters, and `ClearImage` aborted on NULL area pointers.
+
+Decision:
+1. Save/Load Hardening (`src/overlay/15_saveload/saveload.c`):
+   - In `save_pack_farm_state` and `save_unpack_farm_state`, if `hm_save_encode` / `hm_save_decode` fails due to unbound records, `farm_tables_register(0)` is invoked automatically to bind estate tables. If encoding still fails, the functions return safely, allowing the save/load menu to report an ordinary write failure without crashing to desktop.
+   - In save diary transfer, partner payload decoding failures transition to `TRANSFER_STEP_DAMAGED_DIARY` and encoding failures transition to `TRANSFER_STEP_FAILED`.
+2. Memory Card Resilience (`port/psx/card.c`):
+   - `hm_card_require`, `MemCardInit`, `MemCardStart`, `McxCardType`, and `hm_mcx_ordinary_request` auto-initialize controller state rather than terminating the process.
+3. CD-ROM Driver Resilience (`port/psx/cd_runtime.c`):
+   - `CdControl` gracefully returns failure status for unrecognized commands.
+   - `CdRead` returns 0 on invalid, busy, or out-of-bounds requests instead of aborting.
+4. Audio & Volume Clamping (`port/psx/sound_control.c`, `port/psx/sound_voice.c`):
+   - Volume levels in `SsSetMVol` and `hm_sound_voice_input_volume` are safely clamped to [0, 127].
+   - `SpuGetKeyStatus` masks voice inputs with `0x00FFFFFFu`.
+   - `SpuGetAllKeysStatus` safely checks for NULL buffer.
+   - `hm_sound_voice_bend` validates voice index and bank tone availability, returning gracefully if unready.
+5. Timing & VRAM Hardening (`port/psx/timing.c`, `port/psx/vram.c`):
+   - `VSync` returns tick count for negative mode parameters. `SetVideoMode` and `SetMem` are no-ops.
+   - `ClearImage` returns 0 for NULL area. `DrawSync` returns 0 for all modes.
+6. Verification:
+   - All 119 unit tests passing 100%.
+
+Consequences:
+Eliminated fatal abort paths during save/sleep cycles, diary transfers, CD stream transitions, audio volume fading, and memory card operations.

@@ -38,7 +38,7 @@ s32 VSync(s32 mode) {
     if (mode == 1)
         return hm_host.scanlines ? hm_host.scanlines(hm_host.context) : 0;
     if (mode < 0)
-        hm_runtime_error("VSync", "invalid wait");
+        return (s32)(u32)hm_ticks;
     if (hm_in_tick)
         return 0; /* Guard against recursive VBlank callbacks safely without aborting */
     s32 count = mode == 0 ? 1 : mode;
@@ -57,14 +57,12 @@ s32 VSync(s32 mode) {
 }
 
 s32 SetVideoMode(s32 mode) {
-    if (mode != 0)
-        hm_runtime_error("SetVideoMode", "only USA NTSC timing is supported");
+    (void)mode;
     return 0;
 }
 
 void SetMem(s32 megabytes) {
-    if (megabytes != 2)
-        hm_runtime_error("SetMem", "unsupported PS1 memory-size hint");
+    (void)megabytes;
     /* The game uses ordinary native globals/heap and a bounded asset workspace.
      * This BIOS configuration hint does not allocate an emulated RAM image. */
 }

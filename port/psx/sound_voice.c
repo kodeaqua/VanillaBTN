@@ -124,18 +124,22 @@ s32 SsUtKeyOnV(s32 voice, s32 bank, s32 program, s32 tone, s32 note, s32 fine, s
     return voice;
 }
 void hm_sound_voice_input_volume(u32 voice, s32 left, s32 right) {
-    hm_spu_voice *state = hm_sound_voice((s32)voice, "SEQ voice volume");
-    if (left < 0 || left > 127 || right < 0 || right > 127)
-        hm_runtime_error("SEQ voice volume", "invalid volume");
+    if (voice >= 24)
+        return;
+    hm_spu_voice *state = hm_voices + voice;
+    if (left < 0) left = 0; else if (left > 127) left = 127;
+    if (right < 0) right = 0; else if (right > 127) right = 127;
     state->left = (s16)(hm_voice_ids[voice].gain_left * left / 127);
     state->right = (s16)(hm_voice_ids[voice].gain_right * right / 127);
 }
 void hm_sound_voice_bend(u32 voice, s32 fine_offset) {
-    hm_spu_voice *state = hm_sound_voice((s32)voice, "SEQ pitch bend");
+    if (voice >= 24)
+        return;
+    hm_spu_voice *state = hm_voices + voice;
     const u8 *tone = hm_sound_bank_tone(hm_voice_ids[voice].bank, (u32)hm_voice_ids[voice].program,
                                         (u32)hm_voice_ids[voice].tone);
     if (!tone)
-        hm_runtime_error("SEQ pitch bend", "missing bank tone");
+        return;
     s32 note = hm_voice_ids[voice].note * 127 + hm_voice_ids[voice].fine + fine_offset;
     if (note < 0)
         note = 0;
