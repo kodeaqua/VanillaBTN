@@ -31,7 +31,7 @@ android {
                           "-DHMBTN_ENH_DITHERING=ON",
                           "-DANDROID_STL=c++_static"
                 abiFilters "arm64-v8a"
-                cFlags "-march=armv8-a -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -Wno-fortify-source"
+                cFlags "-march=armv8-a -O3 -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -Wno-fortify-source"
             }
         }
         ndk {
@@ -42,6 +42,7 @@ android {
     buildTypes {
         release {
             minifyEnabled false
+            signingConfig signingConfigs.debug
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {

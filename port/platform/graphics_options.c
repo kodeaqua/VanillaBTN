@@ -17,9 +17,6 @@ static void hm_validate_rate(hm_graphics_options *options);
 
 void hm_graphics_defaults(hm_graphics_options *o) {
     *o = (hm_graphics_options){.width = 640, .height = 480, .vsync = 1, .fps_denominator = 1, .pgxp = 0, .dither = 1};
-#ifdef __ANDROID__
-    o->renderer = 1;
-#endif
     o->aa_capabilities =
 #ifdef HMBTN_ENH_ANTIALIASING
         (1u << HM_AA_COUNT) - 1;

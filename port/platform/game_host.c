@@ -171,12 +171,24 @@ static void hm_host_scaling_unavailable(void) {
     hm_audio_output_pause(0);
 }
 #ifdef HMBTN_ENH_PAUSE_MENU
+static int hm_host_wide_active(void);
 static void hm_host_output_size(int *w, int *h);
 static int hm_host_scaling_prepare(void) {
     int w, h;
     if (!SDL_GetWindowSizeInPixels(hm_window, &w, &h) || w <= 0 || h <= 0)
         return 0;
     hm_host_output_size(&w, &h);
+#ifdef __ANDROID__
+    if (w > 854 || h > 480) {
+        if (hm_host_wide_active()) {
+            w = 854;
+            h = 480;
+        } else {
+            w = 640;
+            h = 480;
+        }
+    }
+#endif
 #ifdef HMBTN_ENH_FILTERING
     hm_scaling_filter(hm_options.linear);
 #endif
@@ -286,7 +298,7 @@ static int hm_host_submit(u32 image_width, u32 image_height, int linear, int wid
     return 1;
 }
 
-#if defined(HMBTN_GPU_RASTER) && !defined(__ANDROID__)
+#ifdef HMBTN_GPU_RASTER
 static int hm_host_gpu_present(const RECT *native_area) {
     if (!hm_gpu_output || !hm_gpu_commands || native_area->w <= 0 || native_area->h <= 0)
         return 0;
@@ -318,6 +330,17 @@ static int hm_host_gpu_present(const RECT *native_area) {
         if (!SDL_GetWindowSizeInPixels(hm_window, &w, &h) || w <= 0 || h <= 0)
             return 0;
         hm_host_output_size(&w, &h);
+#ifdef __ANDROID__
+        if (w > 1280 || h > 720) {
+            if (hm_host_wide_active()) {
+                w = 1280;
+                h = 720;
+            } else {
+                w = 960;
+                h = 720;
+            }
+        }
+#endif
         if (w > 4096 || h > 4096) {
             hm_host_scaling_unavailable();
             return 0;
@@ -808,7 +831,7 @@ static void hm_host_present_scanout(u64 tick) {
 #ifdef HMBTN_ENH_PAUSE_MENU
     hm_options.gpu_active = 0;
 #endif
-#if defined(HMBTN_GPU_RASTER) && !defined(__ANDROID__)
+#ifdef HMBTN_GPU_RASTER
     if (state->display_enabled && hm_host_gpu_present(area)) {
 #ifdef HMBTN_ENH_PAUSE_MENU
         hm_options.gpu_active = 1;
@@ -958,6 +981,37 @@ static void hm_host_present_scanout(u64 tick) {
     if (!pixels)
         hm_host_fail();
     u16 backdrop = state->display_enabled ? hm_gpu_background(&state->draw) : 0;
+#ifdef HMBTN_ENH_SCALING
+    const u16 *scaled_pixels = scaled.pixels;
+#else
+    const u16 *scaled_pixels = NULL;
+#endif
+#if defined(HMBTN_ENH_FILTERING) || defined(HMBTN_ENH_WIDESCREEN)
+    const u16 *filter_pixels = native_filtered.pixels;
+#else
+    const u16 *filter_pixels = NULL;
+#endif
+#ifdef HMBTN_ENH_INTERPOLATION
+    const u16 *interp_pixels = interpolated.pixels;
+#else
+    const u16 *interp_pixels = NULL;
+#endif
+    if (!scaled_pixels && !filter_pixels && !interp_pixels && state->display_enabled &&
+        output_width == (u32)source_area.w && output_height == (u32)source_area.h) {
+        /* High-speed direct 32-bit VRAM blit path for vanilla / 1:1 scanout */
+        for (u32 y = 0; y < output_height; ++y) {
+            u32 *out_words = (u32 *)(pixels + y * output_width * 4);
+            u32 sx = (u32)source_area.x;
+            u32 sy = (u32)(source_area.y + (int)y);
+            for (u32 x = 0; x < output_width; ++x) {
+                u16 color = hm_vram_pixel(sx + x, sy);
+                u32 r = ((color >> 0) & 31) * 255 / 31;
+                u32 g = ((color >> 5) & 31) * 255 / 31;
+                u32 b = ((color >> 10) & 31) * 255 / 31;
+                out_words[x] = 0xFF000000 | (r << 0) | (g << 8) | (b << 16);
+            }
+        }
+    } else {
     for (u32 y = 0; y < output_height; ++y)
         for (u32 x = 0; x < output_width; ++x) {
             u16 color = 0;
@@ -999,6 +1053,7 @@ static void hm_host_present_scanout(u64 tick) {
             }
             out[3] = 255;
         }
+    }
     const char *capture = SDL_getenv("HMBTN_CAPTURE_FRAME");
     if (capture) {
         SDL_Surface *surface =
@@ -1368,11 +1423,6 @@ int hm_game_host_start(hm_disc *disc) {
     hm_dither_set_enabled(0); /* Auto-applied: clean 32-bit smooth colors without dither noise */
 #endif
 #ifdef HMBTN_GPU_RASTER
-#ifdef __ANDROID__
-    hm_gpu_output = NULL;
-    hm_gpu_commands = NULL;
-    hm_gpu_replay = NULL;
-#else
     hm_gpu_output = hm_gpu_renderer_create(hm_device);
     if (hm_gpu_output) {
         hm_gpu_commands = hm_gpu_scene_create();
@@ -1387,6 +1437,9 @@ int hm_game_host_start(hm_disc *disc) {
         hm_gpu_output = NULL;
         fprintf(stderr, "GPU scene renderer unavailable; using software rendering\n");
     }
+#ifdef __ANDROID__
+    __android_log_print(ANDROID_LOG_INFO, "VanillaBTN",
+        "GPU scene renderer: %s", hm_gpu_output ? "ACTIVE (GPU Auto)" : "FALLBACK (Software)");
 #endif
 #endif
 #ifdef HM_HOST_AA
