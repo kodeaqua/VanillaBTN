@@ -4,8 +4,8 @@
 > *Preserving the true essence and childhood nostalgia of Mineral Town on modern hardware.*
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](#building-from-source-windows)
-[![Platform](https://img.shields.io/badge/platform-Windows%20x86--64-blue)](#quick-start-guide)
-[![Tests](https://img.shields.io/badge/tests-121%2F121%20passing%20(100%25)-success)](#building-from-source-windows)
+[![Platform](https://img.shields.io/badge/platform-Windows%20x86--64%20%7C%20Android%20arm64--v8a-blue)](#quick-start-guide)
+[![Tests](https://img.shields.io/badge/tests-122%2F122%20passing%20(100%25)-success)](#building-from-source-windows)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 ---
@@ -102,7 +102,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File port/packaging/windows/b
 This automated script will:
 1. Provision local LLVM-MinGW (Clang), Ninja, and CMake toolchains without system pollution.
 2. Compile the cow application icon, Windows GUI subsystem, and all runtime modules.
-3. Run the automated test suite (121 unit tests, 100% passing).
+3. Run the automated test suite (122 unit tests, 100% passing).
 4. Output the standalone `VanillaBTN.exe` binary to `build/port/windows-release/bin/`.
 5. Package the release archive and README to `dist/VanillaBTN-windows-x64-v0.9.0.zip`.
 

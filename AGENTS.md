@@ -56,7 +56,7 @@ override this one for their subtree.
   native/CPU fallback aspect stable. Gameplay coverage remains owner-tested.
   Report CPU raster performance and untested gameplay/device behavior plainly.
 
-### Current state and agent workflow (as of 2026-10-28)
+### Current state and agent workflow (as of 2026-10-30)
 
 - Active branch workflow: Always work on `fix` branched from `main`. Commit changes,
   push to `origin/fix`, open PR to `main` via `gh pr create`, squash-merge via `gh pr merge --squash`,
@@ -78,7 +78,10 @@ override this one for their subtree.
      smart animal bell, 10-heart stamina HUD in top-left (visible during NPC dialogues, hides
      during fullscreen menus/storage), calendar NPC birthday/milestone dialogue info on X press,
      and roaming horse.
-  4. Unit test suite: 121 tests passing 100%.
+  4. Unit test suite: 122 tests passing 100%.
+  5. Fast Text dialogue instant delivery and robust page break confirm advance (ADR-106/109).
+  6. Rucksack reorganize screen strict category protection preventing tool/item cross-swapping (ADR-107).
+  7. Android arm64-v8a native support with 720p scaling limit.
 
 These explicit owner decisions override conflicting roadmap, CI skeleton,
 workflow, and definition-of-done requirements below.
