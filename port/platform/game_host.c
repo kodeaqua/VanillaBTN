@@ -182,6 +182,18 @@ static int hm_host_scaling_prepare(void) {
     if (!SDL_GetWindowSizeInPixels(hm_window, &w, &h) || w <= 0 || h <= 0)
         return 0;
     hm_host_output_size(&w, &h);
+#ifdef __ANDROID__
+    /* Cap scaling buffer on Android to 720p (ADR-105). */
+    if (w > 1280 || h > 720) {
+        if (hm_host_wide_active()) {
+            w = 1280;
+            h = 720;
+        } else {
+            w = 960;
+            h = 720;
+        }
+    }
+#endif
 #ifdef HMBTN_ENH_FILTERING
     hm_scaling_filter(hm_options.linear);
 #endif
@@ -377,15 +389,15 @@ static int hm_host_gpu_present(const RECT *native_area) {
             return 0;
         hm_host_output_size(&w, &h);
 #ifdef __ANDROID__
-        /* Cap internal scaling on Android to 2x native PS1 resolution (480p),
-         * reducing compute shader pixel invocations by 3x compared to 720p. */
-        if (w > 854 || h > 480) {
+        /* Cap internal scaling on Android to 720p (ADR-105),
+         * preventing 1080p thermal throttling while providing crisp HD scaling. */
+        if (w > 1280 || h > 720) {
             if (hm_host_wide_active()) {
-                w = 854;
-                h = 480;
+                w = 1280;
+                h = 720;
             } else {
-                w = 640;
-                h = 480;
+                w = 960;
+                h = 720;
             }
         }
 #endif

@@ -127,10 +127,10 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
             }
         } catch(Exception ignored) {}
 
-        if (nDeviceHeight > 540 && width == nDeviceWidth && height == nDeviceHeight) {
+        if (nDeviceHeight > 720 && width == nDeviceWidth && height == nDeviceHeight) {
             float aspect = (float) nDeviceWidth / (float) nDeviceHeight;
-            int targetH = 540;
-            int targetW = Math.round(540.0f * aspect);
+            int targetH = 720;
+            int targetW = Math.round(720.0f * aspect);
             if ((targetW & 1) != 0) targetW++;
             if (width != targetW || height != targetH) {
                 holder.setFixedSize(targetW, targetH);
