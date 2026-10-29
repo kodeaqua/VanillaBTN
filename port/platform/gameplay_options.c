@@ -150,40 +150,40 @@ void hm_gameplay_value(const hm_gameplay_options *options, int item, char *text,
         return;
     switch (item) {
     case 0:
-        snprintf(text, capacity, "Walk freely through crops and wild weeds");
+        snprintf(text, capacity, "Walk freely through farm crops");
         break;
     case 1:
-        snprintf(text, capacity, "Stack identical items in rucksack up to 99");
+        snprintf(text, capacity, "Stack items in rucksack up to 99");
         break;
     case 2:
-        snprintf(text, capacity, "Prevent farm lumber fences from rotting");
+        snprintf(text, capacity, "Prevent farm lumber from rotting");
         break;
     case 3:
-        snprintf(text, capacity, "Draw connecting rails between adjacent fences");
+        snprintf(text, capacity, "Connect adjacent wooden fences");
         break;
     case 4:
-        snprintf(text, capacity, "Allow wild stray dog farm attacks at night");
+        snprintf(text, capacity, "Allow wild dog attacks at night");
         break;
     case 5:
-        snprintf(text, capacity, "Ringing bell guides animals in/out of barn and coop");
+        snprintf(text, capacity, "Bell guides animals in and out");
         break;
     case 6:
-        snprintf(text, capacity, "Show stamina bar on HUD with Pete head and hearts");
+        snprintf(text, capacity, "Show stamina and hearts on HUD");
         break;
     case 7:
-        snprintf(text, capacity, "Show birthdays and livestock milestones on calendar");
+        snprintf(text, capacity, "Show birthdays on calendar");
         break;
     case 8:
-        snprintf(text, capacity, "Allow riding horse outside the farm estate");
+        snprintf(text, capacity, "Allow riding horse outside farm");
         break;
     case 9:
-        snprintf(text, capacity, "Display dialogue text instantly without typing delay");
+        snprintf(text, capacity, "Display dialogue text instantly");
         break;
     case 10:
-        snprintf(text, capacity, "Show visual charge meter above Pete while charging tools");
+        snprintf(text, capacity, "Show tool charge bar above Pete");
         break;
     case 11:
-        snprintf(text, capacity, "Highlight targeted farm tile grid with isometric projection");
+        snprintf(text, capacity, "Highlight targeted field tile grid");
         break;
     default:
         text[0] = 0;
