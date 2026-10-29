@@ -192,8 +192,15 @@ void hm_sound_mix(s16 *stereo, u32 frames) {
         s16 cd[2];
         hm_cd_audio_sample(cd);
         if (control->common.cd.mix) {
-            left += cd[0] * control->serial_left / 127;
-            right += cd[1] * control->serial_right / 127;
+            int bgm_vol = control->bgm_volume;
+            s32 cd_l = cd[0] * control->serial_left / 127;
+            s32 cd_r = cd[1] * control->serial_right / 127;
+            if (bgm_vol < 100) {
+                cd_l = (cd_l * bgm_vol) / 100;
+                cd_r = (cd_r * bgm_vol) / 100;
+            }
+            left += cd_l;
+            right += cd_r;
         }
         if (control->mono)
             left = right = (left + right) / 2;

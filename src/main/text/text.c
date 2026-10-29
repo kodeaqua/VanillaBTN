@@ -241,6 +241,15 @@ static u16 text_speed_intervals[] = {0, 3, 5, 0};
 /* Set the glyph interval from text_speed_intervals; an index past the table uses entry 1. */
 void text_set_speed(s32 index)
 {
+#ifdef HMBTN_PORT
+    /* PORT: Instant dialogue text - see docs/port/DECISIONS.md#adr-094 */
+    extern int hm_gameplay_fast_text(void);
+    if (hm_gameplay_fast_text())
+    {
+        text_glyph_interval = 0;
+        return;
+    }
+#endif
     if (index >= 3U)
     {
         index = 1;
@@ -695,10 +704,18 @@ static TextWindowResult text_window_frame(u_long *ot, u16 *text, s16 x, s16 y, s
     {
     case TEXT_STATE_PRINTING:
         result = TEXT_WINDOW_PRINTING;
+#ifdef HMBTN_PORT
+        /* PORT: Instant dialogue text - see docs/port/DECISIONS.md#adr-094 */
+        if (hm_gameplay_fast_text() || (held & (PAD_CIRCLE | PAD_CROSS)))
+        {
+            text_set_speed(0);
+        }
+#else
         if (held & (PAD_CIRCLE | PAD_CROSS))
         {
             text_set_speed(0);
         }
+#endif
         break;
     case TEXT_STATE_SCROLLING:
         if (text_scrolling == 0)
@@ -714,10 +731,18 @@ static TextWindowResult text_window_frame(u_long *ot, u16 *text, s16 x, s16 y, s
         else
         {
             result = TEXT_WINDOW_SCROLLING;
+#ifdef HMBTN_PORT
+            /* PORT: Faster text scroll - see docs/port/DECISIONS.md#adr-094 */
+            if (hm_gameplay_fast_text() || (held & (PAD_CIRCLE | PAD_CROSS)))
+            {
+                step = 2;
+            }
+#else
             if (held & (PAD_CIRCLE | PAD_CROSS))
             {
                 step = 2;
             }
+#endif
         }
         break;
     case TEXT_STATE_END:

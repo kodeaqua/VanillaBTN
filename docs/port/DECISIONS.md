@@ -2632,3 +2632,46 @@ Decision:
 
 Consequences:
 Completely eliminated unintended Circle button presses in Save/Load screens, title screen, dialogues, and menus.
+
+## ADR-094: Instant dialogue text option without typing delay
+
+Date: 2026-10-29. Status: accepted.
+
+Context:
+In original Harvest Moon: Back to Nature, dialogue with villagers and story cutscenes display text character-by-character with multi-tick glyph intervals. While atmospheric, modern players and repeat playthroughs frequently desire faster narrative pacing without continuously mashing or holding buttons.
+
+Decision:
+1. Gameplay Setting (`port/enhance/gameplay/`, `port/platform/gameplay_options.c`):
+   - Added `fast_text` setting (default OFF, `0` for vanilla parity) toggleable via Pause Menu -> Gameplay -> Fast Text.
+   - Saved and loaded persistently in `settings.json` under `enhance.fast_text`.
+2. Engine Text System Integration (`src/main/text/text.c`):
+   - Guarded with narrow `#ifdef HMBTN_PORT`.
+   - When `hm_gameplay_fast_text()` is active, `text_set_speed` sets `text_glyph_interval = 0` (instant display) and `text_window_frame` accelerates page scrolling while preserving user confirmation on page breaks.
+3. Verification:
+   - 120/120 unit tests passing 100%.
+
+Consequences:
+Dialogue text renders instantly on screen when enabled, streamlining daily village conversations and shop visits.
+
+## ADR-095: Dedicated BGM and SFX volume sliders and pause menu audio settings
+
+Date: 2026-10-29. Status: accepted.
+
+Context:
+PS1 hardware and PSY-Q libsnd only expose unified master volume (`SsSetMVol`), preventing players from balancing background music independently against environmental sound effects (tools, animals, water, footsteps) or adjusting sound levels to personal preference on modern speakers and headsets.
+
+Decision:
+1. Audio Options & Persistence (`port/platform/audio_options.h`, `audio_options.c`):
+   - Added independent controls: `bgm_volume` (0..100%, default 100%), `sfx_volume` (0..100%, default 100%), and `hq_resampler` (0 = PS1 Gaussian, 1 = Studio Catmull-Rom, default 1).
+   - Persisted under `"audio"` block in `settings.json`.
+2. SPU Voice Stream Isolation (`port/psx/sequence.h`, `sequence.c`, `spu_voice.c`, `sound_voice.c`):
+   - Tracked voice sequence ownership in `hm_seq_owners`. Voices associated with active sequences scale by `bgm_volume`, while standalone sound effect voices scale by `sfx_volume`.
+   - CD audio playback scales with `bgm_volume`.
+   - Muted voices (0% volume) continue deterministic ADSR and phase tracking to maintain sound engine synchronization.
+3. Pause Menu Integration (`port/enhance/pause_menu/menu.h`, `menu.c`, `port/platform/game_host.c`):
+   - Added 4th settings sub-menu: **Audio** (BGM Volume, SFX Volume, Resampling).
+4. Verification:
+   - Unit tests (`platform.audio_options`, `platform.pause_menu_navigation`) passing 100% across all 120 tests.
+
+Consequences:
+Players have independent, fine-grained control over music and sound effects volume directly from the in-game pause menu.

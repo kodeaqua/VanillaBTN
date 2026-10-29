@@ -19,7 +19,8 @@ int main(void) {
     CHECK(hm_pause_handle(&menu, HM_PAUSE_CONFIRM) == HM_PAUSE_EXIT);
     hm_pause_handle(&menu, HM_PAUSE_UP);
     CHECK(hm_pause_handle(&menu, HM_PAUSE_CONFIRM) == HM_PAUSE_NONE);
-    CHECK(menu.page == HM_PAUSE_SETTINGS && hm_pause_count(&menu) == 3);
+    CHECK(menu.page == HM_PAUSE_SETTINGS && hm_pause_count(&menu) == 4);
+    CHECK(!strcmp(hm_pause_label(&menu, 3), "Audio"));
     CHECK(!strcmp(hm_pause_label(&menu, 0), "Graphics"));
     CHECK(!strcmp(hm_pause_label(&menu, 1), "Gameplay"));
     CHECK(!strcmp(hm_pause_label(&menu, 2), "Controls"));
@@ -58,6 +59,7 @@ int main(void) {
     CHECK(!strcmp(hm_pause_label(&menu, 6), "Stamina HUD"));
     CHECK(!strcmp(hm_pause_label(&menu, 7), "Calendar Events"));
     CHECK(!strcmp(hm_pause_label(&menu, 8), "Roaming Horse"));
+    CHECK(!strcmp(hm_pause_label(&menu, 9), "Fast Text"));
     for (int i = 0; i < HM_PAUSE_GAMEPLAY_ITEMS; ++i) {
         CHECK(menu.selected == i);
         CHECK(hm_pause_handle(&menu, HM_PAUSE_RIGHT) == HM_PAUSE_CHANGE_GAMEPLAY);
@@ -84,6 +86,23 @@ int main(void) {
     }
     hm_pause_handle(&menu, HM_PAUSE_BACK);
     CHECK(menu.page == HM_PAUSE_SETTINGS && menu.selected == 2);
+    /* Test audio settings menu */
+    hm_pause_handle(&menu, HM_PAUSE_DOWN);
+    CHECK(menu.selected == 3);
+    hm_pause_handle(&menu, HM_PAUSE_CONFIRM);
+    CHECK(menu.page == HM_PAUSE_AUDIO && hm_pause_count(&menu) == HM_PAUSE_AUDIO_ITEMS);
+    CHECK(!strcmp(hm_pause_label(&menu, 0), "BGM Volume"));
+    CHECK(!strcmp(hm_pause_label(&menu, 1), "SFX Volume"));
+    CHECK(!strcmp(hm_pause_label(&menu, 2), "Resampling"));
+    for (int i = 0; i < HM_PAUSE_AUDIO_ITEMS; ++i) {
+        CHECK(menu.selected == i);
+        CHECK(hm_pause_handle(&menu, HM_PAUSE_RIGHT) == HM_PAUSE_CHANGE_AUDIO);
+        CHECK(hm_pause_handle(&menu, HM_PAUSE_LEFT) == HM_PAUSE_CHANGE_AUDIO);
+        CHECK(hm_pause_handle(&menu, HM_PAUSE_CONFIRM) == HM_PAUSE_CHANGE_AUDIO);
+        hm_pause_handle(&menu, HM_PAUSE_DOWN);
+    }
+    hm_pause_handle(&menu, HM_PAUSE_BACK);
+    CHECK(menu.page == HM_PAUSE_SETTINGS && menu.selected == 3);
 
     hm_pause_handle(&menu, HM_PAUSE_BACK);
     CHECK(menu.page == HM_PAUSE_ROOT && menu.selected == 1);

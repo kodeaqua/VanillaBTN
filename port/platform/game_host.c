@@ -39,6 +39,7 @@
 #endif
 #endif
 #include "platform/controls_options.h"
+#include "platform/audio_options.h"
 #ifdef HMBTN_ENH_GAMEPLAY
 #include "platform/gameplay_options.h"
 #endif
@@ -67,6 +68,7 @@ static hm_input_replay hm_replay;
 static int hm_replay_enabled;
 static u64 hm_host_tick_limit;
 static hm_controls_options hm_controls;
+static hm_audio_options hm_audio;
 static SDL_Gamepad *hm_active_gamepad = NULL;
 static int hm_mouse_wheel_up = 0;
 static int hm_mouse_wheel_down = 0;
@@ -573,6 +575,12 @@ static void hm_host_pause(void) {
                     notice = hm_controls_save(&hm_controls) ? "" : "Cannot save settings";
                 }
             }
+            if (action == HM_PAUSE_CHANGE_AUDIO) {
+                if (hm_audio_change(&hm_audio, menu.selected,
+                                    input == HM_PAUSE_LEFT ? -1 : 1)) {
+                    notice = hm_audio_save(&hm_audio) ? "" : "Cannot save settings";
+                }
+            }
         }
         if (!running)
             break;
@@ -602,6 +610,11 @@ static void hm_host_pause(void) {
                 if (menu.page == HM_PAUSE_CONTROLS)
                     for (int i = 0; i < HM_PAUSE_CONTROLS_ITEMS; ++i)
                         hm_controls_row_value(&hm_controls, i, rows[i], sizeof(rows[i]));
+                if (menu.page == HM_PAUSE_AUDIO)
+                    hm_audio_value(&hm_audio, menu.selected, value, sizeof(value));
+                if (menu.page == HM_PAUSE_AUDIO)
+                    for (int i = 0; i < HM_PAUSE_AUDIO_ITEMS; ++i)
+                        hm_audio_row_value(&hm_audio, i, rows[i], sizeof(rows[i]));
                 value_dirty = 0;
             }
             view.notice = notice;
@@ -1168,6 +1181,7 @@ int hm_game_host_start(hm_disc *disc) {
 #endif
     hm_controls_defaults(&hm_controls);
     hm_controls_load(&hm_controls);
+    hm_audio_load(&hm_audio);
     int pad_count = 0;
     SDL_JoystickID *pads = SDL_GetGamepads(&pad_count);
     if (pads && pad_count > 0) {

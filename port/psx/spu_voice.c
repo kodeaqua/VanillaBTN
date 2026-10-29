@@ -1,3 +1,5 @@
+#include "psx/sound_control.h"
+#include "psx/sequence.h"
 #include "psx/spu_voice.h"
 #include "psx/error.h"
 #include "psx/reverb.h"
@@ -87,16 +89,32 @@ void hm_spu_voice_start(hm_spu_voice *voice, const void *data, u32 bytes, u32 pi
 }
 
 static void hm_voice_mix(hm_spu_voice voices[24], s16 *stereo, u32 frames, int reverb) {
+    int bgm_vol = hm_sound_get_bgm_volume();
+    int sfx_vol = hm_sound_get_sfx_volume();
     for (u32 frame = 0; frame < frames; ++frame) {
         s32 left = 0, right = 0, send_left = 0, send_right = 0;
         for (u32 i = 0; i < 24; ++i) {
             hm_spu_voice *voice = voices + i;
             if (voice->envelope.phase == HM_ADSR_OFF)
                 continue;
+            int vol_mult = hm_sound_sequence_voice_active(i) ? bgm_vol : sfx_vol;
+            if (vol_mult <= 0) {
+                hm_spu_adsr_tick(&voice->envelope);
+                voice->fraction += voice->pitch;
+                while (voice->fraction >= 4096 && voice->envelope.phase != HM_ADSR_OFF) {
+                    voice->fraction -= 4096;
+                    hm_voice_advance(voice);
+                }
+                continue;
+            }
             s16 interp = hm_spu_hq_interpolation ? hm_spu_cubic_hermite(voice->recent, voice->fraction)
                                                   : hm_spu_gaussian(voice->recent, voice->fraction);
             s32 sample = hm_voice_floor(interp * hm_spu_adsr_tick(&voice->envelope));
             s32 l = hm_voice_floor(sample * voice->left), r = hm_voice_floor(sample * voice->right);
+            if (vol_mult < 100) {
+                l = (l * vol_mult) / 100;
+                r = (r * vol_mult) / 100;
+            }
             left += l;
             right += r;
             if (voice->reverb) {
