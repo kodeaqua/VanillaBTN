@@ -3217,3 +3217,25 @@ history is available.
 
 Consequences: This avoids consuming unset depth but does not interpolate
 perspective-correct textures. Owner visual and device validation remains pending.
+
+## ADR-115: Preserve moving primitive bounds and presentation borders
+
+Date: 2026-10-30. Status: accepted.
+
+Context: GPU primitive bins used current-frame bounds even when motion replay
+interpolated vertices from an earlier position. The earlier portion could be
+omitted, producing clipped motion or seams. GPU filter mode 2 was also reduced
+to mode 1 before packet construction, so the selected mode and cache key did not
+match. On Android, the presentation path eventually used an undefined swapchain
+load operation for pillarbox borders.
+
+Decision: Include the previous endpoint in motion-interpolated triangle and
+rectangle bounds, retaining the existing dependency fallback. Preserve GPU
+filter modes 0 through 2 in scene packets. Clear letterbox or pillarbox regions
+on every presentation on all platforms; full-window blits still discard previous
+contents. This replaces the Android skip-clear optimization.
+
+Consequences: XBR packets can use their intended shader mode and reuse cache
+entries; software filtering remains its existing bilinear fallback. Android may
+incur additional render-pass cost for bordered output. Actual performance,
+GPU/device behavior and gameplay remain unverified at the owner's request.

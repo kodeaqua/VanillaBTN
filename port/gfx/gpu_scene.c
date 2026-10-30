@@ -262,6 +262,23 @@ static void hm_scene_triangle(hm_gpu_scene *s, u32 *material, const u32 xy[3], c
     if (x1 - x0 > 1023 || y1 - y0 > 511)
         return;
 
+    /* Bins must cover the entire interpolated primitive, including pixels at
+     * the previous endpoint. The current-frame bounds alone can clip moving
+     * edges and leave gaps between adjacent primitives. */
+    if (s->motion_previous && s->motion_current) {
+        for (int i = 0; i < 3; ++i) {
+            if (indices[i] >= s->motion_count)
+                continue;
+            u32 previous = s->motion_previous[indices[i]];
+            int x = hm_scene_signed(previous) + d->ofs[0];
+            int y = hm_scene_signed(previous >> 16) + d->ofs[1];
+            if (x < x0) x0 = x;
+            if (x > x1) x1 = x;
+            if (y < y0) y0 = y;
+            if (y > y1) y1 = y;
+        }
+    }
+
     s64 area = (s64)((s32)p[20] - (s32)p[18]) * ((s32)p[23] - (s32)p[19]) -
                (s64)((s32)p[21] - (s32)p[19]) * ((s32)p[22] - (s32)p[18]);
     if (s->motion_previous || has_pgxp) {
@@ -379,7 +396,16 @@ static void hm_scene_rectangle(hm_gpu_scene *s, const u32 *w, u32 available) {
     }
     if (!hm_scene_texture_bounds(s, p, p[27] & 255, (p[27] >> 8) & 255, width, height))
         return;
-    hm_scene_add(s, p, x, y, x + (int)width, y + (int)height);
+    int x0 = x, y0 = y, x1 = x + (int)width, y1 = y + (int)height;
+    if (s->motion_previous && s->motion_current && s->motion_count > 1) {
+        int previous_x = hm_scene_signed(s->motion_previous[1]) + d->ofs[0];
+        int previous_y = hm_scene_signed(s->motion_previous[1] >> 16) + d->ofs[1];
+        if (previous_x < x0) x0 = previous_x;
+        if (previous_y < y0) y0 = previous_y;
+        if (previous_x + (int)width > x1) x1 = previous_x + (int)width;
+        if (previous_y + (int)height > y1) y1 = previous_y + (int)height;
+    }
+    hm_scene_add(s, p, x0, y0, x1, y1);
 }
 static void hm_scene_line_segment(hm_gpu_scene *s, u32 xy0, u32 xy1, u32 c0, u32 c1, u32 op,
                                   int skip) {
@@ -476,7 +502,9 @@ static void hm_scene_command(void *context, const u32 *w, u32 available, int aft
 }
 hm_gpu_scene *hm_gpu_scene_create(void) { return calloc(1, sizeof(hm_gpu_scene)); }
 void hm_gpu_scene_destroy(hm_gpu_scene *s) { free(s); }
-void hm_gpu_scene_texture_filter(hm_gpu_scene *s, int linear) { s->texture_linear = !!linear; }
+void hm_gpu_scene_texture_filter(hm_gpu_scene *s, int linear) {
+    s->texture_linear = linear >= 0 && linear <= 2 ? linear : 0;
+}
 void hm_gpu_scene_multisamples(hm_gpu_scene *s, unsigned samples) {
     s->multisamples = samples == 2 || samples == 4 ? samples : 1;
 }

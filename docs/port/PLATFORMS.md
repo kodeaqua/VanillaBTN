@@ -453,3 +453,8 @@ Owner gameplay validation is pending; GPU/CPU parity has not been remeasured.
 GPU packets that interpolate motion use affine texture mapping when PGXP is
 also enabled; non-interpolated PGXP packets retain perspective correction
 (ADR-114). Owner visual validation is pending.
+
+Interpolated GPU primitive bins include the previous endpoint; GPU texture
+filter mode 2 is retained in scene packets. Android bordered presentation clears
+its borders each frame instead of assuming retained swapchain pixels (ADR-115).
+No performance or device validation has been performed for these changes.
