@@ -353,6 +353,113 @@ static int hm_probe_texture_feedback(SDL_GPUDevice *device, hm_gpu_renderer *ren
     puts("Ordered VRAM texture feedback matches the CPU raster reference.");
     return 0;
 }
+static void hm_probe_copy_seed(void) {
+    setup();
+    const u16 colors[4][4] = {{0x001f, 0x03e0, 0x7c00, 0x4210},
+                              {0x1234, 0x2345, 0x3456, 0x4567},
+                              {0x7fff, 0x03ff, 0x7c1f, 0x2108},
+                              {0x0010, 0x0200, 0x4000, 0x6318}};
+    for (u32 y = 0; y < 4; ++y)
+        for (u32 x = 0; x < 4; ++x)
+            hm_vram_draw_pixel((1022 + x) & 1023, (510 + y) & 511, colors[y][x]);
+    hm_vram_draw_pixel(12, 8, 0x8001);
+    hm_vram_draw_pixel(13, 8, 0x8002);
+    hm_vram_draw_pixel(16, 8, 0x8003);
+    hm_vram_draw_pixel(17, 8, 0x0004);
+}
+static int hm_probe_vram_transfers(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
+                                   hm_gpu_scene *builder) {
+    const u32 commands[] = {
+        0x80000000, xy(1022, 510), xy(8, 8), xy(4, 4),
+        0xe6000001, 0x80000000, xy(8, 8), xy(10, 8), xy(4, 4),
+        0xe6000002, 0x80000000, xy(8, 8), xy(12, 8), xy(4, 4),
+        0xa0000000, xy(16, 8), xy(2, 1), 0x45671234,
+        0xe6000001, 0xa0000000, xy(18, 8), xy(2, 1), 0x45671234};
+    hm_probe_copy_seed();
+    RECT area = {0, 0, 32, 32};
+    hm_replay_sink previous = hm_gpu_scene_begin(builder, 32, 32);
+    hm_replay_begin(&area);
+    hm_gpu_execute_words(commands, SDL_arraysize(commands));
+    if (hm_gpu_scene_needs_materialization(builder)) {
+        hm_gpu_scene_materialize_vram(builder, 1);
+        hm_probe_copy_seed();
+        (void)hm_gpu_scene_begin(builder, 32, 32);
+        hm_replay_begin(&area);
+        hm_gpu_execute_words(commands, SDL_arraysize(commands));
+        hm_gpu_scene_materialize_vram(builder, 0);
+    }
+    hm_gpu_scene_data scene;
+    CHECK(hm_gpu_scene_end(builder, previous, &scene));
+    CHECK(scene.vram_version_count >= 2);
+
+    hm_probe_copy_seed();
+    hm_gpu_execute_words(commands, SDL_arraysize(commands));
+    for (u32 y = 0; y < 32; ++y)
+        for (u32 x = 0; x < 32; ++x)
+            reference[y * 32 + x] = hm_vram_pixel(x, y);
+    CHECK(!readback(device, renderer, &scene, actual));
+    for (u32 y = 0; y < 32; ++y)
+        for (u32 x = 0; x < 32; ++x) {
+            u16 color = reference[y * 32 + x];
+            for (u32 channel = 0; channel < 3; ++channel) {
+                u32 value = (color >> (channel * 5)) & 31;
+                u8 expected = (u8)((value << 3) | (value >> 2));
+                u8 got = actual[(y * 32 + x) * 4 + channel];
+                if (got != expected) {
+                    fprintf(stderr, "VRAM transfer mismatch %u,%u channel %u: GPU %u CPU %u\n",
+                            x, y, channel, got, expected);
+                    return 1;
+                }
+            }
+        }
+
+    /* A destination crossing both VRAM edges splits into four wrapped pieces;
+     * compare the visible bottom-right quadrant against the CPU state. */
+    const u32 destination_wrap[] = {0x80000000, xy(1018, 506), xy(1022, 510), xy(4, 4)};
+    setup();
+    const u16 edge_colors[4][4] = {{0x001f, 0x03e0, 0x7c00, 0x4210},
+                                   {0x1234, 0x2345, 0x3456, 0x4567},
+                                   {0x7fff, 0x03ff, 0x7c1f, 0x2108},
+                                   {0x0010, 0x0200, 0x4000, 0x6318}};
+    for (u32 y = 0; y < 4; ++y)
+        for (u32 x = 0; x < 4; ++x)
+            hm_vram_draw_pixel(1018 + x, 506 + y, edge_colors[y][x]);
+    RECT edge_area = {992, 480, 32, 32};
+    DRAWENV edge_draw;
+    SetDefDrawEnv(&edge_draw, edge_area.x, edge_area.y, edge_area.w, edge_area.h);
+    edge_draw.dtd = 0;
+    edge_draw.dfe = 1;
+    PutDrawEnv(&edge_draw);
+    previous = hm_gpu_scene_begin(builder, 32, 32);
+    hm_replay_begin(&edge_area);
+    hm_gpu_execute_words(destination_wrap, SDL_arraysize(destination_wrap));
+    CHECK(hm_gpu_scene_end(builder, previous, &scene));
+    setup();
+    for (u32 y = 0; y < 4; ++y)
+        for (u32 x = 0; x < 4; ++x)
+            hm_vram_draw_pixel(1018 + x, 506 + y, edge_colors[y][x]);
+    hm_gpu_execute_words(destination_wrap, SDL_arraysize(destination_wrap));
+    for (u32 y = 0; y < 32; ++y)
+        for (u32 x = 0; x < 32; ++x)
+            reference[y * 32 + x] = hm_vram_pixel(992 + x, 480 + y);
+    CHECK(!readback(device, renderer, &scene, actual));
+    for (u32 y = 0; y < 32; ++y)
+        for (u32 x = 0; x < 32; ++x) {
+            u16 color = reference[y * 32 + x];
+            for (u32 channel = 0; channel < 3; ++channel) {
+                u32 value = (color >> (channel * 5)) & 31;
+                u8 expected = (u8)((value << 3) | (value >> 2));
+                u8 got = actual[(y * 32 + x) * 4 + channel];
+                if (got != expected) {
+                    fprintf(stderr, "Wrapped destination mismatch %u,%u channel %u: GPU %u CPU %u\n",
+                            x, y, channel, got, expected);
+                    return 1;
+                }
+            }
+        }
+    puts("GPU VRAM copy wrap/overlap and masked copy/load transfers match the CPU reference.");
+    return 0;
+}
 static u32 hm_probe_random(void) {
     static u32 value = 0x98765432;
     value ^= value << 13;
@@ -789,6 +896,7 @@ int main(int argc, char **argv) {
     CHECK(builder);
     printf("Offscreen GPU renderer: %s\n", SDL_GetGPUDeviceDriver(device));
     CHECK(!hm_probe_texture_feedback(device, renderer, builder));
+    CHECK(!hm_probe_vram_transfers(device, renderer, builder));
     CHECK(!hm_probe_dynamic_scene(device, renderer, builder));
     u32 shapes[] = {0x200000ff, xy(1, 1),   xy(26, 4), xy(5, 26),  0x300000ff,
                     xy(3, 3),   0x0000ff00, xy(29, 7), 0x00ff0000, xy(8, 29),

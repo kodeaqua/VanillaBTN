@@ -166,6 +166,38 @@ int main(void) {
           data.words[data.words[8] + HM_SCENE_STRIDE] == 2 &&
           data.words[data.words[8] + HM_SCENE_STRIDE + 40] == 1);
     hm_gpu_scene_materialize_vram(s, 0);
+    /* An independent GP0(80h) packet reads the immutable frame-start VRAM. */
+    setup(32, 32);
+    const u32 copy[] = {0x80000000, 20u | (21u << 16), 8u | (9u << 16), 4u | (3u << 16)};
+    previous = hm_gpu_scene_begin(s, 32, 32);
+    hm_replay_begin(&area);
+    hm_gpu_execute_words(copy, 4);
+    CHECK(!hm_gpu_scene_needs_materialization(s));
+    CHECK(hm_gpu_scene_end(s, previous, &data) && data.words[10] == 1);
+    CHECK(data.words[data.words[8] + 1] == 0x80 &&
+          data.words[data.words[8] + 30] == 8 && data.words[data.words[8] + 31] == 9 &&
+          data.words[data.words[8] + 34] == 20 && data.words[data.words[8] + 35] == 21 &&
+          data.words[data.words[8] + 40] == 0);
+
+    /* If a copy reads a preceding GPU draw, the capture requests one exact
+     * CPU materialization and stores that pre-copy VRAM version for the GPU. */
+    setup(32, 32);
+    const u32 dependent_copy[] = {0x600000ff, 0x00020002, 0x00040004,
+                                  0x80000000, 2u | (2u << 16), 8u | (8u << 16),
+                                  4u | (4u << 16)};
+    previous = hm_gpu_scene_begin(s, 32, 32);
+    hm_replay_begin(&area);
+    hm_gpu_execute_words(dependent_copy, sizeof(dependent_copy) / sizeof(*dependent_copy));
+    CHECK(hm_gpu_scene_needs_materialization(s));
+    CHECK(hm_gpu_scene_end(s, previous, &data));
+    hm_gpu_scene_materialize_vram(s, 1);
+    setup(32, 32);
+    previous = hm_gpu_scene_begin(s, 32, 32);
+    hm_replay_begin(&area);
+    hm_gpu_execute_words(dependent_copy, sizeof(dependent_copy) / sizeof(*dependent_copy));
+    CHECK(hm_gpu_scene_end(s, previous, &data) && data.vram_version_count == 1);
+    CHECK(data.words[data.words[8] + HM_SCENE_STRIDE + 40] == 1);
+    hm_gpu_scene_materialize_vram(s, 0);
     setup(32, 32);
     previous = hm_gpu_scene_begin(s, 32, 32);
     hm_replay_begin(&area);

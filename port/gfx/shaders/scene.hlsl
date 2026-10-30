@@ -73,10 +73,15 @@ void main(uint3 id:SV_DispatchThreadID){
         if(!(flags&2)&&!(flags&128)&&word(p,17)&&all(logical>=display)&&all(logical<display_end))continue;
         if(word(p,0)==2){int2 delta=logical-int2(word(p,30),word(p,31));
             if(any(delta<0)||delta.x>=int(word(p,32))||delta.y>=int(word(p,33)))continue;
-            uint transferred=word(p,1)==0xa0?vram(word(p,40),logical.x,logical.y):word(p,24);
-            [unroll]for(uint transfer_sample=0;transfer_sample<4;++transfer_sample){
-                if(transfer_sample>=samples)break;sample_colors[transfer_sample]=transferred;
-                fine_colors[transfer_sample]=expand555(transferred);}
+            [unroll]for(uint transfer_mask_sample=0;transfer_mask_sample<4;++transfer_mask_sample){
+                if(transfer_mask_sample>=samples)break;
+                if((flags&8)&&(sample_colors[transfer_mask_sample]&32768))continue;
+                uint transferred=word(p,1)==0xa0?vram(word(p,40),logical.x,logical.y):
+                    word(p,1)==0x80?vram(word(p,40),int(word(p,34))+delta.x,int(word(p,35))+delta.y):
+                    word(p,24);
+                sample_colors[transfer_mask_sample]=transferred|((flags&4)?32768:0);
+                fine_colors[transfer_mask_sample]=expand555(sample_colors[transfer_mask_sample]);
+            }
             continue;}
         uint coverage=(1u<<samples)-1;
         [unroll]for(uint mask_sample=0;mask_sample<4;++mask_sample){if(mask_sample>=samples)break;

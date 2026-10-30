@@ -34,7 +34,7 @@ try {
     & ctest --preset $Preset
     if ($LASTEXITCODE -ne 0) { throw 'Windows tests failed' }
 
-    if ($Game) {
+    if ($Game -and $Preset -eq 'windows-release') {
         $gameExe = Join-Path $repoRoot "build/port/$Preset/bin/VanillaBTN.exe"
         if (-not (Test-Path $gameExe)) {
             $gameExe = Join-Path $repoRoot "build/port/$Preset/bin/hmbtn_native.exe"
@@ -90,6 +90,8 @@ Crash Diagnostics:
             Write-Host "Game Executable: $gameExe" -ForegroundColor Cyan
             Write-Host "Standalone ZIP:  $zipPath" -ForegroundColor Green
         }
+    } elseif ($Game) {
+        Write-Host "`n[TEST BUILD SUCCESS] Sanitizer game binary built; release packaging was skipped." -ForegroundColor Yellow
     }
 } finally {
     Pop-Location

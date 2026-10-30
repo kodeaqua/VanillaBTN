@@ -1,23 +1,35 @@
 # Platform status
 
-## Current status (2026-10-30)
+## Current status (2026-10-31)
 
 | Target | Current validation |
 | --- | --- |
-| Windows x86-64 | Playable -Game build and standalone package produced in the 2026-10-30 audit; Release suite 124/124 and ASan/UBSan suite 108/108 passed. Full-playthrough parity and device behavior remain unverified. |
-| Android arm64-v8a | Release APK built with AGP 9.5.0, Gradle 9.8.2, and NDK 30.0.16248370; native ELF and APK zip alignment checks pass for 16 KB pages. SAF disc import and app-private storage are implemented; device gameplay remains unverified. |
+| Windows x86-64 | Release `-Game` build and standalone package built; Release and ASan/UBSan suites pass 124/124. Full-playthrough parity remains unverified. |
+| Android arm64-v8a | Release APK built with AGP 9.5.0, Gradle 9.8.2, and NDK 30.0.16248370; native ELF and APK zip alignment checks pass for 16 KB pages. On the connected Xiaomi MediaTek G100 tablet, SDL JNI startup and Vulkan GPU device creation pass; rendering and gameplay remain unverified. |
 | Linux x86-64 | Deferred to a separate Linux host; WSL is excluded. |
 | macOS universal | No macOS build has been validated. |
 | Matching build | The check target remains unverified on this Windows host because its separate Linux toolchain is unavailable. |
 
 ### Core, Windows and Android audit (2026-10-31)
 
-The Windows Release preset builds and all 125 CTest cases pass. Android Release
-builds with the pinned NDK 30.0.16248370, Gradle 9.8.2 and AGP 9.5.0. The APK
+The Windows Release preset builds and all 124 CTest cases pass; the ASan/UBSan
+preset also passes all 124. Android Release builds with the pinned NDK
+30.0.16248370, Gradle 9.8.2 and AGP 9.5.0. The APK
 signature verifies; `zipalign -c -P 16 4` passes, and the native ELF load
 segments use 16 KB alignment. Android backup rules exclude imported disc
 images, the temporary copy, and runtime logs from cloud backup and device
 transfer while preserving saves and settings (ADR-145).
+
+Only `windows-release -Game` updates the standalone Windows package. The
+`windows-asan-ubsan -Game` executable is a diagnostic build and requires the
+Clang ASan runtime when launched outside the toolchain environment; it is not
+copied into the release folder or ZIP.
+
+On the connected MediaTek G100 tablet, the prior native/Java SDL mismatch was
+fixed by synchronizing Android Java glue to SDL 3.4.18. The installed APK then
+logged successful JNI setup and `GPU Device created and claimed successfully
+(Driver: vulkan)`. The diagnostic stopped at graphics initialization; it did
+not run a game scene or test rendering parity.
 
 The same core audit found that `SsInit` converted a saved 0% BGM/SFX value back
 to 100%; ADR-146 now preserves configured levels. The new mixer regression
@@ -26,9 +38,9 @@ their playback continues. Both focused tests also pass under the Windows
 ASan/UBSan preset.
 
 Gradle reports deprecated APIs that may become errors with Gradle 10; the
-current pinned build succeeds. No interactive Windows playthrough or Android
-device run was performed for this audit. Device graphics, lifecycle, and
-gameplay behavior remain owner-verified.
+current pinned build succeeds. No interactive Windows playthrough was performed.
+Android GPU device creation was checked on one tablet; scene rendering,
+lifecycle behavior, other devices, and gameplay remain unverified.
 
 GPU Auto shares scene output at native and enhanced resolutions, with Software
 as the reference and CPU fallback for unsupported work. Coverage is partial;

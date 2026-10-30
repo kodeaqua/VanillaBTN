@@ -672,30 +672,9 @@ static int hm_scene_has_writes(const hm_gpu_scene *s) {
             return 1;
     return 0;
 }
-static void hm_scene_transfer_piece(hm_gpu_scene *s, u32 op, u32 color, u32 x, u32 y,
-                                    u32 width, u32 height) {
-    u32 p[HM_SCENE_STRIDE] = {0};
-    p[0] = 2;
-    p[1] = op;
-    p[4] = 128; /* VRAM transfers ignore draw clipping, display protection, and masks. */
-    p[9] = 0;
-    p[10] = 0;
-    p[11] = HM_VRAM_WIDTH;
-    p[12] = HM_VRAM_HEIGHT;
-    p[24] = color;
-    p[30] = x;
-    p[31] = y;
-    p[32] = width;
-    p[33] = height;
-    u32 before = s->count;
-    hm_scene_add(s, p, (int)x, (int)y, (int)(x + width), (int)(y + height));
-    if (s->count != before &&
-        s->pending_transfer_count < sizeof(s->pending_transfer_indices) /
-                                        sizeof(s->pending_transfer_indices[0]))
-        s->pending_transfer_indices[s->pending_transfer_count++] = before;
-}
-static void hm_scene_transfer(hm_gpu_scene *s, u32 op, u32 color, u32 x, u32 y, u32 width,
-                              u32 height) {
+static int hm_scene_source_has_writes(hm_gpu_scene *s, u32 x, u32 y, u32 width,
+                                      u32 height) {
+    int overlap = 0;
     u32 offset_y = 0;
     while (offset_y < height) {
         u32 part_y = (y + offset_y) & (HM_VRAM_HEIGHT - 1);
@@ -708,7 +687,61 @@ static void hm_scene_transfer(hm_gpu_scene *s, u32 op, u32 color, u32 x, u32 y, 
             u32 part_width = width - offset_x;
             if (part_width > HM_VRAM_WIDTH - part_x)
                 part_width = HM_VRAM_WIDTH - part_x;
-            hm_scene_transfer_piece(s, op, color, part_x, part_y, part_width, part_height);
+            overlap |= hm_scene_tiles(s->written_tiles, part_x, part_y, part_width, part_height,
+                                      0);
+            offset_x += part_width;
+        }
+        offset_y += part_height;
+    }
+    return overlap;
+}
+static void hm_scene_transfer_piece(hm_gpu_scene *s, u32 op, u32 color, u32 x, u32 y,
+                                    u32 width, u32 height, u32 source_x, u32 source_y,
+                                    u32 source_layer) {
+    u32 p[HM_SCENE_STRIDE] = {0};
+    p[0] = 2;
+    p[1] = op;
+    const hm_vram_context *vram = hm_vram_state();
+    p[4] = 128 | ((op == 0xa0 || op == 0x80) ? (vram->set_mask ? 4u : 0u) |
+                                                    (vram->check_mask ? 8u : 0u)
+                                              : 0u);
+    p[9] = 0;
+    p[10] = 0;
+    p[11] = HM_VRAM_WIDTH;
+    p[12] = HM_VRAM_HEIGHT;
+    p[24] = color;
+    p[30] = x;
+    p[31] = y;
+    p[32] = width;
+    p[33] = height;
+    p[34] = source_x;
+    p[35] = source_y;
+    p[40] = source_layer;
+    u32 before = s->count;
+    hm_scene_add(s, p, (int)x, (int)y, (int)(x + width), (int)(y + height));
+    if (s->count != before &&
+        s->pending_transfer_count < sizeof(s->pending_transfer_indices) /
+                                        sizeof(s->pending_transfer_indices[0]))
+        s->pending_transfer_indices[s->pending_transfer_count++] = before;
+}
+static void hm_scene_transfer(hm_gpu_scene *s, u32 op, u32 color, u32 x, u32 y, u32 width,
+                              u32 height, u32 source_x, u32 source_y, u32 source_layer) {
+    u32 offset_y = 0;
+    while (offset_y < height) {
+        u32 part_y = (y + offset_y) & (HM_VRAM_HEIGHT - 1);
+        u32 part_height = height - offset_y;
+        if (part_height > HM_VRAM_HEIGHT - part_y)
+            part_height = HM_VRAM_HEIGHT - part_y;
+        u32 offset_x = 0;
+        while (offset_x < width) {
+            u32 part_x = (x + offset_x) & (HM_VRAM_WIDTH - 1);
+            u32 part_width = width - offset_x;
+            if (part_width > HM_VRAM_WIDTH - part_x)
+                part_width = HM_VRAM_WIDTH - part_x;
+            hm_scene_transfer_piece(s, op, color, part_x, part_y, part_width, part_height,
+                                    (source_x + offset_x) & (HM_VRAM_WIDTH - 1),
+                                    (source_y + offset_y) & (HM_VRAM_HEIGHT - 1),
+                                    source_layer);
             if (s->failure)
                 return;
             offset_x += part_width;
@@ -721,7 +754,7 @@ static void hm_scene_command(void *context, const u32 *w, u32 available, int aft
     if (!s->begun || s->failure || !available)
         return;
     u32 op = w[0] >> 24;
-    if (op == 2 || op == 0xa0) {
+    if (op == 2 || op == 0x80 || op == 0xa0) {
         if (after) {
             if (op == 0xa0 && s->pending_transfer_count) {
                 u32 layer = hm_scene_snapshot(s, !s->pending_transfer_requires_materialization);
@@ -732,17 +765,34 @@ static void hm_scene_command(void *context, const u32 *w, u32 available, int aft
             s->pending_transfer_requires_materialization = 0;
             return;
         }
-        if (available < 3) {
+        u32 header_words = op == 0x80 ? 4u : 3u;
+        if (available < header_words) {
             s->failure = "truncated VRAM transfer";
             return;
         }
         u32 x = w[1] & 1023u, y = (w[1] >> 16) & 511u;
         u32 width, height;
-        if (op == 0xa0) {
+        u32 source_x = 0, source_y = 0, source_layer = 0;
+        if (op == 0x80) {
+            source_x = x;
+            source_y = y;
+            x = w[2] & 1023u;
+            y = (w[2] >> 16) & 511u;
+            width = w[3] & 1023u;
+            height = (w[3] >> 16) & 511u;
+            width = width ? width : HM_VRAM_WIDTH;
+            height = height ? height : HM_VRAM_HEIGHT;
+            int source_written = hm_scene_source_has_writes(s, source_x, source_y, width, height);
+            if (source_written) {
+                if (!s->materialize_vram)
+                    s->needs_materialization = 1;
+                source_layer = hm_scene_snapshot(s, s->materialize_vram);
+            }
+        } else if (op == 0xa0) {
             width = (((w[2] & 0xffffu) - 1) & 1023u) + 1;
             height = (((w[2] >> 16) - 1) & 511u) + 1;
             size_t payload_words = ((size_t)width * height + 1) / 2;
-            if (payload_words > available - 3) {
+            if (payload_words > available - header_words) {
                 s->failure = "truncated VRAM transfer";
                 return;
             }
@@ -760,7 +810,8 @@ static void hm_scene_command(void *context, const u32 *w, u32 available, int aft
         s->pending_transfer_count = 0;
         u32 color = ((w[0] & 255u) >> 3) | (((w[0] >> 8) & 255u) >> 3) << 5 |
                     (((w[0] >> 16) & 255u) >> 3) << 10;
-        hm_scene_transfer(s, op, color, x, y, width, height);
+        hm_scene_transfer(s, op, color, x, y, width, height, source_x, source_y,
+                          source_layer);
         return;
     }
     if (after)
