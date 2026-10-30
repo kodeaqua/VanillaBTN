@@ -3391,3 +3391,22 @@ Decision:
 
 Consequences:
 Memory card space checking and save creation operate flawlessly across 64-bit Android (LP64) and Windows (LLP64). Diaries can be created and saved without false "not enough space" errors.
+
+
+## ADR-124: Three graphics modes with retained Modern settings
+
+Date: 2026-10-30
+
+Context: The owner requests Native PS1, Enhance PS1, and Modern as a clear
+choice while retaining the original presentation by default.
+
+Decision: Persist `graphics.graphics_mode` as 0, 1, or 2. Native selects the
+original geometry and dithering, with modern visual effects disabled. Enhance
+PS1 enables PGXP and disables dithering. Modern applies those same fixes and
+exposes the existing optional visual effects. Modern effect choices remain
+persisted while another mode is active. Existing settings migrate according to
+their previously enabled enhancements. Display settings remain independent.
+The current Android menu exposes the same three modes; its interpolation clamp
+remains in effect. Runtime changes update PGXP, dithering, scaling, interpolation,
+and widescreen without changing game logic. GPU coverage and visual results
+remain subject to the existing fallback and owner gameplay validation.

@@ -4,10 +4,10 @@
 static const char *const hm_root_items[] = {"Resume", "Settings", "Exit Game"};
 static const char *const hm_settings_items[] = {"Graphics", "Gameplay", "Controls", "Audio"};
 #ifdef __ANDROID__
-static const char *const hm_graphics_items[] = {"Profile"};
+static const char *const hm_graphics_items[] = {"Graphics Mode"};
 #else
 static const char *const hm_graphics_items[] = {
-    "Monitor",   "Window Mode", "Resolution", "Enhance Scaling", "Widescreen Mode", "Anti-Aliasing",
+    "Graphics Mode", "Monitor",   "Window Mode", "Resolution", "Enhance Scaling", "Widescreen Mode", "Anti-Aliasing",
     "Filtering", "VSync",       "FPS Limit",  "Interpolation"};
 #endif
 static const char *const hm_gameplay_items[] = {
@@ -21,6 +21,7 @@ void hm_pause_open(hm_pause_menu *menu) {
     menu->page = HM_PAUSE_ROOT;
     menu->selected = 0;
     menu->first_visible = 0;
+    menu->graphics_modern = 0;
 }
 
 int hm_pause_count(const hm_pause_menu *menu) {
@@ -29,7 +30,12 @@ int hm_pause_count(const hm_pause_menu *menu) {
            : menu->page == HM_PAUSE_GAMEPLAY ? HM_PAUSE_GAMEPLAY_ITEMS
            : menu->page == HM_PAUSE_CONTROLS ? HM_PAUSE_CONTROLS_ITEMS
            : menu->page == HM_PAUSE_AUDIO    ? HM_PAUSE_AUDIO_ITEMS
-                                             : HM_PAUSE_GRAPHICS_ITEMS;
+                                             :
+#ifdef __ANDROID__
+                                               HM_PAUSE_GRAPHICS_ITEMS;
+#else
+                                               (menu->graphics_modern ? HM_PAUSE_GRAPHICS_ITEMS : 4);
+#endif
 }
 
 const char *hm_pause_label(const hm_pause_menu *menu, int index) {

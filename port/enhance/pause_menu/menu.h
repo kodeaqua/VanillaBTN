@@ -14,7 +14,7 @@ enum {
 #ifdef __ANDROID__
     HM_PAUSE_GRAPHICS_ITEMS = 1,
 #else
-    HM_PAUSE_GRAPHICS_ITEMS = 10,
+    HM_PAUSE_GRAPHICS_ITEMS = 11,
 #endif
     HM_PAUSE_GAMEPLAY_ITEMS = 12,
     HM_PAUSE_CONTROLS_ITEMS = 3,
@@ -45,6 +45,7 @@ typedef struct {
     hm_pause_page page;
     int selected;
     int first_visible;
+    int graphics_modern;
 } hm_pause_menu;
 
 void hm_pause_open(hm_pause_menu *menu);
