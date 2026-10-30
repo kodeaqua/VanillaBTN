@@ -17,6 +17,8 @@ int hm_gameplay_connect_fences(void);
 int hm_gameplay_wild_dog_enabled(void);
 int hm_gameplay_smart_bell(void);
 int hm_gameplay_stamina_hud(void);
+int hm_gameplay_fatigue_fill(int fatigue);
+void hm_gameplay_draw_fatigue_bar(s16 x, s16 y, int fatigue);
 int hm_gameplay_calendar_events(void);
 int hm_gameplay_roaming_horse(void);
 int hm_gameplay_fast_text(void);

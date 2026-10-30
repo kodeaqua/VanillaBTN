@@ -77,6 +77,25 @@ int hm_gameplay_stamina_hud(void) {
     return active_options.stamina_hud;
 }
 
+int hm_gameplay_fatigue_fill(int fatigue) {
+    if (fatigue < 0) fatigue = 0;
+    if (fatigue > 100) fatigue = 100;
+    int width = fatigue * 48 / 100;
+    return fatigue && !width ? 1 : width;
+}
+
+void hm_gameplay_draw_fatigue_bar(s16 x, s16 y, int fatigue) {
+    static u16 label[] = {5, 0xffff}; /* Original font glyph F. */
+    if (!hm_gameplay_stamina_hud()) return;
+    int width = hm_gameplay_fatigue_fill(fatigue);
+    int color = fatigue >= 80 ? 0xc05040 : fatigue >= 50 ? 0xc89940 : 0x6f9b70;
+    u_long *background = &current_frame->otTags[0][35];
+    u_long *foreground = &current_frame->otTags[0][34];
+    text_draw_plain(foreground, label, x + 23, y + 15);
+    prim_add_rect(background, x + 34, y + 19, 48, 4, 0x806c54, 0);
+    if (width) prim_add_rect(foreground, x + 34, y + 19, (s16)width, 4, color, 0);
+}
+
 int hm_gameplay_calendar_events(void) {
     return active_options.calendar_events;
 }
