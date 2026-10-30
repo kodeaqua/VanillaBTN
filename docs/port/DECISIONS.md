@@ -3175,3 +3175,10 @@ After rebuilding, the owner reopened the game. Read-only window capture shows
 the cyan marker around the weed tile in front of the player during normal
 farm gameplay. This confirms the reported farm visibility fix; greenhouse,
 mine and cutscene behavior remain covered by technical checks or owner testing.
+
+### ADR-110: Restore vanilla audio default (2026-10-30)
+
+The Studio HQ resampler was enabled for new settings despite the vanilla-first
+policy. Default to PS1 Gaussian; retain explicitly saved HQ settings and the
+existing option. The audio options regression checks both the default and the
+opt-in persistence path.

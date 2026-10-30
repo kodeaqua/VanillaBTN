@@ -10,7 +10,7 @@
 static hm_audio_options active_audio = {
     .bgm_volume = 100,
     .sfx_volume = 100,
-    .hq_resampler = 1,
+    .hq_resampler = 0,
 };
 
 void hm_audio_defaults(hm_audio_options *options) {
@@ -18,7 +18,7 @@ void hm_audio_defaults(hm_audio_options *options) {
         return;
     options->bgm_volume = 100;
     options->sfx_volume = 100;
-    options->hq_resampler = 1;
+    options->hq_resampler = 0;
 }
 
 void hm_audio_load(hm_audio_options *options) {

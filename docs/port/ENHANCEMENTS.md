@@ -171,3 +171,6 @@ the tool charge gauge checked capacity against the original backup buffer.
 Both now validate the active arena and reject draws only when its remaining
 space is insufficient. The owner's horizontal-line report while running is
 deferred; no further fix for that report is claimed here.
+
+The audio resampler defaults to PS1 Gaussian. Studio HQ remains an explicit
+opt-in through audio settings; existing saved choices are preserved (ADR-110).

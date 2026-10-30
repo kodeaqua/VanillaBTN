@@ -6,7 +6,7 @@
 typedef struct {
     int bgm_volume;    /* 0..100% (default 100) */
     int sfx_volume;    /* 0..100% (default 100) */
-    int hq_resampler;  /* 0 = PS1 Gaussian, 1 = Studio Cubic (default 1) */
+    int hq_resampler;  /* 0 = PS1 Gaussian, 1 = Studio Cubic (default 0) */
 } hm_audio_options;
 
 void hm_audio_defaults(hm_audio_options *options);
