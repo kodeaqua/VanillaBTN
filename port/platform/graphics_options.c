@@ -22,6 +22,43 @@ int hm_graphics_profile_get(const hm_graphics_options *o) {
 void hm_graphics_profile_set(hm_graphics_options *o, int profile) {
     if (!o || profile < HM_GRAPHICS_PROFILE_NATIVE || profile > HM_GRAPHICS_PROFILE_MODERN)
         return;
+#ifdef __ANDROID__
+    o->profile = profile;
+    if (profile == HM_GRAPHICS_PROFILE_MODERN) {
+        o->widescreen = 1;
+        o->linear = 1;
+        o->scaling = 1;
+        o->vsync = 1;
+        o->fps_numerator = 0;
+        o->fps_denominator = 1;
+        o->interpolation = 0;
+        o->antialiasing = 0;
+        o->pgxp = 1;
+        o->dither = 0;
+    } else if (profile == HM_GRAPHICS_PROFILE_ENHANCE) {
+        o->widescreen = 0;
+        o->linear = 0;
+        o->scaling = 0;
+        o->vsync = 1;
+        o->fps_numerator = 0;
+        o->fps_denominator = 1;
+        o->interpolation = 0;
+        o->antialiasing = 0;
+        o->pgxp = 1;
+        o->dither = 0;
+    } else {
+        o->widescreen = 0;
+        o->linear = 0;
+        o->scaling = 0;
+        o->vsync = 1;
+        o->fps_numerator = 0;
+        o->fps_denominator = 1;
+        o->interpolation = 0;
+        o->antialiasing = 0;
+        o->pgxp = 0;
+        o->dither = 1;
+    }
+#else
     if (o->profile == HM_GRAPHICS_PROFILE_MODERN) {
         o->modern_linear = o->linear;
         o->modern_scaling = o->scaling;
@@ -37,8 +74,6 @@ void hm_graphics_profile_set(hm_graphics_options *o, int profile) {
     o->widescreen = profile == HM_GRAPHICS_PROFILE_MODERN ? o->modern_widescreen : 0;
     o->interpolation = profile == HM_GRAPHICS_PROFILE_MODERN ? o->modern_interpolation : 0;
     o->antialiasing = profile == HM_GRAPHICS_PROFILE_MODERN ? o->modern_antialiasing : 0;
-#ifdef __ANDROID__
-    o->interpolation = 0;
 #endif
 }
 
@@ -211,10 +246,12 @@ int hm_graphics_save(const hm_graphics_options *o) {
                                              !o->dither ? "true" : "false");
 #endif
 #ifdef __ANDROID__
-    if (ok)
-        ok = hm_user_data_set_nested_setting(
-            "enhance", "profile",
-            hm_graphics_profile_get(o) == HM_GRAPHICS_PROFILE_MODERN ? "modern" : "native");
+    if (ok) {
+        const char *prof_str =
+            hm_graphics_profile_get(o) == HM_GRAPHICS_PROFILE_MODERN ? "\"modern\"" :
+            hm_graphics_profile_get(o) == HM_GRAPHICS_PROFILE_ENHANCE ? "\"enhance\"" : "\"native\"";
+        ok = hm_user_data_set_nested_setting("enhance", "profile", prof_str);
+    }
 #endif
     return ok;
 }
@@ -454,11 +491,9 @@ int hm_graphics_change(SDL_GPUDevice *device, SDL_Window *window, hm_graphics_op
 #ifdef __ANDROID__
     (void)device;
     (void)window;
-    (void)direction;
-    (void)step;
     if (item == 0) {
         int current = hm_graphics_profile_get(o);
-        int next = !current;
+        int next = (current + 3 + (direction < 0 ? -1 : 1)) % 3;
         hm_graphics_profile_set(&candidate, next);
 #ifdef HMBTN_ENH_SCALING
         if (!hm_scaling_enable(candidate.scaling))
@@ -594,6 +629,8 @@ void hm_graphics_value(const hm_graphics_options *o, int item, char *text, size_
         int profile = hm_graphics_profile_get(o);
         if (profile == HM_GRAPHICS_PROFILE_MODERN)
             SDL_snprintf(text, capacity, "Modern - Tuned Mobile (16:9, 720p)");
+        else if (profile == HM_GRAPHICS_PROFILE_ENHANCE)
+            SDL_snprintf(text, capacity, "Enhance - PS1 Clean (4:3, 1x, PGXP)");
         else
             SDL_snprintf(text, capacity, "Native - Authentic PS1 (4:3, 1x)");
     } else {
@@ -668,7 +705,8 @@ void hm_graphics_row_value(const hm_graphics_options *o, int item, char *text, s
     if (item == 0) {
         int profile = hm_graphics_profile_get(o);
         SDL_snprintf(text, capacity, "%s",
-                     profile == HM_GRAPHICS_PROFILE_MODERN ? "Modern" : "Native");
+                     profile == HM_GRAPHICS_PROFILE_MODERN ? "Modern" :
+                     profile == HM_GRAPHICS_PROFILE_ENHANCE ? "Enhance" : "Native");
     } else {
         SDL_snprintf(text, capacity, "-");
     }

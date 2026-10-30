@@ -6,4 +6,10 @@
     <string name="action_exit">Keluar</string>
     <string name="action_open_folder">Buka Folder</string>
     <string name="permission_storage_needed">Izin penyimpanan diperlukan untuk membaca data save dan file game disc.</string>
+    <string name="setup_title">Harvest Moon: Back to Nature</string>
+    <string name="setup_subtitle">VanillaBTN — Native Port</string>
+    <string name="setup_description">File game disc (.bin / .cue / .iso) diperlukan untuk bermain.\n\nSilakan pilih file game disc versi USA Anda. File akan disalin ke penyimpanan aman aplikasi agar save game dan pengaturan berjalan lancar tanpa kendala izin penyimpanan.</string>
+    <string name="setup_button_select">PILIH FILE GAME DISC</string>
+    <string name="setup_copying">Menyalin game disc ke penyimpanan aman…</string>
+    <string name="setup_copy_failed">Gagal menyalin game disc. Pastikan perangkat Anda memiliki ruang penyimpanan kosong minimal 700 MB.</string>
 </resources>
