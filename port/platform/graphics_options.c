@@ -679,7 +679,7 @@ void hm_graphics_row_value(const hm_graphics_options *o, int item, char *text, s
         static const char *const names[] = {"Windowed", "Fullscreen", "Borderless"};
         SDL_snprintf(text, capacity, "%s", names[o->mode]);
     } else if (item == 2)
-        hm_graphics_value(o, item, text, capacity);
+        hm_graphics_value(o, item + 1, text, capacity);
     else if (item == 3)
         SDL_snprintf(text, capacity, "%s", o->scaling ? "On" : "Off");
     else if (item == 4)
