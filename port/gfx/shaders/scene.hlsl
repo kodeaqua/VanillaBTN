@@ -35,7 +35,12 @@ uint texel(uint p,uint2 st){uint mx=(256-word(p,7))&248,my=(256-word(p,8))&248;
     uint index=depth==0?(vram(x+int(u/4),y+int(v))>>((u&3)*4))&15:
         (vram(x+int(u/2),y+int(v))>>((u&1)*8))&255;
     uint clut=word(p,3);return vram(int((clut&63)*16+index),int((clut>>6)&511));}
-uint interp_i(uint3 values,int3 w,int area){return (uint(w.x)*values.x+uint(w.y)*values.y+
+uint interp_i(uint3 values,int3 w,int area){
+    uint a=uint(area),num=uint(w.x)*values.x+uint(w.y)*values.y+uint(w.z)*values.z+a/2;
+    uint reciprocal=0xffffffffu/a+((0xffffffffu%a)+1+a/2)/a;
+    return hm_mul_u64(num,reciprocal).y;
+}
+uint interp_div(uint3 values,int3 w,int area){return (uint(w.x)*values.x+uint(w.y)*values.y+
     uint(w.z)*values.z+uint(area/2))/uint(area);}
 uint interp_f(uint3 values,float3 w,float area){return uint(floor(dot(float3(values),w)/area+0.5));}
 #include "../../enhance/filtering/texture.hlsl"
@@ -59,6 +64,8 @@ void main(uint3 id:SV_DispatchThreadID){
         uint p=load_word(8)+load_word(bin+1+item)*40,op=word(p,1),flags=word(p,4);
         int2 clip=int2(word(p,9),word(p,10)),clip_end=clip+int2(word(p,11),word(p,12));
         if(any(logical<clip)||any(logical>=clip_end))continue;
+        int2 display=int2(word(p,13),word(p,14)),display_end=display+int2(word(p,15),word(p,16));
+        if(!(flags&2)&&word(p,17)&&all(logical>=display)&&all(logical<display_end))continue;
         uint coverage=(1u<<samples)-1;
         [unroll]for(uint mask_sample=0;mask_sample<4;++mask_sample){if(mask_sample>=samples)break;
             if((flags&8)&&(sample_colors[mask_sample]&32768))coverage&=~(1u<<mask_sample);}
@@ -91,7 +98,9 @@ void main(uint3 id:SV_DispatchThreadID){
             uint3 r0=rgb(word(p,24)),r1=rgb(word(p,25)),r2=rgb(word(p,26));
             uint2 t0=uv(word(p,27)),t1=uv(word(p,28)),t2=uv(word(p,29));
             texture_bounds=uint4(min(t0,min(t1,t2)),max(t0,max(t1,t2)));
-            if(exact_native){if((op&16)&&!raw)light=uint3(interp_i(uint3(r0.x,r1.x,r2.x),wi,ai),interp_i(uint3(r0.y,r1.y,r2.y),wi,ai),interp_i(uint3(r0.z,r1.z,r2.z),wi,ai));
+            if(exact_native){if((op&16)&&!raw&&!(all(r0==r1)&&all(r1==r2)))
+                light=filtering_enabled?uint3(interp_div(uint3(r0.x,r1.x,r2.x),wi,ai),interp_div(uint3(r0.y,r1.y,r2.y),wi,ai),interp_div(uint3(r0.z,r1.z,r2.z),wi,ai)):
+                    uint3(interp_i(uint3(r0.x,r1.x,r2.x),wi,ai),interp_i(uint3(r0.y,r1.y,r2.y),wi,ai),interp_i(uint3(r0.z,r1.z,r2.z),wi,ai));
                 if(textured){if(filtering_enabled)filtered_uv=int2(hm_filter_uv_i(uint3(t0.x,t1.x,t2.x),wi,ai),hm_filter_uv_i(uint3(t0.y,t1.y,t2.y),wi,ai));
                     else st=uint2(interp_i(uint3(t0.x,t1.x,t2.x),wi,ai),interp_i(uint3(t0.y,t1.y,t2.y),wi,ai));}}
             else{if((op&16)&&!raw)light=uint3(interp_f(uint3(r0.x,r1.x,r2.x),wf,af),interp_f(uint3(r0.y,r1.y,r2.y),wf,af),interp_f(uint3(r0.z,r1.z,r2.z),wf,af));
@@ -123,10 +132,12 @@ void main(uint3 id:SV_DispatchThreadID){
             continue;}
         uint sample_color=textured?texel(p,st):0;if(textured&&sample_color==0)continue;
         uint source=sample_color&32768;
+        uint3 smooth_color=light;
         if(raw)source=sample_color;
         else{int3 value=int3(light);int3 tex=int3(sample_color&31,(sample_color>>5)&31,(sample_color>>10)&31);
             if(word(p,0)==0){if(textured)value=value*tex/16;
                 if((flags&1)&&((op&16)||(textured&&!raw)))value+=dither(logical);
+                smooth_color=uint3(clamp(value,0,255));
                 value=clamp(value,0,255)>>3;
             }else{if(textured)value=min(tex*value/128,31);
                 else{if(word(p,34)&&(flags&1))value=clamp(value+dither(logical),0,255);value>>=3;}}
@@ -139,8 +150,8 @@ void main(uint3 id:SV_DispatchThreadID){
             uint mode=(word(p,2)>>5)&3;int3 mixed=mode==0?back/2+front/2:mode==1?back+front:mode==2?back-front:back+front/4;
             mixed=clamp(mixed,0,31);result=(source&32768)|uint(mixed.x|(mixed.y<<5)|(mixed.z<<10));}
         sample_colors[blend_sample]=result|((flags&4)?32768:0);
-        fine_colors[blend_sample]=(flags&64)&&word(p,0)==0&&(op&16)&&!textured&&!(op&2)
-            ? light : expand555(result);}
+        fine_colors[blend_sample]=(flags&64)&&word(p,0)==0&&!raw&&!(op&2)&&((op&16)||textured)
+            ? smooth_color : expand555(result);}
     }
     uint3 sum=0;
     [unroll]for(uint resolve_sample=0;resolve_sample<4;++resolve_sample){if(resolve_sample>=samples)break;

@@ -3430,3 +3430,55 @@ Consequences: This is a partial improvement, not general true-color rendering
 or elimination of banding. Software and unsupported GPU frames retain their
 existing behavior. The feature adds per-sample shader storage; performance and
 owner gameplay validation remain unverified.
+
+
+## ADR-126: Respect displayed-area write protection in GPU scenes
+
+Date: 2026-10-30
+
+Context: The GPU scene descriptors captured the display rectangle and drawing
+permission, but the shader ignored them, allowing primitives into a protected
+displayed area where the CPU reference leaves pixels unchanged.
+
+Decision: Before drawing each primitive, apply the captured display-enable,
+rectangle, and draw-to-display flag in the shared GPU shader, matching the
+existing CPU and software paths. The check uses logical PS1 coordinates.
+
+Consequences: Offscreen D3D12 and Vulkan comparisons cover both display buffer
+positions and permission states. Gameplay and device coverage remain unverified.
+
+## ADR-127: Preserve opaque textured triangle shading precision
+
+Date: 2026-10-30
+
+Context: ADR-125 preserves untextured opaque Gouraud output, while modulation
+of opaque textured triangles still quantizes intermediate shading to BGR555.
+
+Decision: In enhanced GPU output with dithering bypassed, preserve the computed
+8-bit shading for opaque, non-raw, unfiltered textured triangles, while retaining
+the existing BGR555 state for masks, subsequent primitives, and VRAM. Native
+mode and software fallback remain unchanged. Transparent, raw, and filtered
+texture paths keep their existing precision.
+
+Consequences: Synthetic D3D12/Vulkan probes verify the limited path. This is
+not full true-color output; performance and owner gameplay checks are pending.
+
+
+## ADR-128: Match native GPU interpolation to the CPU reference
+
+Date: 2026-10-30
+
+Context: Random native scenes disagreed between GPU and CPU, including texture
+coordinates that selected different neighboring texels. CPU polygon interpolation
+uses a rounded fixed-point reciprocal; native GPU interpolation previously used
+direct division. The software filtering reference instead uses exact division.
+
+Decision: Reproduce the CPU reciprocal multiplication in native GPU polygon
+interpolation using existing emulated 64-bit multiplication. Retain direct
+division for the filtering path to match its software reference, and preserve
+constant vertex colors without reciprocal rounding. Enhanced-resolution and
+PGXP floating-point interpolation remain unchanged.
+
+Consequences: The complete synthetic native, randomized, filtering, widened
+scene, and presentation probes pass on local D3D12 and Vulkan. This does not
+establish complete gameplay or device coverage. Shader performance is unmeasured.
