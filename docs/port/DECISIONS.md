@@ -3930,3 +3930,26 @@ Consequences: Windows Android Release builds now use the requested NDK and the
 current Android build plugins with a checksum-verified wrapper. The NDK 30
 release APK passes APK signature verification, 16 KB zip alignment, and native
 ELF load-segment alignment checks. Device-level behavior remains owner-tested.
+
+## ADR-144: Add an Optional NPC Relationships Status Page
+
+Date: 2026-10-30. Status: accepted.
+
+Context: The owner requested a simple status page that lists NPC friendship and
+affection in the existing multi-page farm status menu.
+
+Decision: Add an optional ninth page that displays the 32 named adult villagers,
+using each original friendship value (0-255) or bachelorette affection value
+(0-65535). Show a small pixel head icon, the NPC name, and a colored progress
+bar; use green for friendship and pink for affection. Exclude unnamed records
+and the player's child. Gate the page behind `HMBTN_ENH_NPC_BONDS`, require the
+existing gameplay and pause-menu options, and persist `enhance.npc_bonds` with a
+runtime default of false. Enable its build option in Windows and Android `-Game`
+profiles. Add narrow `HMBTN_PORT && HMBTN_ENH_NPC_BONDS` source guards while
+keeping the exact matching-build eight-page handler and wrap behavior.
+
+Consequences: The feature leaves vanilla status navigation intact while OFF.
+It reads the original villager state without modifying it or loading/mutating
+villager sprites. Pure model and settings tests cover the roster, relationship
+mapping, bar bounds, defaults and persistence. The owner must still validate
+layout and navigation during gameplay.

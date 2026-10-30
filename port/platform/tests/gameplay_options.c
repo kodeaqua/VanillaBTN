@@ -196,6 +196,7 @@ int main(int argc, char **argv) {
     CHECK(opt.fast_text == 0);
     CHECK(opt.tool_charge_gauge == 0);
     CHECK(opt.tile_targeting == 0);
+    CHECK(opt.npc_bonds == 0);
 
     CHECK(hm_gameplay_walk_through_crops() == 0);
     CHECK(hm_gameplay_item_stacking() == 0);
@@ -216,6 +217,7 @@ int main(int argc, char **argv) {
     CHECK(hm_gameplay_fast_text() == 0);
     CHECK(hm_gameplay_tool_charge_gauge() == 0);
     CHECK(hm_gameplay_tile_targeting() == 0);
+    CHECK(hm_gameplay_npc_bonds() == 0);
 
     char val[64];
     hm_gameplay_row_value(&opt, 0, val, sizeof(val));
@@ -255,6 +257,12 @@ int main(int argc, char **argv) {
     CHECK(opt.tile_targeting == 1);
     CHECK(hm_gameplay_tile_targeting() == 1);
 
+    CHECK(hm_gameplay_change(&opt, 11, 1) == 1);
+    CHECK(opt.npc_bonds == 1);
+    CHECK(hm_gameplay_npc_bonds() == 1);
+    hm_gameplay_row_value(&opt, 11, val, sizeof(val));
+    CHECK(!strcmp(val, "On"));
+
     /* Test save & load persistence */
     CHECK(hm_gameplay_save(&opt) == 1);
 
@@ -268,6 +276,7 @@ int main(int argc, char **argv) {
     CHECK(loaded.roaming_horse == 1);
     CHECK(loaded.tool_charge_gauge == 1);
     CHECK(loaded.tile_targeting == 1);
+    CHECK(loaded.npc_bonds == 1);
 
     hm_gameplay_defaults(&opt);
     hm_gameplay_set_active(&opt);
@@ -280,6 +289,7 @@ int main(int argc, char **argv) {
     CHECK(hm_gameplay_fast_text() == 0);
     CHECK(hm_gameplay_tool_charge_gauge() == 0);
     CHECK(hm_gameplay_tile_targeting() == 0);
+    CHECK(hm_gameplay_npc_bonds() == 0);
 
     SDL_free(root);
     SDL_Quit();

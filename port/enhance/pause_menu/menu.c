@@ -13,7 +13,11 @@ static const char *const hm_graphics_items[] = {
 static const char *const hm_gameplay_items[] = {
     "Walk Crops", "Item Stacking", "Durable Fences", "Connect Fences", "Wild Dog Attacks",
     "Smart Bell", "Stamina HUD",   "Calendar Events","Roaming Horse",
-    "Tool Charge Bar", "Tile Targeting"};
+    "Tool Charge Bar", "Tile Targeting",
+#ifdef HMBTN_ENH_NPC_BONDS
+    "NPC Relationships",
+#endif
+};
 static const char *const hm_controls_items[] = {"Gamepad", "Keyboard", "Mouse"};
 static const char *const hm_audio_items[] = {"BGM Volume", "SFX Volume", "Resampling"};
 

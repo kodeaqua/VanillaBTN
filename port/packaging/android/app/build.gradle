@@ -21,6 +21,7 @@ android {
                           "-DBUILD_TESTING=OFF",
                           "-DHMBTN_BUILD_GPU_SPIKE=OFF",
                           "-DHMBTN_ENH_GAMEPLAY=ON",
+                          "-DHMBTN_ENH_NPC_BONDS=ON",
                           "-DHMBTN_ENH_PAUSE_MENU=ON",
                           "-DHMBTN_ENH_WIDESCREEN=ON",
                           "-DHMBTN_ENH_SCALING=ON",

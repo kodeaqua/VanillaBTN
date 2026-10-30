@@ -34,6 +34,10 @@
 #include "text_bank.h"
 #include "texture_pack.h"
 #include "ui_icons.h"
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_NPC_BONDS)
+#include "enhance/gameplay/gameplay.h"
+#include "enhance/npc_bonds/page.h"
+#endif
 
 /* The text terminator and the blank glyph of the status pages' message strings. */
 #define TEXT_END 0xFFFF
@@ -596,10 +600,17 @@ void status_page_step(void)
     }
 }
 
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_NPC_BONDS)
+static void (*status_page_handlers[9])(void) = {
+    status_draw_summary, status_draw_shipments, status_page_chickens, status_page_cows, status_page_sheep,
+    status_page_helpers, status_page_ledger, status_page_tool_levels, hm_npc_bonds_draw_page,
+};
+#else
 static void (*status_page_handlers[8])(void) = {
     status_draw_summary, status_draw_shipments, status_page_chickens, status_page_cows, status_page_sheep,
     status_page_helpers, status_page_ledger, status_page_tool_levels,
 };
+#endif
 
 /* Draw the page frame, the title and the side arrows, handle the page and close buttons,
  * draw the current page, then advance the cycle timer. */
@@ -627,6 +638,11 @@ static void status_page_tick(void)
         status_page_close();
     }
 
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_NPC_BONDS)
+    if (!hm_gameplay_npc_bonds() && (s16)status_page >= 8) {
+        status_page = 0;
+    }
+#endif
     (*status_page_handlers[(s16)status_page])();
 
     timer = status_cycle_frames + 1;
@@ -1552,9 +1568,21 @@ void options_page_next(void) {
             status_page = status_page + 1;
         }
     }
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_NPC_BONDS)
+    if (hm_gameplay_npc_bonds()) {
+        if ((s16)status_page >= 9) {
+            status_page = 0;
+        }
+    } else {
+        if ((s16)status_page >= 8) {
+            status_page = 0;
+        }
+    }
+#else
     if ((s16)status_page >= 8) {
         status_page = 0;
     }
+#endif
 }
 
 /* Step to the previous status page, skipping the chicken, cattle and sheep pages when there are
@@ -1579,9 +1607,15 @@ void options_page_prev(void) {
             status_page = status_page - 1;
         }
     }
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_NPC_BONDS)
+    if ((s16)status_page < 0) {
+        status_page = hm_gameplay_npc_bonds() ? 8 : 7;
+    }
+#else
     if ((s16)status_page < 0) {
         status_page = 7;
     }
+#endif
 }
 
 s32 status_count_pond_fish(void) {

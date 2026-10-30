@@ -23,6 +23,7 @@ try {
         $configureArgs += '-DHMBTN_ENH_WIDESCREEN=ON'
         $configureArgs += '-DHMBTN_ENH_ANTIALIASING=ON'
         $configureArgs += '-DHMBTN_ENH_GAMEPLAY=ON'
+        $configureArgs += '-DHMBTN_ENH_NPC_BONDS=ON'
         $configureArgs += '-DHMBTN_ENH_PGXP=ON'
         $configureArgs += '-DHMBTN_ENH_DITHERING=ON'
     }
