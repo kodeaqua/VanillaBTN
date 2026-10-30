@@ -266,7 +266,9 @@ static void hm_scene_triangle(hm_gpu_scene *s, u32 *material, const u32 xy[3], c
                (s64)((s32)p[21] - (s32)p[19]) * ((s32)p[22] - (s32)p[18]);
     if (s->motion_previous || has_pgxp) {
         p[4] |= 32;
-        if (has_pgxp) {
+        /* Interpolated vertices do not carry interpolated depth. Keep affine
+         * texture mapping for those frames instead of using unset PGXP Z. */
+        if (has_pgxp && !s->motion_previous) {
             p[33] = 1;
         }
         area = ((s64)(s32)p[36] - (s32)p[34]) * ((s64)(s32)p[39] - (s32)p[35]) -

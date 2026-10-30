@@ -3199,3 +3199,21 @@ ADR-092.
 Consequences: GPU output no longer adds a separate debanding effect. Native and
 enhanced rendering still retain their existing rasterization and fallback paths.
 Visual behaviour remains to be checked by the owner; no performance claim is made.
+
+## ADR-114: Use affine textures for interpolated PGXP packets
+
+Date: 2026-10-30. Status: accepted.
+
+Context: Motion-interpolated GPU packets use interpolated XY coordinates, but
+have no corresponding interpolated PGXP depth. The packet nevertheless enabled
+perspective correction when current PGXP vertices were available, leaving its
+three depth fields unset and allowing division by zero in the shader.
+
+Decision: Disable perspective correction for those interpolated packets. Keep
+PGXP perspective correction for non-interpolated packets with valid depth and
+keep interpolation's existing XY coordinates. Simulation and fallback are not
+changed. Interpolated frames use affine texture mapping until matching depth
+history is available.
+
+Consequences: This avoids consuming unset depth but does not interpolate
+perspective-correct textures. Owner visual and device validation remains pending.

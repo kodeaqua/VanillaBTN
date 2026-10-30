@@ -449,3 +449,7 @@ claimed. Matching source is unchanged and its Linux check was not run.
 The shared GPU output no longer adds unconditional presentation noise after
 BGR555 colour expansion (ADR-113). Original primitive dithering is unchanged.
 Owner gameplay validation is pending; GPU/CPU parity has not been remeasured.
+
+GPU packets that interpolate motion use affine texture mapping when PGXP is
+also enabled; non-interpolated PGXP packets retain perspective correction
+(ADR-114). Owner visual validation is pending.
