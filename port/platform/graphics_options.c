@@ -27,7 +27,7 @@ void hm_graphics_profile_set(hm_graphics_options *o, int profile) {
     if (profile == HM_GRAPHICS_PROFILE_MODERN) {
         o->widescreen = 1;
         o->linear = 1;
-        o->scaling = 1;
+        o->scaling = 0;
         o->vsync = 1;
         o->fps_numerator = 0;
         o->fps_denominator = 1;
@@ -628,7 +628,7 @@ void hm_graphics_value(const hm_graphics_options *o, int item, char *text, size_
     if (item == 0) {
         int profile = hm_graphics_profile_get(o);
         if (profile == HM_GRAPHICS_PROFILE_MODERN)
-            SDL_snprintf(text, capacity, "Modern - Tuned Mobile (16:9, 720p)");
+            SDL_snprintf(text, capacity, "Modern - Tuned Mobile (16:9, Bilinear)");
         else if (profile == HM_GRAPHICS_PROFILE_ENHANCE)
             SDL_snprintf(text, capacity, "Enhance - PS1 Clean (4:3, 1x, PGXP)");
         else
