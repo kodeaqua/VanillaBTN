@@ -3532,7 +3532,7 @@ Context:
 2. Android Scoped Storage restrictions frequently prevented write access to shared external documents, causing save failures and memory card storage errors.
 
 Decision:
-1. Update Android's graphics option selector to cycle through all 3 modes: Native PS1 (4:3, 1x), Enhance PS1 (4:3, 1x, PGXP), and Modern (16:9, 720p, Bilinear). Each mode explicitly configures widescreen, scaling, bilinear filtering, and PGXP while keeping frame interpolation clamped to OFF.
+1. Update Android's graphics option selector to cycle through all 3 modes: Native PS1 (4:3, 1x), Enhance PS1 (4:3, 1x, PGXP), and Modern (16:9, Bilinear, Scaling OFF). Each mode explicitly configures widescreen, 1x native scaling (preventing mobile GPU compute throttling), bilinear filtering, and PGXP while keeping frame interpolation clamped to OFF.
 2. Properly quote string literals in hm_graphics_save so JSON replacement validation succeeds on Android.
 3. Introduce a dedicated LauncherActivity and migrate user data and disc storage to Android app-private storage (getExternalFilesDir(null)/VanillaBTN), where full read/write access is guaranteed across all Android versions without runtime storage permissions:
    - On fresh install (disc absent from safe storage), display a clean Material 3 setup interface allowing the user to select their game disc via Android's Storage Access Framework (ACTION_OPEN_DOCUMENT) and copy it to safe storage with progress feedback.
