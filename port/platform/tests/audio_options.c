@@ -1,6 +1,7 @@
 #include "platform/audio_options.h"
 #include "platform/user_data.h"
 #include "psx/sound_control.h"
+#include "psx/spu_voice.h"
 #include <SDL3/SDL.h>
 #include <stdio.h>
 #include <string.h>
@@ -18,7 +19,11 @@ int main(int argc, char **argv) {
 
     CHECK(opt.bgm_volume == 100);
     CHECK(opt.sfx_volume == 100);
-    CHECK(opt.hq_resampler == 1);
+    CHECK(opt.hq_resampler == 0);
+    hm_spu_set_hq(1);
+    hm_audio_load(&opt);
+    CHECK(opt.hq_resampler == 0);
+    CHECK(hm_spu_get_hq() == 0);
 
     char val[64];
     hm_audio_row_value(&opt, 0, val, sizeof(val));
@@ -26,7 +31,7 @@ int main(int argc, char **argv) {
     hm_audio_row_value(&opt, 1, val, sizeof(val));
     CHECK(!strcmp(val, "100%"));
     hm_audio_row_value(&opt, 2, val, sizeof(val));
-    CHECK(!strcmp(val, "Studio HQ"));
+    CHECK(!strcmp(val, "PS1 Gaussian"));
 
     /* Test volume stepping and clamping */
     CHECK(hm_audio_change(&opt, 0, -1) == 1);
@@ -38,9 +43,9 @@ int main(int argc, char **argv) {
     CHECK(hm_sound_get_sfx_volume() == 80);
 
     CHECK(hm_audio_change(&opt, 2, 1) == 1);
-    CHECK(opt.hq_resampler == 0);
+    CHECK(opt.hq_resampler == 1);
     hm_audio_row_value(&opt, 2, val, sizeof(val));
-    CHECK(!strcmp(val, "PS1 Gaussian"));
+    CHECK(!strcmp(val, "Studio HQ"));
 
     /* Test save & load persistence */
     CHECK(hm_audio_save(&opt) == 1);
@@ -49,7 +54,8 @@ int main(int argc, char **argv) {
     hm_audio_load(&loaded);
     CHECK(loaded.bgm_volume == 90);
     CHECK(loaded.sfx_volume == 80);
-    CHECK(loaded.hq_resampler == 0);
+    CHECK(loaded.hq_resampler == 1);
+    CHECK(hm_spu_get_hq() == 1);
     CHECK(hm_sound_get_bgm_volume() == 90);
     CHECK(hm_sound_get_sfx_volume() == 80);
 

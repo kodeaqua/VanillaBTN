@@ -11,7 +11,7 @@ Full playthrough and broader gameplay remain unverified; see WINDOWS_PLAYTEST.md
 | Windows x86-64 | windows-release | All 113 original source units and native window build; tests passed (79/79 with -Game) |
 | Windows x86-64 sanitizers | windows-asan-ubsan | All source units and native window build; Clang 20.1.8 ASan/UBSan tests passed (79/79 with shared GPU output, pause, interpolation and scaling compiled); gameplay coverage remains limited |
 | macOS universal | macos-universal-release | Pending; no macOS host tested |
-| Android arm64 | Pending NDK and minSdk selection | No device/build validation |
+| Android arm64 | Gradle / NDK r27c, minSdk 26 | Previous build succeeded; current device behavior remains unverified |
 
 The owner prioritizes Windows. No workflow/CI changes are included or requested.
 The owner now performs interactive gameplay testing. The Windows host stores

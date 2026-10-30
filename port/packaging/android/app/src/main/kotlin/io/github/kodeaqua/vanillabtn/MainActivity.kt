@@ -129,6 +129,11 @@ class MainActivity : SDLActivity() {
                 }
                 foundDiscFile = candidateFile
                 targetDataDir = dir
+                try {
+                    Os.setenv("HMBTN_USER_DATA_DIR", dir.absolutePath, true)
+                } catch (e: Exception) {
+                    log("Failed to update HMBTN_USER_DATA_DIR: ${e.message}")
+                }
                 log("Found disc file: ${foundDiscFile?.absolutePath}")
                 break
             }
