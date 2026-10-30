@@ -405,6 +405,8 @@ initial area selection):
 | src/include/cpu_asm.h | Keep the native stack and use explicit diagnostic hooks |
 | src/main/graphics/anim.c | Check alignment using the full host pointer |
 | src/main/geometry/ground.c | Include two static helpers and exclude their nested copies (3 guards) |
+| src/main/geometry/ground.c | Use 32-bit VECTOR component pointers on LP64 hosts (ADR-110) |
+| src/main/geometry/model.c | Use 32-bit VECTOR component pointers in camera view construction (ADR-110) |
 | src/overlay/11_GF_FARM/animals/animals.c | Include three static helpers and exclude nested copies (4 guards) |
 | src/overlay/11_GF_FARM/estate.c | Include the static estate flag helper and exclude its nested copy (2 guards) |
 | src/overlay/11_GF_FARM/menu/shop_dialogues.c | Include the static medal-row helper and exclude its nested copy (2 guards) |

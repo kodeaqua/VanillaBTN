@@ -3093,3 +3093,20 @@ Decision:
 
 Consequences:
 Tile targeting renders cyan highlight quads and crisp perimeter borders on all targeted tiles on the farm, in the greenhouse, and in mines. Fast Text displays dialogue swiftly, displays the blinking advance prompt at page breaks, and seamlessly advances pages or choices on X/Cross press. All 122 unit tests pass 100%.
+## ADR-110: Use 32-bit vector component pointers in geometry
+
+Date: 2026-10-30
+
+Context: Android arm64 uses 64-bit `long`, while PS1 VECTOR components and
+the native compatibility VECTOR use 32-bit words. Camera view construction and
+the ground proximity check indexed these components through `long *`, causing
+incorrect reads and writes on LP64 hosts, including writes beyond VECTOR.
+
+Decision: Under HMBTN_PORT use `s32 *` for these component pointers. Keep the
+matching declarations unchanged. Add a camera basis regression test.
+
+Consequences: Camera construction and ground checks use the intended 32-bit
+stride on Android and other LP64 hosts. Actual Android gameplay remains to be
+validated on a device; the separate Linux matching check is not available on
+this Windows host.
+
