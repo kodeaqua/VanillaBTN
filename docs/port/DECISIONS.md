@@ -3763,3 +3763,23 @@ without removing any overlay code (avoids manifest hash updates for
 - 100% unit tests still passing (124/124); vanilla parity unaffected.
 - To re-enable in a future ADR: remove the `if (0 && ...)` guards and fix
   the OS cursor Y-offset root cause.
+
+
+## ADR-137: Use the VanillaBTN Documents folder for Windows user data
+
+Date: 2026-10-30. Status: accepted owner override.
+
+Context: ADR-044 originally selected Documents/BackToNature for Windows saves
+and settings. The owner later standardized the Windows user-data directory and
+specified that it must follow the active user's OS-resolved Documents folder,
+including redirected Documents locations.
+
+Decision: Store Windows configuration at Documents/VanillaBTN/settings.json
+and native memory-card containers under Documents/VanillaBTN/saves/. Resolve
+Documents through the OS user-folder API; do not hardcode a username, write
+beside the executable, or use AppData for these files. This supersedes ADR-044's
+Windows directory name. Android continues to use its app-private storage path.
+
+Consequences: Settings and saves use one current Windows location while
+respecting redirected Documents folders. Historical ADR-044 references describe
+the earlier path and are not the current Windows storage contract.

@@ -4,7 +4,7 @@ Owner-requested experimental screen-space primitive interpolation, not image
 crossfading or additional simulation. Build HMBTN_ENH_INTERPOLATION=ON (OFF by
 default); Windows build.ps1 -Game enables compilation. Runtime defaults OFF.
 Choose ESC > Settings > Graphics > Interpolation > On and a higher FPS Limit.
-The boolean persists as enhance.interpolation in Documents/BackToNature/settings.json.
+The boolean persists as enhance.interpolation in Documents/VanillaBTN/settings.json.
 
 Read-only frame observers capture native GPU commands, the pre-draw environment
 and VRAM. Two frame histories associate world primitives by arena-relative

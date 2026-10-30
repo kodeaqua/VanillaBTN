@@ -1,5 +1,9 @@
 # Native pause interface
 
+Current graphics paths and their limits are summarized in
+docs/port/ENHANCEMENTS.md. The implementation notes below are not a complete
+feature inventory.
+
 Initial implementation on port/windows-pause-menu, based on merged main.
 HMBTN_ENH_PAUSE_MENU defaults OFF in CMake. Windows build.ps1 -Game enables it
 for the owner's explicitly requested ESC interface. Set enhance.pause_menu to
@@ -45,7 +49,7 @@ Limit offers Native (30), Off (Unlimited), and monitor refresh-derived rates, pr
 values such as 60000/1001 (shown as 59.94). Windowed/borderless choices use the
 desktop resolution; exclusive choices use the selected resolution. VSync can
 reduce achieved presentation to the active OS refresh. A cap does not switch
-desktop refresh. The eleven-item list scrolls through seven visible rows.
+desktop refresh. The graphics list scrolls through its visible rows.
 
 Presentation deadlines are independent of the fixed 60 Hz hardware ticks.
 Original normal game updates remain 30 Hz through VSync(2). Higher caps repeat
@@ -57,10 +61,12 @@ through GPU Auto or the software reference; enhance.scaling defaults false.
 See ../scaling/README.md for coverage, limits and measured costs. Widescreen
 Mode now covers all screens while keeping UI centered and native
 sized (ADR-057); enhance.widescreen defaults false. See ../widescreen/README.md
-for scope and owner validation. FXAA/MSAA remain unavailable. Original texture
-assets and native simulation are retained.
+for scope and owner validation. FXAA (final image) and MSAA 2x/4x (GPU scene)
+were added in ADR-076 and default OFF. MSAA requires GPU Auto; the Software
+reference supports Off/FXAA. Original texture assets and native simulation are
+retained.
 
-The graphics object in Documents/BackToNature/settings.json stores monitor
+The graphics object in Documents/VanillaBTN/settings.json stores monitor
 ordinal, window_mode (0 windowed, 1 exclusive, 2 borderless), width, height and
 bilinear (0 or 1), vsync (0 or 1), fps_numerator and fps_denominator. Zero FPS
 numerator selects Native; -1 selects Off (Unlimited), with denominator 1. Defaults are VSync On and Native (30). Unknown root properties are preserved when replacing the

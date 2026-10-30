@@ -1,5 +1,14 @@
 # Windows SDL_GPU presentation spike
 
+## Current game renderer status
+
+This file documents an early synthetic presentation diagnostic, not the
+current renderer's full test coverage. The Windows game now uses shared GPU
+scene output at native and enhanced resolutions, retains Software as a
+reference, and falls back to CPU for unsupported operations. GPU coverage,
+gameplay parity, device behavior, and frame-time budgets remain incomplete;
+see PLATFORMS.md and ENHANCEMENTS.md.
+
 This optional local diagnostic validates GPU presentation without game data.
 It is not a game screen or a primitive rasterizer. Default unit builds neither
 download SDL nor require a GPU. The SDL release and SHA-256 are pinned in the
@@ -46,9 +55,10 @@ The launcher builds the release window if missing and clears diagnostic input
 replays/tick limits for the child game, restoring the caller's environment on
 exit. It does not copy disc data into the repository. Keyboard: arrows move,
 Enter is Start, X is Cross/confirm, Z is Square, D is Circle, W is Triangle,
-A/S are L1/R1, Q/E are L2/R2 and Backspace is Select. A 31000-tick replay now
+A/S are L1/R1, Q/E are L2/R2 and Backspace is Select. A 31000-tick replay
 validates free movement in the house (WINDOWS_PLAYTEST.md). Physical keyboard
-input remains unverified by automation; save persistence is not implemented.
+input remains unverified by automation. Native file-backed card containers are
+implemented; the complete in-game sleep/save/load lifecycle remains owner-unverified.
 
 The headless boot probe also accepts HMBTN_CAPTURE_FRAME to export its final
 15-bit scanout to BMP at HMBTN_BOOT_TICKS, and HMBTN_TRACE_GAME_STATE to print

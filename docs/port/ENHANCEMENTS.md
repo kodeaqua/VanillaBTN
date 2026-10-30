@@ -1,26 +1,39 @@
 # Enhancements
 
-ADR-124 defines Graphics Mode: Native PS1 (default), Enhance PS1 (PGXP and
-dithering bypass), and Modern (the same fixes plus individually selectable
-visual effects). Modern choices are retained when another mode is selected.
-Existing saved enhancement choices are migrated. GPU/CPU coverage and visual
-results remain subject to owner gameplay validation. On Android the existing
-compact menu exposes only the mode selector; individual Modern controls remain
-desktop-only, and mobile interpolation stays disabled. Earlier menu descriptions
-below are historical and are superseded by ADR-124.
+## Current status (2026-10-30)
 
-Disabling dithering removes the ordered pattern, but the current shared GPU
-scene still quantizes intermediate colors to BGR555. ADR-125/127 preserve 8-bit
-shading for opaque untextured Gouraud and non-raw, unfiltered textured triangles
-in enhanced GPU output. Other paths and software fallback still use BGR555.
-This reduces banding only in those cases. Older claims below and in ADR-084/092
-are superseded by this limitation and ADR-113/125/127.
+Graphics Mode offers Native PS1, Enhance PS1, and Modern. Modern effect
+selections are retained when another mode is active. Android has the same
+three-profile selector, keeps interpolation off, and bypasses the desktop PGXP
+compute path for mobile performance (ADR-123/124/131/132).
+
+| Area | Current state |
+| --- | --- |
+| Pause interface | ESC pause, Resume, Settings, and Exit Game are available by default per owner request; set enhance.pause_menu=false to turn it off. |
+| Renderer | GPU Auto is the default shared scene-output path at native and enhanced resolutions. Software remains selectable as the reference. Unsupported work falls back to CPU; GPU coverage is partial. |
+| Scaling and widescreen | Implemented as optional paths; both default OFF. Widescreen covers the implemented screens, but complete scene/device coverage and CPU fallback performance are unverified. |
+| Filtering and anti-aliasing | Nearest, Bilinear, xBR, FXAA, and GPU MSAA 2x/4x are implemented. FXAA/MSAA default OFF; MSAA requires GPU Auto. |
+| Interpolation | Optional and default OFF. Private primitive replay is limited to eligible farm views; Android clamps it off. It does not advance simulation. |
+| Dithering and color | Native PS1 retains original dithering. Enhance PS1/Modern can bypass it; 8-bit shading is preserved only for selected opaque GPU paths. Other paths and Software output retain BGR555 precision. |
+| Controls | Gamepad and keyboard controls work. Mouse settings remain in the controls model, but in-game mouse/touch actions are disabled by ADR-136. Pause-menu mouse navigation remains available. |
+| Gameplay options | Optional gameplay enhancements default OFF, except wild-dog attacks stay ON to preserve the vanilla behavior. The stamina HUD includes hearts and a fatigue gauge. Fast Text was removed from the menu and disabled pending a better multi-line pagination design (ADR-133). |
+| Android | Native PS1, Enhance PS1, and Modern profiles are available. Scaling is capped at 720p; interpolation and the desktop PGXP compute path are disabled. Device/gameplay validation remains limited. |
+
+Graphics and gameplay settings are stored under Documents/VanillaBTN/settings.json
+on Windows. The ESC interface is the explicit runtime-default exception to the
+general enhancement-OFF rule. Synthetic probes do not establish complete GPU
+coverage, gameplay parity, display behavior, or performance; see PLATFORMS.md.
+
+## Dated implementation history
+
+Entries below record the state at the time of each change. The current summary
+above and later ADRs supersede older feature descriptions and validation status.
 
 The owner requested the native pause interface and graphics settings on
 2026-10-26. Implementation starts on port/windows-pause-menu, after PR #1
 (windows port init) was merged and all old branches were removed.
 
-| Feature | Current implementation |
+| Feature | Initial implementation state (2026-10-26) |
 | --- | --- |
 | ESC pause, Resume, Settings > Graphics, Exit Game | Host interface implemented; owner interactive test pending |
 | Original dialog presentation/font | Original window-frame C and runtime disc glyph cache; synthetic composition and local asset decoding checks pass |
@@ -41,9 +54,10 @@ HMBTN_ENH_PAUSE_MENU defaults OFF in CMake; Windows build.ps1 -Game enables it.
 The owner explicitly requests ESC availability across scenes, so that interface
 defaults available at runtime; enhance.pause_menu=false disables it. This is
 recorded as a narrow owner override in AGENTS.md. Rendering enhancements retain
-their OFF defaults and cannot be enabled through placeholder controls.
+their OFF runtime defaults; implemented paths and current coverage limits are
+summarized at the top of this document.
 
-Graphics properties are saved in Documents/BackToNature/settings.json. Unknown
+Graphics properties are saved in Documents/VanillaBTN/settings.json. Unknown
 root properties are preserved; malformed input is not overwritten. No game
 state, RNG, CD progress, GPU VRAM or SPU synthesis advances inside the pause UI
 loop. Paused wall time is excluded from the pacing epoch. No game art, fonts,
@@ -58,7 +72,9 @@ Enable Interpolation and choose a higher FPS Limit in Graphics. Positions are
 interpolated through private GPU command replay, without extra game updates or
 image crossfading. Initial scope is normal farm views; unmatched primitives,
 loading, transitions and other contexts retain native cadence. See
-port/enhance/interpolation/README.md. Optional farm Widescreen ON is available (ADR-056); AA remains pending.
+port/enhance/interpolation/README.md. Optional Widescreen is available. FXAA
+and MSAA were implemented later in ADR-076; gameplay/device validation remains
+owner-tested.
 
 FPS Limit Off removes the software presentation cap (ADR-051). VSync On still
 synchronizes to the active monitor; Native remains the default. A synthetic
@@ -152,7 +168,10 @@ Graphics Mode supersedes the earlier individual PGXP and dithering controls (ADR
 
 ## Recent Enhancements & Fixes (2026-10-29 to 2026-10-30)
 
-### Fast Text Dialogue Flow (ADR-106 & ADR-109)
+### Fast Text Dialogue Flow (ADR-106 & ADR-109; removed by ADR-133)
+
+This records the earlier implementation. Fast Text is currently removed from
+the menu and disabled while multi-line pagination behavior is reconsidered.
 Fast Text provides instant dialogue text typing while strictly preserving game control codes and timing events:
 - At TEXT_CODE_PAGE_MARK and TEXT_CODE_PAGE_END, Fast Text immediately pauses text advancement and locks 	ext_phase = TEXT_STATE_PAGE_BREAK.
 - Prevents subsequent glyph evaluations from overwriting the phase back to TEXT_STATE_PRINTING.

@@ -1,8 +1,16 @@
 # Native port reconnaissance
 
-Status: native Windows bring-up in progress, 2026-10-25. All 113 original C
-units compile. A native console probe executes the original boot prefix, but
-title rendering/gameplay and the matching baseline remain unverified.
+This is the source/overlay inventory baseline from 2026-10-25, not the current
+feature-status page. The Windows game has since reached the title and farm;
+Android arm64-v8a build support has also been added. Full gameplay parity and
+the matching check remain unverified. Current Windows user data is under
+Documents/VanillaBTN; older BackToNature references below are historical
+(ADR-137). See PLATFORMS.md for current platform status and ENHANCEMENTS.md
+for current renderer coverage.
+
+At the time of this inventory, all 113 original C units compiled. A native
+console probe executed the original boot prefix, but title rendering/gameplay
+and the matching baseline had not yet been validated.
 
 ## Source and overlays
 
