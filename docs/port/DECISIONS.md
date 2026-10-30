@@ -3860,3 +3860,73 @@ Against ADR-138's earlier GPU measurements, D3D12 changed from
 0.475/0.547/0.877 ms and Vulkan from 0.520/0.564/0.998 ms. This probe uses
 unchanged VRAM after its first frame; it does not represent scene uploads that
 modify most VRAM each frame or end-to-end gameplay frame rate.
+
+## ADR-141: Keep Android Disc Import Within App-Private Storage
+
+Date: 2026-10-30. Status: accepted.
+
+Context: The Android launcher still probed public Documents directly and kept
+legacy shared-storage permissions even though the current setup flow uses the
+Storage Access Framework (SAF). Scoped storage makes those direct probes
+unreliable. Disc import also deleted the installed image before checking that
+the replacement rename succeeded. The accepted NDK r27c configuration had the
+16 KB maximum page-size linker flag but lacked the matching common page-size
+flag.
+
+Decision: Import a raw USA `.bin` selected through SAF into app-specific
+external storage, with internal app storage as a writable fallback. Do not
+request broad shared-storage access or probe public Documents paths. Copy to a
+temporary file, flush it, then replace the installed image atomically when the
+filesystem supports it; a failed copy must keep the installed image. Keep logs
+free of user paths. Mark touch hardware optional so Android devices with a
+controller and no touchscreen remain installable. For NDK r27, link with both
+`max-page-size=16384` and `common-page-size=16384`.
+
+Consequences: Older disc images in shared Documents must be selected with the
+document picker. The app uses one consistent app-private root for native data,
+saves and the imported image. Device-level 16 KB execution and interactive
+gameplay still require owner/device validation.
+
+## ADR-142: Preserve Existing User Data When Atomic Replacement Fails
+
+Date: 2026-10-30. Status: accepted.
+
+Context: Windows settings and memory-card persistence used a temporary file,
+but on rename failure the fallback removed the existing file and then wrote
+directly to the destination. A second failure could destroy the last valid
+settings or save data. The Windows C runtime's narrow `rename` was also used
+for a Documents folder migration even though paths are stored as UTF-8.
+
+Decision: Replace files on Windows with `MoveFileExW` using UTF-8 to UTF-16
+conversion and `MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH`. On other
+platforms use the platform-aware SDL rename. Any failed replacement removes
+only the temporary file and leaves the previous destination untouched. Use
+`SDL_RenamePath` for the legacy directory move so Windows paths stay Unicode
+safe.
+
+Consequences: A failed settings or memory-card save preserves the prior
+committed file. Unit coverage exercises successful replacement of existing
+card data and the existing failed-write preservation path.
+
+## ADR-143: Upgrade the Android Build Toolchain
+
+Date: 2026-10-30. Status: accepted.
+
+Context: The owner requested the newest Android Gradle Plugin and Gradle
+wrapper, with NDK `30.0.16248370`. The previous Android setup used an older AGP
+and NDK. AGP 9 provides built-in Kotlin support, while the project had also
+passed a redundant `HMBTN_PORT` CMake variable that the port build does not use.
+
+Decision: Pin AGP 9.5.0, Gradle 9.8.2, and NDK `30.0.16248370`. Commit the
+Gradle wrapper scripts and JAR, verify the JAR against the official Gradle 9.8.2
+checksum, and pin the distribution SHA-256 in wrapper properties. Use AGP's
+built-in Kotlin support and remove the external Kotlin plugin. Have the
+Android build script verify the installed side-by-side NDK and wrapper versions;
+use the literal `android.ndkVersion` pin instead of passing a second version
+through a Gradle property. Remove the unused `HMBTN_PORT` CMake argument; the
+port target already defines that compile macro.
+
+Consequences: Windows Android Release builds now use the requested NDK and the
+current Android build plugins with a checksum-verified wrapper. The NDK 30
+release APK passes APK signature verification, 16 KB zip alignment, and native
+ELF load-segment alignment checks. Device-level behavior remains owner-tested.

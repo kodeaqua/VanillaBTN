@@ -33,6 +33,15 @@ int main(int argc, char **argv) {
     CHECK(MemCardWriteFile(0, "SAVE01", expected, 128, sizeof(expected)) == 1);
     long command, result;
     CHECK(MemCardSync(0, &command, &result) == 1 && command == 4 && result == 0);
+    const unsigned char replacement[] = {11, 22, 33, 44, 55, 66};
+    unsigned char actual[sizeof(expected)] = {0};
+    CHECK(MemCardWriteFile(0, "SAVE01", replacement, 128, sizeof(replacement)) == 1);
+    CHECK(MemCardSync(0, &command, &result) == 1 && command == 4 && result == 0);
+    CHECK(MemCardReadFile(0, "SAVE01", actual, 128, sizeof(actual)) == 1);
+    CHECK(MemCardSync(0, &command, &result) == 1 && result == 0);
+    CHECK(!memcmp(actual, replacement, sizeof(actual)));
+    CHECK(MemCardWriteFile(0, "SAVE01", expected, 128, sizeof(expected)) == 1);
+    CHECK(MemCardSync(0, &command, &result) == 1 && command == 4 && result == 0);
     hm_user_data_stop();
     /* Preserve existing settings, even keys unknown to this build. */
     file = SDL_IOFromFile(settings, "wb");
@@ -40,7 +49,6 @@ int main(int argc, char **argv) {
     CHECK(file && SDL_WriteIO(file, custom, sizeof(custom) - 1) == sizeof(custom) - 1);
     CHECK(SDL_CloseIO(file));
     CHECK(hm_user_data_start_at(root));
-    unsigned char actual[sizeof(expected)] = {0};
     MemCardInit(0);
     MemCardStart();
     CHECK(MemCardReadFile(0, "SAVE01", actual, 128, sizeof(actual)) == 1);

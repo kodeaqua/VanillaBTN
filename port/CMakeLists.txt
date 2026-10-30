@@ -330,7 +330,9 @@ if(HMBTN_BUILD_GPU_SPIKE OR HMBTN_BUILD_NATIVE_WINDOW)
                 OUTPUT_NAME "VanillaBTN"
                 LINKER_LANGUAGE CXX)
             target_link_libraries(hmbtn_native PRIVATE log android c++_static)
-            target_link_options(hmbtn_native PRIVATE "-Wl,-z,max-page-size=16384")
+            target_link_options(hmbtn_native PRIVATE
+                "-Wl,-z,max-page-size=16384"
+                "-Wl,-z,common-page-size=16384")
             target_compile_definitions(hmbtn_native PRIVATE HMBTN_SDL_HOST=1)
         else()
             add_executable(hmbtn_native platform/boot_probe.c platform/game_host.c platform/input_replay.c

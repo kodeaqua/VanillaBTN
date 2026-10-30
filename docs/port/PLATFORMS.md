@@ -4,8 +4,8 @@
 
 | Target | Current validation |
 | --- | --- |
-| Windows x86-64 | Playable -Game build and standalone package have been produced. The latest recorded Windows suite is 124/124; this documentation update did not rerun it. Full-playthrough parity and several scene/device checks remain unverified. |
-| Android arm64-v8a | Native APK build has succeeded with NDK r27c. Graphics profiles, SAF disc import, touch controls, and app-private storage are implemented; full gameplay/device validation remains incomplete. |
+| Windows x86-64 | Playable -Game build and standalone package produced in the 2026-10-30 audit; Release suite 124/124 and ASan/UBSan suite 108/108 passed. Full-playthrough parity and device behavior remain unverified. |
+| Android arm64-v8a | Release APK built with AGP 9.5.0, Gradle 9.8.2, and NDK 30.0.16248370; native ELF and APK zip alignment checks pass for 16 KB pages. SAF disc import and app-private storage are implemented; device gameplay remains unverified. |
 | Linux x86-64 | Deferred to a separate Linux host; WSL is excluded. |
 | macOS universal | No macOS build has been validated. |
 | Matching build | The check target remains unverified on this Windows host because its separate Linux toolchain is unavailable. |
@@ -21,6 +21,24 @@ Owner follow-up: the owner reports that sleep/save is now safe. The exact
 scenarios covered were not specified, so broad sleep, day-transition, save,
 and load parity remains unverified. Earlier crash reports below are historical
 and should be reopened only if the problem reproduces. See WINDOWS_PLAYTEST.md.
+
+### Core, Windows and Android audit (2026-10-30)
+
+Windows `build.ps1 -Preset windows-release -Game` rebuilt the playable
+executable and standalone ZIP; all 124 Release tests passed. The
+`windows-asan-ubsan` preset passed all 108 tests. The data persistence tests
+cover replacing existing card files and preserving the last valid card after a
+failed write. The game was not launched.
+
+Android `build.ps1 -BuildType Release` completed with AGP 9.5.0, Gradle 9.8.2,
+and NDK 30.0.16248370. The 8.38 MB APK passed `apksigner verify`,
+`zipalign -c -P 16 4`, and an `llvm-readelf -l` check showing `0x4000` alignment
+for every native load segment. It uses the local debug signing config and is
+not production-signed. No Android device or gameplay test was run.
+
+The matching decompilation check was not run because its separate Linux
+toolchain is unavailable on this Windows host. No files under matching source
+directories were changed.
 
 ## Historical validation notes
 

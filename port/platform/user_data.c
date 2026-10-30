@@ -21,6 +21,28 @@ static int hm_exists(const char *directory, const char *name) {
     SDL_free(path);
     return ok ? 1 : 0;
 }
+static int hm_replace_path(const char *source, const char *destination) {
+#ifdef _WIN32
+    int source_count = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, source, -1, NULL, 0);
+    int destination_count =
+        MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, destination, -1, NULL, 0);
+    wchar_t *wide_source = source_count ? SDL_malloc((size_t)source_count * sizeof(wchar_t)) : NULL;
+    wchar_t *wide_destination =
+        destination_count ? SDL_malloc((size_t)destination_count * sizeof(wchar_t)) : NULL;
+    int ok = wide_source && wide_destination &&
+             MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, source, -1, wide_source,
+                                 source_count) &&
+             MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, destination, -1, wide_destination,
+                                 destination_count) &&
+             MoveFileExW(wide_source, wide_destination,
+                         MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
+    SDL_free(wide_destination);
+    SDL_free(wide_source);
+    return ok;
+#else
+    return SDL_RenamePath(source, destination);
+#endif
+}
 static int hm_replace(const char *directory, const char *name, const void *data, size_t bytes) {
     char *path = NULL, *temporary = NULL;
     if (SDL_asprintf(&path, "%s/%s", directory, name) < 0 ||
@@ -33,17 +55,9 @@ static int hm_replace(const char *directory, const char *name, const void *data,
     bool ok = file && SDL_WriteIO(file, data, bytes) == bytes && SDL_FlushIO(file);
     if (file && !SDL_CloseIO(file))
         ok = false;
-    if (ok && !SDL_RenamePath(temporary, path)) {
-        SDL_RemovePath(path);
-        if (!SDL_RenamePath(temporary, path)) {
-            SDL_IOStream *direct = SDL_IOFromFile(path, "wb");
-            ok = direct && SDL_WriteIO(direct, data, bytes) == bytes && SDL_FlushIO(direct);
-            if (direct && !SDL_CloseIO(direct))
-                ok = false;
-            SDL_RemovePath(temporary);
-        }
-    }
-    if (!ok && file)
+    if (ok)
+        ok = hm_replace_path(temporary, path);
+    if (!ok)
         SDL_RemovePath(temporary);
     SDL_free(temporary);
     SDL_free(path);
@@ -135,7 +149,7 @@ int hm_user_data_start(void) {
     if (SDL_asprintf(&old_root, "%s/BackToNature", documents) >= 0) {
         SDL_PathInfo new_info, old_info;
         if (!SDL_GetPathInfo(root, &new_info) && SDL_GetPathInfo(old_root, &old_info)) {
-            rename(old_root, root);
+            SDL_RenamePath(old_root, root);
         }
         SDL_free(old_root);
     }

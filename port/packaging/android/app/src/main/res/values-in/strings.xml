@@ -2,14 +2,16 @@
 <resources>
     <string name="app_name">VanillaBTN</string>
     <string name="game_disc_not_found_title">File Game Tidak Ditemukan</string>
-    <string name="game_disc_not_found_message">Silakan taruh file disc Harvest Moon: Back to Nature (.bin / .cue) di folder berikut:\n\nPenyimpanan Internal > Documents > VanillaBTN\n\nNama file yang didukung: game.bin, hmbtn.bin, VanillaBTN.bin, atau nama file disc asli kamu.</string>
+    <string name="game_disc_not_found_message">Pilih file disc raw Harvest Moon: Back to Nature versi USA (.bin). File CUE dan ISO tidak didukung. File yang dipilih akan disalin ke penyimpanan privat aplikasi.</string>
     <string name="action_exit">Keluar</string>
     <string name="action_open_folder">Buka Folder</string>
-    <string name="permission_storage_needed">Izin penyimpanan diperlukan untuk membaca data save dan file game disc.</string>
     <string name="setup_title">Harvest Moon: Back to Nature</string>
     <string name="setup_subtitle">VanillaBTN — Native Port</string>
-    <string name="setup_description">File game disc (.bin / .cue / .iso) diperlukan untuk bermain.\n\nSilakan pilih file game disc versi USA Anda. File akan disalin ke penyimpanan aman aplikasi agar save game dan pengaturan berjalan lancar tanpa kendala izin penyimpanan.</string>
+    <string name="setup_description">Diperlukan file disc raw (.bin) Harvest Moon: Back to Nature versi USA. File CUE dan ISO tidak didukung.\n\nPilih file .bin melalui pemilih dokumen. VanillaBTN akan menyalinnya ke penyimpanan privat aplikasi untuk game dan save.</string>
     <string name="setup_button_select">PILIH FILE GAME DISC</string>
-    <string name="setup_copying">Menyalin game disc ke penyimpanan aman…</string>
+    <string name="setup_copying">Menyalin game disc ke penyimpanan privat aplikasi…</string>
+    <string name="setup_select_raw_bin">Pilih file disc raw versi USA yang berakhiran .bin. File CUE dan ISO tidak didukung.</string>
+    <string name="setup_invalid_disc">File yang dipilih terlalu kecil untuk menjadi image disc. Pilih file .bin yang lengkap.</string>
+    <string name="setup_storage_unavailable">VanillaBTN tidak dapat mengakses penyimpanan privat aplikasi. Periksa ruang penyimpanan lalu coba lagi.</string>
     <string name="setup_copy_failed">Gagal menyalin game disc. Pastikan perangkat Anda memiliki ruang penyimpanan kosong minimal 700 MB.</string>
 </resources>
