@@ -28,8 +28,9 @@ Output backend execution is separate from this portable capture/packet layer.
 Snapshots are immutable input; only backend-owned output is written. Source
 texture/CLUT overlap with output, offscreen draw dependencies, dependent VRAM
 transfers and capacity overflow reject GPU packet output so the caller can use
-the software reference. Fully offscreen untextured draws can be skipped until
-a later textured primitive requires the software reference. Leading fills/uploads and transfers outside both the
+the software reference. Fully offscreen untextured draws are skipped and their
+conservative 16x16 VRAM tile footprints are tracked; later textured draws trigger
+software fallback only when sampled textures or CLUTs overlap those written tiles. Leading fills/uploads and transfers outside both the
 output and previously sampled texture/CLUT tiles update the private initial
 snapshot. Tile-level overlap is conservative and retains fallback when a
 dependency cannot be excluded.

@@ -17,7 +17,8 @@ struct hm_gpu_scene {
     RECT area, native;
     u16 background;
     const char *failure;
-    int begun, texture_linear, offscreen_writes;
+    int begun, texture_linear;
+    u64 offscreen_writes[32]; /* Conservative 16x16 VRAM tile footprint for offscreen writes. */
     u64 texture_reads[32]; /* Conservative 16x16 VRAM tile footprint. */
     unsigned multisamples;
     u64 revision;
@@ -47,8 +48,7 @@ static int hm_scene_overlap(int x, int y, int w, int h, const RECT *r) {
         }
     return 0;
 }
-static int hm_scene_texture_tiles(hm_gpu_scene *s, u32 x, u32 y, u32 width, u32 height,
-                                  int mark) {
+static int hm_scene_tiles(u64 tiles[32], u32 x, u32 y, u32 width, u32 height, int mark) {
     if (!width || !height)
         return 0;
     u32 last_x = (x + width - 1) / 16, last_y = (y + height - 1) / 16;
@@ -56,7 +56,7 @@ static int hm_scene_texture_tiles(hm_gpu_scene *s, u32 x, u32 y, u32 width, u32 
     for (u32 ty = y / 16; ty <= last_y; ++ty) {
         for (u32 tx = x / 16; tx <= last_x; ++tx) {
             u64 bit = UINT64_C(1) << (tx & 63);
-            u64 *row = &s->texture_reads[ty & 31];
+            u64 *row = &tiles[ty & 31];
             overlap |= (*row & bit) != 0;
             if (mark)
                 *row |= bit;
@@ -64,16 +64,18 @@ static int hm_scene_texture_tiles(hm_gpu_scene *s, u32 x, u32 y, u32 width, u32 
     }
     return overlap;
 }
+static int hm_scene_texture_tiles(hm_gpu_scene *s, u32 x, u32 y, u32 width, u32 height,
+                                  int mark) {
+    return hm_scene_tiles(s->texture_reads, x, y, width, height, mark);
+}
+static int hm_scene_offscreen_tiles(hm_gpu_scene *s, u32 x, u32 y, u32 width, u32 height,
+                                    int mark) {
+    return hm_scene_tiles(s->offscreen_writes, x, y, width, height, mark);
+}
 static int hm_scene_material(hm_gpu_scene *s, u32 *p, u32 op, u32 page, u32 clut) {
     const hm_gpu_environment *env = hm_gpu_environment_state();
     const DRAWENV *d = &env->draw;
     if (op & 4) {
-        /* Offscreen writes are not rasterized into this private snapshot.
-         * A later textured primitive could read them, so replay in software. */
-        if (s->offscreen_writes) {
-            s->failure = "offscreen draw dependencies";
-            return 0;
-        }
         u32 depth = (page >> 7) & 3;
         if (depth > 2) {
             s->failure = "reserved texture depth";
@@ -82,6 +84,11 @@ static int hm_scene_material(hm_gpu_scene *s, u32 *p, u32 op, u32 page, u32 clut
         if (depth < 2 && hm_scene_overlap((clut & 63) * 16, (clut >> 6) & 511, depth ? 256 : 16, 1,
                                           &s->native)) {
             s->failure = "framebuffer texture feedback";
+            return 0;
+        }
+        if (depth < 2 && hm_scene_offscreen_tiles(s, (clut & 63) * 16, (clut >> 6) & 511,
+                                                  depth ? 256 : 16, 1, 0)) {
+            s->failure = "offscreen draw dependencies";
             return 0;
         }
         if (depth < 2)
@@ -152,6 +159,11 @@ static int hm_scene_texture_bounds(hm_gpu_scene *s, const u32 *p, u32 u, u32 v, 
         s->failure = "framebuffer texture feedback";
         return 0;
     }
+    if (hm_scene_offscreen_tiles(s, (p[2] & 15) * 64 + (u32)x0, (p[2] & 16) * 16 + (u32)y0,
+                                 (u32)(x1 - x0 + 1), (u32)(y1 - y0 + 1), 0)) {
+        s->failure = "offscreen draw dependencies";
+        return 0;
+    }
     hm_scene_texture_tiles(s, (p[2] & 15) * 64 + (u32)x0, (p[2] & 16) * 16 + (u32)y0,
                            (u32)(x1 - x0 + 1), (u32)(y1 - y0 + 1), 1);
     return 1;
@@ -181,9 +193,13 @@ static void hm_scene_add(hm_gpu_scene *s, u32 *p, int x0, int y0, int x1, int y1
             s->failure = "offscreen draw dependencies";
             return;
         }
-        /* This untextured draw cannot affect output directly. Preserve a
-         * conservative dependency flag for any later texture/CLUT read. */
-        s->offscreen_writes = 1;
+        /* This untextured draw cannot affect output directly. Record its
+         * conservative 16x16 VRAM tile footprint for any later texture/CLUT read. */
+        u32 wx = (u32)x0 & 1023u, wy = (u32)y0 & 511u;
+        u32 ww = (u32)(x1 - x0), wh = (u32)(y1 - y0);
+        if (ww > 1024) ww = 1024;
+        if (wh > 512) wh = 512;
+        hm_scene_offscreen_tiles(s, wx, wy, ww, wh, 1);
         return;
     }
     if (x0 < s->area.x)
@@ -638,7 +654,7 @@ hm_replay_sink hm_gpu_scene_begin(hm_gpu_scene *s, u32 width, u32 height) {
     s->width = width;
     s->height = height;
     s->count = 0;
-    s->offscreen_writes = 0;
+    memset(s->offscreen_writes, 0, sizeof(s->offscreen_writes));
     memset(s->texture_reads, 0, sizeof(s->texture_reads));
     s->failure = NULL;
     s->begun = 0;

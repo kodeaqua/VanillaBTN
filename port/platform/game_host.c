@@ -1454,8 +1454,11 @@ static void hm_host_tick(void *context, u64 tick) {
 #else
         Uint64 next_present = (!interp_active && presented_this_tick)
                                   ? deadline
-                                  : (hm_presentation.unlimited ? now + 2000000
-                                                               : hm_presentation.next_ns);
+                                  : (hm_presentation.unlimited
+                                         ? now + 2000000
+                                         : (hm_presentation.next_ns <= now
+                                                ? now + 1000000
+                                                : hm_presentation.next_ns));
         Uint64 wake = next_present < deadline ? next_present : deadline;
         if (wake > now) {
             SDL_DelayPrecise(wake - now);

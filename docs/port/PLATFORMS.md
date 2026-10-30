@@ -474,3 +474,6 @@ output area (ADR-118). Actual scene coverage and gameplay remain unverified.
 GPU replay may skip fully offscreen, untextured draws when wrapped bounds do not
 touch output; any later textured draw forces the reference fallback (ADR-119).
 Actual scene coverage and gameplay remain unverified.
+
+
+Fine-grained 16x16 VRAM tile tracking for skipped offscreen untextured draws eliminates blanket fallbacks when later textured draws sample independent VRAM regions; fallback is restricted to actual tile overlap with sampled textures or CLUTs, and frame pacing prevents busy-spin when swapchains stall (ADR-121). Actual scene coverage and gameplay remain unverified.

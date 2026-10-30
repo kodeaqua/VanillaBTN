@@ -3317,3 +3317,14 @@ Context: When Widescreen Mode is enabled, the farm world viewport expands horizo
 Decision: When Widescreen Mode is active (`hm_widescreen_margin() > 0`), expand the horizontal weather particle spawn boundaries in `particle_respawn` to cover `[-margin, 320 + margin)` (`add6 = -margin`, `add0 = 320 + 2 * margin`). The number of random number generator rolls per particle respawn remains exactly 5, preserving deterministic PRNG stepping. When Widescreen Mode is OFF (`hm_widescreen_margin() == 0`), the original constants (`add6 = 20`, `add0 = 240`) are preserved unconditionally for 100% vanilla parity.
 
 Consequences: Rain, snow, and weather particles render seamlessly across the entire visible widescreen viewport without artificial pillarboxed boundaries. Vanilla 4:3 rendering and logic remain identical.
+
+
+## ADR-121: Fine-grained VRAM tile tracking for offscreen draws and swapchain pacing protection
+
+Date: 2026-10-30. Status: accepted.
+
+Context: ADR-119 deferred fallbacks for fully offscreen untextured draws using a coarse boolean flag. Any subsequent textured primitive anywhere in the frame immediately forced a fallback to CPU software rasterization, even when reading from independent VRAM regions far from the offscreen write. In addition, when swapchains stall or presentation deadlines fall behind real time during window minimization or display transitions, Windows presentation loops could busy-spin without delay.
+
+Decision: Replace coarse boolean tracking with conservative 16x16 VRAM tile footprints (`offscreen_writes[32]`) matching the existing tile tracking mechanism used for texture reads (`texture_reads[32]`). Fully offscreen untextured draws record their wrapped destination tiles. Subsequent textured primitives trigger CPU fallback only if their sampled texture UV footprint or CLUT footprint overlaps recorded offscreen write tiles. In the presentation loop, bound non-unlimited catch-up delays to at least 1 ms when presentation deadlines are in the past or swapchains are unavailable, preventing 0-ns busy-spinning. Native VRAM drawing and game logic remain unchanged.
+
+Consequences: Qualifying frames with offscreen helper draws alongside independent textured geometry remain on the GPU compute pipeline, eliminating false-positive fallbacks for smoother frame pacing and reduced CPU load. Bit-exact dependency safety is preserved. Actual scene coverage and gameplay behavior remain unverified at the owner's request.
