@@ -158,10 +158,10 @@ static int tile_render_checks(void) {
     CHECK(frame.primCursor.bytes == frame.primBuffer);
     event_flag_set(EVENT_FLAG_EVENT_ACTIVE, 0);
 
-    event_flag_set(EVENT_FLAG_REQUEST_BUSY, 1);
+    game_state.requests.state = FARM_REQUEST_RUN;
     hm_gameplay_draw_tile_targeting(&game_state.player, 2500);
     CHECK(frame.primCursor.bytes == frame.primBuffer);
-    event_flag_set(EVENT_FLAG_REQUEST_BUSY, 0);
+    game_state.requests.state = 0;
 
     game_state.system.menuState = MENU_STATE_OPEN;
     hm_gameplay_draw_tile_targeting(&game_state.player, 2500);
@@ -246,15 +246,12 @@ int main(int argc, char **argv) {
     CHECK(hm_gameplay_change(&opt, 8, 1) == 1);
     CHECK(opt.roaming_horse == 1);
     CHECK(hm_gameplay_roaming_horse() == 1);
-    CHECK(hm_gameplay_change(&opt, 9, 1) == 1);
-    CHECK(opt.fast_text == 1);
-    CHECK(hm_gameplay_fast_text() == 1);
 
-    CHECK(hm_gameplay_change(&opt, 10, 1) == 1);
+    CHECK(hm_gameplay_change(&opt, 9, 1) == 1);
     CHECK(opt.tool_charge_gauge == 1);
     CHECK(hm_gameplay_tool_charge_gauge() == 1);
 
-    CHECK(hm_gameplay_change(&opt, 11, 1) == 1);
+    CHECK(hm_gameplay_change(&opt, 10, 1) == 1);
     CHECK(opt.tile_targeting == 1);
     CHECK(hm_gameplay_tile_targeting() == 1);
 
@@ -269,7 +266,6 @@ int main(int argc, char **argv) {
     CHECK(loaded.stamina_hud == 1);
     CHECK(loaded.calendar_events == 1);
     CHECK(loaded.roaming_horse == 1);
-    CHECK(loaded.fast_text == 1);
     CHECK(loaded.tool_charge_gauge == 1);
     CHECK(loaded.tile_targeting == 1);
 

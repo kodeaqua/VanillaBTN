@@ -130,12 +130,9 @@ int hm_gameplay_change(hm_gameplay_options *options, int item, int direction) {
         options->roaming_horse = !options->roaming_horse;
         break;
     case 9:
-        options->fast_text = !options->fast_text;
-        break;
-    case 10:
         options->tool_charge_gauge = !options->tool_charge_gauge;
         break;
-    case 11:
+    case 10:
         options->tile_targeting = !options->tile_targeting;
         break;
     default:
@@ -177,12 +174,9 @@ void hm_gameplay_value(const hm_gameplay_options *options, int item, char *text,
         snprintf(text, capacity, "Allow riding horse outside farm");
         break;
     case 9:
-        snprintf(text, capacity, "Display dialogue text instantly");
-        break;
-    case 10:
         snprintf(text, capacity, "Show tool charge bar above Pete");
         break;
-    case 11:
+    case 10:
         snprintf(text, capacity, "Highlight targeted field tile grid");
         break;
     default:
@@ -223,12 +217,9 @@ void hm_gameplay_row_value(const hm_gameplay_options *options, int item, char *t
         snprintf(text, capacity, "%s", options->roaming_horse ? "On" : "Off");
         break;
     case 9:
-        snprintf(text, capacity, "%s", options->fast_text ? "On" : "Off");
-        break;
-    case 10:
         snprintf(text, capacity, "%s", options->tool_charge_gauge ? "On" : "Off");
         break;
-    case 11:
+    case 10:
         snprintf(text, capacity, "%s", options->tile_targeting ? "On" : "Off");
         break;
     default:

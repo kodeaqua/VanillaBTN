@@ -347,19 +347,19 @@ static void storage_swap_screen(void) {
     if (hm_mouse_get_pos(&mouse_vx, &mouse_vy)) {
         int rucksack_slots = math_int_pow(2, game_state.player.rucksackLevel + 1);
         int hovered_spot = -1;
-        if (hm_mouse_in_rect(mouse_vx, mouse_vy, storage_spots[0].x - 6, storage_spots[0].y - 6, 28, 28)) {
+        if (hm_mouse_in_rect(mouse_vx, mouse_vy, storage_spots[0].x - 17, storage_spots[0].y - 17, 34, 34)) {
             hovered_spot = 0;
-        } else if (hm_mouse_in_rect(mouse_vx, mouse_vy, storage_spots[9].x - 6, storage_spots[9].y - 6, 28, 28)) {
+        } else if (hm_mouse_in_rect(mouse_vx, mouse_vy, storage_spots[9].x - 17, storage_spots[9].y - 17, 34, 34)) {
             hovered_spot = 9;
         } else {
             for (i = 0; i < rucksack_slots; i++) {
                 int tool_spot = i + SPOT_TOOL_FIRST;
-                if (hm_mouse_in_rect(mouse_vx, mouse_vy, storage_spots[tool_spot].x - 6, storage_spots[tool_spot].y - 6, 28, 28)) {
+                if (hm_mouse_in_rect(mouse_vx, mouse_vy, storage_spots[tool_spot].x - 17, storage_spots[tool_spot].y - 17, 34, 34)) {
                     hovered_spot = tool_spot;
                     break;
                 }
                 int item_spot = i + SPOT_ITEM_FIRST;
-                if (hm_mouse_in_rect(mouse_vx, mouse_vy, storage_spots[item_spot].x - 6, storage_spots[item_spot].y - 6, 28, 28)) {
+                if (hm_mouse_in_rect(mouse_vx, mouse_vy, storage_spots[item_spot].x - 17, storage_spots[item_spot].y - 17, 34, 34)) {
                     hovered_spot = item_spot;
                     break;
                 }
