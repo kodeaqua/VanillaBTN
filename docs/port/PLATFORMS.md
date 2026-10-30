@@ -505,4 +505,7 @@ neighbor-bin correction passes the moving-row fixture at 65x97 and 1128x634,
 nearest/xBR, MSAA 1x/2x/4x on local D3D12 and Vulkan. Full native GPU probes
 pass on both; GPU packet and seam checks pass Windows ASan/UBSan. The owner
 reported the line while idle as well as moving, and with Widescreen Off; the
-owner's exact scene and performance still require interactive validation.
+owner confirmed the reported line disappeared while idle and running in the
+same scene with Modern, Scaling On, Widescreen Off, MSAA 4x, Nearest,
+Interpolation Off, VSync On, and unlimited FPS. Other scenes and performance
+remain unverified.

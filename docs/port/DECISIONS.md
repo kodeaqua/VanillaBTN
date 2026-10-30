@@ -3500,5 +3500,7 @@ Single-sample binning is unchanged.
 
 Consequences: The synthetic boundary fixture failed with MSAA 2x before this
 change and passes at 1x/2x/4x on local D3D12 and Vulkan after it. Extra bin
-entries may increase GPU work or trigger existing safe fallback in dense scenes;
-performance and the owner's gameplay scene remain unverified.
+entries may increase GPU work or trigger existing safe fallback in dense scenes.
+The owner confirmed the reported line disappeared while idle and running with
+Modern, Scaling On, Widescreen Off, MSAA 4x, Nearest, Interpolation Off, VSync
+On and unlimited FPS. Other scenes, devices, and performance remain unverified.
