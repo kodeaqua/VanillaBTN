@@ -17,7 +17,7 @@ struct hm_gpu_scene {
     RECT area, native;
     u16 background;
     const char *failure;
-    int begun, texture_linear;
+    int begun, texture_linear, has_textured;
     unsigned multisamples;
     u64 revision;
     const u32 *motion_previous, *motion_current;
@@ -38,8 +38,8 @@ static u32 hm_scene_scaled(s64 q, int origin, u32 size, int logical) {
     return (u32)hm_scene_floor((q - (s64)origin * 65536) * size * 256, (s64)logical * 65536);
 }
 static int hm_scene_overlap(int x, int y, int w, int h, const RECT *r) {
-    for (int sy = 0; sy < 2; ++sy)
-        for (int sx = 0; sx < 2; ++sx) {
+    for (int sy = -1; sy <= 1; ++sy)
+        for (int sx = -1; sx <= 1; ++sx) {
             int left = x - sx * 1024, top = y - sy * 512;
             if (left < r->x + r->w && left + w > r->x && top < r->y + r->h && top + h > r->y)
                 return 1;
@@ -169,6 +169,8 @@ static void hm_scene_add(hm_gpu_scene *s, u32 *p, int x0, int y0, int x1, int y1
         return;
     }
     memcpy(s->primitives[s->count], p, HM_SCENE_STRIDE * sizeof(*p));
+    if (p[1] & 4)
+        s->has_textured = 1;
     u32 bx0 = (u32)(x0 - s->area.x) / 16, by0 = (u32)(y0 - s->area.y) / 16;
     u32 bx1 = (u32)(x1 - 1 - s->area.x) / 16, by1 = (u32)(y1 - 1 - s->area.y) / 16;
     for (u32 y = by0; y <= by1; ++y)
@@ -492,20 +494,32 @@ static void hm_scene_command(void *context, const u32 *w, u32 available, int aft
         return;
     u32 op = w[0] >> 24;
     if (op == 2 || op == 0xa0) {
-        /* Before any emitted primitives, a completed transfer can be folded
-         * into the scene's initial VRAM snapshot. Once drawing starts, the
-         * transfer is ordered relative to previous output and must fall back. */
-        if (s->count || available < 3) {
+        /* A transfer can update the initial snapshot after untextured draws
+         * only if it does not touch the output. Earlier textured draws could
+         * have sampled the old VRAM contents, so retain their fallback. */
+        if (available < 3) {
             s->failure = "inline VRAM transfer";
             return;
         }
+        u32 x = w[1] & 1023u, y = (w[1] >> 16) & 511u;
+        u32 width, height;
         if (op == 0xa0) {
-            u32 width = (((w[2] & 0xffffu) - 1) & 1023u) + 1;
-            u32 height = (((w[2] >> 16) - 1) & 511u) + 1;
+            width = (((w[2] & 0xffffu) - 1) & 1023u) + 1;
+            height = (((w[2] >> 16) - 1) & 511u) + 1;
             if (available < 3 + (width * height + 1) / 2) {
                 s->failure = "truncated VRAM transfer";
                 return;
             }
+        } else {
+            x &= 0x3f0u;
+            width = ((w[2] & 1023u) + 15u) & ~15u;
+            height = (w[2] >> 16) & 511u;
+        }
+        if (s->count && (s->has_textured ||
+                         (width && height && hm_scene_overlap((int)x, (int)y, (int)width,
+                                                              (int)height, &s->area)))) {
+            s->failure = "inline VRAM transfer";
+            return;
         }
         if (after)
             memcpy(s->packed + HM_SCENE_HEADER, hm_vram_state()->pixels,
@@ -591,6 +605,7 @@ hm_replay_sink hm_gpu_scene_begin(hm_gpu_scene *s, u32 width, u32 height) {
     s->width = width;
     s->height = height;
     s->count = 0;
+    s->has_textured = 0;
     s->failure = NULL;
     s->begun = 0;
     s->motion_previous = s->motion_current = NULL;

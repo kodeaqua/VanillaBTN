@@ -462,3 +462,7 @@ No performance or device validation has been performed for these changes.
 Leading GP0 clears and uploads can now be folded into the private GPU scene
 snapshot before any primitive is emitted (ADR-116). Later transfers still use
 fallback. The affected gameplay scenes and performance remain unverified.
+
+GPU scenes may fold offscreen VRAM transfers following untextured primitives when
+they do not overlap the logical output. Textured and output-overlap dependencies
+retain fallback (ADR-117). Gameplay and device behavior remain unverified.
