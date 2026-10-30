@@ -33,7 +33,7 @@ void hm_graphics_profile_set(hm_graphics_options *o, int profile) {
         o->fps_denominator = 1;
         o->interpolation = 0;
         o->antialiasing = 0;
-        o->pgxp = 1;
+        o->pgxp = 0;
         o->dither = 0;
     } else if (profile == HM_GRAPHICS_PROFILE_ENHANCE) {
         o->widescreen = 0;
@@ -44,7 +44,7 @@ void hm_graphics_profile_set(hm_graphics_options *o, int profile) {
         o->fps_denominator = 1;
         o->interpolation = 0;
         o->antialiasing = 0;
-        o->pgxp = 1;
+        o->pgxp = 0;
         o->dither = 0;
     } else {
         o->widescreen = 0;
@@ -434,6 +434,7 @@ static int hm_rates(const hm_graphics_options *o, hm_present_rate rates[256]) {
     }
     return used;
 }
+#ifndef __ANDROID__
 static int hm_cycle_rate(hm_graphics_options *o, int step) {
     hm_present_rate rates[256];
     int count = hm_rates(o, rates), current = 0;
@@ -446,6 +447,7 @@ static int hm_cycle_rate(hm_graphics_options *o, int step) {
     o->fps_denominator = next ? (int)rates[next].denominator : 1;
     return count > 1;
 }
+#endif
 static void hm_validate_rate(hm_graphics_options *o) {
     if (o->fps_numerator <= 0) {
         o->fps_denominator = 1;
@@ -493,7 +495,7 @@ int hm_graphics_change(SDL_GPUDevice *device, SDL_Window *window, hm_graphics_op
     (void)window;
     if (item == 0) {
         int current = hm_graphics_profile_get(o);
-        int next = (current + 3 + (direction < 0 ? -1 : 1)) % 3;
+        int next = (current + 3 + step) % 3;
         hm_graphics_profile_set(&candidate, next);
 #ifdef HMBTN_ENH_SCALING
         if (!hm_scaling_enable(candidate.scaling))
@@ -630,7 +632,7 @@ void hm_graphics_value(const hm_graphics_options *o, int item, char *text, size_
         if (profile == HM_GRAPHICS_PROFILE_MODERN)
             SDL_snprintf(text, capacity, "Modern - Tuned Mobile (16:9, Bilinear)");
         else if (profile == HM_GRAPHICS_PROFILE_ENHANCE)
-            SDL_snprintf(text, capacity, "Enhance - PS1 Clean (4:3, 1x, PGXP)");
+            SDL_snprintf(text, capacity, "Enhance - PS1 Clean (4:3, 1x, No Dither)");
         else
             SDL_snprintf(text, capacity, "Native - Authentic PS1 (4:3, 1x)");
     } else {
