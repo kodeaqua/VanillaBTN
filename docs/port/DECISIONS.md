@@ -1447,8 +1447,10 @@ assets are unchanged; bilinear does not create higher-detail textures.
 
 Consequences: Optional replay adds output work and CPU fallback can be costly.
 Primitive-local clamping can expose differing filtering at shared UV bounds.
-Final presentation filtering remains for window scaling. Generated shaders
-hash both scene.hlsl and the filtering include. No new linked dependency.
+The game's 8x12 text glyph atlas stays nearest-sampled to keep small UI text
+crisp in filtering modes 1 and 2. Final presentation filtering remains for
+window scaling. Generated shaders hash both scene.hlsl and the filtering
+include. No new linked dependency.
 Release and ASan/UBSan pass 80 tests. Offscreen Vulkan/D3D12 comparisons cover
 Nearest and Bilinear, CLUT depths, texture windows, masks/blends, deterministic
 random primitives, native and enlarged outputs. Native comparisons are exact;
@@ -3953,6 +3955,7 @@ It reads the original villager state without modifying it or loading/mutating
 villager sprites. Portraits come from the first 80x80 face bank grouped under
 each Character ID in the user's `face.bin`; the page crops and downsamples them
 at runtime and ships no game art. Names use title case with the game's lowercase
-glyphs. Pure model and settings tests cover the roster, relationship mapping,
+glyphs; the page heading and bar labels also use title case. Pure model and
+settings tests cover the roster, relationship mapping,
 bar bounds, defaults and persistence. The owner must still validate layout and
 navigation during gameplay.

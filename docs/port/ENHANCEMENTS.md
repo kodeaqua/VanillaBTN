@@ -220,7 +220,8 @@ villagers. Each row uses a small pixel head icon cropped from that NPC's origina
 portrait bank in the user's `face.bin`, the NPC name in title case, and a bar
 sourced from the game's original friendship value (0-255) or bachelorette
 affection value (0-65535). Friendship is green and affection is pink. Portraits
-are decoded at runtime; no game image data is shipped. The setting
+are decoded at runtime; the page heading and bar labels use title case, and no
+game image data is shipped. The setting
 `enhance.npc_bonds` defaults to `false`; disabled builds retain the original
 eight-page order and wrap behavior. The Windows and Android `-Game` builds
 compile the option. The owner still needs to check the page in gameplay.
