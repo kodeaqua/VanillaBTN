@@ -17,7 +17,7 @@ struct hm_gpu_scene {
     RECT area, native;
     u16 background;
     const char *failure;
-    int begun, texture_linear;
+    int begun, texture_linear, offscreen_writes;
     u64 texture_reads[32]; /* Conservative 16x16 VRAM tile footprint. */
     unsigned multisamples;
     u64 revision;
@@ -68,6 +68,12 @@ static int hm_scene_material(hm_gpu_scene *s, u32 *p, u32 op, u32 page, u32 clut
     const hm_gpu_environment *env = hm_gpu_environment_state();
     const DRAWENV *d = &env->draw;
     if (op & 4) {
+        /* Offscreen writes are not rasterized into this private snapshot.
+         * A later textured primitive could read them, so replay in software. */
+        if (s->offscreen_writes) {
+            s->failure = "offscreen draw dependencies";
+            return 0;
+        }
         u32 depth = (page >> 7) & 3;
         if (depth > 2) {
             s->failure = "reserved texture depth";
@@ -171,7 +177,13 @@ static void hm_scene_add(hm_gpu_scene *s, u32 *p, int x0, int y0, int x1, int y1
         return;
     if (x0 < s->area.x || y0 < s->area.y || x1 > s->area.x + s->area.w ||
         y1 > s->area.y + s->area.h) {
-        s->failure = "offscreen draw dependencies";
+        if ((p[1] & 4) || hm_scene_overlap(x0, y0, x1 - x0, y1 - y0, &s->area)) {
+            s->failure = "offscreen draw dependencies";
+            return;
+        }
+        /* This untextured draw cannot affect output directly. Preserve a
+         * conservative dependency flag for any later texture/CLUT read. */
+        s->offscreen_writes = 1;
         return;
     }
     if (x0 < s->area.x)
@@ -626,6 +638,7 @@ hm_replay_sink hm_gpu_scene_begin(hm_gpu_scene *s, u32 width, u32 height) {
     s->width = width;
     s->height = height;
     s->count = 0;
+    s->offscreen_writes = 0;
     memset(s->texture_reads, 0, sizeof(s->texture_reads));
     s->failure = NULL;
     s->begun = 0;
