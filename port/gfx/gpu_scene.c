@@ -488,9 +488,32 @@ static void hm_scene_line(hm_gpu_scene *s, const u32 *w, u32 available) {
 }
 static void hm_scene_command(void *context, const u32 *w, u32 available, int after) {
     hm_gpu_scene *s = context;
-    if (after || !s->begun || s->failure || !available)
+    if (!s->begun || s->failure || !available)
         return;
     u32 op = w[0] >> 24;
+    if (op == 2 || op == 0xa0) {
+        /* Before any emitted primitives, a completed transfer can be folded
+         * into the scene's initial VRAM snapshot. Once drawing starts, the
+         * transfer is ordered relative to previous output and must fall back. */
+        if (s->count || available < 3) {
+            s->failure = "inline VRAM transfer";
+            return;
+        }
+        if (op == 0xa0) {
+            u32 width = (((w[2] & 0xffffu) - 1) & 1023u) + 1;
+            u32 height = (((w[2] >> 16) - 1) & 511u) + 1;
+            if (available < 3 + (width * height + 1) / 2) {
+                s->failure = "truncated VRAM transfer";
+                return;
+            }
+        }
+        if (after)
+            memcpy(s->packed + HM_SCENE_HEADER, hm_vram_state()->pixels,
+                   1024 * 512 * sizeof(u16));
+        return;
+    }
+    if (after)
+        return;
     if (op >= 0x20 && op <= 0x3f)
         hm_scene_polygon(s, w, available);
     else if (op >= 0x60 && op <= 0x7f)

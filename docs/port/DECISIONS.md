@@ -3239,3 +3239,20 @@ Consequences: XBR packets can use their intended shader mode and reuse cache
 entries; software filtering remains its existing bilinear fallback. Android may
 incur additional render-pass cost for bordered output. Actual performance,
 GPU/device behavior and gameplay remain unverified at the owner's request.
+
+## ADR-116: Fold leading VRAM transfers into GPU scene snapshots
+
+Date: 2026-10-30. Status: accepted.
+
+Context: GPU scene construction rejected every inline VRAM upload and clear,
+including transfers before the first emitted primitive. Such leading transfers
+can be represented by the initial VRAM state without changing command order.
+
+Decision: After a complete leading GP0 fill or upload, refresh the private GPU
+scene VRAM snapshot from the replay context. Continue to reject truncated
+transfers and every transfer after a primitive, preserving the software fallback
+for ordered dependencies. Native VRAM and game logic remain unchanged.
+
+Consequences: Some frames with leading transfers can stay on GPU, but actual
+scene coverage and gameplay effects are not established. No profiling or tests
+were run at the owner's request.

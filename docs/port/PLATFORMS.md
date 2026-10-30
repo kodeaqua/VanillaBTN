@@ -458,3 +458,7 @@ Interpolated GPU primitive bins include the previous endpoint; GPU texture
 filter mode 2 is retained in scene packets. Android bordered presentation clears
 its borders each frame instead of assuming retained swapchain pixels (ADR-115).
 No performance or device validation has been performed for these changes.
+
+Leading GP0 clears and uploads can now be folded into the private GPU scene
+snapshot before any primitive is emitted (ADR-116). Later transfers still use
+fallback. The affected gameplay scenes and performance remain unverified.
