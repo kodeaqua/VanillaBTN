@@ -505,10 +505,6 @@ static void status_draw_stamina_hud(void) {
     int i;
     u32 k;
 
-    /* Hide HUD only when full-screen menus/storage are open or during scene transitions */
-    if (game_state.globalFlags & (GLOBAL_FLAG_MENU_OPEN | GLOBAL_FLAG_TRANSITION)) {
-        return;
-    }
 
     if (status_page_sprites[0].source == NULL) {
         afile_read_bytes(STATUS_PACK_FILE, 0, STATUS_PACK_BYTES, STAGING_BUFFER, 1, 1);

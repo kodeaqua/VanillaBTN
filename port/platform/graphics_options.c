@@ -33,7 +33,7 @@ void hm_graphics_profile_set(hm_graphics_options *o, int profile) {
         o->fps_denominator = 1;
         o->interpolation = 0;
         o->antialiasing = 0;
-        o->pgxp = 0;
+        o->pgxp = 1;
         o->dither = 0;
     } else if (profile == HM_GRAPHICS_PROFILE_ENHANCE) {
         o->widescreen = 0;
@@ -44,7 +44,7 @@ void hm_graphics_profile_set(hm_graphics_options *o, int profile) {
         o->fps_denominator = 1;
         o->interpolation = 0;
         o->antialiasing = 0;
-        o->pgxp = 0;
+        o->pgxp = 1;
         o->dither = 0;
     } else {
         o->widescreen = 0;
@@ -632,7 +632,7 @@ void hm_graphics_value(const hm_graphics_options *o, int item, char *text, size_
         if (profile == HM_GRAPHICS_PROFILE_MODERN)
             SDL_snprintf(text, capacity, "Modern - Tuned Mobile (16:9, Bilinear)");
         else if (profile == HM_GRAPHICS_PROFILE_ENHANCE)
-            SDL_snprintf(text, capacity, "Enhance - PS1 Clean (4:3, 1x, No Dither)");
+            SDL_snprintf(text, capacity, "Enhance - PS1 Clean (4:3, 1x, PGXP)");
         else
             SDL_snprintf(text, capacity, "Native - Authentic PS1 (4:3, 1x)");
     } else {

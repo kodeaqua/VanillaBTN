@@ -1,4 +1,6 @@
 #include "enhance/dithering/dithering.h"
+#include "enhance/pgxp/pgxp.h"
+#include <math.h>
 #include "psx/error.h"
 #include "psx/gpu_environment.h"
 #include "psx/gpu_raster.h"
@@ -165,8 +167,19 @@ u32 hm_gpu_polygon(const u32 *words, u32 available) {
             rgb = words[at++];
         u32 xy = words[at++];
         hm_vertex *vertex = vertices + i;
+#if defined(HMBTN_ENH_PGXP) && HMBTN_ENH_PGXP
+        float fx, fy, fz;
+        if (hm_pgxp_lookup_vertex(&words[at - 1], xy, &fx, &fy, &fz)) {
+            vertex->x = (s32)roundf((fx + (float)draw->ofs[0]) * 2.0f);
+            vertex->y = (s32)roundf((fy + (float)draw->ofs[1]) * 2.0f);
+        } else {
+            vertex->x = (hm_poly_signed11(xy) + draw->ofs[0]) * 2;
+            vertex->y = (hm_poly_signed11(xy >> 16) + draw->ofs[1]) * 2;
+        }
+#else
         vertex->x = (hm_poly_signed11(xy) + draw->ofs[0]) * 2;
         vertex->y = (hm_poly_signed11(xy >> 16) + draw->ofs[1]) * 2;
+#endif
         for (u32 channel = 0; channel < 3; ++channel)
             vertex->color[channel] = (rgb >> (channel * 8)) & 255;
         vertex->u = vertex->v = 0;

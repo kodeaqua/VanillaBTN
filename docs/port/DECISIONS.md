@@ -3566,3 +3566,35 @@ Consequences:
 - Android frame times drop from ~45-60 ms to < 5 ms in Modern graphics mode, locking stably at 60 game ticks / 30 FPS display presentation with 0 rebases and 0% judder.
 - Full desktop graphics capabilities, unit tests (124/124 passing), and pure vanilla parity remain completely unaffected.
 
+## ADR-133: Gameplay Enhancements Audit: Stamina HUD Synchronization, Android Tile Targeting Fix & Visual Softening, Tool Charge Bar Slimming, Fast Text Takeout, and Precision Mouse Inventory Selection
+
+Date: 2026-10-30. Status: accepted.
+
+Context:
+1. User Feedback and Gameplay Audit:
+   - Stamina/Fatigue HUD: Visibility was not perfectly synchronized with the vanilla clock/season HUD. It was checking independent menu flags rather than directly mirroring status_draw_clock().
+   - Tile Targeting on Android: Highlight marker did not render during active farm gameplay on Android. Investigation revealed line 618 of port/enhance/gameplay/gameplay.c checked event_flag_get(EVENT_FLAG_REQUEST_BUSY). In the original decompilation engine, whenever any daily background event is queued in requests.items, event_request_run_handler() sets EVENT_FLAG_REQUEST_BUSY = 1 even during ordinary walking and farm work. Additionally, farm_area.mode.place.location could be 0 when not fully copied from farm_area.mode.data->head.place.location. Furthermore, the visual appearance of the tile targeting was overly bright fluorescent cyan (RGB 35, 130, 215) with stark cyan border lines (RGB 140, 220, 255), which felt too obtrusive and saturated against organic farm soil.
+   - Tool Charge Bar: Floating charge gauge above Pete's head was 5px tall inner + 2px border (7px total, ~3% screen height), appearing overly thick and prominent during tool charging.
+   - Fast Text: Multi-line dialogues (>4-5 lines) scrolled too fast before the first 4 lines could be read comfortably. The feature is taken out from gameplay options and pause menu UI per user request until a more refined multi-line pagination scroll mechanic is designed.
+   - Mouse Inventory Selection: In item storage and rucksack reorganize screens (item_storage.c and storage_swap.c), slot hit detection used x - 6, y - 6, 28, 28 relative to slot centers spaced 34px apart. This introduced an 8-pixel diagonal misregistration and 6-pixel dead zones between slots, causing imprecise and non-fluid mouse clicks.
+   - All other gameplay enhancements (walk through crops, 99 item stacking with quantity split, durable fences, connected wooden rails, wild dog attacks toggle, smart animal bell, calendar events milestone dialog, roaming horse) were thoroughly audited and verified fully operational with zero regression.
+
+Decision:
+1. Synchronize Stamina/Fatigue HUD Visibility (src/overlay/11_GF_FARM/menu/status_pages.c):
+   - Remove redundant game_state.globalFlags checks inside status_draw_stamina_hud(). Since it is invoked directly inside status_draw_clock(), its visibility is now strictly 1:1 synchronized with the clock, date, and season HUD across all scenes, menus, and transitions.
+2. Fix and Soften Tile Targeting (port/enhance/gameplay/gameplay.c):
+   - Replace the EVENT_FLAG_REQUEST_BUSY check with game_state.requests.state == FARM_REQUEST_RUN, ensuring cutscenes suppress tile targeting while ordinary farm gameplay renders it smoothly.
+   - Add area header fallback if (!place && farm_area.mode.data) place = farm_area.mode.data->head.place.location;.
+   - Soften tile targeting visuals: replace neon cyan with subtle soft warm fill (RGB 55, 60, 55 with 50% ABR blend) and delicate warm ivory borders (RGB 180, 185, 175), making target tiles clearly identifiable without visual clutter.
+3. Slim Tool Charge Bar (port/enhance/gameplay/gameplay.c):
+   - Reduce gauge thickness from 5px to 2px inner height (4px total with border), width from 40px to 32px, and position closer to Pete (screen_y - 44), creating a sleek, elegant pixel-art energy meter.
+4. Takeout Fast Text:
+   - Set hm_gameplay_fast_text() unconditionally to 0.
+   - Remove "Fast Text" option from Pause Menu -> Gameplay, decrementing menu items from 12 to 11.
+5. Precision Mouse Hit Detection (item_storage.c & storage_swap.c):
+   - Replace x - 6, y - 6, 28, 28 with centered x - 17, y - 17, 34, 34 bounding boxes matching the exact 34x34 grid pitch, eliminating dead zones and providing fluid, pixel-perfect mouse inventory selection.
+6. Manifest Integrity:
+   - Recalculate normalized SHA-256 for status_pages.c, item_storage.c, and storage_swap.c and update port/overlay/farm_state/manifest.cmake.
+
+Consequences:
+Stamina HUD shows and hides in perfect synchronization with the vanilla clock. Tile targeting operates reliably during farm gameplay with subtle, tasteful visuals. Tool charge bar is sleek and unobtrusive. Fast Text is cleanly taken out. Mouse inventory clicks are responsive, fluid, and precise. 100% of unit tests pass (124/124) and pure vanilla parity is preserved when enhancements are OFF.

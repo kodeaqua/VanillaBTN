@@ -102,7 +102,7 @@ int hm_gameplay_roaming_horse(void) {
     return active_options.roaming_horse;
 }
 int hm_gameplay_fast_text(void) {
-    return active_options.fast_text;
+    return 0;
 }
 
 int hm_gameplay_tool_charge_gauge(void) {
@@ -512,10 +512,10 @@ void hm_gameplay_draw_tool_charge_gauge(const void *player_ptr, s32 depth, s16 s
 
     int cur_level = cur_charge / 20;
 
-    s16 bar_w = 40;
-    s16 bar_h = 5;
+    s16 bar_w = 32;
+    s16 bar_h = 2;
     s16 bar_x = screen_x - (bar_w / 2);
-    s16 bar_y = screen_y - 48;
+    s16 bar_y = screen_y - 44;
 
     s32 ot_idx = (depth >> 2) - 2;
     if (ot_idx < 1)
@@ -615,7 +615,7 @@ void hm_gameplay_draw_tile_targeting(const void *player_ptr, s32 depth) {
                                   GLOBAL_FLAG_PAUSED | GLOBAL_FLAG_CAMERA_BUSY |
                                   GLOBAL_FLAG_DEMO_START | GLOBAL_FLAG_INPUT_REPLAY))
         return;
-    if (event_flag_get(EVENT_FLAG_EVENT_ACTIVE) || event_flag_get(EVENT_FLAG_REQUEST_BUSY))
+    if (event_flag_get(EVENT_FLAG_EVENT_ACTIVE) || game_state.requests.state == FARM_REQUEST_RUN)
         return;
     if (game_state.system.menuState != MENU_STATE_IDLE)
         return;
@@ -626,7 +626,11 @@ void hm_gameplay_draw_tile_targeting(const void *player_ptr, s32 depth) {
         return;
 
     s16 place = player->place.location ? player->place.location : farm_area.mode.place.location;
+    if (!place && farm_area.mode.data)
+        place = farm_area.mode.data->head.place.location;
     u16 place_val = player->place.value ? player->place.value : farm_area.mode.place.value;
+    if (!place_val && farm_area.mode.data)
+        place_val = farm_area.mode.data->head.place.value;
     int is_farm = (place == 1);
     int is_greenhouse = (place == 6);
     int is_mine = (place_val == 0x37 || place_val == 0x43);
@@ -717,12 +721,12 @@ void hm_gameplay_draw_tile_targeting(const void *player_ptr, s32 depth) {
     current_frame->primCursor.bytes += sizeof(DR_TPAGE);
     setDrawTPage(tpage, 0, 1, GetTPage(0, 0, 0, 0));
 
-    /* Semi-transparent cyan quad fill */
+    /* Semi-transparent soft warm quad fill */
     POLY_F4 *fill = (POLY_F4 *)current_frame->primCursor.bytes;
     current_frame->primCursor.bytes += sizeof(POLY_F4);
     SetPolyF4(fill);
     SetSemiTrans(fill, 1);
-    setRGB0(fill, 35, 130, 215);
+    setRGB0(fill, 55, 60, 55);
     fill->x0 = s0.x; fill->y0 = s0.y;
     fill->x1 = s1.x; fill->y1 = s1.y;
     fill->x2 = s2.x; fill->y2 = s2.y;
@@ -744,7 +748,7 @@ void hm_gameplay_draw_tile_targeting(const void *player_ptr, s32 depth) {
         current_frame->primCursor.bytes += sizeof(LINE_F2);
         setlen(line, 3);
         line->code = 0x40;
-        setRGB0(line, 140, 220, 255);
+        setRGB0(line, 180, 185, 175);
         line->x0 = edges[i].ax; line->y0 = edges[i].ay;
         line->x1 = edges[i].bx; line->y1 = edges[i].by;
         AddPrim(&current_frame->ot[ot_idx], line);

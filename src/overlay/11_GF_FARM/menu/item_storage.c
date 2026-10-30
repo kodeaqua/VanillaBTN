@@ -1078,12 +1078,12 @@ static void item_cursor_move(s32 count) {
     if (hm_mouse_get_pos(&mouse_vx, &mouse_vy)) {
         int rucksack_limit = (game_state.player.rucksackLevel == 0) ? 2 : ((game_state.player.rucksackLevel == 1) ? 4 : 8);
         int hovered_marker = -1;
-        if (hm_mouse_in_rect(mouse_vx, mouse_vy, item_markers[0].x - 6, item_markers[0].y - 6, 28, 28)) {
+        if (hm_mouse_in_rect(mouse_vx, mouse_vy, item_markers[0].x - 17, item_markers[0].y - 17, 34, 34)) {
             hovered_marker = 0;
         }
         for (s32 m = 1; m <= 8; m++) {
             if (m <= rucksack_limit) {
-                if (hm_mouse_in_rect(mouse_vx, mouse_vy, item_markers[m].x - 6, item_markers[m].y - 6, 28, 28)) {
+                if (hm_mouse_in_rect(mouse_vx, mouse_vy, item_markers[m].x - 17, item_markers[m].y - 17, 34, 34)) {
                     hovered_marker = m;
                     break;
                 }
@@ -1091,7 +1091,7 @@ static void item_cursor_move(s32 count) {
         }
         if (hovered_marker < 0) {
             for (s32 m = 9; m <= 16; m++) {
-                if (hm_mouse_in_rect(mouse_vx, mouse_vy, item_markers[m].x - 6, item_markers[m].y - 6, 28, 28)) {
+                if (hm_mouse_in_rect(mouse_vx, mouse_vy, item_markers[m].x - 17, item_markers[m].y - 17, 34, 34)) {
                     hovered_marker = m;
                     break;
                 }
