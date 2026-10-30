@@ -48,5 +48,13 @@ int main(void) {
     SsUtAllKeyOff(0);
     SsEnd();
     CHECK(!state->started);
+
+    /* A configured zero is valid and must survive game sound initialization. */
+    hm_sound_set_volumes(0, 0);
+    SsInit();
+    CHECK(hm_sound_get_bgm_volume() == 0 && hm_sound_get_sfx_volume() == 0);
+    hm_sound_set_volumes(37, 61);
+    SsInit();
+    CHECK(hm_sound_get_bgm_volume() == 37 && hm_sound_get_sfx_volume() == 61);
     return 0;
 }

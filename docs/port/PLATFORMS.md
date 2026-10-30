@@ -10,6 +10,26 @@
 | macOS universal | No macOS build has been validated. |
 | Matching build | The check target remains unverified on this Windows host because its separate Linux toolchain is unavailable. |
 
+### Core, Windows and Android audit (2026-10-31)
+
+The Windows Release preset builds and all 125 CTest cases pass. Android Release
+builds with the pinned NDK 30.0.16248370, Gradle 9.8.2 and AGP 9.5.0. The APK
+signature verifies; `zipalign -c -P 16 4` passes, and the native ELF load
+segments use 16 KB alignment. Android backup rules exclude imported disc
+images, the temporary copy, and runtime logs from cloud backup and device
+transfer while preserving saves and settings (ADR-145).
+
+The same core audit found that `SsInit` converted a saved 0% BGM/SFX value back
+to 100%; ADR-146 now preserves configured levels. The new mixer regression
+checks confirm that zero-volume sequence music and effects are silent while
+their playback continues. Both focused tests also pass under the Windows
+ASan/UBSan preset.
+
+Gradle reports deprecated APIs that may become errors with Gradle 10; the
+current pinned build succeeds. No interactive Windows playthrough or Android
+device run was performed for this audit. Device graphics, lifecycle, and
+gameplay behavior remain owner-verified.
+
 GPU Auto shares scene output at native and enhanced resolutions, with Software
 as the reference and CPU fallback for unsupported work. Coverage is partial;
 do not claim complete GPU offload or full-playthrough parity. The owner
