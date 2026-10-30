@@ -448,12 +448,6 @@ static int hm_host_gpu_present(const RECT *native_area) {
             return 0;
         }
         hm_gpu_cached_serial = cache_serial;
-    } else {
-#ifdef __ANDROID__
-        /* Skip redundant compute shader dispatch and swapchain blit on ticks where
-         * the game did not issue a new DrawOTag and interpolation is inactive. */
-        return 2;
-#endif
     }
     SDL_GPUCommandBuffer *command = SDL_AcquireGPUCommandBuffer(hm_device);
     if (!command)
@@ -473,6 +467,9 @@ static int hm_host_gpu_present(const RECT *native_area) {
     SDL_GPUTexture *image = hm_gpu_renderer_encode(hm_gpu_output, command, &hm_gpu_cached);
     if (!image) {
         SDL_CancelGPUCommandBuffer(command);
+        /* The scene was cached before encode. A failed encode must not make a
+         * later attempt look like a successfully presented frame. */
+        hm_gpu_cached_serial = 0;
         if (!hm_gpu_fallback_reported) {
             fprintf(stderr, "GPU output unavailable; using software rendering\n");
             hm_gpu_fallback_reported = 1;

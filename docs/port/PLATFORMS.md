@@ -399,6 +399,12 @@ platform builds were not run on this Windows host.
 
 ### Full suite and Android platform validation (2026-10-30)
 
+An Android GPU presentation retry fix retains cached scene data but submits the
+cached image again when presentation is requested. An encode failure invalidates
+the cached serial so the next attempt can rebuild it. This addresses a retry
+failure mode; the reported gameplay black screen and device performance remain
+unverified without the affected Android device.
+
 - Windows Release build passes 122/122 unit tests (100% passing) across native PS1 emulation, GPU packets, GTE projection, card persistence, and enhanced gameplay modules.
 - Packaged Windows standalone release output produced at dist/VanillaBTN-windows-x64-v0.9.0.zip containing VanillaBTN.exe and README.txt.
 - Android platform build passes clean compilation under NDK r27c / Clang 18.0.3, generating signed release APK at dist/VanillaBTN-android-v0.9.0.apk (6.21 MB).
