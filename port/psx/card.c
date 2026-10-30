@@ -42,7 +42,7 @@ static s32 hm_card_request(s32 port, s32 command) {
 }
 s32 MemCardAccept(s32 port) { return hm_card_request(port, 1); }
 s32 MemCardExist(s32 port) { return hm_card_request(port, 1); }
-s32 MemCardSync(s32 mode, s32 *command, s32 *result) {
+s32 MemCardSync(s32 mode, long *command, long *result) {
     hm_card_require("MemCardSync");
     if (mode != 0 && mode != 1)
         return -1;
@@ -70,7 +70,7 @@ s32 McxCardType(s32 port) {
     hm_mcx_pending = 1;
     return 1;
 }
-s32 McxSync(s32 mode, s32 *command, s32 *result) {
+s32 McxSync(s32 mode, long *command, long *result) {
     if (!hm_mcx_started)
         return -1;
     if (mode != 0 && mode != 1)
@@ -97,7 +97,7 @@ s32 MemCardCreateFile(s32 port, const char *name, s32 blocks) {
     hm_card_require("MemCardCreateFile");
     return hm_card_create(port, name, blocks);
 }
-s32 MemCardGetDirentry(s32 port, const char *pattern, struct DIRENTRY *entries, s32 *count,
+s32 MemCardGetDirentry(s32 port, const char *pattern, struct DIRENTRY *entries, long *count,
                        s32 offset, s32 maximum) {
     hm_card_require("MemCardGetDirentry");
     return hm_card_directory(port, pattern, entries, count, offset, maximum);

@@ -46,6 +46,14 @@ int main(int argc, char **argv) {
     CHECK(hm_graphics_change(NULL,NULL,&options,6,1) && options.linear==1);
     CHECK(hm_graphics_change(NULL,NULL,&options,6,1) && options.linear==2);
     CHECK(hm_graphics_change(NULL,NULL,&options,6,1) && options.linear==0);
+    hm_graphics_profile_set(&options, HM_GRAPHICS_PROFILE_MODERN);
+    CHECK(hm_graphics_profile_get(&options) == HM_GRAPHICS_PROFILE_MODERN);
+    CHECK(options.widescreen == 1 && options.scaling == 1 && options.linear == 1);
+    CHECK(options.interpolation == 0 && options.vsync == 1 && options.fps_numerator == 0);
+    hm_graphics_profile_set(&options, HM_GRAPHICS_PROFILE_NATIVE);
+    CHECK(hm_graphics_profile_get(&options) == HM_GRAPHICS_PROFILE_NATIVE);
+    CHECK(options.widescreen == 0 && options.scaling == 0 && options.linear == 0);
+    CHECK(options.interpolation == 0 && options.vsync == 1 && options.fps_numerator == 0);
     hm_user_data_stop();SDL_free(root);SDL_Quit();
     return 0;
 }

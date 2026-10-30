@@ -34,7 +34,7 @@ static int card_write(void *context, int slot, const void *bytes, size_t size) {
     return 1;
 }
 static int card_complete(s32 expected) {
-    s32 command, result;
+    long command, result;
     return MemCardSync(1, &command, &result) == 1 && command == expected && result == McErrNone;
 }
 int main(void) {

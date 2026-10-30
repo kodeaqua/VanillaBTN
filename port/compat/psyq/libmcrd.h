@@ -17,12 +17,12 @@ enum {
 
 void MemCardInit(s32 mode);
 void MemCardStart(void);
-s32 MemCardSync(s32 mode, s32 *command, s32 *result);
+s32 MemCardSync(s32 mode, long *command, long *result);
 s32 MemCardExist(s32 port);
 s32 MemCardAccept(s32 port);
 s32 MemCardFormat(s32 port);
 s32 MemCardUnformat(s32 port);
-s32 MemCardGetDirentry(s32 port, const char *pattern, struct DIRENTRY *entries, s32 *count,
+s32 MemCardGetDirentry(s32 port, const char *pattern, struct DIRENTRY *entries, long *count,
                        s32 offset, s32 maximum);
 s32 MemCardReadFile(s32 port, const char *name, void *buffer, s32 offset, s32 bytes);
 s32 MemCardWriteFile(s32 port, const char *name, const void *buffer, s32 offset, s32 bytes);

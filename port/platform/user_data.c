@@ -12,20 +12,14 @@ static HANDLE hm_data_lock = INVALID_HANDLE_VALUE;
 static char *hm_root;
 static char *hm_saves;
 
-typedef struct {
-    const char *name;
-    int found;
-} hm_lookup;
-static SDL_EnumerationResult hm_find(void *context, const char *directory, const char *name) {
-    (void)directory;
-    hm_lookup *lookup = context;
-    if (!SDL_strcmp(name, lookup->name))
-        lookup->found = 1;
-    return SDL_ENUM_CONTINUE;
-}
 static int hm_exists(const char *directory, const char *name) {
-    hm_lookup lookup = {name, 0};
-    return SDL_EnumerateDirectory(directory, hm_find, &lookup) ? lookup.found : -1;
+    char *path = NULL;
+    if (SDL_asprintf(&path, "%s/%s", directory, name) < 0)
+        return -1;
+    SDL_PathInfo info;
+    bool ok = SDL_GetPathInfo(path, &info);
+    SDL_free(path);
+    return ok ? 1 : 0;
 }
 static int hm_replace(const char *directory, const char *name, const void *data, size_t bytes) {
     char *path = NULL, *temporary = NULL;

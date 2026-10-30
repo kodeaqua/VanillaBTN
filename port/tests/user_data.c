@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
     CHECK(MemCardCreateFile(0, "SAVE01", 4) == 0);
     const unsigned char expected[] = {0, 255, 42, 71, 0, 123};
     CHECK(MemCardWriteFile(0, "SAVE01", expected, 128, sizeof(expected)) == 1);
-    s32 command, result;
+    long command, result;
     CHECK(MemCardSync(0, &command, &result) == 1 && command == 4 && result == 0);
     hm_user_data_stop();
     /* Preserve existing settings, even keys unknown to this build. */

@@ -15,6 +15,38 @@
 #endif
 static void hm_validate_rate(hm_graphics_options *options);
 
+int hm_graphics_profile_get(const hm_graphics_options *o) {
+    if (!o)
+        return HM_GRAPHICS_PROFILE_NATIVE;
+    if (o->widescreen || o->scaling || o->linear)
+        return HM_GRAPHICS_PROFILE_MODERN;
+    return HM_GRAPHICS_PROFILE_NATIVE;
+}
+
+void hm_graphics_profile_set(hm_graphics_options *o, int profile) {
+    if (!o)
+        return;
+    if (profile == HM_GRAPHICS_PROFILE_MODERN) {
+        o->widescreen = 1;
+        o->linear = 1;
+        o->scaling = 1;
+        o->vsync = 1;
+        o->fps_numerator = 0;
+        o->fps_denominator = 1;
+        o->interpolation = 0;
+        o->antialiasing = 0;
+    } else {
+        o->widescreen = 0;
+        o->linear = 0;
+        o->scaling = 0;
+        o->vsync = 1;
+        o->fps_numerator = 0;
+        o->fps_denominator = 1;
+        o->interpolation = 0;
+        o->antialiasing = 0;
+    }
+}
+
 void hm_graphics_defaults(hm_graphics_options *o) {
     *o = (hm_graphics_options){.width = 640, .height = 480, .vsync = 1, .fps_denominator = 1, .pgxp = 0, .dither = 1};
     o->aa_capabilities =
@@ -116,6 +148,18 @@ void hm_graphics_load(hm_graphics_options *o) {
         dither_length == 4 && !SDL_memcmp(dither_value, "true", 4))
         o->dither = 0;
 #endif
+#ifdef __ANDROID__
+    o->interpolation = 0;
+    const char *prof_val;
+    size_t prof_len;
+    if (bytes >= 0 && hm_json_property(text, (size_t)bytes, "enhance", &object, &length) == 1 &&
+        hm_json_property(object, length, "profile", &prof_val, &prof_len) == 1) {
+        if (prof_len == 6 && !SDL_memcmp(prof_val, "modern", 6))
+            hm_graphics_profile_set(o, HM_GRAPHICS_PROFILE_MODERN);
+        else if (prof_len == 6 && !SDL_memcmp(prof_val, "native", 6))
+            hm_graphics_profile_set(o, HM_GRAPHICS_PROFILE_NATIVE);
+    }
+#endif
     SDL_free(text);
     hm_validate_rate(o);
 }
@@ -163,6 +207,12 @@ int hm_graphics_save(const hm_graphics_options *o) {
     if (ok)
         ok = hm_user_data_set_nested_setting("enhance", "disable_dithering",
                                              !o->dither ? "true" : "false");
+#endif
+#ifdef __ANDROID__
+    if (ok)
+        ok = hm_user_data_set_nested_setting(
+            "enhance", "profile",
+            hm_graphics_profile_get(o) == HM_GRAPHICS_PROFILE_MODERN ? "modern" : "native");
 #endif
     return ok;
 }
@@ -374,6 +424,27 @@ int hm_graphics_change(SDL_GPUDevice *device, SDL_Window *window, hm_graphics_op
                        int direction) {
     hm_graphics_options candidate = *o;
     int step = direction < 0 ? -1 : 1;
+#ifdef __ANDROID__
+    (void)device;
+    (void)window;
+    (void)direction;
+    (void)step;
+    if (item == 0) {
+        int current = hm_graphics_profile_get(o);
+        int next = !current;
+        hm_graphics_profile_set(&candidate, next);
+#ifdef HMBTN_ENH_SCALING
+        if (!hm_scaling_enable(candidate.scaling))
+            return 0;
+#endif
+#ifdef HMBTN_ENH_INTERPOLATION
+        hm_interpolation_enable(candidate.interpolation);
+#endif
+        *o = candidate;
+        return 1;
+    }
+    return 0;
+#else
 #ifdef HMBTN_ENH_ANTIALIASING
     if (item == 5) {
         unsigned supported = o->aa_capabilities & (o->renderer ? 3u : 15u);
@@ -480,8 +551,20 @@ int hm_graphics_change(SDL_GPUDevice *device, SDL_Window *window, hm_graphics_op
         hm_validate_rate(&candidate);
     *o = candidate;
     return 1;
+#endif
 }
 void hm_graphics_value(const hm_graphics_options *o, int item, char *text, size_t capacity) {
+#ifdef __ANDROID__
+    if (item == 0) {
+        int profile = hm_graphics_profile_get(o);
+        if (profile == HM_GRAPHICS_PROFILE_MODERN)
+            SDL_snprintf(text, capacity, "Modern - Tuned Mobile (16:9, 720p)");
+        else
+            SDL_snprintf(text, capacity, "Native - Authentic PS1 (4:3, 1x)");
+    } else {
+        SDL_snprintf(text, capacity, "");
+    }
+#else
     static const char *const modes[] = {"Windowed", "Fullscreen", "Borderless Fullscreen"};
     const char *monitor_name = SDL_GetDisplayName(hm_display(o->monitor));
     if (item == 0)
@@ -535,8 +618,18 @@ void hm_graphics_value(const hm_graphics_options *o, int item, char *text, size_
     }
     else
         SDL_snprintf(text, capacity, "Off - not available yet");
+#endif
 }
 void hm_graphics_row_value(const hm_graphics_options *o, int item, char *text, size_t capacity) {
+#ifdef __ANDROID__
+    if (item == 0) {
+        int profile = hm_graphics_profile_get(o);
+        SDL_snprintf(text, capacity, "%s",
+                     profile == HM_GRAPHICS_PROFILE_MODERN ? "Modern" : "Native");
+    } else {
+        SDL_snprintf(text, capacity, "-");
+    }
+#else
     if (item == 0)
         SDL_snprintf(text, capacity, "%d", o->monitor + 1);
     else if (item == 1) {
@@ -578,4 +671,5 @@ void hm_graphics_row_value(const hm_graphics_options *o, int item, char *text, s
     }
     else
         SDL_snprintf(text, capacity, "Off");
+#endif
 }

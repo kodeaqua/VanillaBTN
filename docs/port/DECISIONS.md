@@ -3353,3 +3353,41 @@ Decision:
 
 Consequences:
 Android players have complete 8-button PS1 digital gamepad inputs on the touch overlay. Tile targeting highlight appears strictly during interactive gameplay and is suppressed throughout all cutscenes, intro sequences, dialogues, and demos.
+
+
+## ADR-123: Android Unified Graphics Profile (Native vs Modern) and Frame Interpolation Clamp
+
+Date: 2026-10-30. Status: accepted.
+
+Context: On mobile Android devices, navigating granular desktop graphics options (Internal Resolution, Texture Filtering, Widescreen, Anti-Aliasing, Dithering, PGXP, FPS Cap, and Visual Interpolation) in the pause menu is cumbersome on touchscreens and can cause performance degradation. In particular, visual frame interpolation (`enhance.interpolation`) caused severe frame pacing judder on Android mobile SOC displays with variable or non-standard refresh rates.
+
+Decision:
+1. Under `#ifdef __ANDROID__`, simplify the Graphics Settings menu in the ESC pause interface to a single option: `Profile: [ Native | Modern ]`.
+   - **Native** (default, pure vanilla parity): 4:3 native aspect ratio, Nearest Neighbor texture filtering, 1x internal resolution, 30 FPS cap, Interpolation OFF, Anti-Aliasing OFF.
+   - **Modern** (mobile optimized): 16:9 expanded farm viewport and presentation (ADR-056/057), Bilinear filtering, 720p scaling limit (ADR-105), 30 FPS cap, Interpolation OFF, Anti-Aliasing OFF.
+2. In `graphics_options.c`, clamp `enhance.interpolation` to 0 on Android, disabling mobile frame interpolation judder and keeping pacing locked to native 30 FPS display ticks.
+3. Persist `enhance.profile` in `settings.json`, maintaining full desktop multi-option control on Windows/Linux/macOS without cross-platform regressions.
+
+Consequences:
+Android users enjoy a clean, frictionless single-toggle graphics experience tailored for mobile hardware while preserving 100% pure vanilla parity by default.
+
+
+## ADR-124: Memory Card 64-bit LP64 Pointer Truncation Fix and Android Storage Resilience
+
+Date: 2026-10-30. Status: accepted.
+
+Context: On 64-bit Android (arm64-v8a, LP64 data model), attempting to save in the diary displayed "Not enough free space on MEMORY CARD in slot 1" even on fresh or empty memory cards. Investigation identified two major root causes:
+1. In `src/overlay/15_saveload/saveload.c`, local variables `long cmd, result, save_files, all_files;` are 64-bit integers on LP64 (8 bytes). However, `port/compat/psyq/libmcrd.h` and `port/compat/psyq/libmcx.h` declared `MemCardSync(..., s32 *command, s32 *result)` and `MemCardGetDirentry(..., s32 *count, ...)`. Writing through `s32 *` only populated the lower 4 bytes, leaving uninitialized stack garbage in the upper 4 bytes of `result`, `cmd`, and file counts. In `save_card_read_header()`, `switch (result)` failed to match `case McErrFileNotExist:` (5) because `result == 0xXXXXXXXX00000005 != 5`, falling through to checksum verification on empty buffers and returning `SAVE_CARD_BAD_CHECKSUM` (14). In `save_read_slot_headers()`, this left `save_slot_status[i]` at its initialization value `SAVE_SLOT_SHORT_OF_SPACE` (2), which rendered "Not enough free space" and routed selection to `SAVE_STEP_NOT_ENOUGH_SPACE`.
+2. In `port/platform/user_data.c`, `hm_exists()` used `SDL_EnumerateDirectory()`. On Android Scoped Storage / FUSE filesystem layers, directory enumeration can fail, returning -1. This caused `hm_read_card()` to return -1, making `hm_card_attach()` mark cards as `McErrCardInvalid`.
+3. In `MainActivity.kt`, `saves` subfolder was never explicitly created before native runtime initialization, and storage candidates lacked a fallback if `targetDataDir` was not writable.
+
+Decision:
+1. PSY-Q Compatibility Signatures: Changed `MemCardSync` (`command`, `result`), `McxSync` (`command`, `result`), and `MemCardGetDirentry` (`count`) to use `long *` in `libmcrd.h`, `libmcx.h`, `card.c`, `card_store.h`, and `card_store.c`. This ensures the full 64-bit integer is written on LP64 hosts, eliminating stack garbage and pointer truncation.
+2. File Existence Checking: Replaced `SDL_EnumerateDirectory()` in `hm_exists()` with `SDL_GetPathInfo(path, &info)`, returning 1 if the path exists and 0 if absent, completely avoiding directory enumeration failures.
+3. Android Storage Resilience:
+   - Added `isDirWritable()` validation in `MainActivity.kt`.
+   - Pre-create `File(targetDataDir, "saves").mkdirs()` from Kotlin before native engine startup.
+   - If public Documents is unwritable (e.g. Scoped Storage without All Files permission), seamlessly fallback to app-specific storage (`getExternalFilesDir(null)/VanillaBTN`), where read/write is always guaranteed.
+
+Consequences:
+Memory card space checking and save creation operate flawlessly across 64-bit Android (LP64) and Windows (LLP64). Diaries can be created and saved without false "not enough space" errors.
