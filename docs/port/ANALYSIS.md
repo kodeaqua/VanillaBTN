@@ -851,3 +851,9 @@ ADR-130 extends the existing `HMBTN_PORT && HMBTN_ENH_GAMEPLAY` guarded
 provide a fatigue indicator using the original state. The matching build does
 not compile that guarded function. The farm overlay manifest records the
 normalized source hash.
+
+ADR-144 adds `HMBTN_PORT && HMBTN_ENH_NPC_BONDS` guards in
+`src/overlay/11_GF_FARM/menu/status_pages.c` for the optional ninth page handler
+runtime dispatch, disabled-page recovery, and previous/next wrap limits. The
+exact original eight-page handler and wrap behavior remain in the matching-build
+branches. The farm overlay manifest records the normalized source hash.

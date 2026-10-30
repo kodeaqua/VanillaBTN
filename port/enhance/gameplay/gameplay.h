@@ -24,6 +24,7 @@ int hm_gameplay_roaming_horse(void);
 int hm_gameplay_fast_text(void);
 int hm_gameplay_tool_charge_gauge(void);
 int hm_gameplay_tile_targeting(void);
+int hm_gameplay_npc_bonds(void);
 
 void hm_gameplay_set_active(const void *options_ptr);
 

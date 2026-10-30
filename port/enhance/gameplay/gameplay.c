@@ -32,6 +32,7 @@ typedef struct {
     int fast_text;
     int tool_charge_gauge;
     int tile_targeting;
+    int npc_bonds;
 } hm_gameplay_runtime_options;
 
 static hm_gameplay_runtime_options active_options = {
@@ -47,6 +48,7 @@ static hm_gameplay_runtime_options active_options = {
     .fast_text = 0,
     .tool_charge_gauge = 0,
     .tile_targeting = 0,
+    .npc_bonds = 0,
 };
 
 int hm_gameplay_walk_through_crops(void) {
@@ -111,6 +113,10 @@ int hm_gameplay_tool_charge_gauge(void) {
 
 int hm_gameplay_tile_targeting(void) {
     return active_options.tile_targeting;
+}
+
+int hm_gameplay_npc_bonds(void) {
+    return active_options.npc_bonds;
 }
 
 

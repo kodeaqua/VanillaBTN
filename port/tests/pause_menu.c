@@ -66,6 +66,9 @@ int main(void) {
     CHECK(!strcmp(hm_pause_label(&menu, 8), "Roaming Horse"));
     CHECK(!strcmp(hm_pause_label(&menu, 9), "Tool Charge Bar"));
     CHECK(!strcmp(hm_pause_label(&menu, 10), "Tile Targeting"));
+#ifdef HMBTN_ENH_NPC_BONDS
+    CHECK(!strcmp(hm_pause_label(&menu, 11), "NPC Relationships"));
+#endif
     for (int i = 0; i < HM_PAUSE_GAMEPLAY_ITEMS; ++i) {
         CHECK(menu.selected == i);
         CHECK(hm_pause_handle(&menu, HM_PAUSE_RIGHT) == HM_PAUSE_CHANGE_GAMEPLAY);

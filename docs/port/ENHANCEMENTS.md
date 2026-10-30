@@ -16,7 +16,7 @@ compute path for mobile performance (ADR-123/124/131/132).
 | Interpolation | Optional and default OFF. Private primitive replay is limited to eligible farm views; Android clamps it off. It does not advance simulation. |
 | Dithering and color | Native PS1 retains original dithering. Enhance PS1/Modern can bypass it; 8-bit shading is preserved only for selected opaque GPU paths. Other paths and Software output retain BGR555 precision. |
 | Controls | Gamepad and keyboard controls work. Mouse settings remain in the controls model, but in-game mouse/touch actions are disabled by ADR-136. Pause-menu mouse navigation remains available. |
-| Gameplay options | Optional gameplay enhancements default OFF, except wild-dog attacks stay ON to preserve the vanilla behavior. The stamina HUD includes hearts and a fatigue gauge. Fast Text was removed from the menu and disabled pending a better multi-line pagination design (ADR-133). |
+| Gameplay options | Optional gameplay enhancements default OFF, except wild-dog attacks stay ON to preserve the vanilla behavior. The stamina HUD includes hearts and a fatigue gauge. NPC Relationships adds a scrollable friendship/affection page and defaults OFF (ADR-144). Fast Text was removed from the menu and disabled pending a better multi-line pagination design (ADR-133). |
 | Android | Native PS1, Enhance PS1, and Modern profiles are available. Scaling is capped at 720p; interpolation and the desktop PGXP compute path are disabled. Device/gameplay validation remains limited. |
 
 Graphics and gameplay settings are stored under Documents/VanillaBTN/settings.json
@@ -212,3 +212,13 @@ opt-in through audio settings; existing saved choices are preserved (ADR-110).
 ADR-130 adds a fatigue bar to the optional Stamina HUD. Its fill shows the
 original fatigue value from 0 to 100, and it shares the existing off-by-default
 Stamina HUD setting. Gameplay and display validation remain owner checks.
+
+### NPC Relationships Page (ADR-144)
+
+Settings > Gameplay can enable a ninth status page listing all 32 named adult
+villagers. Each row uses a small pixel head icon, the NPC name, and a bar sourced
+from the game's original friendship value (0-255) or bachelorette affection
+value (0–65535). Friendship is green and affection is pink. The setting
+`enhance.npc_bonds` defaults to `false`; disabled builds retain the original
+eight-page order and wrap behavior. The Windows and Android `-Game` builds
+compile the option. The owner still needs to check the page in gameplay.

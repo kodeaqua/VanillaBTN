@@ -21,6 +21,7 @@ void hm_gameplay_defaults(hm_gameplay_options *options) {
     options->fast_text = 0;
     options->tool_charge_gauge = 0;
     options->tile_targeting = 0;
+    options->npc_bonds = 0;
 }
 
 void hm_gameplay_load(hm_gameplay_options *options) {
@@ -60,6 +61,8 @@ void hm_gameplay_load(hm_gameplay_options *options) {
             options->tool_charge_gauge = (val_len == 4 && !memcmp(val, "true", 4));
         if (hm_json_property(object, length, "tile_targeting", &val, &val_len) == 1)
             options->tile_targeting = (val_len == 4 && !memcmp(val, "true", 4));
+        if (hm_json_property(object, length, "npc_bonds", &val, &val_len) == 1)
+            options->npc_bonds = (val_len == 4 && !memcmp(val, "true", 4));
     }
     free(text);
     hm_gameplay_set_active(options);
@@ -94,6 +97,8 @@ int hm_gameplay_save(const hm_gameplay_options *options) {
                                           options->tool_charge_gauge ? "true" : "false");
     ok &= hm_user_data_set_nested_setting("enhance", "tile_targeting",
                                           options->tile_targeting ? "true" : "false");
+    ok &= hm_user_data_set_nested_setting("enhance", "npc_bonds",
+                                          options->npc_bonds ? "true" : "false");
     return ok;
 }
 
@@ -134,6 +139,9 @@ int hm_gameplay_change(hm_gameplay_options *options, int item, int direction) {
         break;
     case 10:
         options->tile_targeting = !options->tile_targeting;
+        break;
+    case 11:
+        options->npc_bonds = !options->npc_bonds;
         break;
     default:
         return 0;
@@ -179,6 +187,9 @@ void hm_gameplay_value(const hm_gameplay_options *options, int item, char *text,
     case 10:
         snprintf(text, capacity, "Highlight targeted field tile grid");
         break;
+    case 11:
+        snprintf(text, capacity, "Show NPC friendship and affection page");
+        break;
     default:
         text[0] = 0;
         break;
@@ -221,6 +232,9 @@ void hm_gameplay_row_value(const hm_gameplay_options *options, int item, char *t
         break;
     case 10:
         snprintf(text, capacity, "%s", options->tile_targeting ? "On" : "Off");
+        break;
+    case 11:
+        snprintf(text, capacity, "%s", options->npc_bonds ? "On" : "Off");
         break;
     default:
         text[0] = 0;
