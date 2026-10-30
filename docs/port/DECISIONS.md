@@ -3182,3 +3182,20 @@ The Studio HQ resampler was enabled for new settings despite the vanilla-first
 policy. Default to PS1 Gaussian; retain explicitly saved HQ settings and the
 existing option. The audio options regression checks both the default and the
 opt-in persistence path.
+
+## ADR-113: Preserve resolved native colours in GPU presentation
+
+Date: 2026-10-30. Status: accepted.
+
+Context: The shared GPU renderer added unconditional output noise after resolving
+BGR555 colours. This changed even flat native pixels and differed from the CPU
+reference independently of the original draw-environment dithering setting.
+
+Decision: Output the resolved eight-bit channels without additional presentation
+noise. Preserve PS1 primitive dithering and existing runtime controls. Regenerate
+both checked-in shader formats. This supersedes the GPU output-noise portion of
+ADR-092.
+
+Consequences: GPU output no longer adds a separate debanding effect. Native and
+enhanced rendering still retain their existing rasterization and fallback paths.
+Visual behaviour remains to be checked by the owner; no performance claim is made.

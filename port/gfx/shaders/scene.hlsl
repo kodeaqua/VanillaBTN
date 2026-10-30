@@ -141,7 +141,5 @@ void main(uint3 id:SV_DispatchThreadID){
         uint pixel=sample_colors[resolve_sample];uint3 value=uint3(pixel&31,(pixel>>5)&31,(pixel>>10)&31);
         sum+=(value<<3)|(value>>2);}
     uint3 c=(sum+samples/2)/samples;
-    float micro_dither=(float(((id.x*13u+id.y*7u)^(id.x*id.y))&15u)-7.5)/1020.0;
-    float3 smooth_c=clamp(float3(c)/255.0+micro_dither,0.0,1.0);
-    output_image[id.xy]=float4(smooth_c,1.0);
+    output_image[id.xy]=float4(float3(c)/255.0,1.0);
 }
