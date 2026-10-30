@@ -836,3 +836,10 @@ No matching source, layout guard or overlay manifest changes are required.
 The owner deferred the separate horizontal-line report while running.
 
 HMBTN_PORT guards under ADR-120: `src/overlay/11_GF_FARM/world/weather.c` includes `enhance/widescreen/widescreen.h` and scales the horizontal weather particle spawn range to `[-margin, 320 + margin)` when `hm_widescreen_margin() > 0`, ensuring rain and weather effects cover the full widescreen viewport while preserving exact 4:3 vanilla parity and PRNG step count when Widescreen is OFF.
+
+
+ADR-130 extends the existing `HMBTN_PORT && HMBTN_ENH_GAMEPLAY` guarded
+`status_draw_stamina_hud` in `src/overlay/11_GF_FARM/menu/status_pages.c` to
+provide a fatigue indicator using the original state. The matching build does
+not compile that guarded function. The farm overlay manifest records the
+normalized source hash.

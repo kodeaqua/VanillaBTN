@@ -38,7 +38,7 @@ hm_farm_state_unit("menu/options_menu.c" "b7e1e5c5bb8af5a7c3a447d0c3a3a8809ea00c
 hm_farm_state_unit("menu/photo_album.c" "dfd2133be963515b86b8a01b3ca64a3ad421ef38a9a98235876b532bb8e7a17d")
 hm_farm_state_unit("menu/shop_dialogues.c" "95d5085385470f8b420ef994deb64220ab35b7707dee757752c9ecfa18870c03")
 hm_farm_state_unit("menu/shop_page.c" "d8db07183d4817ac5b693b0cc146cc8a10cc959e4c1a1d254e060b0f342a6edc")
-hm_farm_state_unit("menu/status_pages.c" "2f39e6b91f5dbc541be63729f5149cd704e97a4ac801269025beb1b2d1f70506")
+hm_farm_state_unit("menu/status_pages.c" "73e36d51b899177c0372151db61c0a3ba1f7d89df012b046931a699bd7c363cb")
 hm_farm_state_unit("menu/storage_swap.c" "cea9f340aeb8977c6d90206e47044c7d600d4aad4f6f5ec09ea6bf019e9931d2")
 hm_farm_state_unit("people/family.c" "a3df4e17ca40bbc208fcb4d52913b69d3c2cdc98f3ab8501deb426f1db59cc28")
 hm_farm_state_unit("people/harvest_sprites.c" "d6a822ef6e3b87ec820f6a7023282061f6400c90341580f1010b6cf68b1f5ce4")

@@ -188,3 +188,8 @@ deferred; no further fix for that report is claimed here.
 
 The audio resampler defaults to PS1 Gaussian. Studio HQ remains an explicit
 opt-in through audio settings; existing saved choices are preserved (ADR-110).
+
+
+ADR-130 adds a fatigue bar to the optional Stamina HUD. Its fill shows the
+original fatigue value from 0 to 100, and it shares the existing off-by-default
+Stamina HUD setting. Gameplay and display validation remain owner checks.

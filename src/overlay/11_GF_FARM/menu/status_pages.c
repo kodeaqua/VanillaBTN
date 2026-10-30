@@ -533,8 +533,8 @@ static void status_draw_stamina_hud(void) {
     if (active_hearts > 10)
         active_hearts = 10;
 
-    /* Compact window frame: top-left (14, 16), width 90, height 20 */
-    window_frame_draw_at(&current_frame->otTags[0][36], 1, base_x, base_y, 90, 20);
+    /* PORT: reserve a second row for the optional fatigue bar -- see ADR-130. */
+    window_frame_draw_at(&current_frame->otTags[0][36], 1, base_x, base_y, 90, 31);
 
     /* Pete head icon: scaled down to fit sleekly and vertically centered */
     px = base_x + 5;
@@ -550,6 +550,7 @@ static void status_draw_stamina_hud(void) {
             anim_draw_sprt_cursor(&current_frame->otTags[0][35], &status_cursor_sprite, 4, 0, x, hy);
         }
     }
+    hm_gameplay_draw_fatigue_bar(base_x, base_y, game_state.player.fatigue);
 }
 #endif
 
