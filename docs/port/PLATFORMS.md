@@ -520,3 +520,22 @@ owner confirmed the reported line disappeared while idle and running in the
 same scene with Modern, Scaling On, Widescreen Off, MSAA 4x, Nearest,
 Interpolation Off, VSync On, and unlimited FPS. Other scenes and performance
 remain unverified.
+
+### Persistent GPU VRAM upload probe (ADR-140, 2026-10-30)
+
+`hmbtn_gpu_renderer_probe <direct3d12|vulkan> --benchmark` passes the synthetic
+offscreen readback comparisons on both Windows GPU backends. The 50-iteration
+native scene benchmark reports CPU-reference and GPU capture/upload/compute/
+fence times on the local Radeon RX Vega:
+
+| Backend | 320x240 CPU / GPU | 640x480 CPU / GPU | 1440x1080 CPU / GPU |
+|---|---:|---:|---:|
+| D3D12 | 0.326 / 0.447 ms | 1.167 / 0.562 ms | 5.828 / 0.868 ms |
+| Vulkan | 0.323 / 0.314 ms | 1.168 / 0.391 ms | 5.855 / 0.727 ms |
+
+The 1920x1080 synthetic widescreen probe measured 2.183 ms GPU vs 43.457 ms
+CPU on D3D12, and 2.066 ms GPU vs 43.364 ms CPU on Vulkan. The repeated
+benchmark uses unchanged VRAM after the first frame, so it measures the
+persistent cache path. It does not cover scenes that rewrite most of VRAM or
+end-to-end gameplay. The owner still needs to confirm interactive coverage on
+the Windows game; no Android or other-GPU device check was run.

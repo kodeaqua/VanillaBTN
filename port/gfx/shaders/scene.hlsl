@@ -1,11 +1,13 @@
 // Original PS1 command semantics, implemented for independent output pixels.
 // No game logic, native RAM or native VRAM is written by this kernel.
-ByteAddressBuffer scene : register(t0, space0);
+Texture2D<uint> vram_cache : register(t0, space0);
+ByteAddressBuffer scene : register(t1, space0);
 RWTexture2D<float4> output_image : register(u0, space1);
 uint load_word(uint index){return scene.Load(index*4);}
 uint word(uint p,uint i){return load_word(p+i);}
-uint vram(int x,int y){uint at=((uint(y)&511)*1024+(uint(x)&1023));
-    return (load_word(16+at/2)>>((at&1)*16))&65535;}
+uint vram(int x,int y){uint2 at=uint2(uint(x)&1023,uint(y)&511);
+    uint packed=vram_cache.Load(int3(int2(at.x>>1,at.y),0));
+    return (packed>>((at.x&1)*16))&65535;}
 int edge_i(int2 a,int2 b,int2 p){return (b.x-a.x)*(p.y-a.y)-(b.y-a.y)*(p.x-a.x);}
 float edge_f(float2 a,float2 b,float2 p){return (b.x-a.x)*(p.y-a.y)-(b.y-a.y)*(p.x-a.x);}
 // Exact Q8 edge sign near a floating-point cancellation boundary. Emulated

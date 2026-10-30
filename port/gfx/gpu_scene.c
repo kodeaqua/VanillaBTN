@@ -13,8 +13,10 @@ struct hm_gpu_scene {
     u32 primitives[HM_SCENE_PRIMITIVES][HM_SCENE_STRIDE];
     u32 bins[HM_SCENE_BINS][HM_SCENE_BIN_WORDS];
     u32 packed[HM_SCENE_MAX_WORDS];
+    u16 vram_snapshot[HM_VRAM_HEIGHT][HM_VRAM_WIDTH];
     u32 width, height, count, tiles_x, tiles_y;
     RECT area, native;
+    const u16 *vram_pixels;
     u16 background;
     const char *failure;
     int begun, texture_linear;
@@ -271,7 +273,8 @@ static void hm_scene_begin_capture(void *context, const RECT *area) {
     s->tiles_y = ((u32)area->h + 15) / 16;
     for (u32 i = 0; i < s->tiles_x * s->tiles_y; ++i)
         s->bins[i][0] = 0;
-    memcpy(s->packed + HM_SCENE_HEADER, hm_vram_state()->pixels, 1024 * 512 * sizeof(u16));
+    memcpy(s->vram_snapshot, hm_vram_state()->pixels, sizeof(s->vram_snapshot));
+    s->vram_pixels = &s->vram_snapshot[0][0];
     s->begun = 1;
 }
 static void hm_scene_triangle(hm_gpu_scene *s, u32 *material, const u32 xy[3], const u32 rgb[3],
@@ -582,9 +585,9 @@ static void hm_scene_command(void *context, const u32 *w, u32 available, int aft
             s->failure = "inline VRAM transfer";
             return;
         }
-        if (after)
-            memcpy(s->packed + HM_SCENE_HEADER, hm_vram_state()->pixels,
-                   1024 * 512 * sizeof(u16));
+        if (after) {
+            memcpy(s->vram_snapshot, hm_vram_state()->pixels, sizeof(s->vram_snapshot));
+        }
         return;
     }
     if (after)
@@ -670,6 +673,7 @@ hm_replay_sink hm_gpu_scene_begin(hm_gpu_scene *s, u32 width, u32 height) {
     memset(s->texture_reads, 0, sizeof(s->texture_reads));
     s->failure = NULL;
     s->begun = 0;
+    s->vram_pixels = NULL;
     s->motion_previous = s->motion_current = NULL;
     s->motion_count = 0;
     return hm_replay_bind((hm_replay_sink){s, hm_scene_begin_capture, hm_scene_command,
@@ -677,10 +681,9 @@ hm_replay_sink hm_gpu_scene_begin(hm_gpu_scene *s, u32 width, u32 height) {
 }
 int hm_gpu_scene_end(hm_gpu_scene *s, hm_replay_sink previous, hm_gpu_scene_data *data) {
     hm_replay_bind(previous);
-    if (!s->begun || s->failure)
+    if (!s->begun || s->failure || !s->vram_pixels)
         return 0;
-    u32 primitives = HM_SCENE_HEADER + 1024 * 512 / 2,
-        bins = primitives + s->count * HM_SCENE_STRIDE;
+    u32 primitives = HM_SCENE_HEADER, bins = primitives + s->count * HM_SCENE_STRIDE;
     u32 total = bins + s->tiles_x * s->tiles_y * HM_SCENE_BIN_WORDS;
     memset(s->packed, 0, HM_SCENE_HEADER * sizeof(u32));
     s->packed[0] = s->width;
@@ -701,8 +704,8 @@ int hm_gpu_scene_end(hm_gpu_scene *s, hm_replay_sink previous, hm_gpu_scene_data
     s->packed[15] = s->multisamples == 2 || s->multisamples == 4 ? s->multisamples : 1;
     memcpy(s->packed + primitives, s->primitives, s->count * HM_SCENE_STRIDE * sizeof(u32));
     memcpy(s->packed + bins, s->bins, s->tiles_x * s->tiles_y * HM_SCENE_BIN_WORDS * sizeof(u32));
-    *data = (hm_gpu_scene_data){s->packed, (size_t)total * sizeof(u32), ++s->revision, s->width,
-                                s->height};
+    *data = (hm_gpu_scene_data){s->packed, (size_t)total * sizeof(u32), s->vram_pixels,
+                                ++s->revision, s->width, s->height};
     return 1;
 }
 const char *hm_gpu_scene_fallback(const hm_gpu_scene *s) {
