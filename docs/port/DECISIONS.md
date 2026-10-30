@@ -3828,3 +3828,35 @@ Consequences: XA fade restarts resume with the configured speed and filter
 after intervening file reads. The CD runtime remains port-only; no decomp source
 or overlay manifest changed. Interactive gameplay confirmation remains with the
 owner.
+
+## ADR-140: Keep GPU VRAM Persistent and Upload Changed Regions
+
+Date: 2026-10-30. Status: accepted.
+
+Context: GPU scene packets included the full 1 MiB VRAM image, and the renderer
+uploaded it on each new scene revision. This spent bandwidth when consecutive
+frames changed only small regions. Scene data also needs a stable snapshot
+because the CPU reuses its active VRAM context for later reference rendering.
+
+Decision: Store a builder-owned stable VRAM snapshot separately from the packed
+scene records. Keep a persistent R32_UINT VRAM texture in the GPU renderer,
+compare the selected snapshot with its last uploaded shadow, and upload changed
+16x16 tile-row bounds. Use a full upload on the first scene or when changed
+regions cover at least 75% of VRAM. Keep CPU VRAM authoritative and retain
+software fallback behavior.
+
+Consequences: The scene packet and per-frame GPU scene upload no longer carry
+the VRAM image. The renderer still keeps a 1 MiB CPU shadow and transfer buffer;
+the scene builder keeps its 1 MiB stable snapshot. Tile comparison is exact, so
+it supports either of the two retained replay frames without relying on shared
+dirty flags. A first D3D12 probe initially exposed a borrowed-snapshot lifetime
+bug; the builder-owned copy fixed it, and readback comparisons then passed on
+D3D12 and Vulkan.
+
+Measurements: On the local Radeon RX Vega, the synthetic 50-frame
+capture/upload/compute/fence probe measured GPU times of 0.447/0.562/0.868 ms
+at 320x240/640x480/1440x1080 on D3D12, and 0.314/0.391/0.727 ms on Vulkan.
+Against ADR-138's earlier GPU measurements, D3D12 changed from
+0.475/0.547/0.877 ms and Vulkan from 0.520/0.564/0.998 ms. This probe uses
+unchanged VRAM after its first frame; it does not represent scene uploads that
+modify most VRAM each frame or end-to-end gameplay frame rate.

@@ -59,7 +59,7 @@ int main(void) {
     hm_gpu_scene_data data;
     CHECK(hm_frame_replay_draw(b, &live) && hm_gpu_scene_end(s, previous, &data));
     CHECK(data.width == 32 && data.height == 32 && data.bytes <= HM_SCENE_MAX_WORDS * sizeof(u32));
-    CHECK(data.words[10] == 1 && data.words[HM_SCENE_HEADER] == 0);
+    CHECK(data.words[10] == 1 && data.vram_pixels[0] == 0);
     CHECK(!(data.words[data.words[8] + 4] & 64));
 #ifdef HMBTN_ENH_DITHERING
     hm_dither_set_enabled(0);

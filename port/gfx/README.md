@@ -15,14 +15,20 @@ low-resolution CPU VRAM remains authoritative for reads, transfers and logical
 compatibility. This change does not remove that compatibility work.
 
 gpu_scene emits an output-independent command representation with a 16-word
-header, packed 16-bit VRAM snapshot, 40-word primitive records and 16x16 logical
-tile lists. Each tile has at most 256 ordered references; a scene has at most
-8192 primitives and 2048 tiles. All records use explicit uint32_t fields and
-byte offsets are bounded by HM_SCENE_MAX_WORDS. No disc data is interpreted as
-one of these records. Material records include CLUT/tpage, texture window,
-clipping, display-write controls, dither and mask flags. Lines become logical
-cells (flat axis-aligned lines are compact rectangles). Quad triangle order
-and shared-edge ownership are retained.
+header, 40-word primitive records and 16x16 logical tile lists. Each tile has
+at most 256 ordered references; a scene has at most 8192 primitives and 2048
+tiles. The builder owns a stable VRAM snapshot separately from this packet; it
+remains valid until the next capture. The GPU renderer keeps a persistent
+R32_UINT VRAM texture and uploads changed 16x16 tile-row bounds, falling back
+to a full snapshot when most of VRAM changed. Exact content comparison
+preserves correctness when replay selects an older retained frame; it does not
+acknowledge shared VRAM dirty flags. All
+packet records use explicit uint32_t fields and byte offsets are bounded by
+HM_SCENE_MAX_WORDS. No disc data is interpreted as one of these records.
+Material records include CLUT/tpage, texture window, clipping, display-write
+controls, dither and mask flags. Lines become logical cells (flat axis-aligned
+lines are compact rectangles). Quad triangle order and shared-edge ownership
+are retained.
 
 Output backend execution is separate from this portable capture/packet layer.
 Snapshots are immutable input; only backend-owned output is written. Source
