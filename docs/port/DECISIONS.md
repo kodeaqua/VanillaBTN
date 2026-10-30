@@ -3328,3 +3328,28 @@ Context: ADR-119 deferred fallbacks for fully offscreen untextured draws using a
 Decision: Replace coarse boolean tracking with conservative 16x16 VRAM tile footprints (`offscreen_writes[32]`) matching the existing tile tracking mechanism used for texture reads (`texture_reads[32]`). Fully offscreen untextured draws record their wrapped destination tiles. Subsequent textured primitives trigger CPU fallback only if their sampled texture UV footprint or CLUT footprint overlaps recorded offscreen write tiles. In the presentation loop, bound non-unlimited catch-up delays to at least 1 ms when presentation deadlines are in the past or swapchains are unavailable, preventing 0-ns busy-spinning. Native VRAM drawing and game logic remain unchanged.
 
 Consequences: Qualifying frames with offscreen helper draws alongside independent textured geometry remain on the GPU compute pipeline, eliminating false-positive fallbacks for smoother frame pacing and reduced CPU load. Bit-exact dependency safety is preserved. Actual scene coverage and gameplay behavior remain unverified at the owner's request.
+
+
+## ADR-122: Android L2 and R2 virtual touch controls and tile targeting cutscene suppression
+
+Date: 2026-10-30. Status: accepted.
+
+Context:
+1. In the Android virtual touch controller overlay (`VirtualGamepadView.kt`), only shoulder buttons L1 (`KeyEvent.KEYCODE_A`) and R1 (`KeyEvent.KEYCODE_S`) were implemented. L2 (`KeyEvent.KEYCODE_Q` / `HM_PAD_L2`) and R2 (`KeyEvent.KEYCODE_E` / `HM_PAD_R2`) were missing, preventing whistling for the dog/horse and using secondary shoulder shortcuts via touch on Android. In addition, when buttons were positioned adjacent to each other, hitboxes could overlap during expanded touch tolerance checks.
+2. The Tile Targeting enhancement (`hm_gameplay_draw_tile_targeting()`) rendered a cyan highlight box on the farm tile in front of the player during opening cutscenes (including the title screen farm demo and the new game opening cutscene with Mayor Thomas). The highlight was only intended to display during active, controllable gameplay.
+
+Decision:
+1. Android Virtual Gamepad:
+   - Added L2 (`KeyEvent.KEYCODE_Q`) and R2 (`KeyEvent.KEYCODE_E`) rectangular shoulder buttons to `VirtualGamepadView.kt`.
+   - Placed L1 (outer corner) and L2 (inner) side-by-side on the top-left, and R2 (inner) and R1 (outer corner) side-by-side on the top-right, maintaining clear vertical clearance above the dynamic analog stick area (`y > height * 0.20f`).
+   - Implemented prioritized two-pass touch hit resolution (`findHitButton`): exact geometric bounds check takes precedence, falling back to nearest Euclidean distance within expanded touch tolerance to prevent adjacent button hit stealing.
+2. Tile Targeting Cutscene Suppression:
+   - In `port/enhance/gameplay/gameplay.c` (`hm_gameplay_draw_tile_targeting`), added checks to suppress rendering whenever:
+     - `game_state.globalFlags` has `GLOBAL_FLAG_DEMO_START` or `GLOBAL_FLAG_INPUT_REPLAY` (title screen farm demo reel).
+     - `game_state.globalFlags` has `GLOBAL_FLAG_CAMERA_BUSY` (event/cutscene camera pans).
+     - `event_flag_get(EVENT_FLAG_EVENT_ACTIVE)` or `event_flag_get(EVENT_FLAG_REQUEST_BUSY)` is non-zero (active in-game cutscenes, including the new game intro with Mayor Thomas).
+     - `menu_get_phase() != TEXT_WINDOW_CLOSED` (active dialogue/text message boxes).
+   - Preserved all existing checks (`player->stateFlags`, `farm_area.mode.eventMode == FARM_MODE_IDLE`, and `GLOBAL_FLAG_PAUSED | GLOBAL_FLAG_MENU_OPEN | GLOBAL_FLAG_TRANSITION`).
+
+Consequences:
+Android players have complete 8-button PS1 digital gamepad inputs on the touch overlay. Tile targeting highlight appears strictly during interactive gameplay and is suppressed throughout all cutscenes, intro sequences, dialogues, and demos.

@@ -9,6 +9,9 @@
 #include "main.h"
 #include "prim.h"
 #include "model.h"
+#include "event_flags.h"
+#include "text.h"
+#include "menu_window.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -591,7 +594,13 @@ void hm_gameplay_draw_tile_targeting(const void *player_ptr, s32 depth) {
     if (farm_area.mode.eventMode != FARM_MODE_IDLE)
         return;
 
-    if (game_state.globalFlags & (GLOBAL_FLAG_MENU_OPEN | GLOBAL_FLAG_TRANSITION | GLOBAL_FLAG_PAUSED))
+    if (game_state.globalFlags & (GLOBAL_FLAG_MENU_OPEN | GLOBAL_FLAG_TRANSITION |
+                                  GLOBAL_FLAG_PAUSED | GLOBAL_FLAG_CAMERA_BUSY |
+                                  GLOBAL_FLAG_DEMO_START | GLOBAL_FLAG_INPUT_REPLAY))
+        return;
+    if (event_flag_get(EVENT_FLAG_EVENT_ACTIVE) || event_flag_get(EVENT_FLAG_REQUEST_BUSY))
+        return;
+    if (game_state.system.menuState != MENU_STATE_IDLE)
         return;
     if (player->stateFlags & (PLAYER_FLAG_AIRBORNE | PLAYER_FLAG_ASLEEP |
                              PLAYER_FLAG_SCRIPTED | PLAYER_FLAG_EVENT_SPRITE |
