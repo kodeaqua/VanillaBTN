@@ -11,6 +11,12 @@ int main(int argc, char **argv) {
     CHECK(hm_user_data_set_setting("unrelated","42"));
     hm_graphics_options options;
     hm_graphics_defaults(&options);
+    char row[64], detail[64];
+    hm_graphics_row_value(&options, 2, row, sizeof(row));
+    CHECK(!strcmp(row, "Windowed"));
+    hm_graphics_row_value(&options, 3, row, sizeof(row));
+    hm_graphics_value(&options, 3, detail, sizeof(detail));
+    CHECK(!strcmp(row, "640 x 480") && !strcmp(row, detail));
     CHECK(options.antialiasing==HM_AA_OFF);
     hm_graphics_profile_set(&options, HM_GRAPHICS_PROFILE_MODERN);
     for(int mode=HM_AA_OFF;mode<HM_AA_COUNT;++mode) {
