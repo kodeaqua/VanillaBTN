@@ -137,5 +137,22 @@ int main(void) {
     for (u32 y = 20; y < 24; ++y)
         for (u32 x = 20; x < 24; ++x)
             CHECK(hm_vram_pixel(x, y) == 16);
+
+    /* Game scenes draw polygons into the opposite framebuffer with dfe off,
+     * while displaying the other half of VRAM. */
+    DISPENV display;
+    SetDefDispEnv(&display, 0, 0, 320, 240);
+    PutDispEnv(&display);
+    SetDispMask(1);
+    SetDefDrawEnv(&draw, 0, 240, 320, 240);
+    PutDrawEnv(&draw);
+    ClearOTagR(ot, 4);
+    SetPolyF4(&quad);
+    setRGB0(&quad, 255, 0, 0);
+    setXYWH(&quad, 2, 3, 4, 3);
+    addPrim(ot + 3, &quad);
+    DrawOTag(ot + 3);
+    CHECK(hm_vram_pixel(2, 243) == 31);
+    CHECK(hm_vram_pixel(2, 3) != 31);
     return 0;
 }
