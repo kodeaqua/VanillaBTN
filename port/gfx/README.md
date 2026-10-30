@@ -28,10 +28,10 @@ Output backend execution is separate from this portable capture/packet layer.
 Snapshots are immutable input; only backend-owned output is written. Source
 texture/CLUT overlap with output, offscreen draw dependencies, dependent VRAM
 transfers and capacity overflow reject GPU packet output so the caller can use
-the software reference. Leading fills/uploads and transfers outside the output
-after untextured primitives update the private initial snapshot. Transfers after
-textured primitives or into the output retain fallback. Conservative rejection
-may reduce GPU coverage.
+the software reference. Leading fills/uploads and transfers outside both the
+output and previously sampled texture/CLUT tiles update the private initial
+snapshot. Tile-level overlap is conservative and retains fallback when a
+dependency cannot be excluded.
 
 packet_identity records construction spans without changing the packets.
 Native-only adapters identify field/greenhouse sprites by the projected world
