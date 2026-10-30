@@ -1325,17 +1325,20 @@ static void hm_host_poll_events(void) {
             exit(0);
         }
         hm_host_display_event(event.type);
-        if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+        /* ADR-136: mouse/touch-to-game interaction is disabled.
+         * Do not feed button events into the mouse_input state machine so
+         * that all hm_mouse_consume_*() calls in overlay code return 0. */
+        if (0 && event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
             if (event.button.button == SDL_BUTTON_LEFT)
                 hm_mouse_button_down(HM_MOUSE_BTN_LEFT);
             else if (event.button.button == SDL_BUTTON_RIGHT)
                 hm_mouse_button_down(HM_MOUSE_BTN_RIGHT);
-        } else if (event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+        } else if (0 && event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
             if (event.button.button == SDL_BUTTON_LEFT)
                 hm_mouse_button_up(HM_MOUSE_BTN_LEFT);
             else if (event.button.button == SDL_BUTTON_RIGHT)
                 hm_mouse_button_up(HM_MOUSE_BTN_RIGHT);
-        } else if (event.type == SDL_EVENT_MOUSE_WHEEL) {
+        } else if (0 && event.type == SDL_EVENT_MOUSE_WHEEL) {
             if (event.wheel.y > 0)
                 hm_mouse_wheel(1);
             else if (event.wheel.y < 0)
@@ -1544,7 +1547,8 @@ static void hm_host_tick(void *context, u64 tick) {
         if (SDL_GetGamepadButton(hm_active_gamepad, SDL_GAMEPAD_BUTTON_BACK))
             held |= HM_PAD_SELECT;
     }
-    if (hm_controls.mouse_mode != HM_MOUSE_MODE_OFF) {
+    /* ADR-136: Mouse/touch-to-game interaction disabled. */
+    if (0 && hm_controls.mouse_mode != HM_MOUSE_MODE_OFF) {
         int menu_open = (game_state.globalFlags & GLOBAL_FLAG_MENU_OPEN) ||
                         (game_state.system.menuState != MENU_STATE_IDLE);
         if (!menu_open) {

@@ -3705,3 +3705,61 @@ the wrong out-of-the-box experience.
   key overrides it.
 - 100% unit tests still passing (124/124); vanilla parity with all enhancements
   OFF is unaffected.
+## ADR-136: Disable Mouse/Touch-to-Game Interaction (Temporary Takeout)
+
+**Date:** 2026-10-30
+**Status:** Accepted
+
+### Context
+
+The mouse/touch-to-game interaction feature (inventory slot clicks, dialogue
+choice taps, storage swap) introduced in ADR-133/134 had two outstanding
+precision issues that made it unreliable:
+
+1. **OS cursor Y-offset**: The OS mouse cursor appeared slightly above the
+   in-game virtual cursor position, indicating a residual mapping error in
+   the 320x240 virtual-canvas projection.
+2. **Android coordinate mismatch**: Touch precision on Android remained
+   inconsistent across different device densities and SDL3 versions.
+
+Rather than continue debugging the coordinate pipeline in-session, the owner
+requested a clean takeout of the tap/mouse-to-game interaction feature until
+a proper redesign can be done.
+
+### Decision
+
+Disable the mouse/touch-to-game interaction path cleanly within the host layer
+without removing any overlay code (avoids manifest hash updates for
+`src/overlay/11_GF_FARM/` files) and without altering the clean unit-tested
+`controls_options` model:
+
+1. **`game_host.c` `hm_host_poll_events`**: `SDL_EVENT_MOUSE_BUTTON_DOWN`,
+   `SDL_EVENT_MOUSE_BUTTON_UP`, and `SDL_EVENT_MOUSE_WHEEL` events are no
+   longer forwarded to `hm_mouse_button_down()` / `hm_mouse_button_up()` /
+   `hm_mouse_wheel()` (guarded by `if (0 && ...)`). This ensures
+   `hm_mouse_consume_left_click()` and friends in overlay code always return 0.
+
+2. **`game_host.c` `hm_host_tick`**: In-game mouse D-pad and tool button
+   injection (`if (hm_controls.mouse_mode != HM_MOUSE_MODE_OFF)`) is disabled
+   via compile-time guard (`if (0 && ...)`), ensuring mouse clicks never emit
+   gamepad inputs into simulation.
+
+3. **Pause Menu Intact**: The pause menu mouse navigation in `hm_host_pause`
+   remains fully functional as it uses its own direct hit-testing logic.
+
+### Files Changed
+
+- `port/platform/game_host.c`
+
+### Consequences
+
+- No overlay files changed -> no manifest hash update required.
+- `hm_mouse_*` infrastructure (`mouse_input.c`/`h`) is preserved for future use.
+- ADR-135 coordinate fixes (`SDL_GetWindowSizeInPixels` on Android in
+  `hm_host_events` and `hm_host_pause`) are **kept** -- they are still correct
+  for the pause menu mouse navigation which remains functional.
+- Windows/Android/all-platform: mouse clicks no longer interact with
+  inventory, dialogue, or storage. Game is controller/keyboard only.
+- 100% unit tests still passing (124/124); vanilla parity unaffected.
+- To re-enable in a future ADR: remove the `if (0 && ...)` guards and fix
+  the OS cursor Y-offset root cause.
