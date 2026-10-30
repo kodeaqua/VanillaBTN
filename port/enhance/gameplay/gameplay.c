@@ -1,5 +1,6 @@
 #include "enhance/gameplay/gameplay.h"
 #include "enhance/gameplay/mine_grid.h"
+#include "gfx/game_frame.h"
 #include <libgpu.h>
 #include <libgte.h>
 #include "farm_state.h"
@@ -452,6 +453,19 @@ void hm_gameplay_horse_safety_check(void) {
 
 extern s32 greenhouse_world_to_cell(VECTOR *position, s16 *column, s16 *row);
 
+/* primBuffer belongs to overlay backups. Widescreen relocates only primStart,
+ * so compare the cursor against the active arena and its actual capacity. */
+static int hm_gameplay_prim_room(size_t bytes) {
+    if (!current_frame || !current_frame->primStart || !current_frame->primCursor.bytes)
+        return 0;
+    uintptr_t start = (uintptr_t)current_frame->primStart;
+    uintptr_t cursor = (uintptr_t)current_frame->primCursor.bytes;
+    size_t capacity = hm_game_prim_capacity();
+    if (cursor < start || cursor - start > capacity)
+        return 0;
+    return bytes <= capacity - (cursor - start);
+}
+
 void hm_gameplay_draw_tool_charge_gauge(const void *player_ptr, s32 depth, s16 screen_x, s16 screen_y) {
     if (!active_options.tool_charge_gauge)
         return;
@@ -489,7 +503,7 @@ void hm_gameplay_draw_tool_charge_gauge(const void *player_ptr, s32 depth, s16 s
     if (ot_idx >= FRAME_OT_DEPTH)
         ot_idx = FRAME_OT_DEPTH - 1;
 
-    if (current_frame->primCursor.bytes + 3 * sizeof(POLY_F4) + 5 * sizeof(LINE_F2) >= current_frame->primBuffer + FRAME_PRIM_SIZE)
+    if (!hm_gameplay_prim_room(3 * sizeof(POLY_F4) + 5 * sizeof(LINE_F2)))
         return;
 
     /* Outer dark border */
@@ -669,7 +683,7 @@ void hm_gameplay_draw_tile_targeting(const void *player_ptr, s32 depth) {
     if (ot_idx >= FRAME_OT_DEPTH)
         ot_idx = FRAME_OT_DEPTH - 1;
 
-    if (current_frame->primCursor.bytes + sizeof(DR_TPAGE) + sizeof(POLY_F4) + 4 * sizeof(LINE_F2) >= current_frame->primBuffer + FRAME_PRIM_SIZE)
+    if (!hm_gameplay_prim_room(sizeof(DR_TPAGE) + sizeof(POLY_F4) + 4 * sizeof(LINE_F2)))
         return;
 
     /* Ensure semi-transparency blend mode is active (ABR = 0: 50% B + 50% F) */

@@ -426,3 +426,22 @@ The broader GPU reference probe separately fails its native color comparison
 fixture expects an exact match. This task does not change shaders or relax
 that comparison. No interactive gameplay, Android/device validation, other
 platform builds or Linux matching check was run. Matching source is unchanged.
+
+### Active primitive arena correction (ADR-112, 2026-10-30)
+
+The owner's running Windows game confirmed the missing-marker cause: Tile
+Targeting was ON in normal farm play, with only 23,704 bytes used in the active
+private arena, but the indicator checked the unrelated overlay backup buffer.
+The corrected capacity check covers Tile Targeting and the tool charge gauge.
+Regression checks use separate active/backup allocations and verify that a
+genuinely full active arena rejects both indicators.
+
+The Windows Release game build and standalone package pass 124/124 tests;
+the focused gameplay test also passes Windows ASan/UBSan. The owner requests
+16 build jobs for this machine; Windows build.ps1 now uses `-j16`, and a
+subsequent incremental `cmake --build build/port/windows-release -j16` passes
+with no remaining work. The owner reopened the rebuilt game, and direct window
+capture confirms a cyan tile marker in front of the player during normal farm
+gameplay. This observation does not establish other-area coverage. Horizontal
+lines while running are explicitly deferred; no additional graphics fix is
+claimed. Matching source is unchanged and its Linux check was not run.

@@ -826,3 +826,11 @@ adjacent ground sprite rows. Include those corners in the existing rule and
 test changed-material rows on CPU and enlarged GPU output. No matching source
 or manifest changes are needed. The owner's full gameplay scenario remains
 unverified by these isolated fixtures.
+
+ADR-112 (port-only): Live inspection confirmed Tile Targeting was enabled but
+its primitive-capacity guard compared a private widescreen cursor against the
+original overlay-backup `primBuffer`. Both targeting and tool-charge indicator
+checks now use `primStart` and the active arena capacity. Add regression checks
+with separate active/backup buffers and a genuinely exhausted active buffer.
+No matching source, layout guard or overlay manifest changes are required.
+The owner deferred the separate horizontal-line report while running.
