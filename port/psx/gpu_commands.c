@@ -155,16 +155,21 @@ static u32 hm_gpu_command(const u32 *words, u32 available) {
         if (available < 3)
             return available;
         RECT area = {(s16)words[1], (s16)(words[1] >> 16), (s16)words[2], (s16)(words[2] >> 16)};
+        hm_render_transfer_command_begin();
         if (opcode == 2) {
             ClearImage(&area, (u8)words[0], (u8)(words[0] >> 8), (u8)(words[0] >> 16));
+            hm_render_transfer_command_end();
             return 3;
         }
         u32 width = (((u32)area.w - 1) & 1023) + 1;
         u32 height = (((u32)area.h - 1) & 511) + 1;
         u32 length = 3 + (width * height + 1) / 2;
-        if (length > available)
+        if (length > available) {
+            hm_render_transfer_command_end();
             return available;
+        }
         LoadImage(&area, words + 3);
+        hm_render_transfer_command_end();
         return length;
     }
     if ((opcode & 0xE0) == 0x20)

@@ -58,7 +58,7 @@ int main(void) {
     hm_replay_sink previous = hm_gpu_scene_begin(s, 32, 32);
     hm_gpu_scene_data data;
     CHECK(hm_frame_replay_draw(b, &live) && hm_gpu_scene_end(s, previous, &data));
-    CHECK(data.width == 32 && data.height == 32 && data.bytes <= HM_SCENE_MAX_WORDS * sizeof(u32));
+    CHECK(data.width == 32 && data.height == 32 && data.bytes >= HM_SCENE_HEADER * sizeof(u32));
     CHECK(data.words[10] == 1 && data.vram_pixels[0] == 0);
     CHECK(!(data.words[data.words[8] + 4] & 64));
 #ifdef HMBTN_ENH_DITHERING
@@ -85,6 +85,18 @@ int main(void) {
     CHECK(data.words[14] == 0x7fff);
     hm_render_invalidate();
     CHECK(!hm_frame_replay_serial(b, &live));
+    u32 captured_fill[] = {0x020000ff, 0, 0x00040004};
+    hm_render_begin(&live);
+    hm_gpu_execute_words(captured_fill, 3);
+    hm_render_packet(captured_fill, 3);
+    hm_render_end();
+    CHECK(hm_frame_replay_serial(b, &live));
+    RECT direct_clear = {0, 0, 16, 16};
+    hm_render_begin(&live);
+    ClearImage(&direct_clear, 0, 255, 0);
+    hm_render_packet(rectangle, 3);
+    hm_render_end();
+    CHECK(!hm_frame_replay_serial(b, &live));
     hm_frame_replay_release(b);
     /* GPU geometry consumes only output: it must not run the CPU raster a second
      * time, while embedded polygon tpages still affect subsequent sprites. */
@@ -102,29 +114,76 @@ int main(void) {
     hm_replay_begin(&area);
     u32 feedback[] = {0x65000000, 0, 0, 0x00040004};
     hm_gpu_execute_words(feedback, 4);
-    CHECK(!hm_gpu_scene_end(s, previous, &data) && hm_gpu_scene_fallback(s)[0]);
+    CHECK(hm_gpu_scene_end(s, previous, &data));
+
+    /* A texture that reads an earlier draw gets a version of VRAM from that
+     * point in command order. First pass requests one CPU materialization. */
+    setup(32, 32);
+    const u32 feedback_sequence[] = {0x600000ff, 0x00020002, 0x00010001,
+                                     0xe1000100,  0x65000001, 0x00040004,
+                                     0x00020002,  0x00010001};
+    previous = hm_gpu_scene_begin(s, 32, 32);
+    hm_replay_begin(&area);
+    hm_gpu_execute_words(feedback_sequence,
+                         sizeof(feedback_sequence) / sizeof(feedback_sequence[0]));
+    CHECK(hm_gpu_scene_needs_materialization(s));
+    CHECK(hm_gpu_scene_end(s, previous, &data));
+    hm_gpu_scene_materialize_vram(s, 1);
+    setup(32, 32);
+    previous = hm_gpu_scene_begin(s, 32, 32);
+    hm_replay_begin(&area);
+    hm_gpu_execute_words(feedback_sequence,
+                         sizeof(feedback_sequence) / sizeof(feedback_sequence[0]));
+    CHECK(hm_gpu_scene_end(s, previous, &data));
+    CHECK(data.vram_version_count == 1);
+    CHECK(data.words[data.words[8] + HM_SCENE_STRIDE + 40] == 1);
+    hm_gpu_scene_materialize_vram(s, 0);
     setup(32, 32);
     previous = hm_gpu_scene_begin(s, 32, 32);
     hm_replay_begin(&area);
     hm_gpu_execute_words(rectangle, 3);
     u32 fill[] = {0x020000ff, 0, 0x00040004};
     hm_gpu_execute_words(fill, 3);
-    CHECK(!hm_gpu_scene_end(s, previous, &data));
+    CHECK(hm_gpu_scene_end(s, previous, &data));
+    CHECK(data.words[10] == 2 && data.words[data.words[8] + HM_SCENE_STRIDE] == 2 &&
+          data.words[data.words[8] + HM_SCENE_STRIDE + 24] == 0x001f);
+    setup(32, 32);
+    previous = hm_gpu_scene_begin(s, 32, 32);
+    hm_replay_begin(&area);
+    const u32 load[] = {0xa0000000, 0x00040004, 0x00010004, 0x7fff03e0, 0x001f4210};
+    hm_gpu_execute_words(rectangle, 3);
+    hm_gpu_execute_words(load, sizeof(load) / sizeof(load[0]));
+    CHECK(hm_gpu_scene_needs_materialization(s));
+    CHECK(hm_gpu_scene_end(s, previous, &data));
+    hm_gpu_scene_materialize_vram(s, 1);
+    setup(32, 32);
+    previous = hm_gpu_scene_begin(s, 32, 32);
+    hm_replay_begin(&area);
+    hm_gpu_execute_words(rectangle, 3);
+    hm_gpu_execute_words(load, sizeof(load) / sizeof(load[0]));
+    CHECK(hm_gpu_scene_end(s, previous, &data));
+    CHECK(data.vram_version_count == 1 &&
+          data.words[data.words[8] + HM_SCENE_STRIDE] == 2 &&
+          data.words[data.words[8] + HM_SCENE_STRIDE + 40] == 1);
+    hm_gpu_scene_materialize_vram(s, 0);
     setup(32, 32);
     previous = hm_gpu_scene_begin(s, 32, 32);
     hm_replay_begin(&area);
     for (int i = 0; i < 257; ++i)
         hm_gpu_execute_words(rectangle, 3);
-    CHECK(!hm_gpu_scene_end(s, previous, &data));
+    CHECK(hm_gpu_scene_end(s, previous, &data));
+    CHECK(data.words[7] > HM_SCENE_BIN_WORDS &&
+          data.words[data.words[9]] == 257);
     setup(1024, 512);
     area = (RECT){0, 0, 1024, 512};
     previous = hm_gpu_scene_begin(s, 32, 32);
     hm_replay_begin(&area);
-    for (int i = 0; i <= HM_SCENE_PRIMITIVES; ++i) {
+    for (u32 i = 0; i <= HM_SCENE_INITIAL_PRIMITIVES; ++i) {
         rectangle[1] = (u32)((i % 64) * 16) | ((u32)(((i / 64) % 32) * 16) << 16);
         hm_gpu_execute_words(rectangle, 3);
     }
-    CHECK(!hm_gpu_scene_end(s, previous, &data));
+    CHECK(hm_gpu_scene_end(s, previous, &data));
+    CHECK(data.words[10] == HM_SCENE_INITIAL_PRIMITIVES + 1);
     previous = hm_gpu_scene_begin(s, 0, 0);
     hm_replay_begin(&area);
     CHECK(!hm_gpu_scene_end(s, previous, &data));
@@ -153,14 +212,15 @@ int main(void) {
     safe_uv[3] = ((u32)getClut(896, 490) << 16) | 0xf000;
     hm_gpu_execute_words(safe_uv, 5);
     CHECK(hm_gpu_scene_end(s, previous, &data));
-    /* Dependent textured draw sampling v=40 (tile y=2) falls back to software */
+    /* A texture that reads an offscreen write requests a materialized replay. */
     setup(32, 32);
     previous = hm_gpu_scene_begin(s, 32, 32);
     hm_replay_begin(&area);
     hm_gpu_execute_words(unsafe_clip, 4);
     safe_uv[3] = ((u32)getClut(896, 490) << 16) | 0x2800;
     hm_gpu_execute_words(safe_uv, 5);
-    CHECK(!hm_gpu_scene_end(s, previous, &data));
+    CHECK(hm_gpu_scene_needs_materialization(s));
+    CHECK(hm_gpu_scene_end(s, previous, &data));
     /* Multisample locations can cross a 16-pixel bin boundary even when the
      * output pixel centre lies in the neighboring bin. */
     const u32 triangles[2][4] = {{0x200000ff, 0x000c0002, 0x000c000a, 0x00100002},
@@ -174,7 +234,7 @@ int main(void) {
             hm_gpu_execute_words(triangles[axis], 4);
             CHECK(hm_gpu_scene_end(s, previous, &data));
             int bin = axis ? 1 : 2;
-            CHECK(data.words[data.words[9] + bin * HM_SCENE_BIN_WORDS] ==
+            CHECK(data.words[data.words[9] + bin * data.words[7]] ==
                   (samples == 1 ? 0u : 1u));
         }
     }

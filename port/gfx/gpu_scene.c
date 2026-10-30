@@ -10,24 +10,96 @@
 #include <stdlib.h>
 #include <string.h>
 struct hm_gpu_scene {
-    u32 primitives[HM_SCENE_PRIMITIVES][HM_SCENE_STRIDE];
-    u32 bins[HM_SCENE_BINS][HM_SCENE_BIN_WORDS];
-    u32 packed[HM_SCENE_MAX_WORDS];
+    u32 (*primitives)[HM_SCENE_STRIDE];
+    u32 *bins;
+    u32 *packed;
+    size_t bin_capacity_words, packed_capacity_words;
+    u32 primitive_capacity, bin_stride;
     u16 vram_snapshot[HM_VRAM_HEIGHT][HM_VRAM_WIDTH];
+    u16 *vram_versions;
     u32 width, height, count, tiles_x, tiles_y;
+    u32 vram_version_count, vram_version_capacity;
+    u32 pending_transfer_indices[4], pending_transfer_count;
+    int pending_transfer_requires_materialization;
     RECT area, native;
     const u16 *vram_pixels;
     u16 background;
     const char *failure;
-    int begun, texture_filter;
-    u64 offscreen_writes[32]; /* Conservative 16x16 VRAM tile footprint for offscreen writes. */
+    int begun, texture_filter, materialize_vram, needs_materialization;
+    u64 written_tiles[32]; /* Conservative 16x16 VRAM tile footprint for prior writes. */
+    u64 current_texture_tiles[32];
     u64 texture_reads[32]; /* Conservative 16x16 VRAM tile footprint. */
     unsigned multisamples;
     u64 revision;
     const u32 *motion_previous, *motion_current;
     u32 motion_count, motion_alpha;
 };
-_Static_assert(sizeof(((hm_gpu_scene *)0)->primitives[0]) == 160, "GPU descriptor ABI");
+_Static_assert(sizeof(((hm_gpu_scene *)0)->primitives[0]) == 164, "GPU descriptor ABI");
+static int hm_scene_reserve_primitives(hm_gpu_scene *s, u32 needed) {
+    if (needed <= s->primitive_capacity)
+        return 1;
+    u32 capacity = s->primitive_capacity ? s->primitive_capacity : HM_SCENE_INITIAL_PRIMITIVES;
+    while (capacity < needed) {
+        if (capacity > UINT32_MAX / 2) {
+            capacity = needed;
+            break;
+        }
+        capacity *= 2;
+    }
+    if ((size_t)capacity > SIZE_MAX / sizeof(*s->primitives))
+        return 0;
+    void *primitives = realloc(s->primitives, (size_t)capacity * sizeof(*s->primitives));
+    if (!primitives)
+        return 0;
+    s->primitives = primitives;
+    s->primitive_capacity = capacity;
+    return 1;
+}
+static int hm_scene_reserve_bins(hm_gpu_scene *s, size_t tile_count, u32 stride) {
+    if (stride < HM_SCENE_BIN_WORDS)
+        stride = HM_SCENE_BIN_WORDS;
+    if (tile_count > SIZE_MAX / stride)
+        return 0;
+    size_t needed = tile_count * stride;
+    if (stride == s->bin_stride && needed <= s->bin_capacity_words)
+        return 1;
+    u32 *bins = calloc(needed, sizeof(*bins));
+    if (!bins)
+        return 0;
+    if (s->bins && s->bin_stride) {
+        size_t old_tiles = s->bin_capacity_words / s->bin_stride;
+        size_t copy_tiles = old_tiles < tile_count ? old_tiles : tile_count;
+        u32 copy_words = s->bin_stride < stride ? s->bin_stride : stride;
+        for (size_t i = 0; i < copy_tiles; ++i)
+            memcpy(bins + i * stride, s->bins + i * s->bin_stride,
+                   (size_t)copy_words * sizeof(*bins));
+    }
+    free(s->bins);
+    s->bins = bins;
+    s->bin_stride = stride;
+    s->bin_capacity_words = needed;
+    return 1;
+}
+static int hm_scene_reserve_packed(hm_gpu_scene *s, size_t needed) {
+    if (needed <= s->packed_capacity_words)
+        return 1;
+    size_t capacity = s->packed_capacity_words ? s->packed_capacity_words : 4096;
+    while (capacity < needed) {
+        if (capacity > SIZE_MAX / 2) {
+            capacity = needed;
+            break;
+        }
+        capacity *= 2;
+    }
+    if (capacity > SIZE_MAX / sizeof(*s->packed))
+        return 0;
+    u32 *packed = realloc(s->packed, capacity * sizeof(*packed));
+    if (!packed)
+        return 0;
+    s->packed = packed;
+    s->packed_capacity_words = capacity;
+    return 1;
+}
 static int hm_scene_signed(u32 n) { return (int)((n & 2047) ^ 1024) - 1024; }
 static s64 hm_scene_floor(s64 n, s64 d) { return n >= 0 ? n / d : -((-n + d - 1) / d); }
 static s64 hm_scene_coordinate(hm_gpu_scene *s, u32 word, int shift, u32 fallback, int offset) {
@@ -40,15 +112,6 @@ static s64 hm_scene_coordinate(hm_gpu_scene *s, u32 word, int shift, u32 fallbac
 }
 static u32 hm_scene_scaled(s64 q, int origin, u32 size, int logical) {
     return (u32)hm_scene_floor((q - (s64)origin * 65536) * size * 256, (s64)logical * 65536);
-}
-static int hm_scene_overlap(int x, int y, int w, int h, const RECT *r) {
-    for (int sy = -1; sy <= 1; ++sy)
-        for (int sx = -1; sx <= 1; ++sx) {
-            int left = x - sx * 1024, top = y - sy * 512;
-            if (left < r->x + r->w && left + w > r->x && top < r->y + r->h && top + h > r->y)
-                return 1;
-        }
-    return 0;
 }
 static int hm_scene_tiles(u64 tiles[32], u32 x, u32 y, u32 width, u32 height, int mark) {
     if (!width || !height)
@@ -66,36 +129,69 @@ static int hm_scene_tiles(u64 tiles[32], u32 x, u32 y, u32 width, u32 height, in
     }
     return overlap;
 }
+static int hm_scene_mark_write(hm_gpu_scene *s, int x0, int y0, int x1, int y1) {
+    if (x0 < 0) x0 = 0;
+    if (y0 < 0) y0 = 0;
+    if (x1 > HM_VRAM_WIDTH) x1 = HM_VRAM_WIDTH;
+    if (y1 > HM_VRAM_HEIGHT) y1 = HM_VRAM_HEIGHT;
+    if (x0 >= x1 || y0 >= y1)
+        return 0;
+    return hm_scene_tiles(s->written_tiles, (u32)x0, (u32)y0, (u32)(x1 - x0),
+                          (u32)(y1 - y0), 1);
+}
+static u32 hm_scene_snapshot(hm_gpu_scene *s, int allow_unmaterialized) {
+    if (!s->materialize_vram && !allow_unmaterialized) {
+        s->needs_materialization = 1;
+        return 0;
+    }
+    const u16 *current = hm_vram_state()->pixels[0];
+    size_t bytes = sizeof(s->vram_snapshot);
+    for (u32 i = 0; i < s->vram_version_count; ++i) {
+        const u16 *version = s->vram_versions + (size_t)i * HM_VRAM_WIDTH * HM_VRAM_HEIGHT;
+        if (!memcmp(version, current, bytes))
+            return i + 1;
+    }
+    if (s->vram_version_count == s->vram_version_capacity) {
+        u32 capacity = s->vram_version_capacity ? s->vram_version_capacity * 2 : 2;
+        if (capacity < s->vram_version_count ||
+            (size_t)capacity > SIZE_MAX / (HM_VRAM_WIDTH * HM_VRAM_HEIGHT * sizeof(u16))) {
+            s->failure = "texture snapshot capacity";
+            return 0;
+        }
+        u16 *versions = realloc(s->vram_versions,
+                                (size_t)capacity * HM_VRAM_WIDTH * HM_VRAM_HEIGHT * sizeof(u16));
+        if (!versions) {
+            s->failure = "texture snapshot allocation";
+            return 0;
+        }
+        s->vram_versions = versions;
+        s->vram_version_capacity = capacity;
+    }
+    u16 *destination = s->vram_versions +
+                       (size_t)s->vram_version_count * HM_VRAM_WIDTH * HM_VRAM_HEIGHT;
+    memcpy(destination, current, bytes);
+    return ++s->vram_version_count;
+}
 static int hm_scene_texture_tiles(hm_gpu_scene *s, u32 x, u32 y, u32 width, u32 height,
                                   int mark) {
     return hm_scene_tiles(s->texture_reads, x, y, width, height, mark);
 }
-static int hm_scene_offscreen_tiles(hm_gpu_scene *s, u32 x, u32 y, u32 width, u32 height,
-                                    int mark) {
-    return hm_scene_tiles(s->offscreen_writes, x, y, width, height, mark);
-}
 static int hm_scene_material(hm_gpu_scene *s, u32 *p, u32 op, u32 page, u32 clut) {
     const hm_gpu_environment *env = hm_gpu_environment_state();
     const DRAWENV *d = &env->draw;
+    memset(s->current_texture_tiles, 0, sizeof(s->current_texture_tiles));
     if (op & 4) {
         u32 depth = (page >> 7) & 3;
         if (depth > 2) {
             s->failure = "reserved texture depth";
             return 0;
         }
-        if (depth < 2 && hm_scene_overlap((clut & 63) * 16, (clut >> 6) & 511, depth ? 256 : 16, 1,
-                                          &s->native)) {
-            s->failure = "framebuffer texture feedback";
-            return 0;
+        if (depth < 2) {
+            u32 clut_x = (clut & 63) * 16, clut_y = (clut >> 6) & 511;
+            u32 clut_width = depth ? 256 : 16;
+            hm_scene_tiles(s->current_texture_tiles, clut_x, clut_y, clut_width, 1, 1);
+            hm_scene_texture_tiles(s, clut_x, clut_y, clut_width, 1, 1);
         }
-        if (depth < 2 && hm_scene_offscreen_tiles(s, (clut & 63) * 16, (clut >> 6) & 511,
-                                                  depth ? 256 : 16, 1, 0)) {
-            s->failure = "offscreen draw dependencies";
-            return 0;
-        }
-        if (depth < 2)
-            hm_scene_texture_tiles(s, (clut & 63) * 16, (clut >> 6) & 511,
-                                   depth ? 256 : 16, 1, 1);
     }
     const hm_vram_context *vram = hm_vram_state();
     p[1] = op;
@@ -122,7 +218,7 @@ static int hm_scene_material(hm_gpu_scene *s, u32 *p, u32 op, u32 page, u32 clut
 }
 /* Conservative sampled UV footprint, including texture-window remapping and
  * 8-bit wrapping. A page can share unused rows with the native framebuffer. */
-static int hm_scene_texture_bounds(hm_gpu_scene *s, const u32 *p, u32 u, u32 v, u32 width,
+static int hm_scene_texture_bounds(hm_gpu_scene *s, u32 *p, u32 u, u32 v, u32 width,
                                    u32 height) {
     if (!(p[1] & 4) || !width || !height)
         return 1;
@@ -158,18 +254,20 @@ static int hm_scene_texture_bounds(hm_gpu_scene *s, const u32 *p, u32 u, u32 v, 
                 y1 = y;
         }
     }
-    if (hm_scene_overlap((p[2] & 15) * 64 + x0, (p[2] & 16) * 16 + y0, x1 - x0 + 1, y1 - y0 + 1,
-                         &s->native)) {
-        s->failure = "framebuffer texture feedback";
-        return 0;
+    u32 texture_x = (p[2] & 15) * 64 + (u32)x0;
+    u32 texture_y = (p[2] & 16) * 16 + (u32)y0;
+    u32 texture_w = (u32)(x1 - x0 + 1), texture_h = (u32)(y1 - y0 + 1);
+    int dependency = hm_scene_tiles(s->written_tiles, texture_x, texture_y, texture_w, texture_h, 0);
+    if (depth < 2) {
+        u32 clut_x = (p[3] & 63) * 16, clut_y = (p[3] >> 6) & 511;
+        u32 clut_w = depth ? 256 : 16;
+        dependency |= hm_scene_tiles(s->written_tiles, clut_x, clut_y, clut_w, 1, 0);
+        hm_scene_tiles(s->current_texture_tiles, clut_x, clut_y, clut_w, 1, 1);
     }
-    if (hm_scene_offscreen_tiles(s, (p[2] & 15) * 64 + (u32)x0, (p[2] & 16) * 16 + (u32)y0,
-                                 (u32)(x1 - x0 + 1), (u32)(y1 - y0 + 1), 0)) {
-        s->failure = "offscreen draw dependencies";
-        return 0;
-    }
-    hm_scene_texture_tiles(s, (p[2] & 15) * 64 + (u32)x0, (p[2] & 16) * 16 + (u32)y0,
-                           (u32)(x1 - x0 + 1), (u32)(y1 - y0 + 1), 1);
+    if (dependency)
+        p[40] = hm_scene_snapshot(s, 0);
+    hm_scene_tiles(s->current_texture_tiles, texture_x, texture_y, texture_w, texture_h, 1);
+    hm_scene_texture_tiles(s, texture_x, texture_y, texture_w, texture_h, 1);
     return 1;
 }
 static void hm_scene_add(hm_gpu_scene *s, u32 *p, int x0, int y0, int x1, int y1) {
@@ -191,39 +289,40 @@ static void hm_scene_add(hm_gpu_scene *s, u32 *p, int x0, int y0, int x1, int y1
         y1 = (int)p[10] + (int)p[12];
     if (x0 >= x1 || y0 >= y1)
         return;
+    if ((p[1] & 4) &&
+        hm_scene_tiles(s->current_texture_tiles, (u32)x0, (u32)y0, (u32)(x1 - x0),
+                       (u32)(y1 - y0), 0)) {
+        if (s->materialize_vram)
+            p[40] = hm_scene_snapshot(s, 0);
+        else
+            s->needs_materialization = 1;
+    }
+    /* Track writes everywhere in native VRAM, not just offscreen draws. A
+     * later textured primitive may sample an earlier draw from its own target. */
+    hm_scene_mark_write(s, x0, y0, x1, y1);
     if (x0 < s->area.x || y0 < s->area.y || x1 > s->area.x + s->area.w ||
         y1 > s->area.y + s->area.h) {
-        if ((p[1] & 4) || hm_scene_overlap(x0, y0, x1 - x0, y1 - y0, &s->area)) {
-            s->failure = "offscreen draw dependencies";
+        if (x1 <= s->area.x || y1 <= s->area.y || x0 >= s->area.x + s->area.w ||
+            y0 >= s->area.y + s->area.h)
             return;
-        }
-        /* This untextured draw cannot affect output directly. Record its
-         * conservative 16x16 VRAM tile footprint for any later texture/CLUT read. */
-        u32 wx = (u32)x0 & 1023u, wy = (u32)y0 & 511u;
-        u32 ww = (u32)(x1 - x0), wh = (u32)(y1 - y0);
-        if (ww > 1024) ww = 1024;
-        if (wh > 512) wh = 512;
-        hm_scene_offscreen_tiles(s, wx, wy, ww, wh, 1);
-        return;
+        if (x0 < s->area.x) x0 = s->area.x;
+        if (y0 < s->area.y) y0 = s->area.y;
+        if (x1 > s->area.x + s->area.w) x1 = s->area.x + s->area.w;
+        if (y1 > s->area.y + s->area.h) y1 = s->area.y + s->area.h;
     }
-    if (x0 < s->area.x)
-        x0 = s->area.x;
-    if (y0 < s->area.y)
-        y0 = s->area.y;
-    if (x1 > s->area.x + s->area.w)
-        x1 = s->area.x + s->area.w;
-    if (y1 > s->area.y + s->area.h)
-        y1 = s->area.y + s->area.h;
+    if (x0 >= x1 || y0 >= y1)
+        return;
     if (x0 >= (int)p[9] + (int)p[11] || y0 >= (int)p[10] + (int)p[12] || x1 <= (int)p[9] ||
         y1 <= (int)p[10])
         return;
     if (x0 >= x1 || y0 >= y1)
         return;
-    if (s->count == HM_SCENE_PRIMITIVES) {
-        s->failure = "primitive capacity";
+    if (s->count == UINT32_MAX || !hm_scene_reserve_primitives(s, s->count + 1)) {
+        s->failure = "primitive allocation";
         return;
     }
-    memcpy(s->primitives[s->count], p, HM_SCENE_STRIDE * sizeof(*p));
+    u32 primitive_index = s->count;
+    memcpy(s->primitives[primitive_index], p, HM_SCENE_STRIDE * sizeof(*p));
     /* A multisample can lie inside a triangle even when the output pixel's
      * logical centre belongs to the adjacent bin. Include neighboring bins;
      * retain the original bounds for VRAM dependency and clipping decisions. */
@@ -238,12 +337,22 @@ static void hm_scene_add(hm_gpu_scene *s, u32 *p, int x0, int y0, int x1, int y1
     u32 bx1 = (u32)(bin_x1 - 1 - s->area.x) / 16, by1 = (u32)(bin_y1 - 1 - s->area.y) / 16;
     for (u32 y = by0; y <= by1; ++y)
         for (u32 x = bx0; x <= bx1; ++x) {
-            u32 *bin = s->bins[y * s->tiles_x + x];
-            if (bin[0] == HM_SCENE_BIN_WORDS - 1) {
-                s->failure = "tile capacity";
+            size_t bin_index = (size_t)y * s->tiles_x + x;
+            u32 *bin = s->bins + bin_index * s->bin_stride;
+            if (bin[0] + 1 >= s->bin_stride) {
+                if (s->bin_stride > UINT32_MAX / 2 ||
+                    !hm_scene_reserve_bins(s, (size_t)s->tiles_x * s->tiles_y,
+                                           s->bin_stride * 2)) {
+                    s->failure = "tile allocation";
+                    return;
+                }
+                bin = s->bins + bin_index * s->bin_stride;
+            }
+            if (bin[0] == UINT32_MAX) {
+                s->failure = "tile index overflow";
                 return;
             }
-            bin[++bin[0]] = s->count;
+            bin[++bin[0]] = primitive_index;
         }
     ++s->count;
 }
@@ -271,8 +380,13 @@ static void hm_scene_begin_capture(void *context, const RECT *area) {
     s->background = hm_gpu_background(&hm_gpu_environment_state()->draw);
     s->tiles_x = ((u32)area->w + 15) / 16;
     s->tiles_y = ((u32)area->h + 15) / 16;
-    for (u32 i = 0; i < s->tiles_x * s->tiles_y; ++i)
-        s->bins[i][0] = 0;
+    size_t tile_count = (size_t)s->tiles_x * s->tiles_y;
+    if (!hm_scene_reserve_bins(s, tile_count, s->bin_stride)) {
+        s->failure = "tile allocation";
+        return;
+    }
+    for (size_t i = 0; i < tile_count; ++i)
+        s->bins[i * s->bin_stride] = 0;
     memcpy(s->vram_snapshot, hm_vram_state()->pixels, sizeof(s->vram_snapshot));
     s->vram_pixels = &s->vram_snapshot[0][0];
     s->begun = 1;
@@ -325,9 +439,9 @@ static void hm_scene_triangle(hm_gpu_scene *s, u32 *material, const u32 xy[3], c
         if (y > y1)
             y1 = y;
     }
+    /* Match the native reference rasterizer's bounded primitive span. */
     if (x1 - x0 > 1023 || y1 - y0 > 511)
         return;
-
     /* Bins must cover the entire interpolated primitive, including pixels at
      * the previous endpoint. The current-frame bounds alone can clip moving
      * edges and leave gaps between adjacent primitives. */
@@ -552,17 +666,74 @@ static void hm_scene_line(hm_gpu_scene *s, const u32 *w, u32 available) {
     }
     s->failure = "unterminated line";
 }
+static int hm_scene_has_writes(const hm_gpu_scene *s) {
+    for (u32 i = 0; i < 32; ++i)
+        if (s->written_tiles[i])
+            return 1;
+    return 0;
+}
+static void hm_scene_transfer_piece(hm_gpu_scene *s, u32 op, u32 color, u32 x, u32 y,
+                                    u32 width, u32 height) {
+    u32 p[HM_SCENE_STRIDE] = {0};
+    p[0] = 2;
+    p[1] = op;
+    p[4] = 128; /* VRAM transfers ignore draw clipping, display protection, and masks. */
+    p[9] = 0;
+    p[10] = 0;
+    p[11] = HM_VRAM_WIDTH;
+    p[12] = HM_VRAM_HEIGHT;
+    p[24] = color;
+    p[30] = x;
+    p[31] = y;
+    p[32] = width;
+    p[33] = height;
+    u32 before = s->count;
+    hm_scene_add(s, p, (int)x, (int)y, (int)(x + width), (int)(y + height));
+    if (s->count != before &&
+        s->pending_transfer_count < sizeof(s->pending_transfer_indices) /
+                                        sizeof(s->pending_transfer_indices[0]))
+        s->pending_transfer_indices[s->pending_transfer_count++] = before;
+}
+static void hm_scene_transfer(hm_gpu_scene *s, u32 op, u32 color, u32 x, u32 y, u32 width,
+                              u32 height) {
+    u32 offset_y = 0;
+    while (offset_y < height) {
+        u32 part_y = (y + offset_y) & (HM_VRAM_HEIGHT - 1);
+        u32 part_height = height - offset_y;
+        if (part_height > HM_VRAM_HEIGHT - part_y)
+            part_height = HM_VRAM_HEIGHT - part_y;
+        u32 offset_x = 0;
+        while (offset_x < width) {
+            u32 part_x = (x + offset_x) & (HM_VRAM_WIDTH - 1);
+            u32 part_width = width - offset_x;
+            if (part_width > HM_VRAM_WIDTH - part_x)
+                part_width = HM_VRAM_WIDTH - part_x;
+            hm_scene_transfer_piece(s, op, color, part_x, part_y, part_width, part_height);
+            if (s->failure)
+                return;
+            offset_x += part_width;
+        }
+        offset_y += part_height;
+    }
+}
 static void hm_scene_command(void *context, const u32 *w, u32 available, int after) {
     hm_gpu_scene *s = context;
     if (!s->begun || s->failure || !available)
         return;
     u32 op = w[0] >> 24;
     if (op == 2 || op == 0xa0) {
-        /* Earlier primitives must see the old contents wherever they read
-         * textures or write output; tile footprints conservatively protect
-         * those dependencies when updating the shared initial snapshot. */
+        if (after) {
+            if (op == 0xa0 && s->pending_transfer_count) {
+                u32 layer = hm_scene_snapshot(s, !s->pending_transfer_requires_materialization);
+                for (u32 i = 0; i < s->pending_transfer_count; ++i)
+                    s->primitives[s->pending_transfer_indices[i]][40] = layer;
+            }
+            s->pending_transfer_count = 0;
+            s->pending_transfer_requires_materialization = 0;
+            return;
+        }
         if (available < 3) {
-            s->failure = "inline VRAM transfer";
+            s->failure = "truncated VRAM transfer";
             return;
         }
         u32 x = w[1] & 1023u, y = (w[1] >> 16) & 511u;
@@ -570,7 +741,8 @@ static void hm_scene_command(void *context, const u32 *w, u32 available, int aft
         if (op == 0xa0) {
             width = (((w[2] & 0xffffu) - 1) & 1023u) + 1;
             height = (((w[2] >> 16) - 1) & 511u) + 1;
-            if (available < 3 + (width * height + 1) / 2) {
+            size_t payload_words = ((size_t)width * height + 1) / 2;
+            if (payload_words > available - 3) {
                 s->failure = "truncated VRAM transfer";
                 return;
             }
@@ -579,15 +751,16 @@ static void hm_scene_command(void *context, const u32 *w, u32 available, int aft
             width = ((w[2] & 1023u) + 15u) & ~15u;
             height = (w[2] >> 16) & 511u;
         }
-        if (s->count && ((width && height &&
-                          hm_scene_overlap((int)x, (int)y, (int)width, (int)height, &s->area)) ||
-                         hm_scene_texture_tiles(s, x, y, width, height, 0))) {
-            s->failure = "inline VRAM transfer";
-            return;
+        if (op == 0xa0) {
+            s->pending_transfer_requires_materialization = !s->materialize_vram &&
+                                                          hm_scene_has_writes(s);
+            if (s->pending_transfer_requires_materialization)
+                s->needs_materialization = 1;
         }
-        if (after) {
-            memcpy(s->vram_snapshot, hm_vram_state()->pixels, sizeof(s->vram_snapshot));
-        }
+        s->pending_transfer_count = 0;
+        u32 color = ((w[0] & 255u) >> 3) | (((w[0] >> 8) & 255u) >> 3) << 5 |
+                    (((w[0] >> 16) & 255u) >> 3) << 10;
+        hm_scene_transfer(s, op, color, x, y, width, height);
         return;
     }
     if (after)
@@ -601,15 +774,43 @@ static void hm_scene_command(void *context, const u32 *w, u32 available, int aft
     else if (op != 0 && op != 1 && !(op >= 0xe1 && op <= 0xe6))
         s->failure = "inline VRAM transfer";
 }
-hm_gpu_scene *hm_gpu_scene_create(void) { return calloc(1, sizeof(hm_gpu_scene)); }
-void hm_gpu_scene_destroy(hm_gpu_scene *s) { free(s); }
+hm_gpu_scene *hm_gpu_scene_create(void) {
+    hm_gpu_scene *s = calloc(1, sizeof(*s));
+    if (!s)
+        return NULL;
+    s->bin_stride = HM_SCENE_BIN_WORDS;
+    if (!hm_scene_reserve_primitives(s, HM_SCENE_INITIAL_PRIMITIVES)) {
+        hm_gpu_scene_destroy(s);
+        return NULL;
+    }
+    return s;
+}
+void hm_gpu_scene_destroy(hm_gpu_scene *s) {
+    if (!s)
+        return;
+    free(s->primitives);
+    free(s->bins);
+    free(s->packed);
+    free(s->vram_versions);
+    free(s);
+}
 void hm_gpu_scene_texture_filter(hm_gpu_scene *s, int filter_mode) {
     s->texture_filter = filter_mode >= 0 && filter_mode <= 2 ? filter_mode : 0;
 }
 void hm_gpu_scene_multisamples(hm_gpu_scene *s, unsigned samples) {
     s->multisamples = samples == 2 || samples == 4 ? samples : 1;
 }
+void hm_gpu_scene_materialize_vram(hm_gpu_scene *s, int enabled) {
+    if (s)
+        s->materialize_vram = enabled != 0;
+}
+int hm_gpu_scene_needs_materialization(const hm_gpu_scene *s) {
+    return s && s->needs_materialization;
+}
 static u32 hm_scene_consume(void *context, const u32 *w, u32 available) {
+    hm_gpu_scene *s = context;
+    if (s->materialize_vram)
+        return 0;
     if (!available)
         return 0;
     u32 op = w[0] >> 24, length = 0;
@@ -641,7 +842,6 @@ static u32 hm_scene_consume(void *context, const u32 *w, u32 available) {
     if (!length || length > available)
         return 0;
     hm_scene_command(context, w, length, 0);
-    hm_gpu_scene *s = context;
     s->motion_previous = s->motion_current = NULL;
     s->motion_count = 0;
     if (op >= 0x20 && op <= 0x3f && (op & 4)) {
@@ -669,7 +869,12 @@ hm_replay_sink hm_gpu_scene_begin(hm_gpu_scene *s, u32 width, u32 height) {
     s->width = width;
     s->height = height;
     s->count = 0;
-    memset(s->offscreen_writes, 0, sizeof(s->offscreen_writes));
+    s->pending_transfer_count = 0;
+    s->pending_transfer_requires_materialization = 0;
+    s->vram_version_count = 0;
+    s->needs_materialization = 0;
+    memset(s->written_tiles, 0, sizeof(s->written_tiles));
+    memset(s->current_texture_tiles, 0, sizeof(s->current_texture_tiles));
     memset(s->texture_reads, 0, sizeof(s->texture_reads));
     s->failure = NULL;
     s->begun = 0;
@@ -683,8 +888,25 @@ int hm_gpu_scene_end(hm_gpu_scene *s, hm_replay_sink previous, hm_gpu_scene_data
     hm_replay_bind(previous);
     if (!s->begun || s->failure || !s->vram_pixels)
         return 0;
-    u32 primitives = HM_SCENE_HEADER, bins = primitives + s->count * HM_SCENE_STRIDE;
-    u32 total = bins + s->tiles_x * s->tiles_y * HM_SCENE_BIN_WORDS;
+    size_t primitives = HM_SCENE_HEADER;
+    size_t primitive_words = (size_t)s->count * HM_SCENE_STRIDE;
+    if ((s->count && primitive_words / HM_SCENE_STRIDE != (size_t)s->count) ||
+        primitive_words > SIZE_MAX - primitives) {
+        s->failure = "scene size overflow";
+        return 0;
+    }
+    size_t bin_offset = primitives + primitive_words;
+    size_t tile_count = (size_t)s->tiles_x * s->tiles_y;
+    if (!s->bin_stride || tile_count > SIZE_MAX / s->bin_stride ||
+        bin_offset > SIZE_MAX - tile_count * s->bin_stride) {
+        s->failure = "scene size overflow";
+        return 0;
+    }
+    size_t total = bin_offset + tile_count * s->bin_stride;
+    if (total > UINT32_MAX || !hm_scene_reserve_packed(s, total)) {
+        s->failure = "scene allocation";
+        return 0;
+    }
     memset(s->packed, 0, HM_SCENE_HEADER * sizeof(u32));
     s->packed[0] = s->width;
     s->packed[1] = s->height;
@@ -693,19 +915,28 @@ int hm_gpu_scene_end(hm_gpu_scene *s, hm_replay_sink previous, hm_gpu_scene_data
     s->packed[4] = s->area.w;
     s->packed[5] = s->area.h;
     s->packed[6] = s->tiles_x;
-    s->packed[7] = s->tiles_y;
-    s->packed[8] = primitives;
-    s->packed[9] = bins;
+    s->packed[7] = s->bin_stride;
+    s->packed[8] = (u32)primitives;
+    s->packed[9] = (u32)bin_offset;
     s->packed[10] = s->count;
     s->packed[11] = (u32)s->texture_filter;
     s->packed[12] = s->native.x;
     s->packed[13] = s->native.w;
     s->packed[14] = s->background;
     s->packed[15] = s->multisamples == 2 || s->multisamples == 4 ? s->multisamples : 1;
-    memcpy(s->packed + primitives, s->primitives, s->count * HM_SCENE_STRIDE * sizeof(u32));
-    memcpy(s->packed + bins, s->bins, s->tiles_x * s->tiles_y * HM_SCENE_BIN_WORDS * sizeof(u32));
-    *data = (hm_gpu_scene_data){s->packed, (size_t)total * sizeof(u32), s->vram_pixels,
-                                ++s->revision, s->width, s->height};
+    memcpy(s->packed + primitives, s->primitives,
+           (size_t)s->count * HM_SCENE_STRIDE * sizeof(u32));
+    for (size_t i = 0; i < tile_count; ++i)
+        memcpy(s->packed + bin_offset + i * s->bin_stride,
+               s->bins + i * s->bin_stride, (size_t)s->bin_stride * sizeof(u32));
+    *data = (hm_gpu_scene_data){.words = s->packed,
+                                .bytes = total * sizeof(u32),
+                                .vram_pixels = s->vram_pixels,
+                                .vram_versions = s->vram_versions,
+                                .vram_version_count = s->vram_version_count,
+                                .revision = ++s->revision,
+                                .width = s->width,
+                                .height = s->height};
     return 1;
 }
 const char *hm_gpu_scene_fallback(const hm_gpu_scene *s) {

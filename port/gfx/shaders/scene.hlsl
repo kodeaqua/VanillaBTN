@@ -1,12 +1,12 @@
 // Original PS1 command semantics, implemented for independent output pixels.
 // No game logic, native RAM or native VRAM is written by this kernel.
-Texture2D<uint> vram_cache : register(t0, space0);
+Texture2DArray<uint> vram_cache : register(t0, space0);
 ByteAddressBuffer scene : register(t1, space0);
 RWTexture2D<float4> output_image : register(u0, space1);
 uint load_word(uint index){return scene.Load(index*4);}
 uint word(uint p,uint i){return load_word(p+i);}
-uint vram(int x,int y){uint2 at=uint2(uint(x)&1023,uint(y)&511);
-    uint packed=vram_cache.Load(int3(int2(at.x>>1,at.y),0));
+uint vram(uint layer,int x,int y){uint2 at=uint2(uint(x)&1023,uint(y)&511);
+    uint packed=vram_cache.Load(int4(int2(at.x>>1,at.y),int(layer),0));
     return (packed>>((at.x&1)*16))&65535;}
 int edge_i(int2 a,int2 b,int2 p){return (b.x-a.x)*(p.y-a.y)-(b.y-a.y)*(p.x-a.x);}
 float edge_f(float2 a,float2 b,float2 p){return (b.x-a.x)*(p.y-a.y)-(b.y-a.y)*(p.x-a.x);}
@@ -33,10 +33,11 @@ int dither(int2 p){const int values[16]={-4,0,-3,1,2,-2,3,-1,-3,1,-4,0,3,-1,2,-2
 uint texel(uint p,uint2 st){uint mx=(256-word(p,7))&248,my=(256-word(p,8))&248;
     uint u=((st.x&~mx)|(word(p,5)&mx))&255,v=((st.y&~my)|(word(p,6)&my))&255;
     uint page=word(p,2),depth=(page>>7)&3;int x=int((page&15)*64),y=int((page&16)*16);
-    if(depth==2)return vram(x+int(u),y+int(v));
-    uint index=depth==0?(vram(x+int(u/4),y+int(v))>>((u&3)*4))&15:
-        (vram(x+int(u/2),y+int(v))>>((u&1)*8))&255;
-    uint clut=word(p,3);return vram(int((clut&63)*16+index),int((clut>>6)&511));}
+    uint layer=word(p,40);
+    if(depth==2)return vram(layer,x+int(u),y+int(v));
+    uint index=depth==0?(vram(layer,x+int(u/4),y+int(v))>>((u&3)*4))&15:
+        (vram(layer,x+int(u/2),y+int(v))>>((u&1)*8))&255;
+    uint clut=word(p,3);return vram(layer,int((clut&63)*16+index),int((clut>>6)&511));}
 bool hm_font_glyph(uint p){uint clut=word(p,3),row=clut>>6;
     return word(p,2)==14&&(clut&63)==56&&row>=250&&row<=254;}
 uint interp_i(uint3 values,int3 w,int area){
@@ -58,18 +59,25 @@ void main(uint3 id:SV_DispatchThreadID){
     bool native=(width==logical_size.x&&height==logical_size.y);
     uint filter_mode=load_word(11);bool filtering_enabled=filter_mode!=0;
     uint color=(logical.x<int(load_word(12))||logical.x>=int(load_word(12)+load_word(13)))?
-        load_word(14):vram(logical.x,logical.y);
+        load_word(14):vram(0,logical.x,logical.y);
     uint samples=load_word(15);if(samples!=2&&samples!=4)samples=1;
     uint sample_colors[4]={color,color,color,color};
     uint3 fine_colors[4]={expand555(color),expand555(color),expand555(color),expand555(color)};
-    uint bin=load_word(9)+uint((local.y/16)*int(load_word(6))+local.x/16)*257;
+    uint bin=load_word(9)+uint((local.y/16)*int(load_word(6))+local.x/16)*load_word(7);
     uint count=load_word(bin);
     [loop]for(uint item=0;item<count;++item){
-        uint p=load_word(8)+load_word(bin+1+item)*40,op=word(p,1),flags=word(p,4);
+        uint p=load_word(8)+load_word(bin+1+item)*41,op=word(p,1),flags=word(p,4);
         int2 clip=int2(word(p,9),word(p,10)),clip_end=clip+int2(word(p,11),word(p,12));
         if(any(logical<clip)||any(logical>=clip_end))continue;
         int2 display=int2(word(p,13),word(p,14)),display_end=display+int2(word(p,15),word(p,16));
-        if(!(flags&2)&&word(p,17)&&all(logical>=display)&&all(logical<display_end))continue;
+        if(!(flags&2)&&!(flags&128)&&word(p,17)&&all(logical>=display)&&all(logical<display_end))continue;
+        if(word(p,0)==2){int2 delta=logical-int2(word(p,30),word(p,31));
+            if(any(delta<0)||delta.x>=int(word(p,32))||delta.y>=int(word(p,33)))continue;
+            uint transferred=word(p,1)==0xa0?vram(word(p,40),logical.x,logical.y):word(p,24);
+            [unroll]for(uint transfer_sample=0;transfer_sample<4;++transfer_sample){
+                if(transfer_sample>=samples)break;sample_colors[transfer_sample]=transferred;
+                fine_colors[transfer_sample]=expand555(transferred);}
+            continue;}
         uint coverage=(1u<<samples)-1;
         [unroll]for(uint mask_sample=0;mask_sample<4;++mask_sample){if(mask_sample>=samples)break;
             if((flags&8)&&(sample_colors[mask_sample]&32768))coverage&=~(1u<<mask_sample);}

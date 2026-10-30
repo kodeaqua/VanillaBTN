@@ -17,8 +17,10 @@ struct hm_gpu_renderer {
     SDL_GPUComputePipeline *pipeline;
     SDL_GPUBuffer *buffer;
     SDL_GPUTransferBuffer *upload;
+    u32 scene_buffer_size, scene_upload_size;
     SDL_GPUTexture *vram_texture;
     SDL_GPUTransferBuffer *vram_upload;
+    u32 vram_layers, vram_upload_size;
     u16 vram_shadow[HM_VRAM_HEIGHT][HM_VRAM_WIDTH];
     int vram_initialized;
     SDL_GPUTexture *output;
@@ -41,7 +43,7 @@ static u32 hm_gpu_vram_regions(hm_gpu_renderer *r, const hm_gpu_scene_data *scen
     const u16 *shadow = &r->vram_shadow[0][0];
     /* Replay can select either retained frame snapshot; shared dirty flags
      * cannot describe a delta from the last GPU image in both directions. */
-    *full_upload = !r->vram_initialized;
+    *full_upload = !r->vram_initialized || scene->vram_version_count != 0;
     if (*full_upload || !SDL_memcmp(current, shadow, HM_GPU_VRAM_BYTES))
         return 0;
 
@@ -78,6 +80,9 @@ static int hm_gpu_vram_stage(hm_gpu_renderer *r, const hm_gpu_scene_data *scene,
         return 0;
     if (full_upload) {
         SDL_memcpy(mapped, scene->vram_pixels, HM_GPU_VRAM_BYTES);
+        if (scene->vram_version_count)
+            SDL_memcpy((u8 *)mapped + HM_GPU_VRAM_BYTES, scene->vram_versions,
+                       (size_t)scene->vram_version_count * HM_GPU_VRAM_BYTES);
     } else {
         u8 *destination = mapped;
         const u16 *source = scene->vram_pixels;
@@ -96,6 +101,65 @@ static int hm_gpu_vram_stage(hm_gpu_renderer *r, const hm_gpu_scene_data *scene,
         }
     }
     SDL_UnmapGPUTransferBuffer(r->device, r->vram_upload);
+    return 1;
+}
+static int hm_gpu_vram_reserve(hm_gpu_renderer *r, u32 layers) {
+    u32 needed_layers = layers;
+    if (!needed_layers) {
+        SDL_SetError("GPU scene requires at least one VRAM layer");
+        return 0;
+    }
+    u32 capacity = r->vram_layers;
+    SDL_GPUTexture *texture = NULL;
+    if (needed_layers > capacity) {
+        capacity = capacity ? capacity : 1;
+        while (capacity < needed_layers) {
+            if (capacity > UINT32_MAX / 2) {
+                capacity = needed_layers;
+                break;
+            }
+            capacity *= 2;
+        }
+        SDL_GPUTextureCreateInfo info = {.type = SDL_GPU_TEXTURETYPE_2D_ARRAY,
+                                         .format = SDL_GPU_TEXTUREFORMAT_R32_UINT,
+                                         .usage = SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_READ,
+                                         .width = HM_GPU_VRAM_TEXTURE_WIDTH,
+                                         .height = HM_VRAM_HEIGHT,
+                                         .layer_count_or_depth = capacity,
+                                         .num_levels = 1};
+        texture = SDL_CreateGPUTexture(r->device, &info);
+        if (!texture)
+            return 0;
+    }
+    size_t upload_size = (size_t)needed_layers * HM_GPU_VRAM_BYTES;
+    if (upload_size > UINT32_MAX) {
+        if (texture)
+            SDL_ReleaseGPUTexture(r->device, texture);
+        SDL_SetError("GPU VRAM snapshot upload exceeds transfer limits");
+        return 0;
+    }
+    SDL_GPUTransferBuffer *upload = NULL;
+    if (r->vram_upload_size < upload_size) {
+        SDL_GPUTransferBufferCreateInfo transfer = {
+            .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD, .size = (u32)upload_size};
+        upload = SDL_CreateGPUTransferBuffer(r->device, &transfer);
+        if (!upload) {
+            if (texture)
+                SDL_ReleaseGPUTexture(r->device, texture);
+            return 0;
+        }
+    }
+    if (texture) {
+        SDL_ReleaseGPUTexture(r->device, r->vram_texture);
+        r->vram_texture = texture;
+        r->vram_layers = capacity;
+        r->vram_initialized = 0;
+    }
+    if (upload) {
+        SDL_ReleaseGPUTransferBuffer(r->device, r->vram_upload);
+        r->vram_upload = upload;
+        r->vram_upload_size = (u32)upload_size;
+    }
     return 1;
 }
 static void hm_gpu_vram_commit(hm_gpu_renderer *r, const hm_gpu_scene_data *scene,
@@ -119,6 +183,60 @@ static void hm_gpu_vram_commit(hm_gpu_renderer *r, const hm_gpu_scene_data *scen
         }
     }
     r->vram_initialized = 1;
+}
+static int hm_gpu_scene_buffers_reserve(hm_gpu_renderer *r, u32 needed) {
+    u32 buffer_size = r->scene_buffer_size;
+    u32 upload_size = r->scene_upload_size;
+    if (buffer_size < needed) {
+        buffer_size = buffer_size ? buffer_size : 65536;
+        while (buffer_size < needed) {
+            if (buffer_size > UINT32_MAX / 2) {
+                buffer_size = needed;
+                break;
+            }
+            buffer_size *= 2;
+        }
+    }
+    if (upload_size < needed) {
+        upload_size = upload_size ? upload_size : 65536;
+        while (upload_size < needed) {
+            if (upload_size > UINT32_MAX / 2) {
+                upload_size = needed;
+                break;
+            }
+            upload_size *= 2;
+        }
+    }
+    SDL_GPUBuffer *buffer = NULL;
+    SDL_GPUTransferBuffer *upload = NULL;
+    if (buffer_size != r->scene_buffer_size) {
+        SDL_GPUBufferCreateInfo info = {
+            .usage = SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ, .size = buffer_size};
+        buffer = SDL_CreateGPUBuffer(r->device, &info);
+        if (!buffer)
+            return 0;
+    }
+    if (upload_size != r->scene_upload_size) {
+        SDL_GPUTransferBufferCreateInfo info = {
+            .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD, .size = upload_size};
+        upload = SDL_CreateGPUTransferBuffer(r->device, &info);
+        if (!upload) {
+            if (buffer)
+                SDL_ReleaseGPUBuffer(r->device, buffer);
+            return 0;
+        }
+    }
+    if (buffer) {
+        SDL_ReleaseGPUBuffer(r->device, r->buffer);
+        r->buffer = buffer;
+        r->scene_buffer_size = buffer_size;
+    }
+    if (upload) {
+        SDL_ReleaseGPUTransferBuffer(r->device, r->upload);
+        r->upload = upload;
+        r->scene_upload_size = upload_size;
+    }
+    return 1;
 }
 hm_gpu_renderer *hm_gpu_renderer_create(SDL_GPUDevice *device) {
     SDL_GPUShaderFormat formats = SDL_GetGPUShaderFormats(device);
@@ -146,7 +264,7 @@ hm_gpu_renderer *hm_gpu_renderer_create(SDL_GPUDevice *device) {
             SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_WRITE))
         return NULL;
     if (!SDL_GPUTextureSupportsFormat(device, SDL_GPU_TEXTUREFORMAT_R32_UINT,
-                                      SDL_GPU_TEXTURETYPE_2D,
+                                      SDL_GPU_TEXTURETYPE_2D_ARRAY,
                                       SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_READ)) {
         SDL_SetError("GPU VRAM cache format unavailable");
         return NULL;
@@ -157,15 +275,15 @@ hm_gpu_renderer *hm_gpu_renderer_create(SDL_GPUDevice *device) {
     r->device = device;
     r->pipeline = SDL_CreateGPUComputePipeline(device, &info);
     SDL_GPUBufferCreateInfo buffer = {.usage = SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ,
-                                      .size = HM_SCENE_MAX_WORDS * sizeof(u32)};
+                                      .size = 65536};
     SDL_GPUTransferBufferCreateInfo upload = {.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
                                               .size = buffer.size};
-    SDL_GPUTextureCreateInfo vram = {.type = SDL_GPU_TEXTURETYPE_2D,
+    SDL_GPUTextureCreateInfo vram = {.type = SDL_GPU_TEXTURETYPE_2D_ARRAY,
                                      .format = SDL_GPU_TEXTUREFORMAT_R32_UINT,
                                      .usage = SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_READ,
                                      .width = HM_GPU_VRAM_TEXTURE_WIDTH,
                                      .height = HM_VRAM_HEIGHT,
-                                     .layer_count_or_depth = 1,
+                                     .layer_count_or_depth = 2,
                                      .num_levels = 1};
     SDL_GPUTransferBufferCreateInfo vram_upload = {
         .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD, .size = (u32)HM_GPU_VRAM_BYTES};
@@ -173,6 +291,10 @@ hm_gpu_renderer *hm_gpu_renderer_create(SDL_GPUDevice *device) {
     r->upload = SDL_CreateGPUTransferBuffer(device, &upload);
     r->vram_texture = SDL_CreateGPUTexture(device, &vram);
     r->vram_upload = SDL_CreateGPUTransferBuffer(device, &vram_upload);
+    r->vram_layers = 2;
+    r->vram_upload_size = (u32)HM_GPU_VRAM_BYTES;
+    r->scene_buffer_size = buffer.size;
+    r->scene_upload_size = upload.size;
     if (!r->pipeline || !r->buffer || !r->upload || !r->vram_texture || !r->vram_upload) {
         hm_gpu_renderer_destroy(r);
         return NULL;
@@ -199,11 +321,16 @@ void hm_gpu_renderer_destroy(hm_gpu_renderer *r) {
 SDL_GPUTexture *hm_gpu_renderer_encode(hm_gpu_renderer *r, SDL_GPUCommandBuffer *command,
                                        const hm_gpu_scene_data *scene) {
     if (!r || !scene->words || !scene->vram_pixels ||
-        scene->bytes > HM_SCENE_MAX_WORDS * sizeof(u32) || !scene->width || !scene->height ||
+        !scene->bytes || scene->bytes > UINT32_MAX || !scene->width || !scene->height ||
         scene->width > 4096 || scene->height > 4096) {
         SDL_SetError("Invalid GPU scene payload");
         return NULL;
     }
+    if (!hm_gpu_scene_buffers_reserve(r, (u32)scene->bytes))
+        return NULL;
+    u32 scene_layers = scene->vram_version_count + 1;
+    if (!hm_gpu_vram_reserve(r, scene_layers))
+        return NULL;
     if (r->width != scene->width || r->height != scene->height) {
         SDL_GPUTextureCreateInfo info = {.type = SDL_GPU_TEXTURETYPE_2D,
                                          .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
@@ -243,14 +370,19 @@ SDL_GPUTexture *hm_gpu_renderer_encode(hm_gpu_renderer *r, SDL_GPUCommandBuffer 
     SDL_GPUBufferRegion destination = {.buffer = r->buffer, .size = (u32)scene->bytes};
     SDL_UploadToGPUBuffer(copy, &source, &destination, true);
     if (full_vram_upload) {
-        SDL_GPUTextureTransferInfo vram_source = {.transfer_buffer = r->vram_upload,
-                                                  .pixels_per_row = HM_GPU_VRAM_TEXTURE_WIDTH,
-                                                  .rows_per_layer = HM_VRAM_HEIGHT};
-        SDL_GPUTextureRegion vram_destination = {.texture = r->vram_texture,
-                                                 .w = HM_GPU_VRAM_TEXTURE_WIDTH,
-                                                 .h = HM_VRAM_HEIGHT,
-                                                 .d = 1};
-        SDL_UploadToGPUTexture(copy, &vram_source, &vram_destination, false);
+        for (u32 layer = 0; layer < scene_layers; ++layer) {
+            SDL_GPUTextureTransferInfo vram_source = {
+                .transfer_buffer = r->vram_upload,
+                .offset = layer * (u32)HM_GPU_VRAM_BYTES,
+                .pixels_per_row = HM_GPU_VRAM_TEXTURE_WIDTH,
+                .rows_per_layer = HM_VRAM_HEIGHT};
+            SDL_GPUTextureRegion vram_destination = {.texture = r->vram_texture,
+                                                     .layer = layer,
+                                                     .w = HM_GPU_VRAM_TEXTURE_WIDTH,
+                                                     .h = HM_VRAM_HEIGHT,
+                                                     .d = 1};
+            SDL_UploadToGPUTexture(copy, &vram_source, &vram_destination, false);
+        }
     } else {
         for (u32 i = 0; i < vram_region_count; ++i) {
             const hm_gpu_vram_region *region = &regions[i];

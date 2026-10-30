@@ -3994,3 +3994,46 @@ sequence and sound-effect output produces silence without stopping playback.
 
 Consequences: A saved 0% level remains muted after game sound initialization;
 nonzero levels and the existing default stay unchanged.
+
+## ADR-147: Expand Ordered GPU Scene Coverage
+
+Date: 2026-10-31. Status: accepted.
+
+Context: GPU scene capture still rejected inline GP0 transfers and imposed fixed
+limits of 8,192 primitives, 256 references per tile, and a fixed renderer
+payload. Feedback reads after earlier draws also needed a trustworthy VRAM image
+for the exact point in command order.
+
+Decision: Represent GP0 ClearImage and LoadImage operations as ordered GPU scene
+records. Preserve their packet captures; direct VRAM mutations outside a
+captured command remain invalidating. When a texture reads an earlier scene
+write, replay the private scene through the CPU reference rasterizer to
+materialize VRAM, then keep immutable VRAM versions for GPU sampling. Grow
+primitive storage, tile bins, packed packets, renderer buffers, and VRAM texture
+layers to the scene/device resource limits instead of rejecting former fixed
+capacities. Keep malformed/truncated streams, reserved texture depth, missing
+captures, allocation failures, and unsupported devices on the software fallback.
+CPU VRAM remains authoritative.
+
+Consequences: Synthetic Vulkan comparisons cover clear/load ordering, texture
+feedback after writes, scenes beyond the former primitive/bin/payload limits,
+and the established primitive classes against the CPU reference. This does not
+establish full-game scene, device, or gameplay coverage. Feedback scenes perform
+an additional CPU reference replay, and very large per-frame VRAM version sets
+can still exceed device or memory limits.
+
+## ADR-148: Use the Standard Android Release Optimization Level
+
+Date: 2026-10-31. Status: accepted.
+
+Context: The Android Gradle configuration forced `-O3` for every native C and
+C++ translation unit. The port performance policy uses `-O2` by default and
+allows `-O3` for measured hot files; no per-file Android measurements justify a
+global `-O3` override.
+
+Decision: Use `-O2` for Android Release and RelWithDebInfo native builds, while
+keeping the conservative `armv8-a` baseline. Do not add per-file `-O3` flags
+until profiling identifies a hot file and records a before/after result.
+
+Consequences: Android builds follow the common release policy and do not claim
+an unmeasured speedup. Runtime performance still needs device profiling.

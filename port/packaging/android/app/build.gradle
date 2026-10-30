@@ -30,13 +30,13 @@ android {
                           "-DHMBTN_ENH_ANTIALIASING=ON",
                           "-DHMBTN_ENH_PGXP=ON",
                           "-DHMBTN_ENH_DITHERING=ON",
-                          "-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG",
-                          "-DCMAKE_CXX_FLAGS_RELEASE=-O3 -DNDEBUG",
-                          "-DCMAKE_C_FLAGS_RELWITHDEBINFO=-O3 -DNDEBUG",
-                          "-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=-O3 -DNDEBUG",
+                          "-DCMAKE_C_FLAGS_RELEASE=-O2 -DNDEBUG",
+                          "-DCMAKE_CXX_FLAGS_RELEASE=-O2 -DNDEBUG",
+                          "-DCMAKE_C_FLAGS_RELWITHDEBINFO=-O2 -DNDEBUG",
+                          "-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=-O2 -DNDEBUG",
                           "-DANDROID_STL=c++_static"
                 abiFilters "arm64-v8a"
-                cFlags "-march=armv8-a -O3 -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -Wno-fortify-source"
+                cFlags "-march=armv8-a -O2 -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -Wno-fortify-source"
             }
         }
         ndk {

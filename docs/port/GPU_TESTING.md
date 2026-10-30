@@ -2,12 +2,26 @@
 
 ## Current game renderer status
 
-This file documents an early synthetic presentation diagnostic, not the
-current renderer's full test coverage. The Windows game now uses shared GPU
-scene output at native and enhanced resolutions, retains Software as a
-reference, and falls back to CPU for unsupported operations. GPU coverage,
-gameplay parity, device behavior, and frame-time budgets remain incomplete;
+This file documents synthetic GPU checks, not a claim of complete game-scene
+coverage. The Windows game uses shared GPU scene output at native and enhanced
+resolutions and retains Software as a reference. Captured GP0 polygons, lines,
+rectangles, clear-image and load-image transfers, and ordered texture feedback
+are represented on the compute path. Malformed streams, missing/direct captures,
+reserved texture depth, and GPU resource/device failures still use the reference
+path. Gameplay parity, device breadth, and frame-time budgets remain owner checks;
 see PLATFORMS.md and ENHANCEMENTS.md.
+
+The release build includes `hmbtn_gpu_renderer_probe`, an offscreen Vulkan GPU
+readback comparison against the CPU reference. It covers the primitive classes,
+texture depths and blend modes, clear/load ordering, VRAM texture feedback,
+high-density tile bins, scene payloads above the former fixed buffer size,
+clipping, filtering, interpolation, multisampling, and expanded presentation.
+It starts no game window and requires no disc. This is technical coverage of the
+synthetic scenes only; owner gameplay testing remains necessary.
+
+The core `gpu.vram` test also checks overlapping `MoveImage` copies, including
+wrap at the VRAM edge and mask-bit behavior. These transfers now snapshot their
+source before writing, so overlapping areas do not terminate the game.
 
 This optional local diagnostic validates GPU presentation without game data.
 It is not a game screen or a primitive rasterizer. Default unit builds neither

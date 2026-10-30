@@ -11,7 +11,7 @@ typedef struct {
     hm_gpu_environment env;
     hm_vram_context before;
     u32 words[HM_REPLAY_WORDS], used;
-    int complete, has_vram_transfer;
+    int complete;
     u32 group_offset[64], group_world[64], groups;
     u64 serial;
 } hm_captured_frame;
@@ -19,12 +19,14 @@ struct hm_frame_replay {
     hm_captured_frame frames[2];
     hm_gpu_environment env;
     hm_vram_context work;
-    int current, capturing, references;
+    int current, capturing, invalidated, references;
     u64 serial;
 };
 static hm_frame_replay *hm_shared_replay;
 static void hm_capture_transfer(void *context, s32 x, s32 y, u32 width, u32 height) {
     hm_frame_replay *s = context;
+    if (s->capturing)
+        s->invalidated = 1;
     for (int i = 0; i < 2; ++i) {
         const RECT *r = &s->frames[i].env.draw.clip;
         if (r->w > 0 && r->h > 0 && x < r->x + r->w && y < r->y + r->h && (s64)x + width > r->x &&
@@ -35,6 +37,7 @@ static void hm_capture_transfer(void *context, s32 x, s32 y, u32 width, u32 heig
 static void hm_capture_invalidate(void *context) {
     hm_frame_replay *s = context;
     s->capturing = 0;
+    s->invalidated = 1;
     s->frames[0].complete = s->frames[1].complete = 0;
 }
 static void hm_capture_begin(void *context, const hm_render_frame *meta) {
@@ -60,6 +63,7 @@ static void hm_capture_begin(void *context, const hm_render_frame *meta) {
         hm_captured_frame *f = &s->frames[retained];
         f->meta = *meta;
         f->complete = 0;
+        s->invalidated = 0;
         f->serial = ++s->serial;
         s->capturing = 1;
         return;
@@ -69,7 +73,8 @@ static void hm_capture_begin(void *context, const hm_render_frame *meta) {
     f->meta = *meta;
     f->env = *hm_gpu_environment_state();
     f->used = f->groups = 0;
-    f->complete = f->has_vram_transfer = 0;
+    f->complete = 0;
+    s->invalidated = 0;
     f->serial = ++s->serial;
     hm_vram_snapshot(&f->before);
     s->capturing = 1;
@@ -97,11 +102,6 @@ static void hm_capture_packet(void *context, const u32 *words, u32 count) {
         s->capturing = 0;
         return;
     }
-    if (count) {
-        u32 op = words[0] >> 24;
-        if (op == 0x02 || op == 0xA0)
-            f->has_vram_transfer = 1;
-    }
     memcpy(f->words + f->used, words, count * sizeof(*words));
     f->used += count;
 }
@@ -109,7 +109,8 @@ static void hm_capture_end(void *context) {
     hm_frame_replay *s = context;
     if (s->capturing)
         s->frames[s->current].complete =
-            s->frames[s->current].used != 0 || s->frames[s->current].env.draw.isbg;
+            !s->invalidated &&
+            (s->frames[s->current].used != 0 || s->frames[s->current].env.draw.isbg);
     s->capturing = 0;
 }
 hm_frame_replay *hm_frame_replay_acquire(void) {
@@ -164,11 +165,10 @@ int hm_frame_replay_draw(hm_frame_replay *s, const hm_render_frame *live) {
     hm_captured_frame *f = hm_capture_select(s, live);
     if (!f)
         return 0;
-    hm_vram_context *target_vram = &f->before;
-    if (f->has_vram_transfer) {
-        s->work = f->before;
-        target_vram = &s->work;
-    }
+    /* Every private replay runs on a copy. GPU scene construction may ask the
+     * reference executor to materialize prior VRAM writes for feedback reads. */
+    s->work = f->before;
+    hm_vram_context *target_vram = &s->work;
     s->env = f->env;
     hm_vram_context *vram = hm_vram_bind(target_vram);
     hm_gpu_environment *env = hm_gpu_environment_bind(&s->env);
