@@ -154,3 +154,13 @@ Enforces authentic inventory categorization in the rucksack reorganize screen:
 ### Android Platform Optimization & 720p Resolution Cap (ADR-105)
 - Enhance Scaling on Android is capped at a maximum internal resolution of 720p (1280x720) to balance visual crispness with battery life, thermal throttling, and sustained 60 FPS performance on mobile GPUs.
 - Android builds feature touch controls, Storage Access Framework (SAF) disc selection, and automatic audio device management.
+
+### Tile Targeting visibility and ground row seams (ADR-111)
+
+Tile Targeting now rejects event/script control and paused, menu, transition,
+riding, airborne and sleeping states. Its marker is ordered in front of the
+terrain rather than hidden behind it. With interpolation enabled, adjoining
+ground rectangles now share the existing polygon coherence/fallback rule,
+preventing mixed history from opening horizontal gaps in enlarged output.
+Defaults and the vanilla OFF paths are unchanged. Synthetic regression checks
+do not replace the owner's gameplay validation of the reported screen lines.

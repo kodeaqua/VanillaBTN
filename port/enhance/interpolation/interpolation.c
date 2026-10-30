@@ -222,6 +222,36 @@ static int hm_mesh_join(interpolation *s, int a, int b) {
     }
     return a;
 }
+/* Ground is also drawn as SPRT rectangles. Their implicit corners must share
+ * the same fallback decision as adjacent polygons and rectangles. */
+static int hm_mesh_points(const u32 *words, u32 length, int *xs, int *ys) {
+    int indices[4], n = coordinates(words, length, indices);
+    u32 op = words[0] >> 24;
+    if (op >= 0x20 && op <= 0x3f) {
+        for (int i = 0; i < n; ++i) {
+            xs[i] = coordinate(words[indices[i]]);
+            ys[i] = coordinate(words[indices[i]] >> 16);
+        }
+        return n;
+    }
+    if (op < 0x60 || op > 0x7f || !n)
+        return 0;
+    int size = (op >> 3) & 3;
+    int width = size == 1 ? 1 : size == 2 ? 8 : 16, height = width;
+    if (!size) {
+        u32 at = op & 4 ? 3 : 2;
+        if (at >= length)
+            return 0;
+        width = words[at] & 0x3ff;
+        height = (words[at] >> 16) & 0x1ff;
+    }
+    int x = coordinate(words[1]), y = coordinate(words[1] >> 16);
+    for (int i = 0; i < 4; ++i) {
+        xs[i] = x + ((i & 1) ? width : 0);
+        ys[i] = y + ((i & 2) ? height : 0);
+    }
+    return width && height ? 4 : 0;
+}
 static void hm_mesh_cohere(interpolation *s, frame *f, frame *previous) {
     u32 gen = ++s->vertex_gen;
     if (!gen) {
@@ -235,17 +265,20 @@ static void hm_mesh_cohere(interpolation *s, frame *f, frame *previous) {
     for (u32 i = 0; i < f->count; ++i) {
         command *c = &f->commands[i];
         const u32 *words = f->words + c->offset;
-        u32 op = words[0] >> 24;
-        if (!c->world || op < 0x20 || op > 0x3f)
+        if (!c->world)
             continue;
-        int indices[4], n = coordinates(words, c->length, indices);
+        int xs[4], ys[4], pxs[4], pys[4];
+        int n = hm_mesh_points(words, c->length, xs, ys);
+        if (!n)
+            continue;
         command *old = c->previous >= 0 ? &previous->commands[c->previous] : NULL;
         const u32 *old_words = old ? previous->words + old->offset : NULL;
+        if (old)
+            hm_mesh_points(old_words, old->length, pxs, pys);
         if (!old)
             s->bad_mesh[hm_mesh_root(s, (int)i)] = 1;
         for (int vertex = 0; vertex < n; ++vertex) {
-            int at = indices[vertex];
-            int x = coordinate(words[at]) + c->dx, y = coordinate(words[at] >> 16) + c->dy;
+            int x = xs[vertex] + c->dx, y = ys[vertex] + c->dy;
             u32 slot = ((u32)x * 0x9e3779b1u ^ (u32)y * 0x85ebca6bu) & (VERTEX_HASH - 1);
             while (s->vertices[slot].gen == gen &&
                    (s->vertices[slot].x != x || s->vertices[slot].y != y))
@@ -260,8 +293,7 @@ static void hm_mesh_cohere(interpolation *s, frame *f, frame *previous) {
             }
             int root = hm_mesh_join(s, (int)i, v->owner - 1);
             if (old) {
-                int px = coordinate(old_words[at]) + old->dx,
-                    py = coordinate(old_words[at] >> 16) + old->dy;
+                int px = pxs[vertex] + old->dx, py = pys[vertex] + old->dy;
                 if (v->known && (v->px != px || v->py != py))
                     s->bad_mesh[root] = 1;
                 if (!v->known) {
@@ -274,8 +306,7 @@ static void hm_mesh_cohere(interpolation *s, frame *f, frame *previous) {
     }
     for (u32 i = 0; i < f->count; ++i) {
         command *c = &f->commands[i];
-        u32 op = f->words[c->offset] >> 24;
-        if (c->world && op >= 0x20 && op <= 0x3f && s->bad_mesh[hm_mesh_root(s, (int)i)])
+        if (c->world && s->bad_mesh[hm_mesh_root(s, (int)i)])
             c->previous = -1;
     }
 }

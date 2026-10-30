@@ -3109,3 +3109,34 @@ Consequences: Camera construction and ground checks use the intended 32-bit
 stride on Android and other LP64 hosts. Actual Android gameplay remains to be
 validated on a device; the separate Linux matching check is not available on
 this Windows host.
+
+<a id="adr-111"></a>
+
+## ADR-111: Gameplay-only tile markers and coherent ground sprite rows
+
+Date: 2026-10-30. Status: technical validation; owner gameplay pending.
+
+Context: The owner reports Tile Targeting during cutscenes but absent during
+normal play, and horizontal black lines with Enhance Scaling enabled. The
+marker did not reject scripted/event control and used a larger OT slot than
+the terrain. Reverse OT traversal renders that marker behind opaque ground.
+Interpolation coherence previously considered only explicit polygon corners,
+although field cells also use rectangles with implicit corners. A material
+change or missing history on one row can leave it current while its neighbor
+interpolates, exposing a horizontal strip of the background.
+
+Decision: Hide tile markers during paused/menu/transition states, non-idle
+farm events, scripted control, automatic walking, riding, sleep and airborne
+poses. Bias the marker OT slot towards the camera. Extend the existing shared
+vertex coherence rule to implicit rectangle corners: connected rectangles and
+polygons fall back together when history is missing or conflicts. Disconnected
+sprites retain their independent history. Runtime feature defaults stay OFF;
+no game logic, timing, terrain, matching source or shaders change.
+
+Validation: Add marker packet and actual terrain-occlusion checks, including
+the inert OFF path and event/control suppression. Reproduce horizontal holes
+with stacked rows whose lower material changes. Provide a dedicated offscreen
+GPU probe (`hmbtn_gpu_renderer_probe direct3d12 --tile-seams`) at native,
+65x97 and 1128x634 output with one, two and four samples. These fixtures cover
+the identified failure, not every possible cause of the owner's screen lines.
+Interactive gameplay and other devices remain owner-tested.
