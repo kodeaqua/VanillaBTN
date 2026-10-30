@@ -164,3 +164,10 @@ ground rectangles now share the existing polygon coherence/fallback rule,
 preventing mixed history from opening horizontal gaps in enlarged output.
 Defaults and the vanilla OFF paths are unchanged. Synthetic regression checks
 do not replace the owner's gameplay validation of the reported screen lines.
+
+ADR-112 corrects an additional missing-indicator cause observed in the owner's
+running game: widescreen uses a private primitive arena, but Tile Targeting and
+the tool charge gauge checked capacity against the original backup buffer.
+Both now validate the active arena and reject draws only when its remaining
+space is insufficient. The owner's horizontal-line report while running is
+deferred; no further fix for that report is claimed here.

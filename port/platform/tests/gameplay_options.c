@@ -18,6 +18,8 @@ static int tile_render_checks(void) {
     FrameState *saved_frame = current_frame;
     frame.ot = ot;
     frame.primBuffer = (u8 *)buffer;
+    frame.primStart = frame.primBuffer;
+    frame.primSize = sizeof(buffer);
     current_frame = &frame;
     InitGeom();
     MATRIX camera = {{{4096, 0, 0}, {0, 0, -4096}, {0, 4096, 0}}, {0, 0, 10000}};
@@ -66,6 +68,29 @@ static int tile_render_checks(void) {
     PutDrawEnv(&draw);
     DrawOTag(ot + FRAME_OT_DEPTH - 1);
     CHECK((hm_vram_pixel(165, 135) & 0x7fe0) != 0);
+    /* Overlay backup storage and active primitive storage can differ. The
+     * old comparison against primBuffer rejected this valid relocated arena. */
+    static u32 relocated[FRAME_PRIM_SIZE / 4];
+    frame.primStart = (u8 *)relocated;
+    frame.primCursor.bytes = frame.primStart;
+    ClearOTagR(ot, FRAME_OT_DEPTH);
+    hm_gameplay_draw_tile_targeting(&game_state.player, 2500);
+    CHECK(frame.primCursor.bytes > frame.primStart);
+    opt.tool_charge_gauge = 1;
+    hm_gameplay_set_active(&opt);
+    game_state.player.mode = 0x16;
+    game_state.player.toolCharge = 10;
+    game_state.player.held[HELD_TOOL].modifier = 1;
+    frame.primCursor.bytes = frame.primStart;
+    ClearOTagR(ot, FRAME_OT_DEPTH);
+    hm_gameplay_draw_tool_charge_gauge(&game_state.player, 2500, 160, 120);
+    CHECK(frame.primCursor.bytes > frame.primStart);
+    frame.primCursor.bytes = frame.primStart + frame.primSize - 4;
+    hm_gameplay_draw_tile_targeting(&game_state.player, 2500);
+    CHECK(frame.primCursor.bytes == frame.primStart + frame.primSize - 4);
+    hm_gameplay_draw_tool_charge_gauge(&game_state.player, 2500, 160, 120);
+    CHECK(frame.primCursor.bytes == frame.primStart + frame.primSize - 4);
+    frame.primStart = frame.primBuffer;
     const u32 hidden[] = {PLAYER_FLAG_SCRIPTED, PLAYER_FLAG_EVENT_SPRITE,
                          PLAYER_FLAG_NO_INPUT, PLAYER_FLAG_AUTO_WALK,
                          PLAYER_FLAG_AIRBORNE, PLAYER_FLAG_ASLEEP,

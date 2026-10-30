@@ -3140,3 +3140,38 @@ GPU probe (`hmbtn_gpu_renderer_probe direct3d12 --tile-seams`) at native,
 65x97 and 1128x634 output with one, two and four samples. These fixtures cover
 the identified failure, not every possible cause of the owner's screen lines.
 Interactive gameplay and other devices remain owner-tested.
+
+<a id="adr-112"></a>
+
+## ADR-112: Use the active primitive arena for gameplay indicators
+
+Date: 2026-10-30. Status: root cause observed in the owner's running game;
+relocated-arena regression tests pass; rebuilt farm marker observed directly.
+
+Context: The owner reports that ADR-111 did not restore Tile Targeting. With
+permission, inspect the active game window and read its render state without
+changing memory or controlling gameplay. Tile Targeting is ON, the farm event
+mode is idle and the player has only the idle-pose flag. The active primitive
+cursor has used only 23,704 bytes of the private widescreen arena, yet the old
+`primBuffer + FRAME_PRIM_SIZE` comparison reports that it is full.
+
+ADR-056 intentionally relocates `primStart` while retaining `primBuffer` for
+overlay backups. The marker and tool charge gauge compare their active cursor
+to that unrelated backup allocation, so valid draws are rejected. ADR-111's
+single-arena fixture could not reproduce this failure.
+
+Decision: Check both indicators against `primStart` and
+`hm_game_prim_capacity()`. Use bounded integer address differences and check
+remaining capacity before allocation, without comparing unrelated pointers.
+Test distinct active/backup allocations and rejection near the true arena end,
+in addition to the existing OFF-path, event and terrain-occlusion checks.
+
+Consequences: Gameplay indicators can use the actual private render arena
+without changing overlay backup storage, feature defaults, matching source,
+or game logic. Horizontal lines while running are explicitly deferred by the
+owner; this change does not claim to fix them.
+
+After rebuilding, the owner reopened the game. Read-only window capture shows
+the cyan marker around the weed tile in front of the player during normal
+farm gameplay. This confirms the reported farm visibility fix; greenhouse,
+mine and cutscene behavior remain covered by technical checks or owner testing.
