@@ -2,14 +2,16 @@
 <resources>
     <string name="app_name">VanillaBTN</string>
     <string name="game_disc_not_found_title">Game Disc Not Found</string>
-    <string name="game_disc_not_found_message">Please place your Harvest Moon: Back to Nature game disc image (.bin / .cue) into:\n\nInternal Storage > Documents > VanillaBTN\n\nAccepted filenames: game.bin, hmbtn.bin, VanillaBTN.bin, or your disc image name.</string>
+    <string name="game_disc_not_found_message">Select your original USA raw game disc image (.bin). CUE sheets and ISO images are not supported. The selected file will be copied to app-private storage.</string>
     <string name="action_exit">Exit</string>
     <string name="action_open_folder">Open Folder</string>
-    <string name="permission_storage_needed">Storage access is required to load save data and game disc image.</string>
     <string name="setup_title">Harvest Moon: Back to Nature</string>
     <string name="setup_subtitle">VanillaBTN — Native Port</string>
-    <string name="setup_description">Game disc image (.bin / .cue / .iso) is required to play.\n\nPlease select your USA game disc file. It will be copied to secure app storage so your save files and settings work seamlessly without permission restrictions.</string>
+    <string name="setup_description">Your original USA game disc image (.bin) is required. CUE sheets and ISO images are not supported.\n\nChoose the raw .bin file using the document picker. VanillaBTN copies it to app-private storage for the game and save data.</string>
     <string name="setup_button_select">SELECT GAME DISC FILE</string>
-    <string name="setup_copying">Copying game disc to secure storage…</string>
+    <string name="setup_copying">Copying game disc to app-private storage…</string>
+    <string name="setup_select_raw_bin">Please select the original USA raw game disc image ending in .bin. CUE sheets and ISO images are not supported.</string>
+    <string name="setup_invalid_disc">The selected file is too small to be a game disc image. Please choose the complete .bin file.</string>
+    <string name="setup_storage_unavailable">VanillaBTN could not access app-private storage. Check available device storage and try again.</string>
     <string name="setup_copy_failed">Failed to copy game disc. Please ensure your device has at least 700 MB of free storage space.</string>
 </resources>

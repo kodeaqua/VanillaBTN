@@ -4,7 +4,6 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.os.Environment
 import android.provider.OpenableColumns
 import android.view.View
 import android.widget.LinearLayout
@@ -20,6 +19,11 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.util.Locale
 
 class LauncherActivity : AppCompatActivity() {
 
@@ -27,6 +31,11 @@ class LauncherActivity : AppCompatActivity() {
     private lateinit var progressBar: LinearProgressIndicator
     private lateinit var progressText: TextView
     private lateinit var btnSelectDisc: MaterialButton
+    private var safeDataDir: File? = null
+
+    private companion object {
+        const val MIN_DISC_BYTES = 10L * 1024L * 1024L
+    }
 
     private val discPicker = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -48,40 +57,28 @@ class LauncherActivity : AppCompatActivity() {
         controller.hide(WindowInsetsCompat.Type.systemBars())
         controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
 
-        val safeDir = File(getExternalFilesDir(null), "VanillaBTN")
-        if (!safeDir.exists()) safeDir.mkdirs()
-        File(safeDir, "saves").mkdirs()
-
-        // 1. Check if game disc already exists in safe storage
-        val discCandidates = listOf("game.bin", "hmbtn.bin", "VanillaBTN.bin")
-        val safeDisc = discCandidates.map { File(safeDir, it) }
-            .firstOrNull { it.exists() && it.length() > 10 * 1024 * 1024 }
-
-        if (safeDisc != null) {
-            // Already installed: launch game immediately with zero delay
-            launchGame()
-            return
+        safeDataDir = try {
+            AppStorage.ensureUserDataDir(this)
+        } catch (_: Exception) {
+            null
         }
 
-        // 2. Check if game disc exists in legacy Documents folder
-        val legacyDocs = File(
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS),
-            "VanillaBTN"
-        )
-        val legacyDisc = discCandidates.map { File(legacyDocs, it) }
-            .firstOrNull { it.exists() && it.length() > 10 * 1024 * 1024 }
-
-        if (legacyDisc != null) {
-            // Legacy disc found, import it seamlessly
-            setContentView(R.layout.activity_setup)
-            initViews()
-            importLegacyFile(legacyDisc, File(safeDir, "game.bin"))
-            return
+        val safeDir = safeDataDir
+        if (safeDir != null) {
+            val discCandidates = listOf("game.bin", "hmbtn.bin", "VanillaBTN.bin")
+            val safeDisc = discCandidates.map { File(safeDir, it) }
+                .firstOrNull { it.isFile && it.length() > MIN_DISC_BYTES }
+            if (safeDisc != null) {
+                launchGame()
+                return
+            }
         }
 
-        // 3. Fresh install: display setup screen
         setContentView(R.layout.activity_setup)
         initViews()
+        if (safeDir == null) {
+            Toast.makeText(this, getString(R.string.setup_storage_unavailable), Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun initViews() {
@@ -112,18 +109,27 @@ class LauncherActivity : AppCompatActivity() {
                 val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                 val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
                 if (cursor.moveToFirst()) {
-                    if (nameIndex != -1) displayName = cursor.getString(nameIndex)
+                    if (nameIndex != -1) {
+                        cursor.getString(nameIndex)?.takeIf { it.isNotBlank() }?.let { displayName = it }
+                    }
                     if (sizeIndex != -1) fileSize = cursor.getLong(sizeIndex)
                 }
             }
         } catch (_: Exception) {}
 
-        if (displayName.lowercase().endsWith(".cue")) {
+        if (!displayName.lowercase(Locale.ROOT).endsWith(".bin")) {
             MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.game_disc_not_found_title)
-                .setMessage("File yang dipilih adalah .CUE (daftar trek). Silakan pilih file .BIN utama game (biasanya berukuran sekitar 400 - 600 MB).")
+                .setMessage(R.string.setup_select_raw_bin)
                 .setPositiveButton("OK", null)
                 .show()
+            return
+        }
+
+        val safeDir = safeDataDir ?: try {
+            AppStorage.ensureUserDataDir(this).also { safeDataDir = it }
+        } catch (_: Exception) {
+            Toast.makeText(this, getString(R.string.setup_storage_unavailable), Toast.LENGTH_LONG).show()
             return
         }
 
@@ -135,24 +141,25 @@ class LauncherActivity : AppCompatActivity() {
             progressBar.progress = 0
         }
 
-        val safeDir = File(getExternalFilesDir(null), "VanillaBTN")
         val targetTemp = File(safeDir, "game.bin.tmp")
         val targetFinal = File(safeDir, "game.bin")
 
         Thread {
             try {
-                contentResolver.openInputStream(uri)?.use { input ->
+                val input = contentResolver.openInputStream(uri)
+                    ?: throw IOException("Could not open the selected document")
+                input.use { discInput ->
                     FileOutputStream(targetTemp).use { output ->
                         val buffer = ByteArray(65536)
                         var bytesRead: Int
                         var totalRead = 0L
 
-                        while (input.read(buffer).also { bytesRead = it } != -1) {
+                        while (discInput.read(buffer).also { bytesRead = it } != -1) {
                             output.write(buffer, 0, bytesRead)
                             totalRead += bytesRead
 
                             if (fileSize > 0) {
-                                val percent = (totalRead * 100 / fileSize).toInt()
+                                val percent = (totalRead * 100 / fileSize).coerceIn(0, 100).toInt()
                                 runOnUiThread {
                                     progressBar.progress = percent
                                     val mbRead = totalRead / (1024 * 1024)
@@ -162,21 +169,24 @@ class LauncherActivity : AppCompatActivity() {
                             }
                         }
                         output.flush()
+                        output.fd.sync()
                     }
                 }
 
-                if (targetTemp.length() < 10 * 1024 * 1024) {
+                if (targetTemp.length() < MIN_DISC_BYTES) {
                     targetTemp.delete()
                     runOnUiThread {
                         progressContainer.visibility = View.GONE
                         btnSelectDisc.isEnabled = true
-                        Toast.makeText(this, "Ukuran file terlalu kecil atau tidak valid.", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this, getString(R.string.setup_invalid_disc), Toast.LENGTH_LONG).show()
                     }
                     return@Thread
                 }
+                if (fileSize > 0 && targetTemp.length() != fileSize) {
+                    throw IOException("The copied document length did not match its reported size")
+                }
 
-                if (targetFinal.exists()) targetFinal.delete()
-                targetTemp.renameTo(targetFinal)
+                moveReplacing(targetTemp, targetFinal)
 
                 runOnUiThread {
                     launchGame()
@@ -192,53 +202,17 @@ class LauncherActivity : AppCompatActivity() {
         }.start()
     }
 
-    private fun importLegacyFile(source: File, targetFinal: File) {
-        progressContainer.visibility = View.VISIBLE
-        btnSelectDisc.isEnabled = false
-        val fileSize = source.length()
-        progressBar.max = 100
-        progressBar.progress = 0
-
-        val targetTemp = File(targetFinal.parentFile, "game.bin.tmp")
-
-        Thread {
-            try {
-                source.inputStream().use { input ->
-                    FileOutputStream(targetTemp).use { output ->
-                        val buffer = ByteArray(65536)
-                        var bytesRead: Int
-                        var totalRead = 0L
-
-                        while (input.read(buffer).also { bytesRead = it } != -1) {
-                            output.write(buffer, 0, bytesRead)
-                            totalRead += bytesRead
-
-                            val percent = (totalRead * 100 / fileSize).toInt()
-                            runOnUiThread {
-                                progressBar.progress = percent
-                                val mbRead = totalRead / (1024 * 1024)
-                                val mbTotal = fileSize / (1024 * 1024)
-                                progressText.text = "Mengimpor dari Documents ($mbRead MB / $mbTotal MB - $percent%)"
-                            }
-                        }
-                        output.flush()
-                    }
-                }
-
-                if (targetFinal.exists()) targetFinal.delete()
-                targetTemp.renameTo(targetFinal)
-
-                runOnUiThread {
-                    launchGame()
-                }
-            } catch (_: Exception) {
-                targetTemp.delete()
-                runOnUiThread {
-                    progressContainer.visibility = View.GONE
-                    btnSelectDisc.isEnabled = true
-                }
-            }
-        }.start()
+    private fun moveReplacing(source: File, target: File) {
+        try {
+            Files.move(
+                source.toPath(),
+                target.toPath(),
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING
+            )
+        } catch (_: AtomicMoveNotSupportedException) {
+            Files.move(source.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        }
     }
 
     private fun launchGame() {

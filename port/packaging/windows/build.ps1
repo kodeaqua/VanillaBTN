@@ -52,13 +52,13 @@ VanillaBTN - Harvest Moon: Back to Nature Native PC Port (v0.9.0)
 
 How to Play:
 1. Double-click 'VanillaBTN.exe' to launch the game.
-2. On first launch, select your legally owned original PS1 Back to Nature disc image (.bin/.cue or .iso).
+2. On first launch, select your legally owned original PS1 Back to Nature raw disc image (.bin).
 3. The game launches directly in clean single-window mode (Release mode).
 
 Optional Quality of Life Features (Configurable via ESC Pause Menu):
 - 16:9 Widescreen display and smooth fullscreen viewport scaling.
 - Dedicated in-game pause menu (Graphics, Controls, independent BGM/SFX Audio, Gameplay).
-- Tasteful QoL: 10-heart Stamina HUD, Tool Charge Meter, Tile Targeting Grid, Fast Text, etc.
+- Optional gameplay features: 10-heart Stamina HUD, Tool Charge Meter, Tile Targeting Grid, and others.
 
 Default Controls:
 - Gamepad: Left Stick / D-Pad (Move), Button A (Action), Button X (Tool).

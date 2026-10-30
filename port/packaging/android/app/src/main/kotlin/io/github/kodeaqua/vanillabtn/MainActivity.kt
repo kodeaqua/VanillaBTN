@@ -3,7 +3,6 @@ package io.github.kodeaqua.vanillabtn
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
-import android.os.Environment
 import android.system.Os
 import android.util.Log
 import android.view.KeyEvent
@@ -37,8 +36,7 @@ class MainActivity : SDLActivity() {
     private fun log(message: String) {
         Log.i("VanillaBTN", message)
         try {
-            val dir = targetDataDir ?: File(getExternalFilesDir(null), "VanillaBTN")
-            if (!dir.exists()) dir.mkdirs()
+            val dir = targetDataDir ?: return
             val logFile = File(dir, "last_run.log")
             val time = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
             FileWriter(logFile, true).use { fw ->
@@ -56,42 +54,26 @@ class MainActivity : SDLActivity() {
         controller.hide(WindowInsetsCompat.Type.systemBars())
         controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
 
+        // Resolve app-private storage before SDL starts native code.
+        val safeDir = try {
+            AppStorage.ensureUserDataDir(this)
+        } catch (_: Exception) {
+            log("App-private storage is unavailable")
+            startActivity(Intent(this, LauncherActivity::class.java))
+            finish()
+            super.onCreate(savedInstanceState)
+            return
+        }
+        targetDataDir = safeDir
         log("MainActivity.onCreate: device=${Build.MANUFACTURER} ${Build.MODEL}, android=${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})")
 
-        // 1. Resolve secure app-private storage directory
-        val safeDir = File(getExternalFilesDir(null), "VanillaBTN")
-        if (!safeDir.exists()) safeDir.mkdirs()
-        File(safeDir, "saves").mkdirs()
-
         val discCandidates = listOf(
-            "game.bin", "hmbtn.bin", "VanillaBTN.bin",
-            "game.cue", "hmbtn.cue", "VanillaBTN.cue"
+            "game.bin", "hmbtn.bin", "VanillaBTN.bin"
         )
 
         // Prioritize safeDir disc file
         var candidateFile: File? = discCandidates.map { File(safeDir, it) }
-            .firstOrNull { it.exists() && it.length() > 10 * 1024 * 1024 }
-
-        targetDataDir = safeDir
-
-        // 2. Fallback check in external Documents directory if safe storage is empty
-        if (candidateFile == null) {
-            val primaryDocs = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-            val primaryDir = File(primaryDocs, "VanillaBTN")
-            val altDir = File(Environment.getExternalStorageDirectory(), "Documents/VanillaBTN")
-            val fallbackDirs = listOf(primaryDir, altDir)
-
-            for (dir in fallbackDirs) {
-                if (!dir.exists()) continue
-                candidateFile = discCandidates.map { File(dir, it) }.firstOrNull { it.exists() }
-                if (candidateFile != null) {
-                    if (isDirWritable(dir)) {
-                        targetDataDir = dir
-                    }
-                    break
-                }
-            }
-        }
+            .firstOrNull { it.isFile && it.length() > 10 * 1024 * 1024 }
 
         foundDiscFile = candidateFile
 
@@ -107,11 +89,10 @@ class MainActivity : SDLActivity() {
 
         try {
             Os.setenv("HMBTN_USER_DATA_DIR", targetDataDir!!.absolutePath, true)
-            log("HMBTN_USER_DATA_DIR set to: ${targetDataDir!!.absolutePath}")
             Os.setenv("HMBTN_DISC_PATH", foundDiscFile!!.absolutePath, true)
-            log("HMBTN_DISC_PATH set to: ${foundDiscFile!!.absolutePath}")
-        } catch (e: Exception) {
-            log("Failed to set environment variables: ${e.message}")
+            log("Native storage and disc paths configured")
+        } catch (_: Exception) {
+            log("Could not configure native storage and disc paths")
         }
 
         super.onCreate(savedInstanceState)
@@ -136,21 +117,6 @@ class MainActivity : SDLActivity() {
     override fun onBackPressed() {
         onNativeKeyDown(KeyEvent.KEYCODE_ESCAPE)
         onNativeKeyUp(KeyEvent.KEYCODE_ESCAPE)
-    }
-
-    private fun isDirWritable(dir: File): Boolean {
-        if (!dir.exists() && !dir.mkdirs()) return false
-        val testFile = File(dir, ".test_write_${System.currentTimeMillis()}")
-        return try {
-            if (testFile.createNewFile()) {
-                testFile.delete()
-                true
-            } else {
-                false
-            }
-        } catch (_: Exception) {
-            false
-        }
     }
 
     override fun getArguments(): Array<String> {

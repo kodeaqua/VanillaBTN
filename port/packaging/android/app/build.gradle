@@ -1,12 +1,11 @@
 plugins {
     id 'com.android.application'
-    id 'org.jetbrains.kotlin.android'
 }
 
 android {
     namespace 'io.github.kodeaqua.vanillabtn'
     compileSdk 35
-    ndkVersion project.findProperty('ndkVersion') ?: '27.2.12479018'
+    ndkVersion '30.0.16248370'
 
     defaultConfig {
         applicationId "io.github.kodeaqua.vanillabtn"
@@ -18,8 +17,7 @@ android {
         externalNativeBuild {
             cmake {
                 targets "hmbtn_native"
-                arguments "-DHMBTN_PORT=ON",
-                          "-DHMBTN_BUILD_NATIVE_WINDOW=ON",
+                arguments "-DHMBTN_BUILD_NATIVE_WINDOW=ON",
                           "-DBUILD_TESTING=OFF",
                           "-DHMBTN_BUILD_GPU_SPIKE=OFF",
                           "-DHMBTN_ENH_GAMEPLAY=ON",
@@ -59,10 +57,6 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
-    }
-
-    kotlinOptions {
-        jvmTarget = '17'
     }
 
     externalNativeBuild {
