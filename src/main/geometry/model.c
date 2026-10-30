@@ -134,8 +134,14 @@ static void camera_build_view(void) {
     VECTOR side;
     MATRIX roll;
     s32 i;
+#ifdef HMBTN_PORT
+    /* PORT: VECTOR components are 32-bit on LP64 hosts -- see docs/port/DECISIONS.md#adr-110 */
+    s32 *forward_words;
+    s32 *side_words;
+#else
     long *forward_words;
     long *side_words;
+#endif
 
     if (model_camera.lockedView == 0) {
         v.vx = model_camera.targetX - model_camera.eyeX;
