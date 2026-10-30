@@ -3950,6 +3950,9 @@ keeping the exact matching-build eight-page handler and wrap behavior.
 
 Consequences: The feature leaves vanilla status navigation intact while OFF.
 It reads the original villager state without modifying it or loading/mutating
-villager sprites. Pure model and settings tests cover the roster, relationship
-mapping, bar bounds, defaults and persistence. The owner must still validate
-layout and navigation during gameplay.
+villager sprites. Portraits come from the first 80x80 face bank grouped under
+each Character ID in the user's `face.bin`; the page crops and downsamples them
+at runtime and ships no game art. Names use title case with the game's lowercase
+glyphs. Pure model and settings tests cover the roster, relationship mapping,
+bar bounds, defaults and persistence. The owner must still validate layout and
+navigation during gameplay.

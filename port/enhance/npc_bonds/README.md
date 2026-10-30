@@ -12,11 +12,9 @@ defaults to `false`, preserving the original eight-page status menu until the
 owner enables **NPC Relationships** in Settings > Gameplay.
 
 The bar uses friendship 0-255 and affection 0-65535 without changing either game
-value. Names use the original uppercase font glyphs. The icons are composed from
-small native rectangles and do not load or mutate villager sprite state.
-
-The status sprite pack contains Pete's small HUD head, but no matching roster of
-NPC head icons. The disc's dialogue text banks do contain 80x80 face portraits;
-the current game API maps those by dialogue face code and loads one bank into the
-shared portrait texture area. It does not provide a direct NPC-ID-to-small-icon
-mapping or a multi-portrait cache, so the status page does not use those faces.
+value. Names use normal title case and the original lowercase font glyphs. Each
+icon is a cropped, downsampled portrait from the matching NPC's original face
+bank in the user's `face.bin`; visible portraits load progressively while the
+page is open. The portrait-bank mapping follows the original Character ID order.
+Game image data is read at runtime and is not copied into the repository or
+release package.
