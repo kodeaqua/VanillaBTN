@@ -3783,3 +3783,25 @@ Windows directory name. Android continues to use its app-private storage path.
 Consequences: Settings and saves use one current Windows location while
 respecting redirected Documents folders. Historical ADR-044 references describe
 the earlier path and are not the current Windows storage contract.
+
+## ADR-138: Attempt GPU Auto Rendering on Every Desktop Frame
+
+Date: 2026-10-30. Status: accepted owner request.
+
+Context: GPU Auto was the default renderer, but the host only captured a scene
+when an enhancement such as scaling, widescreen, interpolation, PGXP or MSAA
+requested replay. Vanilla desktop output could therefore remain on the CPU
+even while GPU Auto was selected.
+
+Decision: On desktop, request a shared GPU scene replay for every frame, including
+native 320x240 output. Keep the Software renderer selectable and keep unsupported
+scenes, direct/loading scanouts and failed GPU presentation on the software
+reference path. Retain Android's selective compute eligibility from ADR-132.
+Game logic and authoritative CPU VRAM remain on the CPU.
+
+Consequences: Supported desktop scenes can use GPU rasterization without enabling
+an enhancement. Synthetic probes on a Radeon RX Vega measured 0.475 ms GPU versus
+0.359 ms CPU at 320x240, and 0.877 ms versus 6.525 ms at 1440x1080 on D3D12;
+these numbers exclude the game loop and do not predict gameplay frame rate.
+Native-resolution workloads may pay a small render-slice cost. Full gameplay
+coverage and device behavior remain owner-tested.
