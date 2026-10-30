@@ -33,6 +33,8 @@
 #include "platform/version.h"
 #include "platform/window_icon.h"
 #include "platform/mouse_input.h"
+#include "platform/controls_options.h"
+#include "platform/audio_options.h"
 #ifdef HMBTN_ENH_PAUSE_MENU
 #include "enhance/pause_menu/assets.h"
 #include "enhance/pause_menu/canvas.h"
@@ -44,8 +46,6 @@
 #include "enhance/dithering/dithering.h"
 #endif
 #endif
-#include "platform/controls_options.h"
-#include "platform/audio_options.h"
 #ifdef HMBTN_ENH_GAMEPLAY
 #include "platform/gameplay_options.h"
 #endif

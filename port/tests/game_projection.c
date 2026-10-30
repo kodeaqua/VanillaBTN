@@ -7,6 +7,12 @@
  * resolves their imports even when those sections are discarded. They are not
  * runtime implementations and must never be reached by this projection test. */
 FrameState *current_frame;
+#ifdef HMBTN_ENH_WIDESCREEN
+int hm_widescreen_prim_full(const void *cursor) {
+    (void)cursor;
+    hm_runtime_error("game.projection fixture", "unexpected model draw");
+}
+#endif
 void debug_hook_run(s32 value) {
     (void)value;
     hm_runtime_error("game.projection fixture", "unexpected model draw");

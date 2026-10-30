@@ -15,6 +15,10 @@ int main(void) {
 
     /* 2. Disable dithering */
     hm_dither_set_enabled(0);
+#ifndef HMBTN_ENH_DITHERING
+    CHECK(hm_dither_enabled() == 1);
+    return 0;
+#endif
     CHECK(hm_dither_enabled() == 0);
 
     /* 3. Re-enable dithering */

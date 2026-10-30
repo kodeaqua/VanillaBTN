@@ -27,6 +27,10 @@ int main(void) {
 
     /* 2. Enable PGXP */
     hm_pgxp_set_enabled(1);
+#ifndef HMBTN_ENH_PGXP
+    CHECK(hm_pgxp_enabled() == 0);
+    return 0;
+#endif
     CHECK(hm_pgxp_enabled() == 1);
 
     /* 3. Store and lookup vertex */
