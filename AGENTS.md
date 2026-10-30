@@ -14,7 +14,7 @@ override this one for their subtree.
   the original game spirit. Enhancements default OFF at runtime to preserve pure vanilla parity.
 - Executable binary is named `VanillaBTN.exe`. Standalone release archive is produced at
   `dist/VanillaBTN-windows-x64-v0.9.0.zip`.
-- Use 12 parallel build jobs (`cmake --build ... -j12`), as requested by the owner.
+- Use 16 parallel build jobs (`cmake --build ... -j16`), as requested by the owner on 2026-10-30.
 - The owner paused multilingual work on 2026-10-28. Its WIP is preserved in the
   named stash for `port/indonesian-language`; current runtime fixes belong on
   `fix` from main.
