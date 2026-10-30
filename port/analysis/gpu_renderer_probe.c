@@ -543,6 +543,56 @@ static int hm_probe_widescreen(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
 }
 #endif
 #ifdef HM_INTERPOLATION_REFERENCE
+static int hm_probe_scaled_rows(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
+                                hm_gpu_scene *builder) {
+    const u32 sizes[][2] = {{65, 97}, {1128, 634}};
+    for (int filter = 0; filter <= 2; filter += 2)
+        for (unsigned samples = 1; samples <= 4; samples *= 2)
+            for (int shift = 0; shift < 4; ++shift)
+                for (u32 size = 0; size < SDL_arraysize(sizes); ++size)
+                    for (int polygon = 0; polygon < 2; ++polygon) {
+                        setup();
+                        for (u32 y = 0; y < 32; ++y)
+                            for (u32 x = 0; x < 32; ++x)
+                                hm_vram_draw_pixel(x, y, 0);
+                        for (u32 y = 0; y < 16; ++y)
+                            for (u32 x = 0; x < 16; ++x)
+                                hm_vram_draw_pixel(640 + x, 256 + y, 0x7fff);
+                        const u32 rows[] = {0xe1000400 | 282, 0x65808080, xy(2, 2 + shift), 0,
+                                            xy(8, 4), 0x65808080, xy(2, 6 + shift), 0, xy(8, 4)};
+                        const u32 quads[] = {
+                            0xe1000400 | 282,
+                            0x2d808080, xy(2, 2 + shift), 0, xy(10, 2 + shift), (282u << 16) | 8,
+                            xy(2, 6 + shift), 4u << 8, xy(10, 6 + shift), (4u << 8) | 8,
+                            0x2d808080, xy(2, 6 + shift), 0, xy(10, 6 + shift), (282u << 16) | 8,
+                            xy(2, 10 + shift), 4u << 8, xy(10, 10 + shift), (4u << 8) | 8};
+                        u32 width = sizes[size][0], height = sizes[size][1];
+                        hm_gpu_scene_texture_filter(builder, filter);
+                        hm_gpu_scene_multisamples(builder, samples);
+                        hm_replay_sink previous = hm_gpu_scene_begin(builder, width, height);
+                        RECT area = {0, 0, 32, 32};
+                        hm_replay_begin(&area);
+                        hm_gpu_execute_words(polygon ? quads : rows,
+                                             polygon ? sizeof quads / sizeof *quads
+                                                     : sizeof rows / sizeof *rows);
+                        hm_gpu_scene_data data;
+                        CHECK(hm_gpu_scene_end(builder, previous, &data));
+                        CHECK(!readback(device, renderer, &data, actual));
+                        for (u32 y = 0; y < height; ++y)
+                            for (u32 x = 0; x < width; ++x) {
+                                double lx = (x + 0.5) * 32 / width;
+                                double ly = (y + 0.5) * 32 / height;
+                                if (lx <= 3 || lx >= 9 || ly <= 3 + shift || ly >= 9 + shift)
+                                    continue;
+                                const u8 *pixel = actual + (y * width + x) * 4;
+                                CHECK((u32)pixel[0] + pixel[1] + pixel[2] > 700);
+                            }
+                    }
+    hm_gpu_scene_texture_filter(builder, 0);
+    hm_gpu_scene_multisamples(builder, 1);
+    puts("Scaled moving sprite and quad rows passed with nearest/xBR and 1x/2x/4x MSAA.");
+    return 0;
+}
 static int hm_probe_tile_seams(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
                               hm_gpu_scene *builder) {
     u32 packets[2][6];
@@ -638,7 +688,8 @@ int main(int argc, char **argv) {
     }
 #ifdef HM_INTERPOLATION_REFERENCE
     if (argc > 2 && !SDL_strcmp(argv[2], "--tile-seams")) {
-        CHECK(builder && !hm_probe_tile_seams(device, renderer, builder));
+        CHECK(builder && !hm_probe_tile_seams(device, renderer, builder) &&
+              !hm_probe_scaled_rows(device, renderer, builder));
         hm_gpu_scene_destroy(builder);
         hm_gpu_renderer_destroy(renderer);
         SDL_DestroyGPUDevice(device);

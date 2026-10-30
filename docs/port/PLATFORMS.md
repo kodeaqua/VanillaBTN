@@ -477,3 +477,21 @@ Actual scene coverage and gameplay remain unverified.
 
 
 Fine-grained 16x16 VRAM tile tracking for skipped offscreen untextured draws eliminates blanket fallbacks when later textured draws sample independent VRAM regions; fallback is restricted to actual tile overlap with sampled textures or CLUTs, and frame pacing prevents busy-spin when swapchains stall (ADR-121). Actual scene coverage and gameplay remain unverified.
+
+
+### Scaled moving row diagnostic (2026-10-30)
+
+The owner reports full-screen horizontal lines during movement with Modern and
+scaling enabled, with or without interpolation. The active settings also included
+MSAA 4x, xBR, VSync off, and an unlimited FPS cap. The owner reported that the
+lines disappeared with both MSAA and xBR disabled; neither setting has yet been
+isolated from the other or from presentation timing.
+
+An offscreen probe renders synthetic opaque sprite and textured quad rows at
+65x97 and 1128x634 over four positions, nearest/xBR filtering, and 1x/2x/4x
+MSAA. Interior coverage passes on local D3D12 and Vulkan; the D3D12 probe also
+passes Windows ASan/UBSan. It does not reproduce full gameplay, display scanout,
+or tearing, and does not establish the cause of the owner's reported lines.
+A separate interpolation T-junction experiment reproduced a synthetic gap but
+raised a 512-sprite capture benchmark from 0.133 to 0.820 ms/frame and was not
+included. It cannot explain the reported lines when interpolation is off.
