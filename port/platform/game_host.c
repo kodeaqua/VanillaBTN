@@ -444,6 +444,15 @@ static int hm_host_gpu_present(const RECT *native_area) {
 #endif
         if (!replayed)
             replayed = hm_frame_replay_draw(hm_gpu_replay, &live);
+        /* Most scenes need only the immutable pre-draw VRAM snapshot. If a
+         * textured primitive reads an earlier scene write, replay once more
+         * through the native reference executor to materialize that version. */
+        if (replayed && hm_gpu_scene_needs_materialization(hm_gpu_commands)) {
+            hm_gpu_scene_materialize_vram(hm_gpu_commands, 1);
+            (void)hm_gpu_scene_begin(hm_gpu_commands, width, height);
+            replayed = hm_frame_replay_draw(hm_gpu_replay, &live);
+            hm_gpu_scene_materialize_vram(hm_gpu_commands, 0);
+        }
         if (!hm_gpu_scene_end(hm_gpu_commands, previous, &hm_gpu_cached) || !replayed) {
             if (serial && !hm_gpu_fallback_reported) {
                 fprintf(stderr, "GPU scene fallback: %s\n", hm_gpu_scene_fallback(hm_gpu_commands));

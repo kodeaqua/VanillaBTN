@@ -12,12 +12,8 @@
     } while (0)
 
 int main(int argc, char **argv) {
+    (void)argc;
     (void)argv;
-    if (argc == 2) {
-        RECT overlap = {0, 0, 4, 1};
-        MoveImage(&overlap, 1, 0);
-        return 1;
-    }
     hm_vram_reset();
     for (u32 row = 0; row < 32; ++row) {
         CHECK(hm_vram_dirty_row(row) == UINT64_MAX);
@@ -73,5 +69,53 @@ int main(int argc, char **argv) {
     CHECK(MoveImage(&target, 15, 15) == 0);
     CHECK(hm_vram_pixel(16, 15) == (0x5678 | 0x8000));
     CHECK(DrawSync(0) == 0);
+
+    /* Partial overlap copies from a stable source snapshot in both axes. */
+    hm_vram_reset();
+    hm_vram_mask(0, 0);
+    RECT overlap = {10, 10, 4, 3};
+    const u32 overlap_source[6] = {0x10011000, 0x10031002, 0x10051004,
+                                   0x10071006, 0x10091008, 0x100B100A};
+    CHECK(LoadImage(&overlap, overlap_source) == 0);
+    CHECK(MoveImage(&overlap, 11, 11) == 0);
+    RECT overlap_target = {11, 11, 4, 3};
+    u32 overlap_result[6] = {0};
+    CHECK(StoreImage(&overlap_target, overlap_result) == 0);
+    CHECK(!memcmp(overlap_result, overlap_source, sizeof(overlap_source)));
+
+    /* Circular VRAM coordinates must retain the same behavior at the Y edge. */
+    hm_vram_reset();
+    RECT wrapped_overlap = {50, 510, 2, 4};
+    const u32 wrapped_source[4] = {0x20012000, 0x20032002, 0x20052004, 0x20072006};
+    CHECK(LoadImage(&wrapped_overlap, wrapped_source) == 0);
+    CHECK(MoveImage(&wrapped_overlap, 50, 511) == 0);
+    RECT wrapped_target = {50, 511, 2, 4};
+    u32 wrapped_result[4] = {0};
+    CHECK(StoreImage(&wrapped_target, wrapped_result) == 0);
+    CHECK(!memcmp(wrapped_result, wrapped_source, sizeof(wrapped_source)));
+
+    /* X wrapping uses the same overlap snapshot behavior. */
+    hm_vram_reset();
+    RECT wrapped_x = {1022, 400, 4, 1};
+    const u32 wrapped_x_source[2] = {0x30013000, 0x30033002};
+    CHECK(LoadImage(&wrapped_x, wrapped_x_source) == 0);
+    CHECK(MoveImage(&wrapped_x, 1023, 400) == 0);
+    RECT wrapped_x_target = {1023, 400, 4, 1};
+    u32 wrapped_x_result[2] = {0};
+    CHECK(StoreImage(&wrapped_x_target, wrapped_x_result) == 0);
+    CHECK(!memcmp(wrapped_x_result, wrapped_x_source, sizeof(wrapped_x_source)));
+
+    /* Mask checking and setting still apply after the overlap is staged. */
+    hm_vram_reset();
+    hm_vram_mask(0, 0);
+    CHECK(LoadImage(&overlap, overlap_source) == 0);
+    hm_vram_mask(1, 1);
+    CHECK(MoveImage(&overlap, 11, 11) == 0);
+    memset(overlap_result, 0, sizeof(overlap_result));
+    CHECK(StoreImage(&overlap_target, overlap_result) == 0);
+    for (u32 i = 0; i < 6; ++i) {
+        u16 expected = (u16)(overlap_source[i / 2] >> ((i & 1) * 16));
+        CHECK(((u16 *)overlap_result)[i] == (u16)(expected | 0x8000));
+    }
     return 0;
 }

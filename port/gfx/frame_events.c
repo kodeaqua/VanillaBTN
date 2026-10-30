@@ -4,6 +4,7 @@ enum { OBSERVERS = 4 };
 static hm_render_observer observers[OBSERVERS];
 static int hm_group_base, hm_group_effective;
 static int hm_capturing;
+static u32 hm_transfer_command_depth;
 int hm_render_subscribe(hm_render_observer observer) {
     if (!observer.context)
         return 0;
@@ -62,11 +63,16 @@ void hm_render_invalidate(void) {
             observers[i].invalidate(observers[i].context);
 }
 void hm_render_transfer(s32 x, s32 y, u32 width, u32 height) {
-    if (!width || !height)
+    if (!width || !height || hm_transfer_command_depth)
         return;
     for (int i = 0; i < OBSERVERS; ++i)
         if (observers[i].transfer)
             observers[i].transfer(observers[i].context, x, y, width, height);
+}
+void hm_render_transfer_command_begin(void) { ++hm_transfer_command_depth; }
+void hm_render_transfer_command_end(void) {
+    if (hm_transfer_command_depth)
+        --hm_transfer_command_depth;
 }
 void hm_render_direct_draw(s32 x, s32 y, u32 width, u32 height) {
     if (!hm_capturing)

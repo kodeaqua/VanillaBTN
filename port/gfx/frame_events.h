@@ -31,5 +31,7 @@ void hm_render_end(void);
 void hm_render_invalidate(void);
 /* Native VRAM changes outside captured geometry. Rectangles do not wrap. */
 void hm_render_transfer(s32 x, s32 y, u32 width, u32 height);
+void hm_render_transfer_command_begin(void);
+void hm_render_transfer_command_end(void);
 void hm_render_direct_draw(s32 x, s32 y, u32 width, u32 height);
 #endif

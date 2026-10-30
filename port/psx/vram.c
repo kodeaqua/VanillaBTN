@@ -7,6 +7,9 @@
 static hm_vram_context hm_default_vram;
 static hm_vram_context *hm_context = &hm_default_vram;
 static u64 hm_vram_gen = 1;
+/* MoveImage is synchronous in the native backend. Preserve overlapping source
+ * pixels before writes, matching the source-preserving transfer contract. */
+static u16 hm_move_image_scratch[HM_VRAM_WIDTH * HM_VRAM_HEIGHT];
 const hm_vram_context *hm_vram_state(void) { return hm_context; }
 hm_vram_context *hm_vram_mutable_state(void) { return hm_context; }
 u64 hm_vram_generation(void) { return hm_vram_gen; }
@@ -155,13 +158,20 @@ s32 MoveImage(const RECT *area, s32 x, s32 y) {
     u32 height = (((u32)area->h - 1) & 511) + 1;
     int overlap_x = ((dx - sx) & 1023) < width || ((sx - dx) & 1023) < width;
     int overlap_y = ((dy - sy) & 511) < height || ((sy - dy) & 511) < height;
-    if (overlap_x && overlap_y && (sx != dx || sy != dy))
-        hm_runtime_error("MoveImage",
-                         "overlapping transfers require hardware copy-order validation");
+    int overlap = overlap_x && overlap_y;
     hm_vram_transfer(dx, dy, width, height);
+    if (overlap) {
+        for (u32 row = 0; row < height; ++row)
+            for (u32 column = 0; column < width; ++column)
+                hm_move_image_scratch[row * width + column] =
+                    hm_vram_pixel(sx + column, sy + row);
+    }
     for (u32 row = 0; row < height; ++row)
         for (u32 column = 0; column < width; ++column)
-            hm_vram_put(dx + column, dy + row, hm_vram_pixel(sx + column, sy + row), 1);
+            hm_vram_put(dx + column, dy + row,
+                        overlap ? hm_move_image_scratch[row * width + column]
+                                : hm_vram_pixel(sx + column, sy + row),
+                        1);
     return 0;
 }
 

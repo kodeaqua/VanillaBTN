@@ -227,6 +227,14 @@ static int fixture(SDL_GPUDevice *device, hm_gpu_renderer *renderer, hm_gpu_scen
     RECT area = {0, (s16)origin_y, 32, 32};
     hm_replay_begin(&area);
     hm_gpu_execute_words(words, count);
+    if (hm_gpu_scene_needs_materialization(builder)) {
+        hm_gpu_scene_materialize_vram(builder, 1);
+        setup();
+        (void)hm_gpu_scene_begin(builder, width, height);
+        hm_replay_begin(&area);
+        hm_gpu_execute_words(words, count);
+        hm_gpu_scene_materialize_vram(builder, 0);
+    }
     hm_gpu_scene_data scene;
     CHECK(hm_gpu_scene_end(builder, previous, &scene));
     setup();
@@ -267,6 +275,82 @@ static int fixture(SDL_GPUDevice *device, hm_gpu_renderer *renderer, hm_gpu_scen
             CHECK(actual[(y * width + x) * 4 + 3] == 255);
         }
     CHECK(!differences);
+    return 0;
+}
+static int hm_probe_dynamic_scene(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
+                                  hm_gpu_scene *builder) {
+    const u32 primitive_count = HM_SCENE_INITIAL_PRIMITIVES + 1;
+    const u32 packet[] = {0x600000ff, 0x00020002, 0x00040004};
+    u32 *packets = malloc((size_t)primitive_count * sizeof(packet));
+    CHECK(packets);
+    for (u32 i = 0; i < primitive_count; ++i)
+        SDL_memcpy(packets + (size_t)i * SDL_arraysize(packet), packet, sizeof(packet));
+    setup();
+    hm_replay_sink previous = hm_gpu_scene_begin(builder, 32, 32);
+    RECT area = {0, (s16)origin_y, 32, 32};
+    hm_replay_begin(&area);
+    for (u32 i = 0; i < primitive_count; ++i)
+        hm_gpu_execute_words(packets + (size_t)i * SDL_arraysize(packet),
+                             SDL_arraysize(packet));
+    hm_gpu_scene_data scene;
+    CHECK(hm_gpu_scene_end(builder, previous, &scene));
+    CHECK(scene.words[10] == primitive_count && scene.words[7] > HM_SCENE_BIN_WORDS &&
+          scene.bytes > 65536);
+    setup();
+    for (u32 i = 0; i < primitive_count; ++i)
+        hm_gpu_execute_words(packets + (size_t)i * SDL_arraysize(packet),
+                             SDL_arraysize(packet));
+    for (u32 y = 0; y < 32; ++y)
+        for (u32 x = 0; x < 32; ++x)
+            reference[y * 32 + x] = hm_vram_pixel(x, y + (u32)origin_y);
+    CHECK(!readback(device, renderer, &scene, actual));
+    for (u32 y = 0; y < 32; ++y)
+        for (u32 x = 0; x < 32; ++x) {
+            u16 expected = reference[y * 32 + x];
+            const u8 *pixel = actual + (y * 32 + x) * 4;
+            for (u32 channel = 0; channel < 3; ++channel) {
+                u32 value = (expected >> (channel * 5)) & 31;
+                CHECK(pixel[channel] == (u8)((value << 3) | (value >> 2)));
+            }
+        }
+    free(packets);
+    puts("Dynamic GPU scene buffers and high-density tile bins match CPU reference.");
+    return 0;
+}
+static int hm_probe_texture_feedback(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
+                                     hm_gpu_scene *builder) {
+    const u32 commands[] = {0x600000ff, 0x00020002, 0x00010001, 0xe1000100,
+                            0x65000001, 0x00040004, 0x00020002, 0x00010001};
+    setup();
+    hm_gpu_scene_materialize_vram(builder, 1);
+    RECT area = {0, 0, 32, 32};
+    hm_replay_sink previous = hm_gpu_scene_begin(builder, 32, 32);
+    hm_replay_begin(&area);
+    hm_gpu_execute_words(commands, sizeof commands / sizeof *commands);
+    hm_gpu_scene_data scene;
+    CHECK(hm_gpu_scene_end(builder, previous, &scene));
+    CHECK(scene.vram_version_count == 1);
+    CHECK(scene.words[scene.words[8] + HM_SCENE_STRIDE + 40] == 1);
+    CHECK(!readback(device, renderer, &scene, actual));
+
+    setup();
+    hm_gpu_execute_words(commands, sizeof commands / sizeof *commands);
+    for (u32 y = 0; y < 32; ++y)
+        for (u32 x = 0; x < 32; ++x) {
+            u16 color = hm_vram_pixel(x, y);
+            for (u32 channel = 0; channel < 3; ++channel) {
+                u32 value = (color >> (channel * 5)) & 31;
+                u8 expected = (u8)((value << 3) | (value >> 2));
+                u8 got = actual[(y * 32 + x) * 4 + channel];
+                if (got != expected) {
+                    fprintf(stderr, "Feedback mismatch %u,%u channel %u: GPU %u CPU %u\n",
+                            x, y, channel, got, expected);
+                    return 1;
+                }
+            }
+        }
+    hm_gpu_scene_materialize_vram(builder, 0);
+    puts("Ordered VRAM texture feedback matches the CPU raster reference.");
     return 0;
 }
 static u32 hm_probe_random(void) {
@@ -704,6 +788,8 @@ int main(int argc, char **argv) {
 #endif
     CHECK(builder);
     printf("Offscreen GPU renderer: %s\n", SDL_GetGPUDeviceDriver(device));
+    CHECK(!hm_probe_texture_feedback(device, renderer, builder));
+    CHECK(!hm_probe_dynamic_scene(device, renderer, builder));
     u32 shapes[] = {0x200000ff, xy(1, 1),   xy(26, 4), xy(5, 26),  0x300000ff,
                     xy(3, 3),   0x0000ff00, xy(29, 7), 0x00ff0000, xy(8, 29),
                     0x2800ff00, xy(2, 2),   xy(12, 3), xy(3, 13),  xy(13, 14)};
@@ -739,6 +825,23 @@ int main(int argc, char **argv) {
     u32 lines[] = {0xe1000200, 0x400000ff, xy(1, 1), xy(29, 29), 0x500000ff, xy(1, 28), 0x0000ff00,
                    xy(28, 1),  0x4800ff00, xy(2, 2), xy(28, 2),  xy(28, 28), 0x55555555};
     CHECK(!fixture(device, renderer, builder, lines, sizeof(lines) / sizeof(*lines), 32, 32, 0));
+    u32 clear_image[] = {0x020000ff, xy(2, 2), xy(12, 4)};
+    CHECK(!fixture(device, renderer, builder, clear_image,
+                   sizeof(clear_image) / sizeof(*clear_image), 32, 32, 0));
+    u32 wrapped_clear[] = {0x0200ffff, xy(1008, 4), xy(32, 4)};
+    CHECK(!fixture(device, renderer, builder, wrapped_clear,
+                   sizeof(wrapped_clear) / sizeof(*wrapped_clear), 32, 32, 0));
+    u32 load_image_and_sample[] = {0x600000ff, xy(2, 2), xy(4, 4),
+                                   0xa0000000, xy(4, 4), xy(4, 1), 0x7fff03e0, 0x001f4210,
+                                   0xe1000100, 0x6d000000, xy(12, 12), xy(4, 4)};
+    CHECK(!fixture(device, renderer, builder, load_image_and_sample,
+                   sizeof(load_image_and_sample) / sizeof(*load_image_and_sample), 32, 32, 0));
+    u32 wrapped_load_and_sample[] = {
+        0xa0000000, xy(1022, 510), xy(4, 2), 0x03e07c00, 0x42107fff,
+        0x001f5ad6, 0x000f0001, 0xe100011f, 0x6d000000, xy(12, 12), xy(62, 254)};
+    CHECK(!fixture(device, renderer, builder, wrapped_load_and_sample,
+                   sizeof(wrapped_load_and_sample) / sizeof(*wrapped_load_and_sample), 32, 32,
+                   0));
     u32 clipping[] = {0xe3000000 | 4 | (3 << 10),
                       0xe4000000 | 22 | (23 << 10),
                       0x200000ff,
@@ -747,6 +850,12 @@ int main(int argc, char **argv) {
                       xy(0, 30)};
     CHECK(!fixture(device, renderer, builder, clipping, sizeof(clipping) / sizeof(*clipping), 32,
                    32, 0));
+    u32 wide_triangle[] = {0x200000ff, xy(-1024, 16), xy(1023, 16), xy(0, 511)};
+    CHECK(!fixture(device, renderer, builder, wide_triangle,
+                   sizeof(wide_triangle) / sizeof(*wide_triangle), 32, 32, 0));
+    u32 wide_line[] = {0x400000ff, xy(-1024, 16), xy(1023, 16)};
+    CHECK(!fixture(device, renderer, builder, wide_line,
+                   sizeof(wide_line) / sizeof(*wide_line), 32, 32, 0));
     for (int filtering = 0; filtering <
 #ifdef HM_FILTER_REFERENCE
                             2

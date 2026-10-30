@@ -264,10 +264,12 @@ runtime does not perform this benchmark fence wait.
 
 These warm synthetic numbers show a small native-resolution cost and a larger
 output benefit. They are not gameplay FPS or a port-overhead guarantee. ADR-138
-makes desktop GPU Auto attempt every frame; unsupported dependencies/transfers,
-capacity limits and direct/loading scanouts retain the software fallback. Native
-CPU VRAM compatibility remains authoritative. Android keeps the selective GPU
-policy from ADR-132. Owner gameplay and device coverage remain unverified.
+makes desktop GPU Auto attempt every frame. ADR-147 removes fixed scene/bin
+capacity fallbacks and supports ordered GP0 clear/upload and texture-feedback
+dependencies. Invalid/unrecorded work and device/resource failures retain the
+software fallback. Native CPU VRAM compatibility remains authoritative. Android
+keeps the selective GPU policy from ADR-132. Owner gameplay/device coverage
+remains unverified.
 
 ### Optional texture filtering (2026-10-26)
 
@@ -509,8 +511,8 @@ its borders each frame instead of assuming retained swapchain pixels (ADR-115).
 No performance or device validation has been performed for these changes.
 
 Leading GP0 clears and uploads can now be folded into the private GPU scene
-snapshot before any primitive is emitted (ADR-116). Later transfers still use
-fallback. The affected gameplay scenes and performance remain unverified.
+snapshot before any primitive is emitted (ADR-116; superseded by ADR-147).
+The affected gameplay scenes and performance remain unverified.
 
 GPU scenes may fold offscreen VRAM transfers following untextured primitives when
 they do not overlap the logical output. Textured and output-overlap dependencies
@@ -577,3 +579,16 @@ benchmark uses unchanged VRAM after the first frame, so it measures the
 persistent cache path. It does not cover scenes that rewrite most of VRAM or
 end-to-end gameplay. The owner still needs to confirm interactive coverage on
 the Windows game; no Android or other-GPU device check was run.
+
+### GPU scene capacity and ordered-transfer probe (ADR-147, 2026-10-31)
+
+The Windows Vulkan `hmbtn_gpu_renderer_probe` passes CPU-reference comparisons
+for inline GP0 clear/load transfers, a load followed by texture feedback, more
+than 8,192 primitives, and more than 256 references in one logical tile. The
+probe also compares long-span triangles and lines against the CPU path, including
+the CPU rasterizer's span limits. Scene/bin arrays and renderer upload buffers
+now grow dynamically instead of rejecting those former fixed-capacity limits.
+Inline transfers remain in replay captures; direct VRAM mutations still
+invalidate captures. This is synthetic Vulkan validation only. D3D12/Android,
+full-game captures, gameplay parity, allocation-failure behavior, and performance
+with transfer-heavy scenes remain unverified.

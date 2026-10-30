@@ -10,7 +10,7 @@ compute path for mobile performance (ADR-123/124/131/132).
 | Area | Current state |
 | --- | --- |
 | Pause interface | ESC pause, Resume, Settings, and Exit Game are available by default per owner request; set enhance.pause_menu=false to turn it off. |
-| Renderer | GPU Auto is the default shared scene-output path at native and enhanced resolutions. Software remains selectable as the reference. Unsupported work falls back to CPU; GPU coverage is partial. |
+| Renderer | GPU Auto is the default shared scene-output path at native and enhanced resolutions. The compute path handles captured GP0 polygons, lines, rectangles, clears, uploads, and ordered texture feedback. Software remains the reference fallback for invalid/unrecorded work and device/resource failures; full-game scene coverage still needs owner gameplay validation. |
 | Scaling and widescreen | Implemented as optional paths; both default OFF. Widescreen covers the implemented screens, but complete scene/device coverage and CPU fallback performance are unverified. |
 | Filtering and anti-aliasing | Nearest, Bilinear, xBR, FXAA, and GPU MSAA 2x/4x are implemented. FXAA/MSAA default OFF; MSAA requires GPU Auto. |
 | Interpolation | Optional and default OFF. Private primitive replay is limited to eligible farm views; Android clamps it off. It does not advance simulation. |

@@ -15,31 +15,33 @@ low-resolution CPU VRAM remains authoritative for reads, transfers and logical
 compatibility. This change does not remove that compatibility work.
 
 gpu_scene emits an output-independent command representation with a 16-word
-header, 40-word primitive records and 16x16 logical tile lists. Each tile has
-at most 256 ordered references; a scene has at most 8192 primitives and 2048
-tiles. The builder owns a stable VRAM snapshot separately from this packet; it
-remains valid until the next capture. The GPU renderer keeps a persistent
+header, 41-word primitive records and 16x16 logical tile lists. Primitive
+storage, per-tile ordered references, and packed scene payloads grow as needed.
+The 2048 logical tiles are bounded by the PS1 VRAM area. The builder owns a
+stable VRAM snapshot separately from this packet; it remains valid until the
+next capture. The GPU renderer keeps a persistent
 R32_UINT VRAM texture and uploads changed 16x16 tile-row bounds, falling back
 to a full snapshot when most of VRAM changed. Exact content comparison
 preserves correctness when replay selects an older retained frame; it does not
 acknowledge shared VRAM dirty flags. All
-packet records use explicit uint32_t fields and byte offsets are bounded by
-HM_SCENE_MAX_WORDS. No disc data is interpreted as one of these records.
+packet records use explicit uint32_t fields and byte offsets are checked before
+upload. No disc data is interpreted as one of these records.
 Material records include CLUT/tpage, texture window, clipping, display-write
 controls, dither and mask flags. Lines become logical cells (flat axis-aligned
 lines are compact rectangles). Quad triangle order and shared-edge ownership
 are retained.
 
 Output backend execution is separate from this portable capture/packet layer.
-Snapshots are immutable input; only backend-owned output is written. Source
-texture/CLUT overlap with output, offscreen draw dependencies, dependent VRAM
-transfers and capacity overflow reject GPU packet output so the caller can use
-the software reference. Fully offscreen untextured draws are skipped and their
-conservative 16x16 VRAM tile footprints are tracked; later textured draws trigger
-software fallback only when sampled textures or CLUTs overlap those written tiles. Leading fills/uploads and transfers outside both the
-output and previously sampled texture/CLUT tiles update the private initial
-snapshot. Tile-level overlap is conservative and retains fallback when a
-dependency cannot be excluded.
+Snapshots are immutable input; only backend-owned output is written. GP0
+polygons, lines, rectangles, clears, and image uploads are represented in
+command order. When a later texture reads an earlier scene write, the host
+replays that scene through the CPU reference rasterizer into private VRAM and
+uploads immutable VRAM versions for GPU sampling. Fully offscreen untextured
+draws are skipped and their conservative 16x16 VRAM tile footprints are
+tracked. Invalid or truncated command streams, reserved texture depth,
+unavailable captures, and resource/device allocation failures retain the safe
+reference fallback. Direct VRAM mutations outside a captured command stream
+invalidate replay. See ADR-147 for current limits and probes.
 
 packet_identity records construction spans without changing the packets.
 Native-only adapters identify field/greenhouse sprites by the projected world
