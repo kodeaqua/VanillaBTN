@@ -9,6 +9,11 @@ compact menu exposes only the mode selector; individual Modern controls remain
 desktop-only, and mobile interpolation stays disabled. Earlier menu descriptions
 below are historical and are superseded by ADR-124.
 
+Disabling dithering removes the ordered pattern, but the current shared GPU
+scene still quantizes intermediate colors to BGR555. It does not establish
+true-color gradient output or remove color banding. Older claims below and in
+ADR-084/092 are superseded by this limitation and ADR-113.
+
 The owner requested the native pause interface and graphics settings on
 2026-10-26. Implementation starts on port/windows-pause-menu, after PR #1
 (windows port init) was merged and all old branches were removed.
@@ -27,8 +32,8 @@ The owner requested the native pause interface and graphics settings on
 | FXAA/MSAA | FXAA (final-image) and MSAA 2x/4x (GPU scene) implemented (ADR-072); runtime default Off; owner gameplay validation pending |
 | Gameplay Enhancements | Suite of 9 toggleable options in Settings > Gameplay (ADR-080); runtime default OFF except wild dog; owner gameplay validation pending |
 | Controls Settings | Gamepad, keyboard presets, and mouse interaction in Settings > Controls (ADR-081); persistent in settings.json |
-| PGXP Geometry | Subpixel vertex precision and perspective-correct texture mapping (ADR-083); eliminates wobble and texture warping; default OFF |
-| Dithering | PS1 hardware 4x4 Bayer ordered dithering toggle (ADR-084); toggle between original PS1 dither pattern and smooth 32-bit colors; default ON |
+| PGXP Geometry | Subpixel vertex precision and perspective-correct texture mapping (ADR-083); reduces wobble and texture warping where supported; default OFF |
+| Dithering | PS1 hardware 4x4 Bayer ordered dithering toggle (ADR-084); original PS1 dither pattern or bypass; native mode retains dithering |
 
 HMBTN_ENH_PAUSE_MENU defaults OFF in CMake; Windows build.ps1 -Game enables it.
 The owner explicitly requests ESC availability across scenes, so that interface
@@ -126,15 +131,13 @@ Windows -Game builds HMBTN_ENH_PGXP; runtime enhance.pgxp defaults false (vanill
 When enabled, GTE projection captures high-precision 32-bit floating-point screen coordinates and
 view-space depth W without modifying the integer coordinates used by original game logic or collision.
 The GPU scene backend retrieves subpixel coordinates and depth values, rendering geometry with
-perspective-divided texture coordinates ($u/w, v/w, 1/w$), completely eliminating PS1 integer vertex snapping
-wobble and affine texture distortion. Toggleable in Pause Menu > Settings > Graphics > PGXP Geometry.
+perspective-divided texture coordinates ($u/w, v/w, 1/w$), reducing vertex snapping and affine texture distortion where supported. Graphics Mode controls this via Enhance PS1 and Modern.
 
 The owner requested an option to toggle PS1 hardware dithering (ADR-084).
 Windows -Game builds HMBTN_ENH_DITHERING; runtime enhance.disable_dithering defaults false (vanilla parity).
 PS1 hardware uses 16-bit color depth (R5G5B5) and applies an ordered 4x4 Bayer dithering matrix to reduce color banding.
 On modern high-resolution displays, this ordered pattern manifests as checkerboard noise.
-When Dithering is set to Off (`enhance.disable_dithering = true`), dithering is bypassed, producing clean true-color gradients.
-Toggleable in Pause Menu > Settings > Graphics > Dithering.
+Graphics Mode bypasses dithering in Enhance PS1 and Modern. Intermediate GPU colors remain BGR555.
 
 The owner requested edge-directed sharp texture filtering without blur (ADR-085).
 Filtering now supports three selectable modes in Pause Menu > Settings > Graphics:
@@ -143,7 +146,7 @@ Filtering now supports three selectable modes in Pause Menu > Settings > Graphic
 - **xBR**: Edge-directed smart scaling that rounds pixel art corners into smooth diagonal contours while preserving 100% crispness without blur.
 
 Additionally, FXAA is now bypassed during Pause Menu presentation to keep UI text, dialogue, and font pixel art perfectly crisp.
-PGXP geometry stabilization, 32-bit clean dithering bypass, and GPU rendering are now auto-applied defaults, simplifying the Graphics menu to 10 essential controls.
+Graphics Mode supersedes the earlier individual PGXP and dithering controls (ADR-124).
 
 ## Recent Enhancements & Fixes (2026-10-29 to 2026-10-30)
 
