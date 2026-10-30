@@ -138,6 +138,43 @@ static int hm_probe_gradient(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
     puts("Opaque gradient precision and native reference passed.");
     return 0;
 }
+static int hm_probe_texture_precision(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
+                                      hm_gpu_scene *builder) {
+    const u32 triangle[] = {0x34000040, xy(0, 0), 0, 0x000000c0, xy(31, 0),
+                            282u << 16, 0x00000040, xy(0, 31), 0};
+    u8 native[32 * 32 * 4];
+    for (int enhanced = 0; enhanced < 2; ++enhanced) {
+        hm_dither_set_enabled(!enhanced);
+        setup();
+        hm_vram_draw_pixel(640, 256, 0x7fff);
+        RECT area = {0, 0, 32, 32};
+        hm_replay_sink previous = hm_gpu_scene_begin(builder, 32, 32);
+        hm_replay_begin(&area);
+        hm_gpu_execute_words(triangle, sizeof triangle / sizeof *triangle);
+        hm_gpu_scene_data data;
+        CHECK(hm_gpu_scene_end(builder, previous, &data));
+        CHECK(!readback(device, renderer, &data, actual));
+        if (!enhanced) {
+            memcpy(native, actual, sizeof native);
+            setup();
+            hm_vram_draw_pixel(640, 256, 0x7fff);
+            hm_gpu_execute_words(triangle, sizeof triangle / sizeof *triangle);
+            for (int x = 1; x < 29; ++x) {
+                u16 pixel = hm_vram_pixel((u32)x, 1);
+                u8 channel = (u8)(((pixel & 31) << 3) | ((pixel & 31) >> 2));
+                CHECK(abs((int)native[(32 + x) * 4] - channel) <= 9);
+            }
+        } else {
+            int improved = 0;
+            for (int x = 1; x < 29; ++x)
+                if (actual[(32 + x) * 4] != native[(32 + x) * 4]) ++improved;
+            CHECK(improved > 10);
+        }
+    }
+    hm_dither_set_enabled(1);
+    puts("Opaque textured gradient precision passed.");
+    return 0;
+}
 static int hm_probe_presentation(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
                                  hm_gpu_scene *builder) {
     setup();
@@ -272,7 +309,10 @@ static int hm_probe_random_cases(SDL_GPUDevice *device, hm_gpu_renderer *rendere
                                                            << 16);
                 }
         }
-        CHECK(n < 1024 && !fixture(device, renderer, builder, commands, n, 32, 32, 0));
+        if (n >= 1024 || fixture(device, renderer, builder, commands, n, 32, 32, 0)) {
+            fprintf(stderr, "Random batch %d, filter %d\n", batch, texture_linear);
+            return 1;
+        }
     }
     origin_y = 0;
     return 0;
@@ -571,8 +611,25 @@ int main(int argc, char **argv) {
     hm_gpu_renderer *renderer = hm_gpu_renderer_create(device);
     CHECK(renderer);
     hm_gpu_scene *builder = hm_gpu_scene_create();
+    if (argc > 2 && !SDL_strcmp(argv[2], "--display-area")) {
+        const u32 display[] = {0xe1000000, 0x600000ff, 0, xy(30, 30),
+                               0xe1000400, 0x6000ff00, xy(4, 4), xy(20, 20)};
+        CHECK(builder);
+        for (origin_y = 0; origin_y <= 240; origin_y += 240) {
+            display_test = 1;
+            CHECK(!fixture(device, renderer, builder, display,
+                           sizeof(display) / sizeof(*display), 32, 32, 0));
+        }
+        hm_gpu_scene_destroy(builder);
+        hm_gpu_renderer_destroy(renderer);
+        SDL_DestroyGPUDevice(device);
+        SDL_Quit();
+        puts("Displayed-area write protection matches CPU reference.");
+        return 0;
+    }
     if (argc > 2 && !SDL_strcmp(argv[2], "--gradient")) {
-        CHECK(builder && !hm_probe_gradient(device, renderer, builder));
+        CHECK(builder && !hm_probe_gradient(device, renderer, builder) &&
+              !hm_probe_texture_precision(device, renderer, builder));
         hm_gpu_scene_destroy(builder);
         hm_gpu_renderer_destroy(renderer);
         SDL_DestroyGPUDevice(device);
