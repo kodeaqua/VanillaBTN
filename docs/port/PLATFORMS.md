@@ -205,17 +205,13 @@ yet confirmed this correction in gameplay. No game session/replay was launched.
 
 ## Shared GPU output, offscreen validation
 
-Date: 2026-10-26. Host: Ryzen 5 4500 / Radeon RX Vega, driver 31.0.21925.1001.
-Clang 20.1.8 release (-O2, x86-64-v2); SDL 3.2.28. Offscreen compute probes pass
-on Vulkan and D3D12. No window, disc, game loop or input replay is used. Native
-RGB is byte-exact against the software reference for fixed fixtures and 2048
-deterministic random primitives. Tests cover masks, blending, texture depths/
-windows, clipping, lines, display-write control and both framebuffer origins.
-High-resolution comparisons allow up to 9/255 per color channel (one 5-bit step);
-fractional sprite motion across a tile boundary has a separate exact check.
-Game scene coverage and full playthrough remain owner validation.
+Date: 2026-10-30. Host: Ryzen 5 4500 / Radeon RX Vega, driver 31.0.21925.1001.
+SDL 3.2.28. No window, disc, game loop or input replay was used. The synthetic
+GPU renderer probe completed on Vulkan and D3D12; native output comparisons and
+expanded world/UI presentation checks passed. Game scene coverage and full
+playthrough remain owner validation.
 
-Timing tool: hmbtn_gpu_renderer_probe <driver> --benchmark, SDL_GetTicksNS,
+Timing tool: `hmbtn_gpu_renderer_probe <driver> --benchmark`, `SDL_GetTicksNS`,
 50 passes per size, one large flat triangle over a synthetic 32x32 logical area.
 CPU includes private VRAM restore, output seeding and reference raster. GPU
 includes restore, packet creation, upload, compute and a fence wait. No output
@@ -224,17 +220,16 @@ runtime does not perform this benchmark fence wait.
 
 | Output | CPU / Vulkan-run | GPU / Vulkan | CPU / D3D12-run | GPU / D3D12 |
 | --- | --- | --- | --- | --- |
-| 320x240 | 0.344 ms | 0.484 ms | 0.382 ms | 0.566 ms |
-| 640x480 | 1.246 ms | 0.569 ms | 1.324 ms | 0.616 ms |
-| 1440x1080 | 6.198 ms | 0.644 ms | 6.360 ms | 0.882 ms |
+| 320x240 | 0.366 ms | 0.520 ms | 0.359 ms | 0.475 ms |
+| 640x480 | 1.322 ms | 0.564 ms | 1.320 ms | 0.547 ms |
+| 1440x1080 | 6.563 ms | 0.998 ms | 6.525 ms | 0.877 ms |
 
-These warm single-run synthetic numbers show a high-resolution benefit and
-small native-resolution overhead. They are not achieved gameplay FPS or a port
-overhead guarantee. Native CPU VRAM compatibility is still maintained. GPU Auto
-conservatively falls back on unsupported dependencies/transfers or capacity.
-The owner's active windows-release executable remains untouched; a separately
-linked windows-gpu-preview executable contains the latest changes while that
-process is open. Owner gameplay confirmation of the field-seam fix is pending.
+These warm synthetic numbers show a small native-resolution cost and a larger
+output benefit. They are not gameplay FPS or a port-overhead guarantee. ADR-138
+makes desktop GPU Auto attempt every frame; unsupported dependencies/transfers,
+capacity limits and direct/loading scanouts retain the software fallback. Native
+CPU VRAM compatibility remains authoritative. Android keeps the selective GPU
+policy from ADR-132. Owner gameplay and device coverage remain unverified.
 
 ### Optional texture filtering (2026-10-26)
 

@@ -257,7 +257,14 @@ static int hm_host_wide_active(void) {
 #endif
 }
 static int hm_host_needs_replay(void) {
+#ifdef __ANDROID__
     int needed = 0;
+#else
+    /* GPU Auto attempts the shared scene renderer on every desktop frame,
+     * including native-resolution output. Unsupported scenes still fall back
+     * to the software reference in hm_host_gpu_present. */
+    int needed = 1;
+#endif
 #ifdef HMBTN_ENH_PAUSE_MENU
 #ifdef HMBTN_ENH_SCALING
     needed |= hm_options.scaling != 0;
@@ -1761,7 +1768,7 @@ int hm_game_host_start(hm_disc *disc) {
     hm_gpu_output = hm_gpu_renderer_create(hm_device);
     if (hm_gpu_output) {
         hm_gpu_commands = hm_gpu_scene_create();
-        if (hm_host_needs_replay())
+        if (hm_host_needs_replay() && !hm_options.renderer)
             hm_gpu_replay = hm_frame_replay_acquire();
     }
     if (!hm_gpu_output || !hm_gpu_commands) {
