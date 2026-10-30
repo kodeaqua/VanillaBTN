@@ -10,9 +10,11 @@ desktop-only, and mobile interpolation stays disabled. Earlier menu descriptions
 below are historical and are superseded by ADR-124.
 
 Disabling dithering removes the ordered pattern, but the current shared GPU
-scene still quantizes intermediate colors to BGR555. It does not establish
-true-color gradient output or remove color banding. Older claims below and in
-ADR-084/092 are superseded by this limitation and ADR-113.
+scene still quantizes intermediate colors to BGR555. ADR-125 preserves 8-bit
+colors for opaque untextured Gouraud triangles in enhanced GPU output only;
+other primitives and software fallback still use BGR555. This reduces banding
+in that limited case, not across the whole scene. Older claims below and in
+ADR-084/092 are superseded by this limitation and ADR-113/125.
 
 The owner requested the native pause interface and graphics settings on
 2026-10-26. Implementation starts on port/windows-pause-menu, after PR #1

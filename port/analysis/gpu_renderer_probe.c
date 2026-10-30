@@ -7,6 +7,7 @@
 #include "psx/gpu_environment.h"
 #include "psx/gpu_raster.h"
 #include "psx/vram.h"
+#include "enhance/dithering/dithering.h"
 #ifdef HM_INTERPOLATION_REFERENCE
 #include "enhance/interpolation/interpolation.h"
 #include "gfx/packet_identity.h"
@@ -93,6 +94,49 @@ static int readback(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
     SDL_GPUTexture *image = hm_gpu_renderer_encode(renderer, command, scene);
     CHECK(image);
     return download_image(device, command, image, scene->width, scene->height, pixels);
+}
+static int hm_probe_gradient(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
+                             hm_gpu_scene *builder) {
+    const u32 gradient[] = {0x30000000, xy(0, 0), 0x00ffffff, xy(31, 0),
+                            0x00000000, xy(0, 31),
+                            0x600000a0, xy(4, 4), xy(4, 4),
+                            0x62002020, xy(10, 4), xy(4, 4)};
+    u8 native[32 * 32 * 4];
+    for (int enhanced = 0; enhanced < 2; ++enhanced) {
+        hm_dither_set_enabled(!enhanced);
+        setup();
+        RECT area = {0, 0, 32, 32};
+        hm_replay_sink previous = hm_gpu_scene_begin(builder, 32, 32);
+        hm_replay_begin(&area);
+        hm_gpu_execute_words(gradient, sizeof gradient / sizeof *gradient);
+        hm_gpu_scene_data data;
+        CHECK(hm_gpu_scene_end(builder, previous, &data));
+        CHECK(!readback(device, renderer, &data, actual));
+        if (!enhanced) {
+            memcpy(native, actual, sizeof native);
+            setup();
+            hm_gpu_execute_words(gradient, sizeof gradient / sizeof *gradient);
+            for (int x = 1; x < 29; ++x) {
+                u16 pixel = hm_vram_pixel((u32)x, 1);
+                u8 channel = (u8)(((pixel & 31) << 3) | ((pixel & 31) >> 2));
+                /* Existing GPU/CPU interpolation can differ by one 5-bit step. */
+                CHECK(abs((int)native[(32 + x) * 4] - channel) <= 9);
+            }
+        } else {
+            int improved = 0;
+            for (int x = 1; x < 29; ++x)
+                if (actual[(32 + x) * 4] != native[(32 + x) * 4]) ++improved;
+            CHECK(improved > 10);
+            for (int y = 4; y < 8; ++y)
+                for (int x = 4; x < 14; ++x)
+                    if (x < 8 || x >= 10)
+                        CHECK(!memcmp(actual + (y * 32 + x) * 4,
+                                      native + (y * 32 + x) * 4, 4));
+        }
+    }
+    hm_dither_set_enabled(1);
+    puts("Opaque gradient precision and native reference passed.");
+    return 0;
 }
 static int hm_probe_presentation(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
                                  hm_gpu_scene *builder) {
@@ -527,6 +571,14 @@ int main(int argc, char **argv) {
     hm_gpu_renderer *renderer = hm_gpu_renderer_create(device);
     CHECK(renderer);
     hm_gpu_scene *builder = hm_gpu_scene_create();
+    if (argc > 2 && !SDL_strcmp(argv[2], "--gradient")) {
+        CHECK(builder && !hm_probe_gradient(device, renderer, builder));
+        hm_gpu_scene_destroy(builder);
+        hm_gpu_renderer_destroy(renderer);
+        SDL_DestroyGPUDevice(device);
+        SDL_Quit();
+        return 0;
+    }
 #ifdef HM_INTERPOLATION_REFERENCE
     if (argc > 2 && !SDL_strcmp(argv[2], "--tile-seams")) {
         CHECK(builder && !hm_probe_tile_seams(device, renderer, builder));

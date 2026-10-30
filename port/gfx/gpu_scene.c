@@ -100,7 +100,9 @@ static int hm_scene_material(hm_gpu_scene *s, u32 *p, u32 op, u32 page, u32 clut
     p[2] = page;
     p[3] = clut;
     int dtd = hm_dither_enabled() ? (int)d->dtd : 0;
-    p[4] = (u32)dtd | (d->dfe << 1) | (vram->set_mask ? 4u : 0) | (vram->check_mask ? 8u : 0);
+    /* Bit 64 permits higher precision only in enhanced presentation. */
+    p[4] = (u32)dtd | (d->dfe << 1) | (vram->set_mask ? 4u : 0) | (vram->check_mask ? 8u : 0) |
+           (!hm_dither_enabled() ? 64u : 0);
     p[5] = d->tw.x;
     p[6] = d->tw.y;
     p[7] = d->tw.w;
