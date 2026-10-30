@@ -349,15 +349,12 @@ static int hm_host_gpu_present(const RECT *native_area) {
     int need_gpu = hm_host_needs_replay();
 #ifdef __ANDROID__
     /* On mobile TBDR GPUs (e.g. Adreno 610), the 1.5 MB ByteAddressBuffer compute
-     * shader has no L2 SSBO cache and is only worthwhile when high-res scaling,
-     * MSAA, PGXP, or xBR is enabled. Native-resolution Widescreen / Interpolation /
-     * Bilinear are 5x lighter on the 300 KB texture upload path. */
+     * shader has no L2 SSBO cache and causes heavy ~40-60 ms stalls.
+     * Hardware texture scanout path delivers rock-solid 60 FPS (<5 ms) with hardware
+     * bilinear filtering and 16:9 widescreen. */
     need_gpu = hm_options.scaling != 0 || hm_options.linear == 2
 #ifdef HM_HOST_AA
                || hm_options.antialiasing >= HM_AA_MSAA2
-#endif
-#ifdef HMBTN_ENH_PGXP
-               || hm_options.pgxp != 0
 #endif
         ;
 #endif
