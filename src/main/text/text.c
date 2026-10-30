@@ -1494,6 +1494,7 @@ static s32 text_choice_menu(s16 x, s16 y, s16 *cursor, s16 count)
     /* PORT: Modern mouse choice selection - see docs/port/DECISIONS.md#adr-100 */
     int mouse_vx, mouse_vy;
     if (hm_mouse_get_pos(&mouse_vx, &mouse_vy)) {
+        int clicked = hm_mouse_consume_left_click();
         s16 line_h = (s16)text_spacing_y + TEXT_LINE_HEIGHT;
         for (s16 row = 0; row < count; row++) {
             s16 row_y = y + line_h * row;
@@ -1502,7 +1503,7 @@ static s32 text_choice_menu(s16 x, s16 y, s16 *cursor, s16 count)
                     *cursor = row;
                     sound_play(SOUND_MENU_CURSOR);
                 }
-                if (hm_mouse_consume_left_click()) {
+                if (clicked) {
                     sound_play(SOUND_MENU_CONFIRM);
                     chosen = row + 1;
                 }

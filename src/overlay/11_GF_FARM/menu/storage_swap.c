@@ -298,7 +298,7 @@ static void storage_swap_screen(void) {
             if (storage_swap_qty_cur < 1)
                 storage_swap_qty_cur = 1;
             sound_play(5);
-        } else if (input_pad1->pressed & PAD_CROSS) {
+        } else if ((input_pad1->pressed & PAD_CROSS) || hm_mouse_consume_left_click()) {
             if (dst_it->id == 0) {
                 dst_it->id = src_it->id;
                 dst_it->modifier = src_it->modifier;
@@ -343,6 +343,7 @@ static void storage_swap_screen(void) {
     menu_request_open(3, MSG_STORAGE_SWAP_HINT);
 #ifdef HMBTN_PORT
     /* PORT: Modern mouse spot hover and transfer - see docs/port/DECISIONS.md#adr-100 */
+    int mouse_clicked_slot = 0;
     int mouse_vx, mouse_vy;
     if (hm_mouse_get_pos(&mouse_vx, &mouse_vy)) {
         int rucksack_slots = math_int_pow(2, game_state.player.rucksackLevel + 1);
@@ -370,6 +371,14 @@ static void storage_swap_screen(void) {
                 if (storage_swap_cursor != hovered_spot) {
                     storage_swap_cursor = hovered_spot;
                     sound_play(5);
+                }
+            }
+        }
+        if (hm_mouse_consume_left_click()) {
+            if (hovered_spot >= 0) {
+                if (storage_swap_marked == SPOT_NONE || (storage_swap_marked < SPOT_HELD_ITEM) == (hovered_spot < SPOT_HELD_ITEM)) {
+                    storage_swap_cursor = hovered_spot;
+                    mouse_clicked_slot = 1;
                 }
             }
         }
@@ -406,7 +415,7 @@ static void storage_swap_screen(void) {
             }
             sound_play(1);
             storage_swap_marked = SPOT_NONE;
-        } else if (input_pad1->pressed & PAD_CROSS) {
+        } else if ((input_pad1->pressed & PAD_CROSS) || mouse_clicked_slot) {
             if (storage_swap_marked == SPOT_NONE) {
                 sound_play(0);
                 storage_swap_marked = storage_swap_cursor;

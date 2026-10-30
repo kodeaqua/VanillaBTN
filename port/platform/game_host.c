@@ -564,6 +564,7 @@ static void hm_host_pause(void) {
     for (int i = 0; i < HM_PAUSE_MAX_VIEW_ITEMS; ++i)
         view.values[i] = rows[i];
     int value_dirty = 1;
+    hm_mouse_reset();
     while (running) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
@@ -594,7 +595,7 @@ static void hm_host_pause(void) {
                 }
             } else if (event.type == SDL_EVENT_MOUSE_MOTION) {
                 int win_w = 0, win_h = 0;
-                if (SDL_GetWindowSizeInPixels(hm_window, &win_w, &win_h) && win_w > 0 && win_h > 0) {
+                if (SDL_GetWindowSize(hm_window, &win_w, &win_h) && win_w > 0 && win_h > 0) {
                     int vx, vy;
                     if (hm_mouse_calc_virtual_pos(event.motion.x, event.motion.y, win_w, win_h, &vx, &vy)) {
                         if (menu.page == HM_PAUSE_GRAPHICS || menu.page == HM_PAUSE_GAMEPLAY ||
@@ -633,7 +634,7 @@ static void hm_host_pause(void) {
                     input = HM_PAUSE_BACK;
                 } else if (event.button.button == SDL_BUTTON_LEFT) {
                     int win_w = 0, win_h = 0;
-                    if (SDL_GetWindowSizeInPixels(hm_window, &win_w, &win_h) && win_w > 0 && win_h > 0) {
+                    if (SDL_GetWindowSize(hm_window, &win_w, &win_h) && win_w > 0 && win_h > 0) {
                         int vx, vy;
                         if (hm_mouse_calc_virtual_pos(event.button.x, event.button.y, win_w, win_h, &vx, &vy)) {
                             if (menu.page == HM_PAUSE_GRAPHICS || menu.page == HM_PAUSE_GAMEPLAY ||
@@ -849,6 +850,7 @@ static void hm_host_pause(void) {
     hm_start += SDL_GetTicksNS() - before;
     hm_host_reset_presentation();
     hm_ignore_held = 1;
+    hm_mouse_reset();
     hm_audio_output_pause(0);
     hm_host_in_pause = 0;
 }
@@ -1353,7 +1355,7 @@ static void hm_host_poll_events(void) {
 
 static void hm_host_events(void) {
     int current_win_w = 0, current_win_h = 0;
-    if (SDL_GetWindowSizeInPixels(hm_window, &current_win_w, &current_win_h) && current_win_w > 0 &&
+    if (SDL_GetWindowSize(hm_window, &current_win_w, &current_win_h) && current_win_w > 0 &&
         current_win_h > 0) {
 #if defined(HMBTN_ENH_WIDESCREEN) && defined(HMBTN_ENH_PAUSE_MENU)
         hm_widescreen_configure(hm_options.widescreen, current_win_w, current_win_h);
@@ -1522,8 +1524,11 @@ static void hm_host_tick(void *context, u64 tick) {
             held |= HM_PAD_SELECT;
     }
     if (hm_controls.mouse_mode != HM_MOUSE_MODE_OFF) {
-        float mx, my;
-        Uint32 mbuttons = SDL_GetMouseState(&mx, &my);
+        int menu_open = (game_state.globalFlags & GLOBAL_FLAG_MENU_OPEN) ||
+                        (game_state.system.menuState != MENU_STATE_IDLE);
+        if (!menu_open) {
+            float mx, my;
+            Uint32 mbuttons = SDL_GetMouseState(&mx, &my);
         if (mbuttons & SDL_BUTTON_LMASK)
             held |= HM_PAD_CROSS;
         if (mbuttons & SDL_BUTTON_RMASK)
@@ -1550,6 +1555,7 @@ static void hm_host_tick(void *context, u64 tick) {
                 if (dy > 40.0f) held |= HM_PAD_DOWN;
                 if (dy < -40.0f) held |= HM_PAD_UP;
             }
+        }
         }
     }
 #ifdef __ANDROID__
@@ -1579,6 +1585,7 @@ static void hm_host_tick(void *context, u64 tick) {
     }
 #endif
     hm_pad_sample(0, 1, held);
+    hm_mouse_tick();
 #ifdef __ANDROID__
     hm_perf.last_exit = SDL_GetTicksNS();
 #endif

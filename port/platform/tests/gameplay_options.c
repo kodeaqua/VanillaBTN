@@ -153,10 +153,10 @@ static int tile_render_checks(void) {
     game_state.globalFlags = 0;
 
     /* Cutscene, event, and dialogue suppression */
-    event_flag_set(EVENT_FLAG_EVENT_ACTIVE, 1);
+    game_state.player.stateFlags = PLAYER_FLAG_SCRIPTED;
     hm_gameplay_draw_tile_targeting(&game_state.player, 2500);
     CHECK(frame.primCursor.bytes == frame.primBuffer);
-    event_flag_set(EVENT_FLAG_EVENT_ACTIVE, 0);
+    game_state.player.stateFlags = 0;
 
     game_state.requests.state = FARM_REQUEST_RUN;
     hm_gameplay_draw_tile_targeting(&game_state.player, 2500);

@@ -1,5 +1,6 @@
 #include "platform/mouse_input.h"
 #include <stdint.h>
+#include <math.h>
 
 static float s_mx = 0.0f;
 static float s_my = 0.0f;
@@ -20,10 +21,10 @@ void hm_mouse_update_pos(float mx, float my, int win_w, int win_h) {
 
 void hm_mouse_button_down(int button) {
     if (button == HM_MOUSE_BTN_LEFT) {
-        s_left_clicked = 1;
+        s_left_clicked = 2;
         s_left_held = 1;
     } else if (button == HM_MOUSE_BTN_RIGHT) {
-        s_right_clicked = 1;
+        s_right_clicked = 2;
         s_right_held = 1;
     }
 }
@@ -70,8 +71,8 @@ int hm_mouse_calc_virtual_pos(float mx, float my, int win_w, int win_h, int *vx,
     float virt_x = (mx - offset_x) / scale;
     float virt_y = (my - offset_y) / scale;
 
-    int cx = (int)virt_x;
-    int cy = (int)virt_y;
+    int cx = (int)floorf(virt_x);
+    int cy = (int)floorf(virt_y);
     if (vx) *vx = cx;
     if (vy) *vy = cy;
 
@@ -87,7 +88,7 @@ int hm_mouse_in_rect(int vx, int vy, int rx, int ry, int rw, int rh) {
 }
 
 int hm_mouse_consume_left_click(void) {
-    if (s_left_clicked) {
+    if (s_left_clicked > 0) {
         s_left_clicked = 0;
         return 1;
     }
@@ -95,7 +96,7 @@ int hm_mouse_consume_left_click(void) {
 }
 
 int hm_mouse_consume_right_click(void) {
-    if (s_right_clicked) {
+    if (s_right_clicked > 0) {
         s_right_clicked = 0;
         return 1;
     }
@@ -114,6 +115,13 @@ int hm_mouse_is_left_held(void) {
 
 int hm_mouse_is_right_held(void) {
     return s_right_held;
+}
+
+void hm_mouse_tick(void) {
+    if (s_left_clicked > 0)
+        s_left_clicked--;
+    if (s_right_clicked > 0)
+        s_right_clicked--;
 }
 
 void hm_mouse_reset(void) {

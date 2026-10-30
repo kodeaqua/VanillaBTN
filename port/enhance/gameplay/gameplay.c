@@ -615,7 +615,7 @@ void hm_gameplay_draw_tile_targeting(const void *player_ptr, s32 depth) {
                                   GLOBAL_FLAG_PAUSED | GLOBAL_FLAG_CAMERA_BUSY |
                                   GLOBAL_FLAG_DEMO_START | GLOBAL_FLAG_INPUT_REPLAY))
         return;
-    if (event_flag_get(EVENT_FLAG_EVENT_ACTIVE) || game_state.requests.state == FARM_REQUEST_RUN)
+    if (game_state.requests.state == FARM_REQUEST_RUN)
         return;
     if (game_state.system.menuState != MENU_STATE_IDLE)
         return;
@@ -726,7 +726,7 @@ void hm_gameplay_draw_tile_targeting(const void *player_ptr, s32 depth) {
     current_frame->primCursor.bytes += sizeof(POLY_F4);
     SetPolyF4(fill);
     SetSemiTrans(fill, 1);
-    setRGB0(fill, 55, 60, 55);
+    setRGB0(fill, 35, 130, 215);
     fill->x0 = s0.x; fill->y0 = s0.y;
     fill->x1 = s1.x; fill->y1 = s1.y;
     fill->x2 = s2.x; fill->y2 = s2.y;
@@ -748,7 +748,7 @@ void hm_gameplay_draw_tile_targeting(const void *player_ptr, s32 depth) {
         current_frame->primCursor.bytes += sizeof(LINE_F2);
         setlen(line, 3);
         line->code = 0x40;
-        setRGB0(line, 180, 185, 175);
+        setRGB0(line, 140, 220, 255);
         line->x0 = edges[i].ax; line->y0 = edges[i].ay;
         line->x1 = edges[i].bx; line->y1 = edges[i].by;
         AddPrim(&current_frame->ot[ot_idx], line);

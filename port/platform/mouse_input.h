@@ -38,6 +38,9 @@ int hm_mouse_consume_wheel(void);
 int hm_mouse_is_left_held(void);
 int hm_mouse_is_right_held(void);
 
+/* Age unconsumed clicks so they don't linger across frames */
+void hm_mouse_tick(void);
+
 /* Reset all mouse click/held states */
 void hm_mouse_reset(void);
 

@@ -702,7 +702,42 @@ static s32 item_select_input(void) {
         return 0;
     }
 #ifdef HMBTN_PORT
-    /* PORT: Modern mouse storage right-click cancel - see docs/port/DECISIONS.md#adr-100 */
+    /* PORT: Modern mouse storage selection and right-click cancel - see docs/port/DECISIONS.md#adr-100 */
+    int mouse_clicked_marker = 0;
+    int mouse_vx, mouse_vy;
+    if (hm_mouse_get_pos(&mouse_vx, &mouse_vy)) {
+        int rucksack_limit = (game_state.player.rucksackLevel == 0) ? 2 : ((game_state.player.rucksackLevel == 1) ? 4 : 8);
+        int hovered_marker = -1;
+        if (hm_mouse_in_rect(mouse_vx, mouse_vy, item_markers[0].x - 17, item_markers[0].y - 17, 34, 34)) {
+            hovered_marker = 0;
+        }
+        for (s32 m = 1; m <= 8; m++) {
+            if (m <= rucksack_limit) {
+                if (hm_mouse_in_rect(mouse_vx, mouse_vy, item_markers[m].x - 17, item_markers[m].y - 17, 34, 34)) {
+                    hovered_marker = m;
+                    break;
+                }
+            }
+        }
+        if (hovered_marker < 0) {
+            for (s32 m = 9; m <= 16; m++) {
+                if (hm_mouse_in_rect(mouse_vx, mouse_vy, item_markers[m].x - 17, item_markers[m].y - 17, 34, 34)) {
+                    hovered_marker = m;
+                    break;
+                }
+            }
+        }
+        if (hovered_marker >= 0 && item_cursor_x != hovered_marker) {
+            item_cursor_x = hovered_marker;
+            sound_play(SOUND_MENU_CURSOR);
+        }
+        if (hm_mouse_consume_left_click()) {
+            if (hovered_marker >= 0) {
+                item_cursor_x = hovered_marker;
+                mouse_clicked_marker = 1;
+            }
+        }
+    }
     if (hm_mouse_consume_right_click()) {
         if (item_held_x == idle) {
             menu_begin_close();
@@ -737,7 +772,7 @@ static s32 item_select_input(void) {
         item_held_x = idle;
         return 0;
     }
-    if (flags & PAD_CROSS) {
+    if ((flags & PAD_CROSS) || mouse_clicked_marker) {
         held = item_held_x;
         if (held == idle) {
             sound_play(SOUND_MENU_CONFIRM);
