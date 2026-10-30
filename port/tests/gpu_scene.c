@@ -4,6 +4,7 @@
 #include "psx/gpu_raster.h"
 #include "psx/timing.h"
 #include "psx/vram.h"
+#include "enhance/dithering/dithering.h"
 #include <stdio.h>
 #include <string.h>
 #define CHECK(x)                                                                                   \
@@ -59,6 +60,14 @@ int main(void) {
     CHECK(hm_frame_replay_draw(b, &live) && hm_gpu_scene_end(s, previous, &data));
     CHECK(data.width == 32 && data.height == 32 && data.bytes <= HM_SCENE_MAX_WORDS * sizeof(u32));
     CHECK(data.words[10] == 1 && data.words[HM_SCENE_HEADER] == 0);
+    CHECK(!(data.words[data.words[8] + 4] & 64));
+#ifdef HMBTN_ENH_DITHERING
+    hm_dither_set_enabled(0);
+    previous = hm_gpu_scene_begin(s, 32, 32);
+    CHECK(hm_frame_replay_draw(b, &live) && hm_gpu_scene_end(s, previous, &data));
+    CHECK(data.words[data.words[8] + 4] & 64);
+    hm_dither_set_enabled(1);
+#endif
     hm_vram_snapshot(&after);
     CHECK(!memcmp(&before, &after, sizeof(before)));
     CHECK(!memcmp(&env, hm_gpu_environment_state(), sizeof(env)) && ticks == hm_timing_ticks());

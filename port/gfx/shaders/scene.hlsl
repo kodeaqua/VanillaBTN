@@ -24,6 +24,7 @@ int hm_edge_sign(int2 a,int2 b,int2 p,float approximate){
 bool top_left(int2 a,int2 b){return b.y<a.y||(b.y==a.y&&b.x>a.x);}
 bool top_left_f(float2 a,float2 b){return b.y<a.y||(b.y==a.y&&b.x>a.x);}
 uint3 rgb(uint c){return uint3(c&255,(c>>8)&255,(c>>16)&255);}
+uint3 expand555(uint c){uint3 v=uint3(c&31,(c>>5)&31,(c>>10)&31);return (v<<3)|(v>>2);}
 uint2 uv(uint c){return uint2(c&255,(c>>8)&255);}
 int dither(int2 p){const int values[16]={-4,0,-3,1,2,-2,3,-1,-3,1,-4,0,3,-1,2,-2};
     return values[((p.y&3)*4)+(p.x&3)];}
@@ -51,6 +52,7 @@ void main(uint3 id:SV_DispatchThreadID){
         load_word(14):vram(logical.x,logical.y);
     uint samples=load_word(15);if(samples!=2&&samples!=4)samples=1;
     uint sample_colors[4]={color,color,color,color};
+    uint3 fine_colors[4]={expand555(color),expand555(color),expand555(color),expand555(color)};
     uint bin=load_word(9)+uint((local.y/16)*int(load_word(6))+local.x/16)*257;
     uint count=load_word(bin);
     [loop]for(uint item=0;item<count;++item){
@@ -115,7 +117,9 @@ void main(uint3 id:SV_DispatchThreadID){
             st+=uint2(delta);}
         if(textured&&filtering_enabled){
             [unroll]for(uint filtered_sample=0;filtered_sample<4;++filtered_sample){if(filtered_sample>=samples)break;
-                if(coverage&(1u<<filtered_sample))sample_colors[filtered_sample]=hm_filter_compose(p,filtered_uv,texture_bounds,light,logical,sample_colors[filtered_sample],filter_mode);}
+                if(coverage&(1u<<filtered_sample)){
+                    sample_colors[filtered_sample]=hm_filter_compose(p,filtered_uv,texture_bounds,light,logical,sample_colors[filtered_sample],filter_mode);
+                    fine_colors[filtered_sample]=expand555(sample_colors[filtered_sample]);}}
             continue;}
         uint sample_color=textured?texel(p,st):0;if(textured&&sample_color==0)continue;
         uint source=sample_color&32768;
@@ -134,12 +138,13 @@ void main(uint3 id:SV_DispatchThreadID){
             int3 back=int3(background&31,(background>>5)&31,(background>>10)&31),front=int3(source&31,(source>>5)&31,(source>>10)&31);
             uint mode=(word(p,2)>>5)&3;int3 mixed=mode==0?back/2+front/2:mode==1?back+front:mode==2?back-front:back+front/4;
             mixed=clamp(mixed,0,31);result=(source&32768)|uint(mixed.x|(mixed.y<<5)|(mixed.z<<10));}
-        sample_colors[blend_sample]=result|((flags&4)?32768:0);}
+        sample_colors[blend_sample]=result|((flags&4)?32768:0);
+        fine_colors[blend_sample]=(flags&64)&&word(p,0)==0&&(op&16)&&!textured&&!(op&2)
+            ? light : expand555(result);}
     }
     uint3 sum=0;
     [unroll]for(uint resolve_sample=0;resolve_sample<4;++resolve_sample){if(resolve_sample>=samples)break;
-        uint pixel=sample_colors[resolve_sample];uint3 value=uint3(pixel&31,(pixel>>5)&31,(pixel>>10)&31);
-        sum+=(value<<3)|(value>>2);}
+        sum+=fine_colors[resolve_sample];}
     uint3 c=(sum+samples/2)/samples;
     output_image[id.xy]=float4(float3(c)/255.0,1.0);
 }

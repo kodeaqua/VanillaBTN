@@ -3410,3 +3410,23 @@ The current Android menu exposes the same three modes; its interpolation clamp
 remains in effect. Runtime changes update PGXP, dithering, scaling, interpolation,
 and widescreen without changing game logic. GPU coverage and visual results
 remain subject to the existing fallback and owner gameplay validation.
+
+
+## ADR-125: Preserve opaque gradient precision in enhanced GPU output
+
+Date: 2026-10-30
+
+Context: Bypassing ordered dithering alone still quantizes scene colors to
+BGR555, leaving visible steps in smooth Gouraud shading.
+
+Decision: When dithering is disabled by Enhance PS1 or Modern, retain the
+8-bit interpolated color of opaque, untextured Gouraud triangles in the shared
+GPU presentation, alongside the BGR555 sample used for masking and subsequent
+primitives. Native mode retains the original output. Later overlapping or
+filtered primitives resolve through the existing BGR555 path. Native VRAM,
+textures, blending arithmetic and game logic are unchanged.
+
+Consequences: This is a partial improvement, not general true-color rendering
+or elimination of banding. Software and unsupported GPU frames retain their
+existing behavior. The feature adds per-sample shader storage; performance and
+owner gameplay validation remain unverified.
