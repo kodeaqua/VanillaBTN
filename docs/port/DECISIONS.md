@@ -3514,7 +3514,7 @@ Context: The owner requests a compact fatigue indicator alongside the existing
 optional stamina hearts, without changing original fatigue behavior.
 
 Decision: Extend the existing guarded port-only HUD frame and draw an original
-font F and a 48-pixel bar beneath the hearts. Clamp the displayed value to
+sleek 59-pixel fatigue gauge directly beneath the 10 hearts. Clamp the displayed value to
 0..100; the fill represents fatigue and changes color at 50 and 80. The
 existing Stamina HUD switch controls both rows and remains off by default.
 The helper reads the original fatigue value and does not write game state.

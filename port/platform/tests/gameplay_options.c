@@ -40,8 +40,8 @@ static int fatigue_render_checks(void) {
     hm_gameplay_draw_fatigue_bar(14, 16, game_state.player.fatigue);
     CHECK(GsGetWorkBase() != buffer && game_state.player.fatigue == 50);
     DrawOTag(ot + 63);
-    CHECK(hm_vram_pixel(50, 36) == ((0xc8 >> 3) | ((0x99 >> 3) << 5) | ((0x40 >> 3) << 10)));
-    CHECK(hm_vram_pixel(80, 36) == ((0x80 >> 3) | ((0x6c >> 3) << 5) | ((0x54 >> 3) << 10)));
+    CHECK(hm_vram_pixel(50, 31) == ((0xc8 >> 3) | ((0x99 >> 3) << 5) | ((0x40 >> 3) << 10)));
+    CHECK(hm_vram_pixel(80, 31) == ((0x80 >> 3) | ((0x6c >> 3) << 5) | ((0x54 >> 3) << 10)));
     hm_gameplay_defaults(&opt);
     hm_gameplay_set_active(&opt);
     current_frame = saved_frame;
@@ -207,10 +207,10 @@ int main(int argc, char **argv) {
     CHECK(hm_gameplay_fatigue_fill(-1) == 0);
     CHECK(hm_gameplay_fatigue_fill(0) == 0);
     CHECK(hm_gameplay_fatigue_fill(1) == 1);
-    CHECK(hm_gameplay_fatigue_fill(50) == 24);
-    CHECK(hm_gameplay_fatigue_fill(99) == 47);
-    CHECK(hm_gameplay_fatigue_fill(100) == 48);
-    CHECK(hm_gameplay_fatigue_fill(101) == 48);
+    CHECK(hm_gameplay_fatigue_fill(50) == 29);
+    CHECK(hm_gameplay_fatigue_fill(99) == 58);
+    CHECK(hm_gameplay_fatigue_fill(100) == 59);
+    CHECK(hm_gameplay_fatigue_fill(101) == 59);
     CHECK(hm_gameplay_calendar_events() == 0);
     CHECK(hm_gameplay_roaming_horse() == 0);
     CHECK(hm_gameplay_fast_text() == 0);
