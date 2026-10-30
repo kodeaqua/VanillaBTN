@@ -3521,3 +3521,22 @@ The helper reads the original fatigue value and does not write game state.
 
 Consequences: The frame is taller and remains hidden under the existing menu
 and transition conditions. Owner gameplay and layout validation are required.
+
+
+## ADR-131: Android 3-Mode Graphics Cycle, Settings String Fix, and Safe Storage Disc Importer
+
+Date: 2026-10-30
+
+Context:
+1. On Android, PR #78 introduced a 3-mode graphics enum, but Android's single toggle was constrained to a binary NOT toggle, preventing selection of the Modern profile, and settings persistence failed with 'Cannot save settings' due to unquoted string values in hm_user_data_set_nested_setting.
+2. Android Scoped Storage restrictions frequently prevented write access to shared external documents, causing save failures and memory card storage errors.
+
+Decision:
+1. Update Android's graphics option selector to cycle through all 3 modes: Native PS1 (4:3, 1x), Enhance PS1 (4:3, 1x, PGXP), and Modern (16:9, 720p, Bilinear). Each mode explicitly configures widescreen, scaling, bilinear filtering, and PGXP while keeping frame interpolation clamped to OFF.
+2. Properly quote string literals in hm_graphics_save so JSON replacement validation succeeds on Android.
+3. Introduce a dedicated LauncherActivity and migrate user data and disc storage to Android app-private storage (getExternalFilesDir(null)/VanillaBTN), where full read/write access is guaranteed across all Android versions without runtime storage permissions:
+   - On fresh install (disc absent from safe storage), display a clean Material 3 setup interface allowing the user to select their game disc via Android's Storage Access Framework (ACTION_OPEN_DOCUMENT) and copy it to safe storage with progress feedback.
+   - On subsequent launches (disc present), launch MainActivity immediately without displaying any setup UI or delay.
+
+Consequences:
+Android users enjoy seamless disc setup, reliable memory card and settings persistence, and frictionless switching between Native, Enhance, and Modern graphics modes.
