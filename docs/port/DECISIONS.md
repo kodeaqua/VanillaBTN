@@ -3109,4 +3109,3 @@ Consequences: Camera construction and ground checks use the intended 32-bit
 stride on Android and other LP64 hosts. Actual Android gameplay remains to be
 validated on a device; the separate Linux matching check is not available on
 this Windows host.
-
