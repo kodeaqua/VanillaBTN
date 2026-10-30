@@ -3482,3 +3482,23 @@ PGXP floating-point interpolation remain unchanged.
 Consequences: The complete synthetic native, randomized, filtering, widened
 scene, and presentation probes pass on local D3D12 and Vulkan. This does not
 establish complete gameplay or device coverage. Shader performance is unmeasured.
+
+
+## ADR-129: Include neighboring GPU bins for multisample coverage
+
+Date: 2026-10-30
+
+Context: At enhanced resolution, a pixel center can fall in the next 16-pixel
+logical bin while one or more of its MSAA samples lie inside a triangle in the
+previous bin. Exclusive triangle bounds omit that primitive from the pixel's
+bin, producing dark horizontal or vertical partial-coverage lines.
+
+Decision: When multisampling is active, conservatively extend triangle bin
+assignment by one logical pixel on each side, clipped to the scene. Perform
+VRAM dependency and clipping decisions with the original primitive bounds.
+Single-sample binning is unchanged.
+
+Consequences: The synthetic boundary fixture failed with MSAA 2x before this
+change and passes at 1x/2x/4x on local D3D12 and Vulkan after it. Extra bin
+entries may increase GPU work or trigger existing safe fallback in dense scenes;
+performance and the owner's gameplay scene remain unverified.

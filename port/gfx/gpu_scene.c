@@ -222,8 +222,18 @@ static void hm_scene_add(hm_gpu_scene *s, u32 *p, int x0, int y0, int x1, int y1
         return;
     }
     memcpy(s->primitives[s->count], p, HM_SCENE_STRIDE * sizeof(*p));
-    u32 bx0 = (u32)(x0 - s->area.x) / 16, by0 = (u32)(y0 - s->area.y) / 16;
-    u32 bx1 = (u32)(x1 - 1 - s->area.x) / 16, by1 = (u32)(y1 - 1 - s->area.y) / 16;
+    /* A multisample can lie inside a triangle even when the output pixel's
+     * logical centre belongs to the adjacent bin. Include neighboring bins;
+     * retain the original bounds for VRAM dependency and clipping decisions. */
+    int bin_x0 = x0, bin_y0 = y0, bin_x1 = x1, bin_y1 = y1;
+    if (s->multisamples > 1 && p[0] == 0) {
+        if (bin_x0 > s->area.x) --bin_x0;
+        if (bin_y0 > s->area.y) --bin_y0;
+        if (bin_x1 < s->area.x + s->area.w) ++bin_x1;
+        if (bin_y1 < s->area.y + s->area.h) ++bin_y1;
+    }
+    u32 bx0 = (u32)(bin_x0 - s->area.x) / 16, by0 = (u32)(bin_y0 - s->area.y) / 16;
+    u32 bx1 = (u32)(bin_x1 - 1 - s->area.x) / 16, by1 = (u32)(bin_y1 - 1 - s->area.y) / 16;
     for (u32 y = by0; y <= by1; ++y)
         for (u32 x = bx0; x <= bx1; ++x) {
             u32 *bin = s->bins[y * s->tiles_x + x];
