@@ -219,6 +219,28 @@ int main(void) {
     CHECK(hm_widescreen_area(native).w == 320);
     CHECK(hm_widescreen_area(double_native).w == 640);
     CHECK(!hm_widescreen_overlay(double_fade, 5, expanded_fade));
+
+    /* Weather particle horizontal bounds: 4:3 native vs widescreen 16:9/21:9 */
+    int margin_off = hm_widescreen_margin();
+    int add6_off = margin_off > 0 ? -margin_off : 20;
+    int add0_off = margin_off > 0 ? 320 + 2 * margin_off : 240;
+    CHECK(add6_off == 20 && add0_off == 240);
+
+    hm_widescreen_configure(1, 1920, 1080);
+    int margin_16_9 = hm_widescreen_margin();
+    int add6_16_9 = margin_16_9 > 0 ? -margin_16_9 : 20;
+    int add0_16_9 = margin_16_9 > 0 ? 320 + 2 * margin_16_9 : 240;
+    CHECK(add6_16_9 == -54 && add0_16_9 == 428);
+    CHECK(add6_16_9 + add0_16_9 == 374);
+
+    hm_widescreen_configure(1, 2560, 1080);
+    int margin_21_9 = hm_widescreen_margin();
+    int add6_21_9 = margin_21_9 > 0 ? -margin_21_9 : 20;
+    int add0_21_9 = margin_21_9 > 0 ? 320 + 2 * margin_21_9 : 240;
+    CHECK(add6_21_9 == -125 && add0_21_9 == 570);
+    CHECK(add6_21_9 + add0_21_9 == 445);
+
+    hm_widescreen_configure(0, 1920, 1080);
     puts("Widescreen world/UI, source bounds, OFF parity and native-state preservation passed");
     return 0;
 }

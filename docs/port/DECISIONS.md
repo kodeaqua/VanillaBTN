@@ -3307,3 +3307,13 @@ unchanged.
 Consequences: Qualifying frames may remain on GPU. This deliberately retains
 false-positive fallbacks; gameplay, visual behavior and performance remain
 unverified at the owner's request.
+
+## ADR-120: Weather particle coverage across the expanded widescreen viewport
+
+Date: 2026-10-30. Status: accepted.
+
+Context: When Widescreen Mode is enabled, the farm world viewport expands horizontally symmetrically around the original center (e.g. [-54, 374) at 16:9). However, weather particles in `src/overlay/11_GF_FARM/world/weather.c` (`particle_respawn`) were hardcoded to spawn within the native 4:3 box `[20, 260)`. As a result, rain splash and weather particles rendered only in the central 4:3 column, leaving the expanded left and right viewport wings completely dry.
+
+Decision: When Widescreen Mode is active (`hm_widescreen_margin() > 0`), expand the horizontal weather particle spawn boundaries in `particle_respawn` to cover `[-margin, 320 + margin)` (`add6 = -margin`, `add0 = 320 + 2 * margin`). The number of random number generator rolls per particle respawn remains exactly 5, preserving deterministic PRNG stepping. When Widescreen Mode is OFF (`hm_widescreen_margin() == 0`), the original constants (`add6 = 20`, `add0 = 240`) are preserved unconditionally for 100% vanilla parity.
+
+Consequences: Rain, snow, and weather particles render seamlessly across the entire visible widescreen viewport without artificial pillarboxed boundaries. Vanilla 4:3 rendering and logic remain identical.

@@ -1,4 +1,8 @@
 /* Weather for the farm: the weather tomorrow rolled per season, the falling particles and the sky tint. */
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_WIDESCREEN)
+/* PORT: weather particle coverage in expanded widescreen viewport — see docs/port/DECISIONS.md#adr-120 */
+#include "enhance/widescreen/widescreen.h"
+#endif
 #include "types.h"
 #include "anim.h"
 #include "animals.h"
@@ -454,6 +458,16 @@ static void particle_respawn(FarmParticle *particle) {
         add2 = 20;
         add6 = 20;
     }
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_WIDESCREEN)
+    /* PORT: weather particle coverage in expanded widescreen viewport — see docs/port/DECISIONS.md#adr-120 */
+    {
+        s32 margin = hm_widescreen_margin();
+        if (margin > 0) {
+            add6 = -margin;
+            add0 = 320 + 2 * margin;
+        }
+    }
+#endif
     base &= 0xFFFF;
     particle->delay = rand_range(base) + add8;
     rand_range(base);
