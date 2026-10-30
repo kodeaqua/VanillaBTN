@@ -78,11 +78,16 @@ class MainActivity : SDLActivity() {
         val appSpecificDir = getExternalFilesDir(null)?.let { File(it, "VanillaBTN") }
 
         val dirCandidates = listOfNotNull(primaryDir, altDir, appSpecificDir)
-        targetDataDir = dirCandidates.firstOrNull { it.exists() } ?: primaryDir
+        var selectedDataDir = dirCandidates.firstOrNull { it.exists() && isDirWritable(it) }
+        if (selectedDataDir == null) {
+            selectedDataDir = dirCandidates.firstOrNull { isDirWritable(it) } ?: appSpecificDir ?: primaryDir
+        }
+        targetDataDir = selectedDataDir
         targetDataDir?.let {
             if (!it.exists()) {
                 it.mkdirs()
             }
+            File(it, "saves").mkdirs()
             try {
                 Os.setenv("HMBTN_USER_DATA_DIR", it.absolutePath, true)
                 log("HMBTN_USER_DATA_DIR set to: ${it.absolutePath}")
@@ -128,11 +133,16 @@ class MainActivity : SDLActivity() {
                     }
                 }
                 foundDiscFile = candidateFile
-                targetDataDir = dir
-                try {
-                    Os.setenv("HMBTN_USER_DATA_DIR", dir.absolutePath, true)
-                } catch (e: Exception) {
-                    log("Failed to update HMBTN_USER_DATA_DIR: ${e.message}")
+                if (isDirWritable(dir)) {
+                    targetDataDir = dir
+                    File(dir, "saves").mkdirs()
+                    try {
+                        Os.setenv("HMBTN_USER_DATA_DIR", dir.absolutePath, true)
+                    } catch (e: Exception) {
+                        log("Failed to update HMBTN_USER_DATA_DIR: ${e.message}")
+                    }
+                } else {
+                    log("Game disc found in ${dir.absolutePath}, but directory is read-only. Retaining writable user data dir: ${targetDataDir?.absolutePath}")
                 }
                 log("Found disc file: ${foundDiscFile?.absolutePath}")
                 break
@@ -177,6 +187,21 @@ class MainActivity : SDLActivity() {
     override fun onBackPressed() {
         onNativeKeyDown(KeyEvent.KEYCODE_ESCAPE)
         onNativeKeyUp(KeyEvent.KEYCODE_ESCAPE)
+    }
+
+    private fun isDirWritable(dir: File): Boolean {
+        if (!dir.exists() && !dir.mkdirs()) return false
+        val testFile = File(dir, ".test_write_${System.currentTimeMillis()}")
+        return try {
+            if (testFile.createNewFile()) {
+                testFile.delete()
+                true
+            } else {
+                false
+            }
+        } catch (_: Exception) {
+            false
+        }
     }
 
     private fun resolveBinFromCue(cueFile: File): File? {

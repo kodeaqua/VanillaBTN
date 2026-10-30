@@ -106,9 +106,11 @@ class VirtualGamepadView(context: Context) : View(context) {
         buttons.add(PadButton("□", KeyEvent.KEYCODE_Z))         // Square
         buttons.add(PadButton("△", KeyEvent.KEYCODE_W))         // Triangle
 
-        // Shoulders
+        // Shoulders & Triggers
         buttons.add(PadButton("L1", KeyEvent.KEYCODE_A, isRect = true))
+        buttons.add(PadButton("L2", KeyEvent.KEYCODE_Q, isRect = true))
         buttons.add(PadButton("R1", KeyEvent.KEYCODE_S, isRect = true))
+        buttons.add(PadButton("R2", KeyEvent.KEYCODE_E, isRect = true))
 
         // System
         buttons.add(PadButton("SELECT", KeyEvent.KEYCODE_DEL, isRect = true))
@@ -149,13 +151,27 @@ class VirtualGamepadView(context: Context) : View(context) {
                 }
                 KeyEvent.KEYCODE_A -> { // L1
                     btn.isRect = true
-                    val rw = 70f * density
+                    val rw = 58f * density
                     val rh = 34f * density
                     btn.rect = RectF(20f * density, 16f * density, 20f * density + rw, 16f * density + rh)
                 }
+                KeyEvent.KEYCODE_Q -> { // L2
+                    btn.isRect = true
+                    val rw = 58f * density
+                    val rh = 34f * density
+                    val left = 20f * density + rw + 10f * density
+                    btn.rect = RectF(left, 16f * density, left + rw, 16f * density + rh)
+                }
+                KeyEvent.KEYCODE_E -> { // R2
+                    btn.isRect = true
+                    val rw = 58f * density
+                    val rh = 34f * density
+                    val right = w - 20f * density - rw - 10f * density
+                    btn.rect = RectF(right - rw, 16f * density, right, 16f * density + rh)
+                }
                 KeyEvent.KEYCODE_S -> { // R1
                     btn.isRect = true
-                    val rw = 70f * density
+                    val rw = 58f * density
                     val rh = 34f * density
                     btn.rect = RectF(w - 20f * density - rw, 16f * density, w - 20f * density, 16f * density + rh)
                 }
@@ -218,20 +234,17 @@ class VirtualGamepadView(context: Context) : View(context) {
                 val x = event.getX(actionIndex)
                 val y = event.getY(actionIndex)
 
-                // Check button hit first
-                var hitButton = false
-                for (btn in buttons) {
-                    if (isHit(btn, x, y)) {
-                        btn.pressed = true
-                        btn.pointerId = pointerId
-                        SDLActivity.onNativeKeyDown(btn.keyCode)
-                        hitButton = true
-                        invalidate()
-                        break
-                    }
+                // Check button hit first (prioritized direct hits + nearest tolerance)
+                val hitBtn = findHitButton(x, y)
+                if (hitBtn != null) {
+                    hitBtn.pressed = true
+                    hitBtn.pointerId = pointerId
+                    SDLActivity.onNativeKeyDown(hitBtn.keyCode)
+                    invalidate()
+                    return true
                 }
 
-                if (!hitButton) {
+                if (true) {
                     // Check if in left half for dynamic analog stick
                     if (x < width * 0.45f && y > height * 0.20f && !stickActive) {
                         stickActive = true
@@ -311,6 +324,45 @@ class VirtualGamepadView(context: Context) : View(context) {
             }
         }
         return super.onTouchEvent(event)
+    }
+
+    private fun findHitButton(x: Float, y: Float): PadButton? {
+        // Priority 1: direct hit inside visible button bounds
+        for (btn in buttons) {
+            if (btn.isRect) {
+                if (btn.rect.contains(x, y)) return btn
+            } else {
+                if (hypot(x - btn.cx, y - btn.cy) <= btn.radius) return btn
+            }
+        }
+        // Priority 2: nearest button within expanded touch tolerance
+        var closestBtn: PadButton? = null
+        var closestDist = Float.MAX_VALUE
+        for (btn in buttons) {
+            if (btn.isRect) {
+                val expand = 12f * density
+                val expRect = RectF(
+                    btn.rect.left - expand,
+                    btn.rect.top - expand,
+                    btn.rect.right + expand,
+                    btn.rect.bottom + expand
+                )
+                if (expRect.contains(x, y)) {
+                    val d = hypot(x - btn.rect.centerX(), y - btn.rect.centerY())
+                    if (d < closestDist) {
+                        closestDist = d
+                        closestBtn = btn
+                    }
+                }
+            } else {
+                val dist = hypot(x - btn.cx, y - btn.cy)
+                if (dist <= btn.radius + (14f * density) && dist < closestDist) {
+                    closestDist = dist
+                    closestBtn = btn
+                }
+            }
+        }
+        return closestBtn
     }
 
     private fun isHit(btn: PadButton, x: Float, y: Float): Boolean {

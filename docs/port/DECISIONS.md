@@ -3328,3 +3328,66 @@ Context: ADR-119 deferred fallbacks for fully offscreen untextured draws using a
 Decision: Replace coarse boolean tracking with conservative 16x16 VRAM tile footprints (`offscreen_writes[32]`) matching the existing tile tracking mechanism used for texture reads (`texture_reads[32]`). Fully offscreen untextured draws record their wrapped destination tiles. Subsequent textured primitives trigger CPU fallback only if their sampled texture UV footprint or CLUT footprint overlaps recorded offscreen write tiles. In the presentation loop, bound non-unlimited catch-up delays to at least 1 ms when presentation deadlines are in the past or swapchains are unavailable, preventing 0-ns busy-spinning. Native VRAM drawing and game logic remain unchanged.
 
 Consequences: Qualifying frames with offscreen helper draws alongside independent textured geometry remain on the GPU compute pipeline, eliminating false-positive fallbacks for smoother frame pacing and reduced CPU load. Bit-exact dependency safety is preserved. Actual scene coverage and gameplay behavior remain unverified at the owner's request.
+
+
+## ADR-122: Android L2 and R2 virtual touch controls and tile targeting cutscene suppression
+
+Date: 2026-10-30. Status: accepted.
+
+Context:
+1. In the Android virtual touch controller overlay (`VirtualGamepadView.kt`), only shoulder buttons L1 (`KeyEvent.KEYCODE_A`) and R1 (`KeyEvent.KEYCODE_S`) were implemented. L2 (`KeyEvent.KEYCODE_Q` / `HM_PAD_L2`) and R2 (`KeyEvent.KEYCODE_E` / `HM_PAD_R2`) were missing, preventing whistling for the dog/horse and using secondary shoulder shortcuts via touch on Android. In addition, when buttons were positioned adjacent to each other, hitboxes could overlap during expanded touch tolerance checks.
+2. The Tile Targeting enhancement (`hm_gameplay_draw_tile_targeting()`) rendered a cyan highlight box on the farm tile in front of the player during opening cutscenes (including the title screen farm demo and the new game opening cutscene with Mayor Thomas). The highlight was only intended to display during active, controllable gameplay.
+
+Decision:
+1. Android Virtual Gamepad:
+   - Added L2 (`KeyEvent.KEYCODE_Q`) and R2 (`KeyEvent.KEYCODE_E`) rectangular shoulder buttons to `VirtualGamepadView.kt`.
+   - Placed L1 (outer corner) and L2 (inner) side-by-side on the top-left, and R2 (inner) and R1 (outer corner) side-by-side on the top-right, maintaining clear vertical clearance above the dynamic analog stick area (`y > height * 0.20f`).
+   - Implemented prioritized two-pass touch hit resolution (`findHitButton`): exact geometric bounds check takes precedence, falling back to nearest Euclidean distance within expanded touch tolerance to prevent adjacent button hit stealing.
+2. Tile Targeting Cutscene Suppression:
+   - In `port/enhance/gameplay/gameplay.c` (`hm_gameplay_draw_tile_targeting`), added checks to suppress rendering whenever:
+     - `game_state.globalFlags` has `GLOBAL_FLAG_DEMO_START` or `GLOBAL_FLAG_INPUT_REPLAY` (title screen farm demo reel).
+     - `game_state.globalFlags` has `GLOBAL_FLAG_CAMERA_BUSY` (event/cutscene camera pans).
+     - `event_flag_get(EVENT_FLAG_EVENT_ACTIVE)` or `event_flag_get(EVENT_FLAG_REQUEST_BUSY)` is non-zero (active in-game cutscenes, including the new game intro with Mayor Thomas).
+     - `menu_get_phase() != TEXT_WINDOW_CLOSED` (active dialogue/text message boxes).
+   - Preserved all existing checks (`player->stateFlags`, `farm_area.mode.eventMode == FARM_MODE_IDLE`, and `GLOBAL_FLAG_PAUSED | GLOBAL_FLAG_MENU_OPEN | GLOBAL_FLAG_TRANSITION`).
+
+Consequences:
+Android players have complete 8-button PS1 digital gamepad inputs on the touch overlay. Tile targeting highlight appears strictly during interactive gameplay and is suppressed throughout all cutscenes, intro sequences, dialogues, and demos.
+
+
+## ADR-123: Android Unified Graphics Profile (Native vs Modern) and Frame Interpolation Clamp
+
+Date: 2026-10-30. Status: accepted.
+
+Context: On mobile Android devices, navigating granular desktop graphics options (Internal Resolution, Texture Filtering, Widescreen, Anti-Aliasing, Dithering, PGXP, FPS Cap, and Visual Interpolation) in the pause menu is cumbersome on touchscreens and can cause performance degradation. In particular, visual frame interpolation (`enhance.interpolation`) caused severe frame pacing judder on Android mobile SOC displays with variable or non-standard refresh rates.
+
+Decision:
+1. Under `#ifdef __ANDROID__`, simplify the Graphics Settings menu in the ESC pause interface to a single option: `Profile: [ Native | Modern ]`.
+   - **Native** (default, pure vanilla parity): 4:3 native aspect ratio, Nearest Neighbor texture filtering, 1x internal resolution, 30 FPS cap, Interpolation OFF, Anti-Aliasing OFF.
+   - **Modern** (mobile optimized): 16:9 expanded farm viewport and presentation (ADR-056/057), Bilinear filtering, 720p scaling limit (ADR-105), 30 FPS cap, Interpolation OFF, Anti-Aliasing OFF.
+2. In `graphics_options.c`, clamp `enhance.interpolation` to 0 on Android, disabling mobile frame interpolation judder and keeping pacing locked to native 30 FPS display ticks.
+3. Persist `enhance.profile` in `settings.json`, maintaining full desktop multi-option control on Windows/Linux/macOS without cross-platform regressions.
+
+Consequences:
+Android users enjoy a clean, frictionless single-toggle graphics experience tailored for mobile hardware while preserving 100% pure vanilla parity by default.
+
+
+## ADR-124: Memory Card 64-bit LP64 Pointer Truncation Fix and Android Storage Resilience
+
+Date: 2026-10-30. Status: accepted.
+
+Context: On 64-bit Android (arm64-v8a, LP64 data model), attempting to save in the diary displayed "Not enough free space on MEMORY CARD in slot 1" even on fresh or empty memory cards. Investigation identified two major root causes:
+1. In `src/overlay/15_saveload/saveload.c`, local variables `long cmd, result, save_files, all_files;` are 64-bit integers on LP64 (8 bytes). However, `port/compat/psyq/libmcrd.h` and `port/compat/psyq/libmcx.h` declared `MemCardSync(..., s32 *command, s32 *result)` and `MemCardGetDirentry(..., s32 *count, ...)`. Writing through `s32 *` only populated the lower 4 bytes, leaving uninitialized stack garbage in the upper 4 bytes of `result`, `cmd`, and file counts. In `save_card_read_header()`, `switch (result)` failed to match `case McErrFileNotExist:` (5) because `result == 0xXXXXXXXX00000005 != 5`, falling through to checksum verification on empty buffers and returning `SAVE_CARD_BAD_CHECKSUM` (14). In `save_read_slot_headers()`, this left `save_slot_status[i]` at its initialization value `SAVE_SLOT_SHORT_OF_SPACE` (2), which rendered "Not enough free space" and routed selection to `SAVE_STEP_NOT_ENOUGH_SPACE`.
+2. In `port/platform/user_data.c`, `hm_exists()` used `SDL_EnumerateDirectory()`. On Android Scoped Storage / FUSE filesystem layers, directory enumeration can fail, returning -1. This caused `hm_read_card()` to return -1, making `hm_card_attach()` mark cards as `McErrCardInvalid`.
+3. In `MainActivity.kt`, `saves` subfolder was never explicitly created before native runtime initialization, and storage candidates lacked a fallback if `targetDataDir` was not writable.
+
+Decision:
+1. PSY-Q Compatibility Signatures: Changed `MemCardSync` (`command`, `result`), `McxSync` (`command`, `result`), and `MemCardGetDirentry` (`count`) to use `long *` in `libmcrd.h`, `libmcx.h`, `card.c`, `card_store.h`, and `card_store.c`. This ensures the full 64-bit integer is written on LP64 hosts, eliminating stack garbage and pointer truncation.
+2. File Existence Checking: Replaced `SDL_EnumerateDirectory()` in `hm_exists()` with `SDL_GetPathInfo(path, &info)`, returning 1 if the path exists and 0 if absent, completely avoiding directory enumeration failures.
+3. Android Storage Resilience:
+   - Added `isDirWritable()` validation in `MainActivity.kt`.
+   - Pre-create `File(targetDataDir, "saves").mkdirs()` from Kotlin before native engine startup.
+   - If public Documents is unwritable (e.g. Scoped Storage without All Files permission), seamlessly fallback to app-specific storage (`getExternalFilesDir(null)/VanillaBTN`), where read/write is always guaranteed.
+
+Consequences:
+Memory card space checking and save creation operate flawlessly across 64-bit Android (LP64) and Windows (LLP64). Diaries can be created and saved without false "not enough space" errors.

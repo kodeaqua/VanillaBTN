@@ -166,7 +166,7 @@ static int hm_matches(const char *pattern, const char *name) {
         ++pattern;
     return !*pattern;
 }
-s32 hm_card_directory(s32 port, const char *pattern, struct DIRENTRY *entries, s32 *count,
+s32 hm_card_directory(s32 port, const char *pattern, struct DIRENTRY *entries, long *count,
                       s32 offset, s32 maximum) {
     if (!count)
         return McErrCardInvalid;

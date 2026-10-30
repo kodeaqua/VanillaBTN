@@ -4,6 +4,7 @@
 #include "farm_state.h"
 #include "main.h"
 #include "psx/gpu_links.h"
+#include "event_flags.h"
 #include "psx/vram.h"
 #include <SDL3/SDL.h>
 #include <stdio.h>
@@ -106,13 +107,30 @@ static int tile_render_checks(void) {
     hm_gameplay_draw_tile_targeting(&game_state.player, 2500);
     CHECK(frame.primCursor.bytes == frame.primBuffer);
     farm_area.mode.eventMode = FARM_MODE_IDLE;
-    const u32 blocked[] = {GLOBAL_FLAG_MENU_OPEN, GLOBAL_FLAG_TRANSITION, GLOBAL_FLAG_PAUSED};
+    const u32 blocked[] = {GLOBAL_FLAG_MENU_OPEN, GLOBAL_FLAG_TRANSITION, GLOBAL_FLAG_PAUSED,
+                           GLOBAL_FLAG_CAMERA_BUSY, GLOBAL_FLAG_DEMO_START, GLOBAL_FLAG_INPUT_REPLAY};
     for (size_t i = 0; i < sizeof(blocked) / sizeof(blocked[0]); ++i) {
         game_state.globalFlags = blocked[i];
         hm_gameplay_draw_tile_targeting(&game_state.player, 2500);
         CHECK(frame.primCursor.bytes == frame.primBuffer);
     }
     game_state.globalFlags = 0;
+
+    /* Cutscene, event, and dialogue suppression */
+    event_flag_set(EVENT_FLAG_EVENT_ACTIVE, 1);
+    hm_gameplay_draw_tile_targeting(&game_state.player, 2500);
+    CHECK(frame.primCursor.bytes == frame.primBuffer);
+    event_flag_set(EVENT_FLAG_EVENT_ACTIVE, 0);
+
+    event_flag_set(EVENT_FLAG_REQUEST_BUSY, 1);
+    hm_gameplay_draw_tile_targeting(&game_state.player, 2500);
+    CHECK(frame.primCursor.bytes == frame.primBuffer);
+    event_flag_set(EVENT_FLAG_REQUEST_BUSY, 0);
+
+    game_state.system.menuState = MENU_STATE_OPEN;
+    hm_gameplay_draw_tile_targeting(&game_state.player, 2500);
+    CHECK(frame.primCursor.bytes == frame.primBuffer);
+    game_state.system.menuState = MENU_STATE_IDLE;
     current_frame = saved_frame;
     hm_gameplay_defaults(&opt);
     hm_gameplay_set_active(&opt);

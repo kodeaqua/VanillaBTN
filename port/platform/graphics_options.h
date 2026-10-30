@@ -25,4 +25,10 @@ void hm_graphics_sync_monitor(SDL_Window *window, hm_graphics_options *options);
 void hm_graphics_value(const hm_graphics_options *options, int item, char *text, size_t capacity);
 void hm_graphics_row_value(const hm_graphics_options *options, int item, char *text,
                            size_t capacity);
+enum {
+    HM_GRAPHICS_PROFILE_NATIVE = 0,
+    HM_GRAPHICS_PROFILE_MODERN = 1
+};
+int hm_graphics_profile_get(const hm_graphics_options *options);
+void hm_graphics_profile_set(hm_graphics_options *options, int profile);
 #endif

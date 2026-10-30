@@ -29,12 +29,17 @@ int main(void) {
     hm_pause_handle(&menu, HM_PAUSE_UP);
     CHECK(menu.selected == 0);
     hm_pause_handle(&menu, HM_PAUSE_CONFIRM);
+#ifdef __ANDROID__
+    CHECK(menu.page == HM_PAUSE_GRAPHICS && hm_pause_count(&menu) == HM_PAUSE_GRAPHICS_ITEMS);
+    CHECK(!strcmp(hm_pause_label(&menu, 0), "Profile"));
+#else
     CHECK(menu.page == HM_PAUSE_GRAPHICS && hm_pause_count(&menu) == 10);
     CHECK(!strcmp(hm_pause_label(&menu, 4), "Widescreen Mode"));
     CHECK(!strcmp(hm_pause_label(&menu, 6), "Filtering"));
     CHECK(!strcmp(hm_pause_label(&menu, 7), "VSync") &&
           !strcmp(hm_pause_label(&menu, 8), "FPS Limit"));
     CHECK(!strcmp(hm_pause_label(&menu, 9), "Interpolation"));
+#endif
     for (int i = 0; i < HM_PAUSE_GRAPHICS_ITEMS; ++i) {
         CHECK(menu.selected == i);
         CHECK(menu.selected >= menu.first_visible &&

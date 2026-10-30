@@ -14,7 +14,7 @@ int main(void) {
     MemCardInit(0);
     MemCardStart();
     McxStartCom();
-    s32 command = -1, result = -1;
+    long command = -1, result = -1;
     CHECK(MemCardSync(0, &command, &result) == -1 && result == McErrCardNotExist);
     CHECK(MemCardAccept(0) == 1 && MemCardExist(0x10) == 0);
     CHECK(MemCardSync(1, &command, &result) == 1 && result == McErrCardNotExist);

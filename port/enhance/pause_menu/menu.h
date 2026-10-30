@@ -12,7 +12,7 @@ typedef enum {
 
 enum {
 #ifdef __ANDROID__
-    HM_PAUSE_GRAPHICS_ITEMS = 7,
+    HM_PAUSE_GRAPHICS_ITEMS = 1,
 #else
     HM_PAUSE_GRAPHICS_ITEMS = 10,
 #endif

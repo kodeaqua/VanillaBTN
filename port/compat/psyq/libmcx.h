@@ -8,7 +8,7 @@ enum { McxErrSuccess = 0, McxErrNoCard = 1, McxErrInvalid = 2, McxErrNewCard = 3
 enum { McxFuncExecFlag = 0x100 };
 
 void McxStartCom(void);
-s32 McxSync(s32 mode, s32 *command, s32 *result);
+s32 McxSync(s32 mode, long *command, long *result);
 s32 McxCardType(s32 port);
 s32 McxAllInfo(s32 port, void *output);
 s32 McxGetApl(s32 port, void *output);

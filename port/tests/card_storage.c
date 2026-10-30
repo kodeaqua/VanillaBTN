@@ -32,7 +32,7 @@ static int write_card(void *context, int slot, const void *data, size_t bytes) {
     return 1;
 }
 static int complete(int expected_command, int expected_result) {
-    s32 command = -1, result = -1;
+    long command = -1, result = -1;
     if (MemCardSync(1, &command, &result) != 1 || command != expected_command ||
         result != expected_result)
         return 0;
@@ -48,7 +48,7 @@ int main(void) {
     CHECK(MemCardAccept(0) == 1 && complete(1, McErrNone));
     CHECK(MemCardExist(0) == 1 && complete(1, McErrNone));
     CHECK(McxCardType(0) == 1);
-    s32 command, result;
+    long command, result;
     CHECK(McxSync(0, &command, &result) == 1 && result == McxErrInvalid);
     CHECK(MemCardCreateFile(0, "SAVE01", 4) == McErrNone);
     CHECK(MemCardCreateFile(0, "SAVE01", 4) == McErrAlreadyExist);
@@ -59,7 +59,7 @@ int main(void) {
     CHECK(MemCardCreateFile(0, "SAVE04", 4) == McErrBlockFull);
     CHECK(MemCardCreateFile(0x10, "SAVE01", 4) == McErrNone);
     struct DIRENTRY entries[15];
-    s32 count;
+    long count;
     CHECK(MemCardGetDirentry(0, "*", entries, &count, 0, 15) == 0 && count == 3);
     CHECK(!strcmp(entries[0].name, "SAVE01") && entries[0].size == 32768);
     CHECK(MemCardGetDirentry(0, "SAVE0?", entries, &count, 1, 1) == 0 && count == 1);
