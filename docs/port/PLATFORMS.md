@@ -445,3 +445,7 @@ capture confirms a cyan tile marker in front of the player during normal farm
 gameplay. This observation does not establish other-area coverage. Horizontal
 lines while running are explicitly deferred; no additional graphics fix is
 claimed. Matching source is unchanged and its Linux check was not run.
+
+The shared GPU output no longer adds unconditional presentation noise after
+BGR555 colour expansion (ADR-113). Original primitive dithering is unchanged.
+Owner gameplay validation is pending; GPU/CPU parity has not been remeasured.
