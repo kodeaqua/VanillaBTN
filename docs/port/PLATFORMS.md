@@ -470,3 +470,7 @@ retain fallback (ADR-117). Gameplay and device behavior remain unverified.
 Offscreen VRAM fills and uploads after textured draws may stay on GPU when their
 wrapped destinations avoid all previously sampled texture/palette tiles and the
 output area (ADR-118). Actual scene coverage and gameplay remain unverified.
+
+GPU replay may skip fully offscreen, untextured draws when wrapped bounds do not
+touch output; any later textured draw forces the reference fallback (ADR-119).
+Actual scene coverage and gameplay remain unverified.

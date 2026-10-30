@@ -3290,3 +3290,20 @@ private snapshot; native VRAM execution is unchanged.
 Consequences: Some independent transfers after textured draws can remain on the
 GPU. Tile-level false positives still fall back. Scene coverage, performance,
 and visual behavior remain unverified at the owner's request.
+
+## ADR-119: Defer fully offscreen untextured draw fallback
+
+Date: 2026-10-30. Status: accepted.
+
+Context: A draw wholly outside the private output can trigger an immediate GPU
+fallback even if no later command reads its native VRAM results.
+
+Decision: Skip a fully offscreen, untextured draw for GPU output only when its
+wrapped bounds cannot overlap the output. Record the skipped write and fall
+back if a later textured draw may read it. Partially offscreen or textured draws
+continue to use the previous conservative fallback. Native VRAM drawing remains
+unchanged.
+
+Consequences: Qualifying frames may remain on GPU. This deliberately retains
+false-positive fallbacks; gameplay, visual behavior and performance remain
+unverified at the owner's request.
