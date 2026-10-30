@@ -25,8 +25,8 @@ void SsInit(void) {
     int prev_sfx = hm_sound.sfx_volume;
     memset(&hm_sound, 0, sizeof(hm_sound));
     hm_sound.initialized = 1;
-    hm_sound.bgm_volume = prev_bgm ? prev_bgm : 100;
-    hm_sound.sfx_volume = prev_sfx ? prev_sfx : 100;
+    hm_sound.bgm_volume = prev_bgm;
+    hm_sound.sfx_volume = prev_sfx;
 }
 
 void SsSetTableSize(void *table, s32 sequences, s32 tracks) {

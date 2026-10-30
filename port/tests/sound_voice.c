@@ -1,5 +1,6 @@
 #include "psx/sound_voice.h"
 #include "psx/sequence.h"
+#include "psx/sound_control.h"
 #include <libsnd.h>
 #include <libspu.h>
 #include <stdio.h>
@@ -11,6 +12,11 @@
             return 1;                                                                              \
         }                                                                                          \
     } while (0)
+
+static void capture_audio(void *context, const s16 *stereo, u32 frames) {
+    memcpy(context, stereo, (size_t)frames * 2 * sizeof(*stereo));
+}
+
 int main(void) {
     CHECK(hm_sound_note_pitch(60, 0, 60, 0) == 4096);
     CHECK(hm_sound_note_pitch(72, 0, 60, 0) == 8192);
@@ -57,6 +63,16 @@ int main(void) {
     }
     CHECK(audible && SpuGetKeyStatus(1u << 23) == 1);
     CHECK(hm_sound_bank_has_voices(0));
+    hm_sound_set_volumes(100, 0);
+    hm_sound_mix(output, 64);
+    for (u32 i = 0; i < 64; ++i)
+        CHECK(output[i * 2] == 0 && output[i * 2 + 1] == 0);
+    hm_sound_set_volumes(100, 100);
+    hm_sound_mix(output, 64);
+    audible = 0;
+    for (u32 i = 0; i < 64; ++i)
+        audible |= output[i * 2] != 0 || output[i * 2 + 1] != 0;
+    CHECK(audible);
     CHECK(SsUtKeyOffV(23) == 0 && SpuGetKeyStatus(1u << 23) == 2);
     hm_sound_mix(output, 1024);
     CHECK(!hm_sound_bank_has_voices(0) && SpuGetKeyStatus(1u << 23) == 0);
@@ -72,13 +88,27 @@ int main(void) {
     SsSetReservedVoice(22);
     SsStart();
     CHECK(SsSeqOpen((const u32 *)seq, 0) == 0);
+    s16 captured[735 * 2];
+    hm_sound_set_sink(capture_audio, captured);
     SsSeqPlay(0, 1, 1);
-    for (u32 tick = 0; tick < 14; ++tick) {
+    hm_sound_set_volumes(100, 100);
+    hm_sound_tick();
+    CHECK(SpuGetKeyStatus(1) == 1 && hm_sound_sequence_voice_active(0));
+    audible = 0;
+    for (u32 i = 0; i < 735; ++i)
+        audible |= captured[i * 2] != 0 || captured[i * 2 + 1] != 0;
+    CHECK(audible);
+    hm_sound_set_volumes(0, 100);
+    for (u32 tick = 1; tick < 14; ++tick) {
         hm_sound_tick();
         CHECK(SpuGetKeyStatus(1) == 1);
+        for (u32 i = 0; i < 735; ++i)
+            CHECK(captured[i * 2] == 0 && captured[i * 2 + 1] == 0);
     }
     hm_sound_tick();
     CHECK(SpuGetKeyStatus(1) == 0);
+    hm_sound_set_volumes(100, 100);
+    hm_sound_set_sink(NULL, NULL);
     SsSeqClose(0);
     u8 loop_seq[] = {'p', 'Q', 'E',  'S',  0,  0,    0,  1,    0,  60,   7,  0xA1, 0x20, 4,
                      2,   0,   0xC0, 7,    0,  0xB0, 99, 20,   0,  0xB0, 6,  1,    0,    0x90,

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <exclude domain="external" path="VanillaBTN/game.bin" />
+    <exclude domain="external" path="VanillaBTN/game.bin.tmp" />
+    <exclude domain="external" path="VanillaBTN/hmbtn.bin" />
+    <exclude domain="external" path="VanillaBTN/VanillaBTN.bin" />
+    <exclude domain="external" path="VanillaBTN/last_run.log" />
+    <exclude domain="file" path="VanillaBTN/game.bin" />
+    <exclude domain="file" path="VanillaBTN/game.bin.tmp" />
+    <exclude domain="file" path="VanillaBTN/hmbtn.bin" />
+    <exclude domain="file" path="VanillaBTN/VanillaBTN.bin" />
+    <exclude domain="file" path="VanillaBTN/last_run.log" />
+</full-backup-content>

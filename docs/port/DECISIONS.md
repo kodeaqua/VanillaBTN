@@ -3959,3 +3959,38 @@ glyphs; the page heading and bar labels also use title case. Pure model and
 settings tests cover the roster, relationship mapping,
 bar bounds, defaults and persistence. The owner must still validate layout and
 navigation during gameplay.
+
+## ADR-145: Exclude Imported Android Disc Images from Backups
+
+Date: 2026-10-31. Status: accepted.
+
+Context: Android Auto Backup includes app-specific external files by default.
+The launcher imports the user's full disc image into that directory, while the
+platform limits each app's backup allocation to 25 MB.
+
+Decision: Add legacy full-backup and Android 12+ data-extraction rules that
+exclude imported disc filenames, the temporary import file, and `last_run.log`
+from both cloud backups and device transfers. Apply exclusions to external and
+internal app storage, since the launcher may use either location. Keep saves
+and settings eligible for backup.
+
+Consequences: Restored devices must reimport the disc image; saves and settings
+remain eligible for transfer and backup. This avoids placing large user-provided
+game data in Android backup sets.
+
+## ADR-146: Preserve Zero Audio Volumes During Sound Initialization
+
+Date: 2026-10-31. Status: accepted.
+
+Context: The host loads saved BGM/SFX volumes before the original game calls
+`SsInit`. `SsInit` preserved nonzero settings but treated zero as uninitialized
+and silently restored the affected volume to 100%, so saved mute settings did
+not survive startup.
+
+Decision: Preserve both configured mixer values across `SsInit`; the static
+initial values already provide the 100% first-run defaults. Add regression
+coverage for zero/nonzero reset preservation and verify that muting live
+sequence and sound-effect output produces silence without stopping playback.
+
+Consequences: A saved 0% level remains muted after game sound initialization;
+nonzero levels and the existing default stay unchanged.
