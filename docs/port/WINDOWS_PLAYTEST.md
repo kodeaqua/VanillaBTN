@@ -1,11 +1,28 @@
 # Windows native playtest
 
-This is a development build of the original compiled game C. It can complete
-the opening, exit the house, decline the tour, finish Zack's introduction and
-respond to free player movement in the farm. Full playthrough,
-save persistence, overlay reentry and hardware parity are not established.
-Use the owner's original USA SLUS_011.15 BIN; it is validated at startup and
-is never copied into git. No WSL, Docker or CI is required.
+## Current status (2026-10-30)
+
+The Windows -Game build launches the original compiled game, reaches the farm,
+supports free movement, and includes pause/settings, memory-card containers,
+and the optional graphics paths summarized in ENHANCEMENTS.md. The latest
+recorded Windows suite is 124/124; it was not rerun for this documentation
+update. Full-playthrough parity, complete GPU scene coverage, and several
+display/device cases remain unverified.
+
+The owner confirmed that a reported horizontal line disappeared in one farm
+scene with Modern, Scaling On, Widescreen Off, MSAA 4x, Nearest, Interpolation
+Off, VSync On, and unlimited FPS. Other scenes and performance remain
+unverified. ADR-136 temporarily disables in-game mouse/touch actions; pause
+menu mouse navigation remains available.
+
+Open issue: the owner has reported a sleep/save access violation
+(-1073741819 / 0xC0000005). Card-container tests do not verify the full
+sleep/day-transition/save/load lifecycle. The owner performs interactive
+gameplay checks. Use the owner's original USA SLUS_011.15 BIN; it is validated
+at startup and is never copied into git. No WSL, Docker, or CI is required.
+
+The dated checkpoints below are historical; later ADRs and the status above
+supersede older test counts and feature limitations.
 
 From the repository root:
 
@@ -37,7 +54,7 @@ directory through SDL's user-folder API. Redirected Documents (including OneDriv
 is respected. The directory contains:
 
 ```
-BackToNature/
+VanillaBTN/
   saves/
     card1.hmc
     card2.hmc
@@ -51,7 +68,8 @@ must be closed before another instance can use this directory. Write/permission
 errors are reported rather than claiming a successful save. Invalid existing
 cards are not automatically replaced; an explicit format erases the selected
 card. settings.json is initialized with a schema version and preserved if it
-already exists; settings loading/application is not implemented yet.
+already exists. Graphics, controls, and gameplay settings are loaded and
+persisted; malformed settings are not silently overwritten.
 
 The storage backend has unit coverage for writes and reopening data. Actual
 in-game save/load, closing/reopening a session and repeated save-menu activation
@@ -72,7 +90,7 @@ complete audited writable native object state on activation (ADR-047). Other
 overlays still reject unsupported reentry. Release and sanitizer builds pass
 71 technical tests; no game loop or interactive replay was run for this change.
 
-## Pause branch
+## Historical pause branch checkpoint (2026-10-26)
 
 On port/windows-pause-menu, build.ps1 -Game now enables the initial native ESC
 interface. Use arrows to navigate, Enter/X to confirm, and ESC/D to go back;
@@ -89,9 +107,9 @@ was launched by the agent. Release and ASan/UBSan pass 74 technical tests.
 Set enhance.pause_menu=false in the enhance object of settings.json to disable
 ESC, or build with HMBTN_ENH_PAUSE_MENU=OFF for the compile-time OFF path.
 
-Enhance Scaling, Widescreen Mode ON and FXAA/MSAA remain unavailable pending
-their actual scene-renderer implementations. The menu states that explicitly;
-framebuffer stretching/filtering is not substituted for those features.
+At this checkpoint, Enhance Scaling, Widescreen Mode ON, and FXAA/MSAA were
+not yet implemented. Later ADRs added those renderer paths; see the current
+status above and ENHANCEMENTS.md for their coverage limits.
 
 The owner reported the first pause panel was blue. Its private canvas had
 reversed red/blue relative to the original primitive builders. This is now
@@ -110,9 +128,10 @@ Other rates come from the monitor's modes; fractional rates retain their exact
 ratio in settings.json. VSync On is synchronized; unsupported Off is refused.
 The selected cap does not change desktop refresh, and VSync can limit output
 to the active display rate. Game hardware ticks remain fixed at 60 Hz and the
-normal original loop still uses VSync(2). High caps repeat native images;
-interpolated scene motion is not implemented. Release and ASan/UBSan pass 75
-technical tests. The owner validates physical VSync, FPS and gameplay timing.
+normal original loop still uses VSync(2). At this checkpoint, high caps
+repeated native images and interpolation was not yet implemented. ADR-050
+later added optional primitive interpolation for eligible farm views. Physical
+VSync, FPS, and gameplay timing remain owner validation.
 
 | Keyboard | Original pad |
 | --- | --- |

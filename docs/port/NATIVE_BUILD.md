@@ -1,5 +1,26 @@
 # Native build setup
 
+## Current native game builds (2026-10-30)
+
+The playable port is built separately from the matching decompilation:
+
+- Windows x86-64: use the Windows build script below. The latest recorded
+  Windows game build produced the standalone package and passed 124/124 tests;
+  that result was not rerun for this documentation update.
+- Android arm64-v8a: the Gradle/NDK build script produces the native APK.
+  NDK r27c has a recorded successful build. Device and full-game validation
+  remain incomplete.
+- Linux and macOS: presets and architecture work exist, but builds have not
+  been validated on those hosts.
+
+From the repository root:
+
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File port/packaging/windows/build.ps1 -Preset windows-release -Game
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File port/packaging/android/build.ps1 -BuildType Release
+
+The owner supplies and interactively tests game data. No WSL or Docker is used.
+The separate matching-build requirements and limitations follow.
+
 ## Matching build
 
 Supported matching setup target: a separate Linux x86-64 host. The owner excludes
@@ -58,7 +79,10 @@ manifest remains pending a successful matching baseline; no versions have been
 invented here. Workflows/CI are excluded by owner instruction. Existing upstream
 workflow files are unchanged and are not part of this setup.
 
-## Port foundation
+## Historical port foundation snapshot (2026-10-25)
+
+The foundation notes in this section describe the early bring-up milestone and
+are superseded by the current native game-build status above.
 
 Presets live in the separate `port/` project. From that directory:
 
@@ -74,8 +98,8 @@ ctest --preset linux-asan-ubsan
 Desktop presets also exist for `windows-release` (LLVM-mingw/UCRT, without MSVC)
 and `macos-universal-release`.
 These build the compatibility layer and eleven original source units.
-Android presets await an NDK
-pin and platform configuration; no Android support is claimed yet.
+At that early milestone Android presets had not been configured. Android
+arm64-v8a build support was added later; see the current status above.
 
 No SDL dependency, SDK, network, or game data is required by the port foundation.
 It is not a playable game. Only `math_util.c`, `farm_data_size.c`, `horse_names.c`,

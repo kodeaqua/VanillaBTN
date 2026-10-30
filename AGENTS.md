@@ -6,12 +6,13 @@ override this one for their subtree.
 
 ## 0. Mission
 
-### Current owner overrides (2026-10-25 to 2026-10-29)
+### Current owner overrides (2026-10-25 to 2026-10-30)
 
 - **Pure Vanilla Essence & Anti-Bloat Policy**: This project strictly rejects out-of-place,
   bloated, or game-breaking mods that ruin the authentic nostalgic essence of Harvest Moon:
   Back to Nature. Any feature additions must remain tasteful, elegant, and 100% faithful to
-  the original game spirit. Enhancements default OFF at runtime to preserve pure vanilla parity.
+  the original game spirit. Enhancements default OFF at runtime to preserve pure vanilla parity;
+  options that preserve a vanilla behavior retain that vanilla default.
 - Executable binary is named `VanillaBTN.exe`. Standalone release archive is produced at
   `dist/VanillaBTN-windows-x64-v0.9.0.zip`.
 - Use 16 parallel build jobs (`cmake --build ... -j16`), as requested by the owner on 2026-10-30.
@@ -41,8 +42,9 @@ override this one for their subtree.
   option in the Windows -Game script; its runtime default is available, with
   enhance.pause_menu=false as the explicit OFF path. This requested interface
   overrides section 9's runtime-OFF default for the pause interface only.
-  Graphics enhancements (scaling, widescreen, AA) still default OFF and must
-  never be advertised as working before their renderer paths are implemented.
+  Graphics enhancements (scaling, widescreen, filtering, AA) still default OFF.
+  Their renderer paths are implemented with partial coverage and safe fallback;
+  do not advertise complete coverage or unverified gameplay/device behavior.
 
 - The owner also requests VSync/FPS caps and visual interpolation while keeping
   game logic/time native. Windows -Game compiles interpolation; its runtime
@@ -53,8 +55,19 @@ override this one for their subtree.
   crash. Windows -Game also compiles Enhance Scaling; enhance.scaling defaults
   OFF. Widescreen now has an opt-in expanded farm world viewport (ADR-056);
   OFF retains 4:3. ADR-057 extends ON presentation to all screens and keeps
-  native/CPU fallback aspect stable. Gameplay coverage remains owner-tested.
-  Report CPU raster performance and untested gameplay/device behavior plainly.
+  native/CPU fallback aspect stable. GPU Auto shares native and enhanced scene
+  output, with Software retained as the reference and a safe CPU fallback.
+  Scaling, widescreen, filtering, PGXP, dithering bypass, FXAA and MSAA have
+  implementation paths, but coverage is partial and gameplay/device validation
+  remains owner-tested. Report CPU raster performance and untested behavior
+  plainly.
+- Graphics Mode offers Native PS1, Enhance PS1, and Modern. Android exposes the
+  same three choices, but its Modern/Enhance profiles bypass the desktop PGXP
+  compute path for mobile performance (ADR-131/132); do not claim PGXP is active
+  on Android.
+- In-game mouse/touch clicks and mouse-to-gamepad injection are temporarily
+  disabled by ADR-136. Mouse navigation in the pause menu remains available.
+  Keep the controls model; do not describe inventory/dialogue taps as working.
 
 ### Current state and agent workflow (as of 2026-10-30)
 
@@ -72,14 +85,18 @@ override this one for their subtree.
   first and ask the owner to close the game before compiling `-Game`.
 - Implemented Features:
   1. ESC Pause Menu with Settings (Graphics, Controls, Gameplay) and Resume / Exit Game.
-  2. Controls Options (ADR-081): Gamepad, Keyboard (Preset A/B/C/Custom), and Mouse.
+  2. Controls Options (ADR-081): Gamepad, Keyboard (Preset A/B/C/Custom), and
+     Mouse settings. In-game mouse/touch interaction is disabled by ADR-136;
+     pause-menu mouse navigation remains available.
   3. Gameplay Enhancements (ADR-080): Walk through crops, 99 item stacking in rucksack with
      quantity selector dialog, durable fences, connected wooden rails, wild dog attacks toggle,
-     smart animal bell, 10-heart stamina HUD in top-left (visible during NPC dialogues, hides
-     during fullscreen menus/storage), calendar NPC birthday/milestone dialogue info on X press,
-     and roaming horse.
-  4. Unit test suite: 122 tests passing 100%.
-  5. Fast Text dialogue instant delivery and robust page break confirm advance (ADR-106/109).
+     smart animal bell, optional 10-heart stamina HUD with fatigue gauge,
+     calendar NPC birthday/milestone dialogue info on X press, and roaming horse.
+  4. Latest recorded Windows unit suite: 124 tests passing (ADR-136; not
+     rerun for this documentation update).
+  5. Fast Text page-break fixes remain in source, but the option was removed
+     from the menu and disabled pending a better multi-line pagination design
+     (ADR-133).
   6. Rucksack reorganize screen strict category protection preventing tool/item cross-swapping (ADR-107).
   7. Android arm64-v8a native support with 720p scaling limit.
 
@@ -411,10 +428,10 @@ fallback while coverage is validated. Synthetic offscreen GPU probes are
 technical checks; interactive gameplay testing remains with the owner. Never
 present partial GPU coverage as complete or remove the reference prematurely.
 
-## Current owner follow-up (2026-10-26)
+## Historical owner follow-up (2026-10-26; superseded)
 
-Finish all-screen widescreen and its aspect/dialogue-fallback corrections, then
-open a PR and merge to main. Create a new branch from latest main for save/load,
-performance and other runtime fixes. FXAA/MSAA are explicitly deferred. Profile
-actual timing and waits before attributing low aggregate CPU/GPU use to a cause;
-interactive gameplay testing stays with the owner.
+The all-screen widescreen and aspect/fallback work was completed in ADR-057.
+FXAA/MSAA were later implemented in ADR-076. Current renderer coverage and
+remaining owner validation are summarized above and in docs/port/PLATFORMS.md.
+Profile actual timing and waits before attributing low aggregate CPU/GPU use to
+a cause; interactive gameplay testing stays with the owner.

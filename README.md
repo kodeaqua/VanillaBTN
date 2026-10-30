@@ -17,10 +17,10 @@ Many modern decompilation and source-port projects for *Harvest Moon: Back to Na
 **VanillaBTN was created to preserve that authentic purity.**
 
 Our core design principles:
-1. **100% Pure Vanilla Parity**: Simulation logic, NPC schedules, festivals, farming, animal husbandry, and narrative events execute byte-for-byte and tick-for-tick faithful to the original PlayStation 1 release (`SLUS_011.15`).
+1. **Vanilla-first Defaults**: With optional enhancements disabled, the port preserves original game logic and timing where native compatibility is implemented. Full-playthrough parity remains unverified.
 2. **Zero Bloat & No Game-Breaking Mods**: No intrusive foreign characters, immersion-breaking textures, or cheats that undermine the tranquil atmosphere of Mineral Town.
-3. **Native 60 FPS Modern Engineering**: Not an emulator and not a slow static recompiler. The game is compiled natively from decompiled C source code coupled with a clean-room PS1 hardware runtime (GPU, SPU, GTE, Pad, Card, CD-ROM) that runs with buttery smoothness and minimal resource overhead on modern PCs.
-4. **Tasteful & Optional Quality of Life (QoL)**: Every technical enhancement (widescreen, studio audio resampling, stamina HUD, tool charge indicator) is carefully styled to blend seamlessly with original PS1 aesthetics and **can be toggled or disabled at any time** via the in-game pause menu (ESC).
+3. **Native Game Timing**: Not an emulator or static recompiler. The game is compiled from decompiled C source and uses a clean-room PS1 runtime (GPU, SPU, GTE, pad, memory card, and CD-ROM). Hardware timing remains fixed; presentation caps and optional visual interpolation do not accelerate simulation.
+4. **Tasteful & Optional Enhancements**: Optional graphics and gameplay features can be configured in the pause menu. Gameplay enhancements retain their own settings; the requested ESC pause interface is available by default.
 
 ---
 
@@ -28,28 +28,29 @@ Our core design principles:
 
 - **Clean Single-Window Native Launch**: The game launches directly into its dedicated window without annoying background command-prompt terminal popups.
 - **Modern Display & Visual Fidelity**:
-  - Native viewport resolution scaling, **16:9 Widescreen Mode**, and adaptive fullscreen presentation.
-  - **True 32-bit Micro-Dither Debanding**: Eliminates color banding artifacts across night skies, morning fog, and dusk horizon gradients.
-  - Optional bilinear texture filtering and FXAA / MSAA antialiasing.
+  - Optional viewport-resolution scaling, **16:9 Widescreen Mode**, and adaptive fullscreen presentation. Unsupported GPU work retains the Software reference path.
+  - Optional dithering bypass and smoother shading on selected enhanced GPU paths. Other paths retain PS1 BGR555 color precision.
+  - Optional bilinear texture filtering, FXAA, and GPU MSAA 2x/4x.
   - Precise VSync and display refresh frame pacing without accelerating game simulation speed.
-- **Studio-Quality Audio**:
-  - High-fidelity audio resampling powered by a *Catmull-Rom Cubic Spline* algorithm delivering crisp treble and acoustic instrument clarity.
+- **Audio Options**:
+  - PS1 Gaussian resampling is the default. Studio HQ Catmull-Rom resampling is an explicit opt-in.
   - Independent volume sliders for Background Music (BGM) and Sound Effects (SFX).
 - **Flexible Modern Input Support**:
   - Full native Gamepad / Controller support (Xbox, DualShock/DualSense, generic XInput/DirectInput).
   - Keyboard mappings: **Preset A** (Arrows + ZX) and **Preset B** (WASD + JK).
-  - Optional Mouse mode for quick interactions.
+  - Mouse navigation remains available in the pause menu. In-game mouse/touch clicks and mouse-to-gamepad input are temporarily disabled.
 - **Authentic In-Game Pause Interface (ESC Key)**:
   - In-game pause menu rendered with the original game's typography and dialogue styling to configure Graphics, Controls, Audio, and Gameplay on the fly.
-- **Elegant QoL Enhancements (Optional - Default OFF)**:
-  - **Stamina HUD**: 10-heart visual indicator in the top-left (automatically hidden during fullscreen menus and dialogue).
+- **Optional Gameplay Enhancements (Default OFF)**:
+  - **Stamina HUD**: 10-heart indicator with a fatigue gauge; visibility follows the configured HUD conditions.
   - **Tool Charge Bar**: Floating charge meter above Pete's head with tier-specific ore color progression (Iron, Copper, Silver, Gold, Mystrile) and max-charge shimmer.
-  - **Tile Targeting Grid**: Subtle 3D isometric highlight projecting the targeted soil tile in the farm field and greenhouse.
-  - **Fast Text**: Instant dialogue text delivery with responsive button handling.
+  - **Tile Targeting Grid**: Isometric highlight for the targeted tile during eligible gameplay on the farm and in mines.
   - Walk through crops, durable fences, and smart animal bells.
+- **Graphics Modes**: Native PS1, Enhance PS1, and Modern. Android offers the same selector with mobile-specific rendering limits.
+- Fast Text is currently removed from the settings menu while multi-line dialogue pagination is reconsidered.
 - **Isolated User Data Storage**:
-  - Saves and configuration are saved cleanly under `Documents\VanillaBTN\`.
-  - Automatic, seamless migration preserves existing player data from previous versions.
+  - Windows saves and configuration use the active user's `Documents\VanillaBTN\`; Android uses app-private storage.
+  - Windows migrates the previous `Documents\BackToNature\` folder when needed.
 - **Robust Crash Diagnostics**:
   - Displays a platform-native error dialog detailing the fault reason, exception code, and memory address if an unexpected crash occurs.
 

@@ -1,22 +1,38 @@
 # Platform status
 
-As of 2026-10-26, native Windows replays complete the opening and validate free
-player movement inside the house and in the farm after the Thomas/Zack dialogue.
-Title/menu, farm, flashback, house and parts of the town render.
-Full playthrough and broader gameplay remain unverified; see WINDOWS_PLAYTEST.md.
+## Current status (2026-10-30)
 
-| Target | Foundation preset | Validation |
-| --- | --- | --- |
-| Linux x86-64 | linux-release, linux-asan-ubsan | Deferred; requires a separate Linux host, no WSL |
-| Windows x86-64 | windows-release | All 113 original source units and native window build; tests passed (79/79 with -Game) |
-| Windows x86-64 sanitizers | windows-asan-ubsan | All source units and native window build; Clang 20.1.8 ASan/UBSan tests passed (79/79 with shared GPU output, pause, interpolation and scaling compiled); gameplay coverage remains limited |
-| macOS universal | macos-universal-release | Pending; no macOS host tested |
-| Android arm64 | Gradle / NDK r27c, minSdk 26 | Previous build succeeded; current device behavior remains unverified |
+| Target | Current validation |
+| --- | --- |
+| Windows x86-64 | Playable -Game build and standalone package have been produced. The latest recorded Windows suite is 124/124; this documentation update did not rerun it. Full-playthrough parity and several scene/device checks remain unverified. |
+| Android arm64-v8a | Native APK build has succeeded with NDK r27c. Graphics profiles, SAF disc import, touch controls, and storage have implementation work; full gameplay/device validation remains incomplete. |
+| Linux x86-64 | Deferred to a separate Linux host; WSL is excluded. |
+| macOS universal | No macOS build has been validated. |
+| Matching build | The check target remains unverified on this Windows host because its separate Linux toolchain is unavailable. |
+
+GPU Auto shares scene output at native and enhanced resolutions, with Software
+as the reference and CPU fallback for unsupported work. Coverage is partial;
+do not claim complete GPU offload or full-playthrough parity. The owner
+confirmed that the reported horizontal line disappeared in one farm scene with
+Modern, Scaling On, Widescreen Off, MSAA 4x, Nearest, Interpolation Off, VSync
+On, and unlimited FPS. Other scenes/devices and performance remain unverified.
+
+Open runtime issue: the owner has reported a sleep/save access violation
+(-1073741819 / 0xC0000005). Synthetic card persistence checks do not prove the
+original in-game sleep, day-transition, save, and load lifecycle. See
+WINDOWS_PLAYTEST.md.
+
+## Historical validation notes
+
+The dated checkpoints below preserve what was tested at each point in time.
+Older test counts, platform limitations, and feature status are historical;
+use the current summary above and later ADRs for the present state.
 
 The owner prioritizes Windows. No workflow/CI changes are included or requested.
-The owner now performs interactive gameplay testing. The Windows host stores
-native card containers in Documents/BackToNature/saves and creates settings.json
-only when missing (ADR-044). New isolated tests cover card persistence,
+The owner now performs interactive gameplay testing. At this historical
+checkpoint, ADR-044 selected Documents/BackToNature for native card containers
+and settings.json; ADR-137 later superseded that Windows path with
+Documents/VanillaBTN. New isolated tests cover card persistence,
 failed-write preservation, slot isolation, capacity, invalid containers, actual
 Unicode filesystem paths and preserving existing settings. There are 66 base
 tests plus one SDL filesystem test when the native window option is enabled.

@@ -29,7 +29,11 @@ uses the same native texture sampler and 15-bit color conventions. Texture
 filtering remains nearest inside this initial rasterizer; the existing Bilinear
 option filters final-frame presentation. Lines retain original logical-pixel
 coverage. Framebuffer feedback textures still sample the private native VRAM;
-they do not gain higher-resolution feedback. Optional per-texture bilinear is now shared with native output (ADR-055). Optional farm world widescreen is available (ADR-056). FXAA/MSAA remain pending.
+they do not gain higher-resolution feedback. Optional per-texture bilinear is
+now shared with native output (ADR-055), and optional Widescreen applies across
+screens (ADR-057). FXAA final-image processing and GPU MSAA 2x/4x were added in
+ADR-076; both default OFF. MSAA requires GPU Auto. See ENHANCEMENTS.md for
+current coverage and owner-validation limits.
 
 Software fallback executes the native rasterizer inside private replay to
 preserve feedback/state semantics. GPU replay consumes output geometry directly. Output textures match image bounds, avoiding stale
