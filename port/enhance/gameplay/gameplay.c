@@ -1,4 +1,5 @@
 #include "enhance/gameplay/gameplay.h"
+#include "enhance/gameplay/mine_grid.h"
 #include <libgpu.h>
 #include <libgte.h>
 #include "farm_state.h"
@@ -614,10 +615,11 @@ void hm_gameplay_draw_tile_targeting(const void *player_ptr, s32 depth) {
         if (col < 0 || col >= GREENHOUSE_SIZE || row < 0 || row >= GREENHOUSE_SIZE)
             return;
     } else {
-        col = (s16)((target_pos.vx - (-2000)) / 400);
-        row = (s16)((2000 - target_pos.vz) / 400);
-        if (col < 0 || col >= 10 || row < 0 || row >= 10)
+        int mine_col, mine_row;
+        if (!hm_mine_grid_cell(target_pos.vx, target_pos.vz, &mine_col, &mine_row))
             return;
+        col = (s16)mine_col;
+        row = (s16)mine_row;
     }
 
     s32 x0, x1, z0, z1;
