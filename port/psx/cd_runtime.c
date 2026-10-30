@@ -9,8 +9,10 @@ static struct {
     hm_disc *disc;
     u8 *destination;
     u32 position, remaining, fraction;
-    u8 mode, last_command, response[8];
+    u8 mode, xa_mode, last_command, response[8];
+    int xa_mode_valid;
     int failed;
+    int command_failed;
     int streaming;
     u8 filter_file, filter_channel;
     hm_xa_decoder decoder;
@@ -22,6 +24,15 @@ static void hm_cd_stop_xa(void) {
     hm_cd.streaming = 0;
     hm_cd.audio_read = hm_cd.audio_count = 0;
     hm_xa_decoder_reset(&hm_cd.decoder);
+}
+
+static s32 hm_cd_reject_control(u8 command, u8 *result) {
+    hm_cd.response[0] = 3;
+    hm_cd.command_failed = 1;
+    hm_cd.last_command = command;
+    if (result)
+        memcpy(result, hm_cd.response, sizeof(hm_cd.response));
+    return 0;
 }
 
 int hm_cd_audio_sample(s16 stereo[2]) {
@@ -81,6 +92,7 @@ s32 CdControl(u8 command, const u8 *parameters, u8 *result) {
     hm_cd_require("CdControl");
     memset(hm_cd.response, 0, sizeof(hm_cd.response));
     hm_cd.response[0] = 2;
+    hm_cd.command_failed = 0;
     switch (command) {
     case CdlSetloc: {
         if (!parameters || !hm_cd_bcd(parameters[0], 100) || !hm_cd_bcd(parameters[1], 60) ||
@@ -102,10 +114,16 @@ s32 CdControl(u8 command, const u8 *parameters, u8 *result) {
         if (parameters[0] & 0x21)
             hm_runtime_error("CdControl", "unsupported sector transfer mode");
         hm_cd.mode = parameters[0];
+        if (hm_cd.mode & 0x40) {
+            hm_cd.xa_mode = hm_cd.mode;
+            hm_cd.xa_mode_valid = 1;
+        }
         break;
     case CdlStandby:
     case 9: /* Pause */
         hm_cd_stop_xa();
+        if (command == CdlStandby)
+            hm_cd.xa_mode_valid = 0;
         hm_cd.remaining = 0;
         hm_cd.destination = NULL;
         break;
@@ -116,8 +134,16 @@ s32 CdControl(u8 command, const u8 *parameters, u8 *result) {
         hm_cd.filter_channel = parameters[1];
         break;
     case CdlReadS: {
-        if (!(hm_cd.mode & 0x40) || hm_cd.remaining)
-            hm_runtime_error("CdControl", "XA stream requires XA mode and an idle data reader");
+        if (hm_cd.remaining)
+            return hm_cd_reject_control(command, result);
+        /* CdRead(mode) can leave the drive in data-only mode while the game still
+         * has an XA track configured. Restore that track's last XA mode when its
+         * fade/restart path issues CdlReadS. */
+        if (!(hm_cd.mode & 0x40)) {
+            if (!hm_cd.xa_mode_valid)
+                return hm_cd_reject_control(command, result);
+            hm_cd.mode = hm_cd.xa_mode;
+        }
         if (parameters) {
             s32 position = CdPosToInt((const CdlLOC *)parameters);
             if (position < 0 || (u32)position >= hm_cd.disc->sectors)
@@ -168,6 +194,7 @@ s32 CdRead(s32 sectors, u32 *destination, s32 mode) {
     hm_cd.destination = (u8 *)destination;
     hm_cd.remaining = (u32)sectors;
     hm_cd.mode = (u8)mode;
+    hm_cd.command_failed = 0;
     hm_cd.fraction = 0;
     hm_cd.failed = 0;
     hm_cd.response[0] = 2;
@@ -246,7 +273,7 @@ s32 CdSync(s32 mode, u8 *result) {
         hm_runtime_error("CdSync", "unsupported polling mode");
     if (result)
         memcpy(result, hm_cd.response, sizeof(hm_cd.response));
-    return hm_cd.failed ? 5 : 2;
+    return (hm_cd.failed || hm_cd.command_failed) ? 5 : 2;
 }
 
 s32 CdReadBreak(void) {

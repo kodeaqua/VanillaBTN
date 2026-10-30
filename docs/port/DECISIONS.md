@@ -3805,3 +3805,26 @@ an enhancement. Synthetic probes on a Radeon RX Vega measured 0.475 ms GPU versu
 these numbers exclude the game loop and do not predict gameplay frame rate.
 Native-resolution workloads may pay a small render-slice cost. Full gameplay
 coverage and device behavior remain owner-tested.
+
+## ADR-139: Restore XA Mode on CD Audio Restart
+
+Date: 2026-10-30. Status: accepted.
+
+Context: The current CD runtime stores `CdRead`'s subsystem mode in the same
+state used by CD-ROM commands. The game starts XA playback in mode `0xC8`, but
+later file reads use mode `0x80`. A subsequent `CdlReadS` from
+`cd_audio_restart` then reached a runtime abort because the XA bit was no longer
+set. A stack captured from the owner's open crash dialog showed
+`farm_mode_tick -> cd_audio_fade_tick -> cd_audio_restart -> CdControl`, with
+the active mode at `0x80` and no outstanding data read.
+
+Decision: Remember the most recently configured XA mode when `CdlSetmode`
+enables ADPCM. On a later `CdlReadS`, restore that mode if a file read changed
+the active mode. Reject a still-busy reader or a read without any prior XA
+configuration through the normal CD command failure status instead of aborting
+the process.
+
+Consequences: XA fade restarts resume with the configured speed and filter
+after intervening file reads. The CD runtime remains port-only; no decomp source
+or overlay manifest changed. Interactive gameplay confirmation remains with the
+owner.
