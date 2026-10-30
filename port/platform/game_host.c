@@ -595,7 +595,12 @@ static void hm_host_pause(void) {
                 }
             } else if (event.type == SDL_EVENT_MOUSE_MOTION) {
                 int win_w = 0, win_h = 0;
+                /* ADR-135: Android touch events are in physical pixels; use pixel size. */
+#ifdef __ANDROID__
+                if (SDL_GetWindowSizeInPixels(hm_window, &win_w, &win_h) && win_w > 0 && win_h > 0) {
+#else
                 if (SDL_GetWindowSize(hm_window, &win_w, &win_h) && win_w > 0 && win_h > 0) {
+#endif
                     int vx, vy;
                     if (hm_mouse_calc_virtual_pos(event.motion.x, event.motion.y, win_w, win_h, &vx, &vy)) {
                         if (menu.page == HM_PAUSE_GRAPHICS || menu.page == HM_PAUSE_GAMEPLAY ||
@@ -634,7 +639,12 @@ static void hm_host_pause(void) {
                     input = HM_PAUSE_BACK;
                 } else if (event.button.button == SDL_BUTTON_LEFT) {
                     int win_w = 0, win_h = 0;
+                    /* ADR-135: Android touch events are in physical pixels; use pixel size. */
+#ifdef __ANDROID__
+                    if (SDL_GetWindowSizeInPixels(hm_window, &win_w, &win_h) && win_w > 0 && win_h > 0) {
+#else
                     if (SDL_GetWindowSize(hm_window, &win_w, &win_h) && win_w > 0 && win_h > 0) {
+#endif
                         int vx, vy;
                         if (hm_mouse_calc_virtual_pos(event.button.x, event.button.y, win_w, win_h, &vx, &vy)) {
                             if (menu.page == HM_PAUSE_GRAPHICS || menu.page == HM_PAUSE_GAMEPLAY ||
@@ -1355,8 +1365,19 @@ static void hm_host_poll_events(void) {
 
 static void hm_host_events(void) {
     int current_win_w = 0, current_win_h = 0;
-    if (SDL_GetWindowSize(hm_window, &current_win_w, &current_win_h) && current_win_w > 0 &&
-        current_win_h > 0) {
+    /* PORT: On Android, SDL3 reports touch-synthesised mouse events in physical
+     * pixels, while SDL_GetWindowSize returns logical dp units.  Use
+     * SDL_GetWindowSizeInPixels so hm_mouse_calc_virtual_pos receives a matching
+     * denominator and the 320x240 virtual-canvas mapping stays precise on
+     * high-DPI Android devices.  On all other platforms logical window size is
+     * correct because SDL mouse events are already in logical coords (ADR-135). */
+#ifdef __ANDROID__
+    if (SDL_GetWindowSizeInPixels(hm_window, &current_win_w, &current_win_h) &&
+        current_win_w > 0 && current_win_h > 0) {
+#else
+    if (SDL_GetWindowSize(hm_window, &current_win_w, &current_win_h) &&
+        current_win_w > 0 && current_win_h > 0) {
+#endif
 #if defined(HMBTN_ENH_WIDESCREEN) && defined(HMBTN_ENH_PAUSE_MENU)
         hm_widescreen_configure(hm_options.widescreen, current_win_w, current_win_h);
 #endif

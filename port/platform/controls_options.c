@@ -10,7 +10,15 @@ void hm_controls_defaults(hm_controls_options *opt) {
         return;
     opt->controller_enabled = 1;
     opt->keyboard_layout = HM_KEYBOARD_LAYOUT_ARROWS;
+    /* PORT: On Android the primary input is touch, which SDL3 synthesises as
+     * left mouse clicks.  Default to ACTION mode so tapping inventory slots,
+     * dialogue choices, and storage grids works out-of-the-box without the
+     * user having to open the Settings menu first (ADR-135). */
+#ifdef __ANDROID__
+    opt->mouse_mode = HM_MOUSE_MODE_ACTION;
+#else
     opt->mouse_mode = HM_MOUSE_MODE_OFF;
+#endif
 }
 
 int hm_controls_change(hm_controls_options *opt, int item, int step) {

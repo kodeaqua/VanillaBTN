@@ -3641,3 +3641,67 @@ Consequences:
 - Mouse navigation and clicking are pixel-perfect on both 100% and high-DPI scaled displays.
 - Ghost clicks and delayed click bleed-through are completely eliminated.
 - 100% unit tests passing (124/124) with full vanilla parity when enhancements are OFF.
+
+## ADR-135: Android Touch Coordinate Precision Fix and Default Mouse Mode
+
+**Date:** 2026-10-30
+**Status:** Accepted
+
+### Context
+
+On Android, SDL3 synthesises finger-touch events as `SDL_EVENT_MOUSE_MOTION` /
+`SDL_EVENT_MOUSE_BUTTON_DOWN` events whose `x`/`y` fields are in **physical
+screen pixels**.  However, `SDL_GetWindowSize` returns the window size in
+**logical dp units** (screen-density-independent points), which differs from
+physical pixels on any high-DPI Android device (e.g. 2× or 3× density).
+
+`hm_mouse_calc_virtual_pos` divides the touch coordinates by the window size to
+derive a position inside the 320×240 virtual canvas.  When the numerator is in
+physical pixels but the denominator is in dp, the ratio is wrong, producing a
+scaled-up virtual position that consistently overshoots the intended slot or
+dialogue option.
+
+On Windows and macOS, SDL mouse events *are* in logical coordinates, so the
+existing `SDL_GetWindowSize` call in `hm_host_events` and `hm_host_pause` was
+correct for those platforms (and ADR-134 intentionally kept it that way).
+
+Additionally, the controls default on Android was `HM_MOUSE_MODE_OFF`, meaning
+touch-to-inventory/touch-to-dialogue interaction was entirely disabled until the
+user manually opened Settings → Controls.  On a touch-primary device this is
+the wrong out-of-the-box experience.
+
+### Decision
+
+1. **Coordinate fix** – in `port/platform/game_host.c`, guard the window-size
+   query in `hm_host_events` and the two mouse-handling paths inside
+   `hm_host_pause` (MOTION and BUTTON_DOWN) with `#ifdef __ANDROID__` /
+   `#else` blocks:
+   - `__ANDROID__`: call `SDL_GetWindowSizeInPixels` → coordinates match the
+     physical-pixel touch events.
+   - All other platforms: keep `SDL_GetWindowSize` → coordinates match logical
+     mouse events (preserves ADR-134 fix on Windows).
+
+2. **Android default mouse mode** – in `port/platform/controls_options.c`,
+   `hm_controls_defaults` sets `mouse_mode = HM_MOUSE_MODE_ACTION` when
+   `__ANDROID__` is defined.  This lets the first-time user tap inventory slots
+   and dialogue choices without any setup.  The setting is still overridden by
+   whatever the user has saved in `settings.json`, so existing per-user
+   preferences are respected.
+
+### Files Changed
+
+- `port/platform/game_host.c` — `hm_host_events`, pause MOTION handler, pause
+  BUTTON_DOWN handler.
+- `port/platform/controls_options.c` — `hm_controls_defaults`.
+
+### Consequences
+
+- Touch-to-slot and touch-to-dialogue precision on Android now matches the
+  Windows mouse precision achieved in ADR-134.
+- No source change under `src/overlay/` — no manifest hash update required.
+- Windows / macOS / Linux behaviour is completely unchanged (compile-time guard).
+- The `mouse_mode` default change only affects first-run or clean-settings
+  Android installs; any existing `settings.json` with an explicit `"mouse"`
+  key overrides it.
+- 100% unit tests still passing (124/124); vanilla parity with all enhancements
+  OFF is unaffected.
