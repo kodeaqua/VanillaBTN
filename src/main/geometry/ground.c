@@ -8,7 +8,12 @@
 #include "model.h"
 
 static s32 ground_xz_in_clip(s32 x0, s32 y0, s32 x1, s32 y1);
+#ifdef HMBTN_PORT
+/* PORT: VECTOR components are 32-bit on LP64 hosts -- see docs/port/DECISIONS.md#adr-110 */
+static s32 ground_xyz_in_clip(s32 *first, s32 *second);
+#else
 static s32 ground_xyz_in_clip(long *first, long *second);
+#endif
 static s32 ground_primitive_under(TmdObject *table, TmdObject *object);
 
 SVECTOR *ground_vertices;
@@ -191,7 +196,11 @@ static s32 ground_xz_in_clip(s32 x0, s32 y0, s32 x1, s32 y1) {
     return 1;
 }
 
+#ifdef HMBTN_PORT
+static s32 ground_xyz_in_clip(s32 *first, s32 *second) {
+#else
 static s32 ground_xyz_in_clip(long *first, long *second) {
+#endif
     s32 limit;
     s32 negative_limit;
     s32 delta;
