@@ -37,6 +37,8 @@ uint texel(uint p,uint2 st){uint mx=(256-word(p,7))&248,my=(256-word(p,8))&248;
     uint index=depth==0?(vram(x+int(u/4),y+int(v))>>((u&3)*4))&15:
         (vram(x+int(u/2),y+int(v))>>((u&1)*8))&255;
     uint clut=word(p,3);return vram(int((clut&63)*16+index),int((clut>>6)&511));}
+bool hm_font_glyph(uint p){uint clut=word(p,3),row=clut>>6;
+    return word(p,2)==14&&(clut&63)==56&&row>=250&&row<=254;}
 uint interp_i(uint3 values,int3 w,int area){
     uint a=uint(area),num=uint(w.x)*values.x+uint(w.y)*values.y+uint(w.z)*values.z+a/2;
     uint reciprocal=0xffffffffu/a+((0xffffffffu%a)+1+a/2)/a;
@@ -75,6 +77,7 @@ void main(uint3 id:SV_DispatchThreadID){
         uint3 light=rgb(word(p,24));uint2 st=uv(word(p,27));
         int2 filtered_uv=int2(st)*256;uint4 texture_bounds=uint4(st,st);
         bool textured=(op&4)!=0,raw=textured&&((op&1)!=0);
+        bool filter_texture=filtering_enabled&&!(textured&&hm_font_glyph(p));
         bool exact_native=native&&!(flags&32)&&samples==1;
         if(word(p,0)==0){
             int2 a=int2(word(p,18),word(p,19)),b=int2(word(p,20),word(p,21)),c=int2(word(p,22),word(p,23));
@@ -103,13 +106,13 @@ void main(uint3 id:SV_DispatchThreadID){
             if(exact_native){if((op&16)&&!raw&&!(all(r0==r1)&&all(r1==r2)))
                 light=filtering_enabled?uint3(interp_div(uint3(r0.x,r1.x,r2.x),wi,ai),interp_div(uint3(r0.y,r1.y,r2.y),wi,ai),interp_div(uint3(r0.z,r1.z,r2.z),wi,ai)):
                     uint3(interp_i(uint3(r0.x,r1.x,r2.x),wi,ai),interp_i(uint3(r0.y,r1.y,r2.y),wi,ai),interp_i(uint3(r0.z,r1.z,r2.z),wi,ai));
-                if(textured){if(filtering_enabled)filtered_uv=int2(hm_filter_uv_i(uint3(t0.x,t1.x,t2.x),wi,ai),hm_filter_uv_i(uint3(t0.y,t1.y,t2.y),wi,ai));
+                if(textured){if(filter_texture)filtered_uv=int2(hm_filter_uv_i(uint3(t0.x,t1.x,t2.x),wi,ai),hm_filter_uv_i(uint3(t0.y,t1.y,t2.y),wi,ai));
                     else st=uint2(interp_i(uint3(t0.x,t1.x,t2.x),wi,ai),interp_i(uint3(t0.y,t1.y,t2.y),wi,ai));}}
             else{if((op&16)&&!raw)light=uint3(interp_f(uint3(r0.x,r1.x,r2.x),wf,af),interp_f(uint3(r0.y,r1.y,r2.y),wf,af),interp_f(uint3(r0.z,r1.z,r2.z),wf,af));
                 if(textured){float3 wp=wf;float ap=af;
                     if(word(p,33)!=0){float3 zv=float3(asfloat(word(p,30)),asfloat(word(p,31)),asfloat(word(p,32)));
                         wp=wf/max(zv,1.0);float sw=dot(wp,float3(1,1,1));if(sw>0.0)ap=sw;}
-                    if(filtering_enabled)filtered_uv=int2(hm_filter_uv_f(uint3(t0.x,t1.x,t2.x),wp,ap),hm_filter_uv_f(uint3(t0.y,t1.y,t2.y),wp,ap));
+                    if(filter_texture)filtered_uv=int2(hm_filter_uv_f(uint3(t0.x,t1.x,t2.x),wp,ap),hm_filter_uv_f(uint3(t0.y,t1.y,t2.y),wp,ap));
                     else st=uint2(interp_f(uint3(t0.x,t1.x,t2.x),wp,ap),interp_f(uint3(t0.y,t1.y,t2.y),wp,ap));}}
         }else{int2 delta;
             texture_bounds=uint4(st,st+uint2(word(p,32),word(p,33))-1);
@@ -119,14 +122,14 @@ void main(uint3 id:SV_DispatchThreadID){
                     if(!coverage)continue;center=hm_aa_center(id.xy,coverage,samples);}
                 else if(any(center<low)||any(center>=high))continue;
                 delta=int2(floor((center-low)*float2(logical_size)/float2(width,height)));
-                if(filtering_enabled){int2 fixed_center=int2(floor(center*256.0))-int2(word(p,35),word(p,36));
+                if(filter_texture){int2 fixed_center=int2(floor(center*256.0))-int2(word(p,35),word(p,36));
                     filtered_uv=int2(st)*256+int2((uint2(fixed_center)*logical_size+uint2(width,height)/2)/uint2(width,height))-128;}
             }else{delta=logical-int2(word(p,30),word(p,31));
                 if(any(delta<0)||delta.x>=int(word(p,32))||delta.y>=int(word(p,33)))continue;
-                if(filtering_enabled){uint2 center_q8=((2*id.xy+1)*logical_size*128+uint2(width,height)/2)/uint2(width,height);
+                if(filter_texture){uint2 center_q8=((2*id.xy+1)*logical_size*128+uint2(width,height)/2)/uint2(width,height);
                     filtered_uv=int2(st)*256+int2(center_q8)+(origin-int2(word(p,30),word(p,31)))*256-128;}}
             st+=uint2(delta);}
-        if(textured&&filtering_enabled){
+        if(textured&&filter_texture){
             [unroll]for(uint filtered_sample=0;filtered_sample<4;++filtered_sample){if(filtered_sample>=samples)break;
                 if(coverage&(1u<<filtered_sample)){
                     sample_colors[filtered_sample]=hm_filter_compose(p,filtered_uv,texture_bounds,light,logical,sample_colors[filtered_sample],filter_mode);

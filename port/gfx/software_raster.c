@@ -107,6 +107,10 @@ static s32 hm_software_uv_q8(u32 a, u32 b, u32 c, const s64 w[3], s64 area) {
         rest = numerator % area;
     return (s32)(whole * 256 + (rest * 256 + area / 2) / area);
 }
+static int hm_software_font_glyph(u16 page, u16 clut) {
+    const u32 clut_row = clut >> 6;
+    return page == 14 && (clut & 63) == 56 && clut_row >= 250 && clut_row <= 254;
+}
 #endif
 static void hm_software_triangle(hm_software_surface *s, hm_software_vertex a, hm_software_vertex b,
                                  hm_software_vertex c, u32 op, u16 clut) {
@@ -155,6 +159,10 @@ static void hm_software_triangle(hm_software_surface *s, hm_software_vertex a, h
     int flat = !textured && a.rgb[0] == b.rgb[0] && a.rgb[0] == c.rgb[0] && a.rgb[1] == b.rgb[1] &&
                a.rgb[1] == c.rgb[1] && a.rgb[2] == b.rgb[2] && a.rgb[2] == c.rgb[2];
     const DRAWENV *d = &hm_gpu_environment_state()->draw;
+#ifdef HMBTN_ENH_FILTERING
+    const int filter_texture = s->texture_filter &&
+                               !(textured && hm_software_font_glyph(d->tpage, clut));
+#endif
     flat = flat && (!d->dtd || !(op & 16));
     u16 flat_color = (u16)((a.rgb[0] >> 3) | ((a.rgb[1] >> 3) << 5) | ((a.rgb[2] >> 3) << 10));
     static const s8 dither[4][4] = {{-4, 0, -3, 1}, {2, -2, 3, -1}, {-3, 1, -4, 0}, {3, -1, 2, -2}};
@@ -184,7 +192,7 @@ static void hm_software_triangle(hm_software_surface *s, hm_software_vertex a, h
                 continue;
             }
 #ifdef HMBTN_ENH_FILTERING
-            if (textured && s->texture_filter) {
+            if (textured && filter_texture) {
                 hm_texture_shading shading = {.opcode = op,
                                               .rectangle = 0,
                                               .dither = d->dtd,
@@ -275,6 +283,11 @@ static void hm_software_rectangle(hm_software_surface *s, const u32 *w, u32 avai
         height = (w[length - 1] >> 16) & 511;
     }
     const DRAWENV *d = &hm_gpu_environment_state()->draw;
+#ifdef HMBTN_ENH_FILTERING
+    const int filter_texture =
+        s->texture_filter &&
+        !(textured && hm_software_font_glyph(d->tpage, (u16)(w[2] >> 16)));
+#endif
     int lx = hm_software_signed11(w[1]) + d->ofs[0],
         ly = hm_software_signed11(w[1] >> 16) + d->ofs[1];
     hm_software_vertex a = hm_software_make_vertex(s, lx, ly, w[0], 0),
@@ -289,7 +302,7 @@ static void hm_software_rectangle(hm_software_surface *s, const u32 *w, u32 avai
             if (dx < 0 || dy < 0 || dx >= width || dy >= height)
                 continue;
 #ifdef HMBTN_ENH_FILTERING
-            if (textured && s->texture_filter) {
+            if (textured && filter_texture) {
                 hm_texture_bounds bounds = {(s32)(w[2] & 255), (s32)((w[2] >> 8) & 255),
                                             (s32)(w[2] & 255) + width - 1,
                                             (s32)((w[2] >> 8) & 255) + height - 1};

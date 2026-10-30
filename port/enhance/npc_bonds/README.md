@@ -16,5 +16,5 @@ value. Names use normal title case and the original lowercase font glyphs. Each
 icon is a cropped, downsampled portrait from the matching NPC's original face
 bank in the user's `face.bin`; visible portraits load progressively while the
 page is open. The portrait-bank mapping follows the original Character ID order.
-Game image data is read at runtime and is not copied into the repository or
-release package.
+The page heading and bar labels use title case as well. Game image data is read
+at runtime and is not copied into the repository or release package.

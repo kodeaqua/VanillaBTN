@@ -173,9 +173,9 @@ static void hm_npc_bonds_draw_row(size_t index, int y)
 
 void hm_npc_bonds_draw_page(void)
 {
-    static const char *const heading = "RELATIONS";
-    static const char *const friendship_label = "FRIEND";
-    static const char *const affection_label = "LOVE";
+    static const char *const heading = "Relations";
+    static const char *const friendship_label = "Friends";
+    static const char *const affection_label = "Love";
     const size_t count = hm_npc_bonds_count();
     const int max_top = (int)count - HM_NPC_BONDS_ROWS;
     u16 text[16];
