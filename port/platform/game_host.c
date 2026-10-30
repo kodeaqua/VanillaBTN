@@ -1632,6 +1632,28 @@ static void hm_host_tick(void *context, u64 tick) {
 #endif
 }
 
+static SDL_GPUDevice *hm_create_gpu_device(void) {
+#if defined(__ANDROID__)
+    SDL_PropertiesID properties = SDL_CreateProperties();
+    if (!properties)
+        return NULL;
+    bool configured =
+        SDL_SetBooleanProperty(properties, SDL_PROP_GPU_DEVICE_CREATE_DEBUGMODE_BOOLEAN, false) &&
+        SDL_SetBooleanProperty(properties, SDL_PROP_GPU_DEVICE_CREATE_SHADERS_SPIRV_BOOLEAN, true) &&
+        SDL_SetBooleanProperty(properties, SDL_PROP_GPU_DEVICE_CREATE_FEATURE_CLIP_DISTANCE_BOOLEAN, false) &&
+        SDL_SetBooleanProperty(properties, SDL_PROP_GPU_DEVICE_CREATE_FEATURE_DEPTH_CLAMPING_BOOLEAN, false) &&
+        SDL_SetBooleanProperty(properties, SDL_PROP_GPU_DEVICE_CREATE_FEATURE_INDIRECT_DRAW_FIRST_INSTANCE_BOOLEAN, false) &&
+        SDL_SetBooleanProperty(properties, SDL_PROP_GPU_DEVICE_CREATE_FEATURE_ANISOTROPY_BOOLEAN, false);
+    SDL_GPUDevice *device = configured ? SDL_CreateGPUDeviceWithProperties(properties) : NULL;
+    SDL_DestroyProperties(properties);
+    return device;
+#else
+    return SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL |
+                                   SDL_GPU_SHADERFORMAT_MSL,
+                               false, NULL);
+#endif
+}
+
 int hm_game_host_start(hm_disc *disc) {
 #ifndef HMBTN_ENH_PAUSE_MENU
     (void)disc;
@@ -1688,9 +1710,7 @@ int hm_game_host_start(hm_disc *disc) {
             SDL_DestroySurface(icon);
         }
     }
-    hm_device = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL |
-                                        SDL_GPU_SHADERFORMAT_MSL,
-                                    false, NULL);
+    hm_device = hm_create_gpu_device();
 #ifdef __ANDROID__
     Uint32 allowed_frames_in_flight = 3;
 #else

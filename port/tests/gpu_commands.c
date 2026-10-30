@@ -1,4 +1,5 @@
 #include "psx/gpu_links.h"
+#include "psx/gpu_raster.h"
 #include "psx/vram.h"
 #include <libgpu.h>
 #include <stdio.h>
@@ -154,5 +155,71 @@ int main(void) {
     DrawOTag(ot + 3);
     CHECK(hm_vram_pixel(2, 243) == 31);
     CHECK(hm_vram_pixel(2, 3) != 31);
+
+    /* GP0(80h) copies wrapped regions and preserves overlapping sources. */
+    hm_vram_reset();
+    const u16 wrapped_source[2][4] = {{0x001f, 0x03e0, 0x7c00, 0x4210},
+                                      {0x1234, 0x2345, 0x3456, 0x4567}};
+    for (u32 y = 0; y < 2; ++y)
+        for (u32 x = 0; x < 4; ++x)
+            hm_vram_draw_pixel(1022 + x, 511 + y, wrapped_source[y][x]);
+    const u32 wrapped_copy[] = {0x80000000, 1022u | (511u << 16), 5u | (8u << 16),
+                                4u | (2u << 16)};
+    hm_gpu_execute_words(wrapped_copy, 4);
+    for (u32 y = 0; y < 2; ++y)
+        for (u32 x = 0; x < 4; ++x)
+            CHECK(hm_vram_pixel(5 + x, 8 + y) == wrapped_source[y][x]);
+
+    hm_vram_reset();
+    for (u32 y = 0; y < 2; ++y)
+        for (u32 x = 0; x < 4; ++x)
+            hm_vram_draw_pixel(1008 + x, 510 + y, wrapped_source[y][x]);
+    const u32 wrapped_destination[] = {0x80000000, 1008u | (510u << 16),
+                                       1022u | (511u << 16), 4u | (2u << 16)};
+    hm_gpu_execute_words(wrapped_destination, 4);
+    for (u32 y = 0; y < 2; ++y)
+        for (u32 x = 0; x < 4; ++x)
+            CHECK(hm_vram_pixel((1022 + x) & 1023, (511 + y) & 511) == wrapped_source[y][x]);
+
+    hm_vram_reset();
+    for (u32 x = 0; x < 6; ++x)
+        hm_vram_draw_pixel(20 + x, 30, (u16)(x + 1));
+    const u32 overlapping_copy[] = {0x80000000, 20u | (30u << 16), 22u | (30u << 16),
+                                    4u | (1u << 16)};
+    hm_gpu_execute_words(overlapping_copy, 4);
+    for (u32 x = 0; x < 4; ++x)
+        CHECK(hm_vram_pixel(22 + x, 30) == x + 1);
+
+    /* E6 mask-check and mask-set state applies to GP0(80h) destinations. */
+    hm_vram_reset();
+    hm_vram_draw_pixel(30, 40, 0x1234);
+    hm_vram_draw_pixel(31, 40, 0x4000);
+    hm_vram_draw_pixel(50, 40, 0x8001);
+    hm_vram_draw_pixel(51, 40, 0x0002);
+    const u32 check_mask_copy[] = {0xe6000002, 0x80000000, 30u | (40u << 16),
+                                   50u | (40u << 16), 2u | (1u << 16)};
+    hm_gpu_execute_words(check_mask_copy, 5);
+    CHECK(hm_vram_pixel(50, 40) == 0x8001);
+    CHECK(hm_vram_pixel(51, 40) == 0x4000);
+    const u32 set_mask_copy[] = {0xe6000001, 0x80000000, 30u | (40u << 16),
+                                 52u | (40u << 16), 2u | (1u << 16)};
+    hm_gpu_execute_words(set_mask_copy, 5);
+    CHECK(hm_vram_pixel(52, 40) == 0x9234);
+    CHECK(hm_vram_pixel(53, 40) == 0xc000);
+
+    /* GP0(A0h) uploads share the destination mask controls. */
+    hm_vram_reset();
+    hm_vram_draw_pixel(60, 50, 0x8001);
+    hm_vram_draw_pixel(61, 50, 0x0002);
+    const u32 check_mask_load[] = {0xe6000002, 0xa0000000, 60u | (50u << 16),
+                                   2u | (1u << 16), 0x45671234};
+    hm_gpu_execute_words(check_mask_load, 5);
+    CHECK(hm_vram_pixel(60, 50) == 0x8001);
+    CHECK(hm_vram_pixel(61, 50) == 0x4567);
+    const u32 set_mask_load[] = {0xe6000001, 0xa0000000, 62u | (50u << 16),
+                                 2u | (1u << 16), 0x45671234};
+    hm_gpu_execute_words(set_mask_load, 5);
+    CHECK(hm_vram_pixel(62, 50) == 0x9234);
+    CHECK(hm_vram_pixel(63, 50) == 0xc567);
     return 0;
 }

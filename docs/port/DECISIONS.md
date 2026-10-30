@@ -4037,3 +4037,40 @@ until profiling identifies a hot file and records a before/after result.
 
 Consequences: Android builds follow the common release policy and do not claim
 an unmeasured speedup. Runtime performance still needs device profiling.
+
+## ADR-149: Relax Unused Vulkan Features for Android GPU Creation
+
+Date: 2026-10-31. Status: accepted.
+
+Context: SDL 3.2.28 rejected the connected MediaTek G100 tablet's Mali-G57 MC2
+Vulkan device because it does not expose `shaderClipDistance`. The game's shared
+scene renderer submits compute pipelines only and does not use Vulkan clip
+distance, depth clamp, indirect first-instance drawing, or sampler anisotropy.
+
+Decision: Upgrade the pinned SDL3 release to 3.4.18 and use its GPU device
+properties on Android to request SPIR-V shaders while disabling those four
+unused optional features. Keep the existing shader-format selection on desktop.
+
+Consequences: Android GPUs missing those optional features can initialize the
+compute renderer while SDL's Vulkan backend still validates the required core
+features. The API remains available if a future renderer starts using one of
+these features; that path must then request and validate it explicitly. Device
+startup is confirmed on the connected tablet; gameplay rendering remains
+unverified.
+
+## ADR-150: Synchronize Android SDL Java Glue with the Native Release
+
+Date: 2026-10-31. Status: accepted.
+
+Context: The Android app packaged SDL 3.2.28 Java glue with SDL 3.4.18 native
+code. SDL's `JNI_OnLoad` expected `SDLActivity.nativeSetupJNI()V`, while the
+checked-in class declared `nativeSetupJNI()I`; the mismatch aborted app startup
+before graphics initialization.
+
+Decision: Keep the SDL Android Java glue synchronized with the exact pinned
+SDL3 release. Replace the checked-in `org.libsdl.app` glue with the official
+3.4.18 source and retain the app-specific `MainActivity` subclass separately.
+
+Consequences: Android native JNI setup now completes with the matching SDL
+library. The connected tablet logs successful Vulkan device creation; no game
+scene was started during this diagnostic.

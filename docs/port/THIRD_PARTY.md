@@ -1,18 +1,24 @@
 # Third-party dependencies
 
-The optional Windows GPU spike uses SDL3; normal data-free unit builds do not
-download or link it. No third-party PSX API implementation has been imported.
+The Windows/Android game host and optional GPU probes use SDL3; normal data-free
+unit builds do not download or link it. No third-party PSX API implementation
+has been imported.
 
 | Dependency | Version | License | Source |
 | --- | --- | --- | --- |
-| SDL3 | 3.2.28 | zlib | https://github.com/libsdl-org/SDL/releases/tag/release-3.2.28 |
+| SDL3 | 3.4.18 | zlib | https://github.com/libsdl-org/SDL/releases/tag/release-3.4.18 |
 
-The official SDL3-3.2.28.tar.gz asset is pinned to SHA-256
-1330671214d146f8aeb1ed399fc3e081873cdb38b5189d1f8bb6ab15bbc04211,
+The official SDL3-3.4.18.tar.gz asset is pinned to SHA-256
+9c75cf16330322c217dedd2e0609f1124f1b54b8633e763467b4684d0f4334a3,
 verified against the publisher's GitHub release asset digest. FetchContent keeps
 the source and its LICENSE.txt in ignored build output. SDL's own notices remain
-intact. The spike links SDL statically and uses the system Vulkan driver on the
-tested Windows host. Packaging must retain applicable SDL/bundled notices.
+intact. The library links statically and uses the system GPU driver. Android
+disables optional Vulkan features unused by the compute-only scene renderer so
+devices that lack shader clip distance can still create an SDL_GPU device.
+The checked-in Android Java glue under
+`port/packaging/android/app/src/main/java/org/libsdl/app/` is synchronized to
+the same 3.4.18 release so its JNI signatures match the native library.
+Packaging must retain applicable SDL/bundled notices.
 
 Windows host tools (downloaded to ignored `build/host-tools/`, not vendored):
 

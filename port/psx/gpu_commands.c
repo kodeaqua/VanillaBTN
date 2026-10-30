@@ -172,6 +172,18 @@ static u32 hm_gpu_command(const u32 *words, u32 available) {
         hm_render_transfer_command_end();
         return length;
     }
+    if (opcode == 0x80) {
+        if (available < 4)
+            return available;
+        RECT source = {(s16)(words[1] & 1023u), (s16)((words[1] >> 16) & 511u),
+                       (s16)(words[3] & 1023u), (s16)((words[3] >> 16) & 511u)};
+        s32 destination_x = (s32)(words[2] & 1023u);
+        s32 destination_y = (s32)((words[2] >> 16) & 511u);
+        hm_render_transfer_command_begin();
+        MoveImage(&source, destination_x, destination_y);
+        hm_render_transfer_command_end();
+        return 4;
+    }
     if ((opcode & 0xE0) == 0x20)
         return hm_gpu_polygon(words, available);
     if ((opcode & 0xE0) == 0x40)
