@@ -161,6 +161,23 @@ int main(void) {
     safe_uv[3] = ((u32)getClut(896, 490) << 16) | 0x2800;
     hm_gpu_execute_words(safe_uv, 5);
     CHECK(!hm_gpu_scene_end(s, previous, &data));
+    /* Multisample locations can cross a 16-pixel bin boundary even when the
+     * output pixel centre lies in the neighboring bin. */
+    const u32 triangles[2][4] = {{0x200000ff, 0x000c0002, 0x000c000a, 0x00100002},
+                                 {0x200000ff, 0x0002000c, 0x00020010, 0x000a000c}};
+    for (unsigned samples = 1; samples <= 4; samples *= 2) {
+        for (int axis = 0; axis < 2; ++axis) {
+            setup(32, 32);
+            hm_gpu_scene_multisamples(s, samples);
+            previous = hm_gpu_scene_begin(s, 65, 97);
+            hm_replay_begin(&area);
+            hm_gpu_execute_words(triangles[axis], 4);
+            CHECK(hm_gpu_scene_end(s, previous, &data));
+            int bin = axis ? 1 : 2;
+            CHECK(data.words[data.words[9] + bin * HM_SCENE_BIN_WORDS] ==
+                  (samples == 1 ? 0u : 1u));
+        }
+    }
     hm_gpu_scene_destroy(s);
     return 0;
 }

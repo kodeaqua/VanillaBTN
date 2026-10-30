@@ -558,14 +558,14 @@ static int hm_probe_scaled_rows(SDL_GPUDevice *device, hm_gpu_renderer *renderer
                         for (u32 y = 0; y < 16; ++y)
                             for (u32 x = 0; x < 16; ++x)
                                 hm_vram_draw_pixel(640 + x, 256 + y, 0x7fff);
-                        const u32 rows[] = {0xe1000400 | 282, 0x65808080, xy(2, 2 + shift), 0,
-                                            xy(8, 4), 0x65808080, xy(2, 6 + shift), 0, xy(8, 4)};
+                        const u32 rows[] = {0xe1000400 | 282, 0x65808080, xy(2, 12 + shift), 0,
+                                            xy(8, 4), 0x65808080, xy(2, 16 + shift), 0, xy(8, 4)};
                         const u32 quads[] = {
                             0xe1000400 | 282,
-                            0x2d808080, xy(2, 2 + shift), 0, xy(10, 2 + shift), (282u << 16) | 8,
-                            xy(2, 6 + shift), 4u << 8, xy(10, 6 + shift), (4u << 8) | 8,
-                            0x2d808080, xy(2, 6 + shift), 0, xy(10, 6 + shift), (282u << 16) | 8,
-                            xy(2, 10 + shift), 4u << 8, xy(10, 10 + shift), (4u << 8) | 8};
+                            0x2d808080, xy(2, 12 + shift), 0, xy(10, 12 + shift), (282u << 16) | 8,
+                            xy(2, 16 + shift), 4u << 8, xy(10, 16 + shift), (4u << 8) | 8,
+                            0x2d808080, xy(2, 16 + shift), 0, xy(10, 16 + shift), (282u << 16) | 8,
+                            xy(2, 20 + shift), 4u << 8, xy(10, 20 + shift), (4u << 8) | 8};
                         u32 width = sizes[size][0], height = sizes[size][1];
                         hm_gpu_scene_texture_filter(builder, filter);
                         hm_gpu_scene_multisamples(builder, samples);
@@ -582,9 +582,14 @@ static int hm_probe_scaled_rows(SDL_GPUDevice *device, hm_gpu_renderer *renderer
                             for (u32 x = 0; x < width; ++x) {
                                 double lx = (x + 0.5) * 32 / width;
                                 double ly = (y + 0.5) * 32 / height;
-                                if (lx <= 3 || lx >= 9 || ly <= 3 + shift || ly >= 9 + shift)
+                                if (lx <= 3 || lx >= 9 || ly <= 13 + shift || ly >= 19 + shift)
                                     continue;
                                 const u8 *pixel = actual + (y * width + x) * 4;
+                                if ((u32)pixel[0] + pixel[1] + pixel[2] <= 700)
+                                    fprintf(stderr, "gap filter=%d samples=%u shift=%d size=%ux%u "
+                                            "polygon=%d pixel=%u,%u logical=%.3f,%.3f rgb=%u,%u,%u\n",
+                                            filter, samples, shift, width, height, polygon, x, y, lx, ly,
+                                            pixel[0], pixel[1], pixel[2]);
                                 CHECK((u32)pixel[0] + pixel[1] + pixel[2] > 700);
                             }
                     }

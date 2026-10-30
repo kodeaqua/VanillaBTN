@@ -495,3 +495,17 @@ or tearing, and does not establish the cause of the owner's reported lines.
 A separate interpolation T-junction experiment reproduced a synthetic gap but
 raised a 512-sprite capture benchmark from 0.133 to 0.820 ms/frame and was not
 included. It cannot explain the reported lines when interpolation is off.
+
+
+### MSAA bin-boundary reproduction (2026-10-30)
+
+A synthetic pair of textured quads sharing logical y=16 at 65x97 reproduced
+a dark pixel with MSAA 2x before ADR-129 (RGB 128 instead of white). The
+neighbor-bin correction passes the moving-row fixture at 65x97 and 1128x634,
+nearest/xBR, MSAA 1x/2x/4x on local D3D12 and Vulkan. Full native GPU probes
+pass on both; GPU packet and seam checks pass Windows ASan/UBSan. The owner
+reported the line while idle as well as moving, and with Widescreen Off; the
+owner confirmed the reported line disappeared while idle and running in the
+same scene with Modern, Scaling On, Widescreen Off, MSAA 4x, Nearest,
+Interpolation Off, VSync On, and unlimited FPS. Other scenes and performance
+remain unverified.
