@@ -834,3 +834,5 @@ checks now use `primStart` and the active arena capacity. Add regression checks
 with separate active/backup buffers and a genuinely exhausted active buffer.
 No matching source, layout guard or overlay manifest changes are required.
 The owner deferred the separate horizontal-line report while running.
+
+HMBTN_PORT guards under ADR-120: `src/overlay/11_GF_FARM/world/weather.c` includes `enhance/widescreen/widescreen.h` and scales the horizontal weather particle spawn range to `[-margin, 320 + margin)` when `hm_widescreen_margin() > 0`, ensuring rain and weather effects cover the full widescreen viewport while preserving exact 4:3 vanilla parity and PRNG step count when Widescreen is OFF.

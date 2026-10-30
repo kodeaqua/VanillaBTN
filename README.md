@@ -5,7 +5,7 @@
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](#building-from-source-windows)
 [![Platform](https://img.shields.io/badge/platform-Windows%20x86--64%20%7C%20Android%20arm64--v8a-blue)](#quick-start-guide)
-[![Tests](https://img.shields.io/badge/tests-122%2F122%20passing%20(100%25)-success)](#building-from-source-windows)
+[![Tests](https://img.shields.io/badge/tests-124%2F124%20passing%20(100%25)-success)](#building-from-source)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 ---
@@ -83,17 +83,12 @@ Our core design principles:
 
 ---
 
-## 🛠️ Building from Source (Windows)
+## 🛠️ Building from Source
 
-VanillaBTN compiles natively using an automated toolchain setup without requiring WSL, Docker containers, or pre-installed PSY-Q SDKs.
+VanillaBTN compiles natively using automated toolchain scripts without requiring WSL, Docker containers, or pre-installed PSY-Q SDKs. See **[BUILDING.md](BUILDING.md)** for comprehensive guides, build options, and prerequisites.
 
-### Prerequisites:
-- Windows 10 or 11 (64-bit).
-- PowerShell 5.1 or newer.
-- Git.
-
-### Build Command:
-Execute the following command in PowerShell:
+### Windows (x86-64 Native)
+Run the following command in PowerShell:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File port/packaging/windows/build.ps1 -Preset windows-release -Game
@@ -101,10 +96,19 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File port/packaging/windows/b
 
 This automated script will:
 1. Provision local LLVM-MinGW (Clang), Ninja, and CMake toolchains without system pollution.
-2. Compile the cow application icon, Windows GUI subsystem, and all runtime modules.
-3. Run the automated test suite (122 unit tests, 100% passing).
+2. Compile the application icon, Windows GUI subsystem, and all runtime modules.
+3. Run the automated test suite (124 unit tests, 100% passing).
 4. Output the standalone `VanillaBTN.exe` binary to `build/port/windows-release/bin/`.
 5. Package the release archive and README to `dist/VanillaBTN-windows-x64-v0.9.0.zip`.
+
+### Android (arm64-v8a Native)
+Run the following command in PowerShell:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File port/packaging/android/build.ps1 -BuildType Release
+```
+
+Output APK will be generated at `dist/VanillaBTN-android-v0.9.0.apk`.
 
 ---
 

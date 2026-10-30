@@ -97,6 +97,7 @@ int main(void) {
     setup(32, 32);
     previous = hm_gpu_scene_begin(s, 32, 32);
     hm_replay_begin(&area);
+    hm_gpu_execute_words(rectangle, 3);
     u32 fill[] = {0x020000ff, 0, 0x00040004};
     hm_gpu_execute_words(fill, 3);
     CHECK(!hm_gpu_scene_end(s, previous, &data));
@@ -139,11 +140,16 @@ int main(void) {
     hm_replay_begin(&area);
     u32 unsafe_clip[] = {0xe4000000u | 31u | (63u << 10), 0x600000ff, 0x00280002, 0x00040004};
     hm_gpu_execute_words(unsafe_clip, 4);
-    CHECK(!hm_gpu_scene_end(s, previous, &data));
+    /* Independent textured draw sampling v=240 (tile y=15) stays on GPU */
+    safe_uv[3] = ((u32)getClut(896, 490) << 16) | 0xf000;
+    hm_gpu_execute_words(safe_uv, 5);
+    CHECK(hm_gpu_scene_end(s, previous, &data));
+    /* Dependent textured draw sampling v=40 (tile y=2) falls back to software */
     setup(32, 32);
     previous = hm_gpu_scene_begin(s, 32, 32);
     hm_replay_begin(&area);
-    safe_uv[3] = (u32)getClut(896, 490) << 16;
+    hm_gpu_execute_words(unsafe_clip, 4);
+    safe_uv[3] = ((u32)getClut(896, 490) << 16) | 0x2800;
     hm_gpu_execute_words(safe_uv, 5);
     CHECK(!hm_gpu_scene_end(s, previous, &data));
     hm_gpu_scene_destroy(s);
