@@ -466,3 +466,7 @@ fallback. The affected gameplay scenes and performance remain unverified.
 GPU scenes may fold offscreen VRAM transfers following untextured primitives when
 they do not overlap the logical output. Textured and output-overlap dependencies
 retain fallback (ADR-117). Gameplay and device behavior remain unverified.
+
+Offscreen VRAM fills and uploads after textured draws may stay on GPU when their
+wrapped destinations avoid all previously sampled texture/palette tiles and the
+output area (ADR-118). Actual scene coverage and gameplay remain unverified.

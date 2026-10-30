@@ -17,7 +17,8 @@ struct hm_gpu_scene {
     RECT area, native;
     u16 background;
     const char *failure;
-    int begun, texture_linear, has_textured;
+    int begun, texture_linear;
+    u64 texture_reads[32]; /* Conservative 16x16 VRAM tile footprint. */
     unsigned multisamples;
     u64 revision;
     const u32 *motion_previous, *motion_current;
@@ -46,6 +47,23 @@ static int hm_scene_overlap(int x, int y, int w, int h, const RECT *r) {
         }
     return 0;
 }
+static int hm_scene_texture_tiles(hm_gpu_scene *s, u32 x, u32 y, u32 width, u32 height,
+                                  int mark) {
+    if (!width || !height)
+        return 0;
+    u32 last_x = (x + width - 1) / 16, last_y = (y + height - 1) / 16;
+    int overlap = 0;
+    for (u32 ty = y / 16; ty <= last_y; ++ty) {
+        for (u32 tx = x / 16; tx <= last_x; ++tx) {
+            u64 bit = UINT64_C(1) << (tx & 63);
+            u64 *row = &s->texture_reads[ty & 31];
+            overlap |= (*row & bit) != 0;
+            if (mark)
+                *row |= bit;
+        }
+    }
+    return overlap;
+}
 static int hm_scene_material(hm_gpu_scene *s, u32 *p, u32 op, u32 page, u32 clut) {
     const hm_gpu_environment *env = hm_gpu_environment_state();
     const DRAWENV *d = &env->draw;
@@ -60,6 +78,9 @@ static int hm_scene_material(hm_gpu_scene *s, u32 *p, u32 op, u32 page, u32 clut
             s->failure = "framebuffer texture feedback";
             return 0;
         }
+        if (depth < 2)
+            hm_scene_texture_tiles(s, (clut & 63) * 16, (clut >> 6) & 511,
+                                   depth ? 256 : 16, 1, 1);
     }
     const hm_vram_context *vram = hm_vram_state();
     p[1] = op;
@@ -125,6 +146,8 @@ static int hm_scene_texture_bounds(hm_gpu_scene *s, const u32 *p, u32 u, u32 v, 
         s->failure = "framebuffer texture feedback";
         return 0;
     }
+    hm_scene_texture_tiles(s, (p[2] & 15) * 64 + (u32)x0, (p[2] & 16) * 16 + (u32)y0,
+                           (u32)(x1 - x0 + 1), (u32)(y1 - y0 + 1), 1);
     return 1;
 }
 static void hm_scene_add(hm_gpu_scene *s, u32 *p, int x0, int y0, int x1, int y1) {
@@ -169,8 +192,6 @@ static void hm_scene_add(hm_gpu_scene *s, u32 *p, int x0, int y0, int x1, int y1
         return;
     }
     memcpy(s->primitives[s->count], p, HM_SCENE_STRIDE * sizeof(*p));
-    if (p[1] & 4)
-        s->has_textured = 1;
     u32 bx0 = (u32)(x0 - s->area.x) / 16, by0 = (u32)(y0 - s->area.y) / 16;
     u32 bx1 = (u32)(x1 - 1 - s->area.x) / 16, by1 = (u32)(y1 - 1 - s->area.y) / 16;
     for (u32 y = by0; y <= by1; ++y)
@@ -494,9 +515,9 @@ static void hm_scene_command(void *context, const u32 *w, u32 available, int aft
         return;
     u32 op = w[0] >> 24;
     if (op == 2 || op == 0xa0) {
-        /* A transfer can update the initial snapshot after untextured draws
-         * only if it does not touch the output. Earlier textured draws could
-         * have sampled the old VRAM contents, so retain their fallback. */
+        /* Earlier primitives must see the old contents wherever they read
+         * textures or write output; tile footprints conservatively protect
+         * those dependencies when updating the shared initial snapshot. */
         if (available < 3) {
             s->failure = "inline VRAM transfer";
             return;
@@ -515,9 +536,9 @@ static void hm_scene_command(void *context, const u32 *w, u32 available, int aft
             width = ((w[2] & 1023u) + 15u) & ~15u;
             height = (w[2] >> 16) & 511u;
         }
-        if (s->count && (s->has_textured ||
-                         (width && height && hm_scene_overlap((int)x, (int)y, (int)width,
-                                                              (int)height, &s->area)))) {
+        if (s->count && ((width && height &&
+                          hm_scene_overlap((int)x, (int)y, (int)width, (int)height, &s->area)) ||
+                         hm_scene_texture_tiles(s, x, y, width, height, 0))) {
             s->failure = "inline VRAM transfer";
             return;
         }
@@ -605,7 +626,7 @@ hm_replay_sink hm_gpu_scene_begin(hm_gpu_scene *s, u32 width, u32 height) {
     s->width = width;
     s->height = height;
     s->count = 0;
-    s->has_textured = 0;
+    memset(s->texture_reads, 0, sizeof(s->texture_reads));
     s->failure = NULL;
     s->begun = 0;
     s->motion_previous = s->motion_current = NULL;

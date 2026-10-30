@@ -3273,3 +3273,20 @@ aliases when checking expanded widescreen output. Native VRAM remains unchanged.
 
 Consequences: GPU coverage may improve for qualifying frames; actual coverage,
 performance and gameplay/device behavior remain unverified at the owner's request.
+
+## ADR-118: Track prior texture reads for offscreen transfers
+
+Date: 2026-10-30. Status: accepted.
+
+Context: ADR-117 rejects offscreen transfers after any textured primitive even
+when that primitive cannot read the transfer destination.
+
+Decision: Record conservative 16x16 VRAM tiles covering previously sampled
+texture footprints and palettes. Permit an otherwise valid offscreen fill or
+upload only when its wrapped destination does not overlap any recorded tile or
+the logical output. Retain fallback for ambiguous dependencies. Update only the
+private snapshot; native VRAM execution is unchanged.
+
+Consequences: Some independent transfers after textured draws can remain on the
+GPU. Tile-level false positives still fall back. Scene coverage, performance,
+and visual behavior remain unverified at the owner's request.
