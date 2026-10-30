@@ -3256,3 +3256,20 @@ for ordered dependencies. Native VRAM and game logic remain unchanged.
 Consequences: Some frames with leading transfers can stay on GPU, but actual
 scene coverage and gameplay effects are not established. No profiling or tests
 were run at the owner's request.
+
+## ADR-117: Fold independent offscreen transfers after flat draws
+
+Date: 2026-10-30. Status: accepted.
+
+Context: A VRAM transfer after an untextured primitive can still be independent
+of previously emitted GPU work when the destination is outside the output area.
+The existing blanket rejection needlessly falls back in this narrow case.
+
+Decision: Permit complete fills/uploads after emitted untextured primitives only
+when the wrapped destination does not overlap the logical output area. Refresh
+the private snapshot after the transfer. Continue rejecting transfers after any
+textured primitive and transfers touching the output. Include wrapped VRAM
+aliases when checking expanded widescreen output. Native VRAM remains unchanged.
+
+Consequences: GPU coverage may improve for qualifying frames; actual coverage,
+performance and gameplay/device behavior remain unverified at the owner's request.
