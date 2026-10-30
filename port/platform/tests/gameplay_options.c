@@ -1,13 +1,101 @@
 #include "platform/gameplay_options.h"
 #include "enhance/gameplay/gameplay.h"
 #include "platform/user_data.h"
+#include "farm_state.h"
+#include "main.h"
+#include "psx/gpu_links.h"
+#include "psx/vram.h"
 #include <SDL3/SDL.h>
 #include <stdio.h>
 #include <string.h>
 
 #define CHECK(x) do { if (!(x)) { fprintf(stderr, "Failed line %d: %s\n", __LINE__, #x); return 1; } } while (0)
 
+static int tile_render_checks(void) {
+    static u32 ot[FRAME_OT_DEPTH], buffer[FRAME_PRIM_SIZE / 4];
+    static FrameState frame;
+    static FarmTmdQuad ground;
+    FrameState *saved_frame = current_frame;
+    frame.ot = ot;
+    frame.primBuffer = (u8 *)buffer;
+    current_frame = &frame;
+    InitGeom();
+    MATRIX camera = {{{4096, 0, 0}, {0, 0, -4096}, {0, 4096, 0}}, {0, 0, 10000}};
+    SetRotMatrix(&camera);
+    SetTransMatrix(&camera);
+    SetGeomOffset(160, 120);
+    SetGeomScreen(256);
+    memset(&game_state.player, 0, sizeof(game_state.player));
+    game_state.globalFlags = 0;
+    farm_area.mode.eventMode = FARM_MODE_IDLE;
+    game_state.player.place.location = 1;
+    farm_area.mode.place.location = 1;
+    for (int y = 0; y < FIELD_ROWS; ++y)
+        for (int x = 0; x < FIELD_COLS; ++x)
+            farm_area.mode.quads[y][x] = &ground;
+    hm_gameplay_options opt;
+    hm_gameplay_defaults(&opt);
+    hm_gameplay_set_active(&opt);
+    frame.primCursor.bytes = frame.primBuffer;
+    hm_gameplay_draw_tile_targeting(&game_state.player, 2500);
+    CHECK(frame.primCursor.bytes == frame.primBuffer); /* OFF is inert. */
+    opt.tile_targeting = 1;
+    hm_gameplay_set_active(&opt);
+    ClearOTagR(ot, FRAME_OT_DEPTH);
+    hm_gameplay_draw_tile_targeting(&game_state.player, 2500);
+    CHECK(frame.primCursor.bytes > frame.primBuffer);
+    /* Projected ground depth is ~2500, slot 625. The marker must be in
+     * front of the ground, not one slot behind it. */
+    CHECK(hm_gpu_link_decode(ot[623]) != &ot[622]);
+    /* Render an opaque terrain patch at its normal depth. The cyan fill
+     * must survive the back-to-front traversal above that patch. */
+    POLY_F4 terrain = {0};
+    SetPolyF4(&terrain);
+    setRGB0(&terrain, 128, 0, 0);
+    terrain.x0 = terrain.x2 = 150;
+    terrain.x1 = terrain.x3 = 180;
+    terrain.y0 = terrain.y1 = 120;
+    terrain.y2 = terrain.y3 = 150;
+    AddPrim(&ot[624], &terrain);
+    hm_vram_reset();
+    ResetGraph(0);
+    DRAWENV draw;
+    SetDefDrawEnv(&draw, 0, 0, 320, 240);
+    draw.dtd = 0;
+    draw.dfe = 1;
+    PutDrawEnv(&draw);
+    DrawOTag(ot + FRAME_OT_DEPTH - 1);
+    CHECK((hm_vram_pixel(165, 135) & 0x7fe0) != 0);
+    const u32 hidden[] = {PLAYER_FLAG_SCRIPTED, PLAYER_FLAG_EVENT_SPRITE,
+                         PLAYER_FLAG_NO_INPUT, PLAYER_FLAG_AUTO_WALK,
+                         PLAYER_FLAG_AIRBORNE, PLAYER_FLAG_ASLEEP,
+                         PLAYER_FLAG_SCENE_CHANGE, PLAYER_FLAG_RIDING};
+    for (size_t i = 0; i < sizeof(hidden) / sizeof(hidden[0]); ++i) {
+        game_state.player.stateFlags = hidden[i];
+        frame.primCursor.bytes = frame.primBuffer;
+        hm_gameplay_draw_tile_targeting(&game_state.player, 2500);
+        CHECK(frame.primCursor.bytes == frame.primBuffer);
+    }
+    game_state.player.stateFlags = 0;
+    farm_area.mode.eventMode = FARM_MODE_IDLE + 1;
+    hm_gameplay_draw_tile_targeting(&game_state.player, 2500);
+    CHECK(frame.primCursor.bytes == frame.primBuffer);
+    farm_area.mode.eventMode = FARM_MODE_IDLE;
+    const u32 blocked[] = {GLOBAL_FLAG_MENU_OPEN, GLOBAL_FLAG_TRANSITION, GLOBAL_FLAG_PAUSED};
+    for (size_t i = 0; i < sizeof(blocked) / sizeof(blocked[0]); ++i) {
+        game_state.globalFlags = blocked[i];
+        hm_gameplay_draw_tile_targeting(&game_state.player, 2500);
+        CHECK(frame.primCursor.bytes == frame.primBuffer);
+    }
+    game_state.globalFlags = 0;
+    current_frame = saved_frame;
+    hm_gameplay_defaults(&opt);
+    hm_gameplay_set_active(&opt);
+    return 0;
+}
+
 int main(int argc, char **argv) {
+    CHECK(tile_render_checks() == 0);
     CHECK(argc == 2 && SDL_Init(0));
     char *root = NULL;
     CHECK(SDL_asprintf(&root, "%s-%llu", argv[1], (unsigned long long)SDL_GetPerformanceCounter()) >= 0);

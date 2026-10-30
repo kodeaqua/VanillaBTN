@@ -7,6 +7,10 @@
 #include "psx/gpu_environment.h"
 #include "psx/gpu_raster.h"
 #include "psx/vram.h"
+#ifdef HM_INTERPOLATION_REFERENCE
+#include "enhance/interpolation/interpolation.h"
+#include "gfx/packet_identity.h"
+#endif
 #include <stdlib.h>
 #ifdef HM_SCALE_REFERENCE
 #include "gfx/software_raster.h"
@@ -454,6 +458,65 @@ static int hm_probe_widescreen(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
     return 0;
 }
 #endif
+#ifdef HM_INTERPOLATION_REFERENCE
+static int hm_probe_tile_seams(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
+                              hm_gpu_scene *builder) {
+    u32 packets[2][6];
+    hm_vram_reset();
+    ResetGraph(0);
+    CHECK(hm_interpolation_enable(1));
+    hm_render_frame live = {0};
+    for (int slot = 0; slot < 2; ++slot) {
+        DRAWENV draw;
+        SetDefDrawEnv(&draw, 0, 0, 32, 32);
+        draw.dtd = 0;
+        draw.dfe = 1;
+        PutDrawEnv(&draw);
+        live = (hm_render_frame){.key = 1, .tick = 2 + slot * 2, .eligible = 1,
+            .arena = {packets[slot], NULL}, .arena_bytes = {sizeof(packets[slot]), 0}};
+        hm_packet_identity_reset();
+        for (int i = 0; i < 2; ++i) {
+            u32 *p = packets[slot] + i * 3;
+            p[0] = slot && i ? 0x6000ff00 : 0x600000ff;
+            p[1] = xy(2, 2 + i * 4 + slot * 4);
+            p[2] = xy(8, 4);
+            CHECK(hm_packet_identity_span(p, p + 3, (u64)i + 1));
+        }
+        hm_render_begin(&live);
+        hm_render_group(1);
+        for (int i = 0; i < 2; ++i) {
+            hm_gpu_execute_words(packets[slot] + i * 3, 3);
+            hm_render_packet(packets[slot] + i * 3, 3);
+        }
+        hm_render_end();
+    }
+    const u32 sizes[][2] = {{32, 32}, {65, 97}, {1128, 634}};
+    for (u32 size = 0; size < SDL_arraysize(sizes); ++size)
+        for (u32 samples = 1; samples <= 4; samples *= 2) {
+            u32 width = sizes[size][0], height = sizes[size][1];
+            hm_gpu_scene_multisamples(builder, samples);
+            hm_replay_sink previous = hm_gpu_scene_begin(builder, width, height);
+            CHECK(hm_interpolation_replay(83333334, &live));
+            hm_gpu_scene_data data;
+            CHECK(hm_gpu_scene_end(builder, previous, &data));
+            CHECK(!readback(device, renderer, &data, actual));
+            for (u32 y = 0; y < height; ++y)
+                for (u32 x = 0; x < width; ++x) {
+                    /* Exclude outer-edge AA, but check every pixel spanning
+                     * the shared horizontal edge of the two rows. */
+                    double lx = (x + 0.5) * 32 / width, ly = (y + 0.5) * 32 / height;
+                    if (lx <= 3 || lx >= 9 || ly <= 7 || ly >= 13)
+                        continue;
+                    const u8 *p = actual + (y * width + x) * 4;
+                    CHECK((u32)p[0] + p[1] + p[2] > 200);
+                }
+        }
+    CHECK(hm_interpolation_enable(0));
+    hm_packet_identity_reset();
+    puts("Tile row seams: native and enlarged GPU readback passed at 1x/2x/4x MSAA.");
+    return 0;
+}
+#endif
 int main(int argc, char **argv) {
     SDL_SetMainReady();
     CHECK(SDL_Init(SDL_INIT_VIDEO));
@@ -464,6 +527,16 @@ int main(int argc, char **argv) {
     hm_gpu_renderer *renderer = hm_gpu_renderer_create(device);
     CHECK(renderer);
     hm_gpu_scene *builder = hm_gpu_scene_create();
+#ifdef HM_INTERPOLATION_REFERENCE
+    if (argc > 2 && !SDL_strcmp(argv[2], "--tile-seams")) {
+        CHECK(builder && !hm_probe_tile_seams(device, renderer, builder));
+        hm_gpu_scene_destroy(builder);
+        hm_gpu_renderer_destroy(renderer);
+        SDL_DestroyGPUDevice(device);
+        SDL_Quit();
+        return 0;
+    }
+#endif
     CHECK(builder);
     printf("Offscreen GPU renderer: %s\n", SDL_GetGPUDeviceDriver(device));
     u32 shapes[] = {0x200000ff, xy(1, 1),   xy(26, 4), xy(5, 26),  0x300000ff,

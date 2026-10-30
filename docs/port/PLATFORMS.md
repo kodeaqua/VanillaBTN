@@ -409,3 +409,20 @@ unverified without the affected Android device.
 - Packaged Windows standalone release output produced at dist/VanillaBTN-windows-x64-v0.9.0.zip containing VanillaBTN.exe and README.txt.
 - Android platform build passes clean compilation under NDK r27c / Clang 18.0.3, generating signed release APK at dist/VanillaBTN-android-v0.9.0.apk (6.21 MB).
 - Fast Text page break and dialog advancement verified cleanly under ADR-106 and ADR-109. Rucksack cross-category tool/item protection verified under ADR-107.
+
+### Tile marker visibility and ground row gaps (ADR-111, 2026-10-30)
+
+Windows Release `build.ps1 -Preset windows-release -Game` builds the game,
+passes 124/124 tests, and produces the standalone v0.9.0 ZIP. The three focused
+gameplay/interpolation tests also pass with the Windows ASan/UBSan preset.
+Marker checks include actual opaque-terrain occlusion and the disabled path.
+
+The synthetic offscreen `hmbtn_gpu_renderer_probe direct3d12 --tile-seams`
+passes shared-row readback at 32x32, 65x97 and 1128x634 with 1/2/4 samples.
+This reproduces mixed interpolation fallback between adjoining sprite rows;
+it does not confirm the owner's complete gameplay scene or other GPUs.
+The broader GPU reference probe separately fails its native color comparison
+(GPU 130 versus CPU 132); its shader output adds micro-dithering while that
+fixture expects an exact match. This task does not change shaders or relax
+that comparison. No interactive gameplay, Android/device validation, other
+platform builds or Linux matching check was run. Matching source is unchanged.

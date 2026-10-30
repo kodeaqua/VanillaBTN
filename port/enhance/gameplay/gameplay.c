@@ -574,10 +574,15 @@ void hm_gameplay_draw_tile_targeting(const void *player_ptr, s32 depth) {
     const FarmPlayer *player = player_ptr ? (const FarmPlayer *)player_ptr : &game_state.player;
     if (!player)
         return;
-
-    if (game_state.globalFlags & (GLOBAL_FLAG_MENU_OPEN | GLOBAL_FLAG_TRANSITION))
+    if (farm_area.mode.eventMode != FARM_MODE_IDLE)
         return;
-    if (player->stateFlags & (PLAYER_FLAG_AIRBORNE | PLAYER_FLAG_ASLEEP))
+
+    if (game_state.globalFlags & (GLOBAL_FLAG_MENU_OPEN | GLOBAL_FLAG_TRANSITION | GLOBAL_FLAG_PAUSED))
+        return;
+    if (player->stateFlags & (PLAYER_FLAG_AIRBORNE | PLAYER_FLAG_ASLEEP |
+                             PLAYER_FLAG_SCRIPTED | PLAYER_FLAG_EVENT_SPRITE |
+                             PLAYER_FLAG_NO_INPUT | PLAYER_FLAG_AUTO_WALK |
+                             PLAYER_FLAG_SCENE_CHANGE | PLAYER_FLAG_RIDING))
         return;
 
     s16 place = player->place.location ? player->place.location : farm_area.mode.place.location;
@@ -656,7 +661,9 @@ void hm_gameplay_draw_tile_targeting(const void *player_ptr, s32 depth) {
         return;
 
     s32 avg_depth = (d0 + d1 + d2 + d3) >> 2;
-    s32 ot_idx = (avg_depth >> 2) + 1;
+    /* The OT is drawn back to front. A larger slot hides the marker under
+     * the terrain; bias towards the camera instead. */
+    s32 ot_idx = (avg_depth >> 2) - 1;
     if (ot_idx < 1)
         ot_idx = 1;
     if (ot_idx >= FRAME_OT_DEPTH)

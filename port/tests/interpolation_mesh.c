@@ -72,6 +72,24 @@ static hm_render_frame hm_test_cells(int slot, u64 tick) {
 static u16 pixel(const hm_interpolated_view *v, int x, int y) {
     return v->pixels[(v->area.y + y) * v->stride + v->area.x + x];
 }
+static hm_render_frame hm_test_rows(int slot, u64 tick, int changed) {
+    hm_render_frame f = hm_test_begin(slot, tick, sprites[slot], sizeof(sprites[slot]));
+    for (int i = 0; i < 2; ++i) {
+        u32 *p = sprites[slot] + i * 3;
+        p[0] = changed && i ? 0x6000ff00 : 0x600000ff;
+        p[1] = xy(2, 2 + i * 4 + slot * 4);
+        p[2] = xy(8, 4);
+        hm_packet_identity_span(p, p + 3, (u64)i + 1);
+    }
+    hm_render_begin(&f);
+    hm_render_group(1);
+    for (int i = 0; i < 2; ++i) {
+        hm_gpu_execute_words(sprites[slot] + i * 3, 3);
+        hm_render_packet(sprites[slot] + i * 3, 3);
+    }
+    hm_render_end();
+    return f;
+}
 int main(void) {
     hm_vram_reset();
     ResetGraph(0);
@@ -112,6 +130,15 @@ int main(void) {
             ++motions;
     CHECK(motions == 2);
     hm_gpu_scene_destroy(scene);
+    hm_render_invalidate();
+    hm_test_rows(0, 2, 0);
+    live = hm_test_rows(1, 4, 1);
+    CHECK(hm_interpolation_render(83333334, &live, &view));
+    /* A material change on the lower row must not leave a black horizontal
+     * strip between its current position and the interpolated upper row. */
+    for (int y = 6; y < 14; ++y)
+        for (int x = 2; x < 10; ++x)
+            CHECK(pixel(&view, x, y) != 0);
     hm_packet_identity_reset();
     CHECK(hm_interpolation_enable(0));
     return 0;

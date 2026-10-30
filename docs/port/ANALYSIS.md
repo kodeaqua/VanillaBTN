@@ -817,3 +817,12 @@ HMBTN_PORT guards under ADR-107: src/overlay/11_GF_FARM/menu/storage_swap.c prev
 HMBTN_PORT guards under ADR-108: src/overlay/11_GF_FARM/field/field.c and src/overlay/11_GF_FARM/field/greenhouse.c cast position->vz to (s16) to prevent 64-bit unsigned promotion sign loss for negative world Z coordinates.
 
 HMBTN_PORT guard under ADR-109: src/main/text/text.c pauses dialogue typing instantly at TEXT_CODE_PAGE_MARK and TEXT_CODE_PAGE_END when Fast Text is active, preventing text_phase corruption and ensuring page breaks and choices advance cleanly on user confirm input.
+
+ADR-111 (port-only): Tile Targeting lacked scripted/event visibility guards
+and biased its reverse OT depth behind terrain. Its gameplay checks now cover
+actual terrain occlusion and the OFF path. Interpolation's shared-vertex
+coherence omitted implicit rectangle corners, allowing mixed fallback between
+adjacent ground sprite rows. Include those corners in the existing rule and
+test changed-material rows on CPU and enlarged GPU output. No matching source
+or manifest changes are needed. The owner's full gameplay scenario remains
+unverified by these isolated fixtures.
