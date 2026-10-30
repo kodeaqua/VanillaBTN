@@ -5,7 +5,7 @@
 | Target | Current validation |
 | --- | --- |
 | Windows x86-64 | Playable -Game build and standalone package have been produced. The latest recorded Windows suite is 124/124; this documentation update did not rerun it. Full-playthrough parity and several scene/device checks remain unverified. |
-| Android arm64-v8a | Native APK build has succeeded with NDK r27c. Graphics profiles, SAF disc import, touch controls, and storage have implementation work; full gameplay/device validation remains incomplete. |
+| Android arm64-v8a | Native APK build has succeeded with NDK r27c. Graphics profiles, SAF disc import, touch controls, and app-private storage are implemented; full gameplay/device validation remains incomplete. |
 | Linux x86-64 | Deferred to a separate Linux host; WSL is excluded. |
 | macOS universal | No macOS build has been validated. |
 | Matching build | The check target remains unverified on this Windows host because its separate Linux toolchain is unavailable. |
@@ -17,16 +17,16 @@ confirmed that the reported horizontal line disappeared in one farm scene with
 Modern, Scaling On, Widescreen Off, MSAA 4x, Nearest, Interpolation Off, VSync
 On, and unlimited FPS. Other scenes/devices and performance remain unverified.
 
-Open runtime issue: the owner has reported a sleep/save access violation
-(-1073741819 / 0xC0000005). Synthetic card persistence checks do not prove the
-original in-game sleep, day-transition, save, and load lifecycle. See
-WINDOWS_PLAYTEST.md.
+Owner follow-up: the owner reports that sleep/save is now safe. The exact
+scenarios covered were not specified, so broad sleep, day-transition, save,
+and load parity remains unverified. Earlier crash reports below are historical
+and should be reopened only if the problem reproduces. See WINDOWS_PLAYTEST.md.
 
 ## Historical validation notes
 
 The dated checkpoints below preserve what was tested at each point in time.
-Older test counts, platform limitations, and feature status are historical;
-use the current summary above and later ADRs for the present state.
+Older test counts, platform limitations, feature status, and crash reports are
+historical; use the current summary above and later ADRs for the present state.
 
 The owner prioritizes Windows. No workflow/CI changes are included or requested.
 The owner now performs interactive gameplay testing. At this historical

@@ -15,9 +15,10 @@ Off, VSync On, and unlimited FPS. Other scenes and performance remain
 unverified. ADR-136 temporarily disables in-game mouse/touch actions; pause
 menu mouse navigation remains available.
 
-Open issue: the owner has reported a sleep/save access violation
-(-1073741819 / 0xC0000005). Card-container tests do not verify the full
-sleep/day-transition/save/load lifecycle. The owner performs interactive
+Owner follow-up: the owner reports that sleep/save is now safe. The exact
+scenarios covered were not specified, so card-container tests and this report
+do not establish broad sleep/day-transition/save/load parity. Reopen the
+earlier crash report only if it reproduces. The owner performs interactive
 gameplay checks. Use the owner's original USA SLUS_011.15 BIN; it is validated
 at startup and is never copied into git. No WSL, Docker, or CI is required.
 
@@ -118,9 +119,9 @@ panels; Graphics has separate header, aligned label/value rows and a detail
 footer. Synthetic RGB/layout checks and private asset-only previews cover the
 change, without entering the game. Confirm the appearance on the updated build.
 
-Known issue: the owner reports a crash when sleeping/saving, with native exit
--1073741819 (0xC0000005). This remains open. Card persistence tests do not prove
-the original in-game serialization and sleep/save lifecycle work.
+At this 2026-10-26 checkpoint, the owner had reported a sleep/save crash with
+native exit -1073741819 (0xC0000005). The owner later reported that sleep/save
+is safe; broad lifecycle coverage remains unverified.
 
 Graphics also offers VSync and FPS Limit. Up/down scrolls the nine-item list;
 left/right changes the selected value. Native is a 30 FPS presentation cap.

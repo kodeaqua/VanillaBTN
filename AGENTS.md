@@ -51,9 +51,11 @@ override this one for their subtree.
   enhance.interpolation defaults OFF. This does not authorize accelerating
   simulation or claiming pending renderer enhancements are complete.
 
-- The owner prioritizes requested graphics work before the pending sleep/save
-  crash. Windows -Game also compiles Enhance Scaling; enhance.scaling defaults
-  OFF. Widescreen now has an opt-in expanded farm world viewport (ADR-056);
+- Graphics work remains the active validation priority. The owner has since
+  confirmed sleep/save is safe; treat the earlier crash report as historical
+  unless it reproduces again. Windows -Game also compiles Enhance Scaling;
+  enhance.scaling defaults OFF. Widescreen now has an opt-in expanded farm
+  world viewport (ADR-056);
   OFF retains 4:3. ADR-057 extends ON presentation to all screens and keeps
   native/CPU fallback aspect stable. GPU Auto shares native and enhanced scene
   output, with Software retained as the reference and a safe CPU fallback.
