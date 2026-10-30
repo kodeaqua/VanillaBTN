@@ -1,5 +1,14 @@
 # Enhancements
 
+ADR-124 defines Graphics Mode: Native PS1 (default), Enhance PS1 (PGXP and
+dithering bypass), and Modern (the same fixes plus individually selectable
+visual effects). Modern choices are retained when another mode is selected.
+Existing saved enhancement choices are migrated. GPU/CPU coverage and visual
+results remain subject to owner gameplay validation. On Android the existing
+compact menu exposes only the mode selector; individual Modern controls remain
+desktop-only, and mobile interpolation stays disabled. Earlier menu descriptions
+below are historical and are superseded by ADR-124.
+
 The owner requested the native pause interface and graphics settings on
 2026-10-26. Implementation starts on port/windows-pause-menu, after PR #1
 (windows port init) was merged and all old branches were removed.

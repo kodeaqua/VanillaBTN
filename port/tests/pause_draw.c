@@ -24,9 +24,10 @@ int main(void) {
     }
     memset(canvas, 0x11, sizeof(canvas));
     menu.page = HM_PAUSE_GRAPHICS;
+    menu.graphics_modern = 1;
     menu.selected = 4;
     const hm_pause_view view = {
-        .values = {"1", "Windowed", "1920 x 1080", "Off", "Off", "Off", "Nearest", "On", "59.94"},
+        .values = {"Modern", "1", "Windowed", "1920 x 1080", "Off", "Off", "Off", "Nearest", "On", "59.94"},
         .detail = "Off - not available yet",
         .notice = ""};
     hm_pause_draw(&assets, canvas, &menu, &view);
@@ -38,8 +39,8 @@ int main(void) {
         fprintf(stderr, "Graphics columns, separated header or detail panel overlap\n");
         return 1;
     }
-    menu.selected = 8;
-    menu.first_visible = 2;
+    menu.selected = 9;
+    menu.first_visible = 3;
     hm_pause_draw(&assets, canvas, &menu, &view);
     const u8 *fps_label = canvas + (169 * 320 + 40) * 4;
     const u8 *fps_value = canvas + (169 * 320 + 192) * 4;

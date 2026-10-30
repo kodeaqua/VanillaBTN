@@ -12,6 +12,7 @@ int main(int argc, char **argv) {
     hm_graphics_options options;
     hm_graphics_defaults(&options);
     CHECK(options.antialiasing==HM_AA_OFF);
+    hm_graphics_profile_set(&options, HM_GRAPHICS_PROFILE_MODERN);
     for(int mode=HM_AA_OFF;mode<HM_AA_COUNT;++mode) {
         options.antialiasing=mode;
         options.width=1280;options.height=720;options.mode=2;
@@ -33,27 +34,32 @@ int main(int argc, char **argv) {
     CHECK(options.antialiasing==HM_AA_OFF && options.renderer==1);
     options.renderer=0;options.aa_capabilities=15;
     for(int mode=1;mode<=HM_AA_COUNT;++mode) {
-        CHECK(hm_graphics_change(NULL,NULL,&options,5,1));
+        CHECK(hm_graphics_change(NULL,NULL,&options,6,1));
         CHECK(options.antialiasing==mode%HM_AA_COUNT);
     }
     options.antialiasing=HM_AA_MSAA2;
-    CHECK(!hm_graphics_change(NULL,NULL,&options,10,1) && options.renderer==0);
+    CHECK(!hm_graphics_change(NULL,NULL,&options,11,1) && options.renderer==0);
     options.renderer=1;options.antialiasing=HM_AA_FXAA;
-    CHECK(hm_graphics_change(NULL,NULL,&options,5,1) && options.antialiasing==HM_AA_OFF);
+    CHECK(hm_graphics_change(NULL,NULL,&options,6,1) && options.antialiasing==HM_AA_OFF);
     options.aa_capabilities=1;
-    CHECK(!hm_graphics_change(NULL,NULL,&options,5,1) && options.antialiasing==HM_AA_OFF);
+    CHECK(!hm_graphics_change(NULL,NULL,&options,6,1) && options.antialiasing==HM_AA_OFF);
     options.linear=0;
-    CHECK(hm_graphics_change(NULL,NULL,&options,6,1) && options.linear==1);
-    CHECK(hm_graphics_change(NULL,NULL,&options,6,1) && options.linear==2);
-    CHECK(hm_graphics_change(NULL,NULL,&options,6,1) && options.linear==0);
-    hm_graphics_profile_set(&options, HM_GRAPHICS_PROFILE_MODERN);
-    CHECK(hm_graphics_profile_get(&options) == HM_GRAPHICS_PROFILE_MODERN);
-    CHECK(options.widescreen == 1 && options.scaling == 1 && options.linear == 1);
-    CHECK(options.interpolation == 0 && options.vsync == 1 && options.fps_numerator == 0);
+    CHECK(hm_graphics_change(NULL,NULL,&options,7,1) && options.linear==1);
+    CHECK(hm_graphics_change(NULL,NULL,&options,7,1) && options.linear==2);
+    CHECK(hm_graphics_change(NULL,NULL,&options,7,1) && options.linear==0);
+    options.renderer = 0;
+    options.scaling = 1; options.widescreen = 1; options.linear = 2;
+    options.antialiasing = HM_AA_FXAA;
     hm_graphics_profile_set(&options, HM_GRAPHICS_PROFILE_NATIVE);
-    CHECK(hm_graphics_profile_get(&options) == HM_GRAPHICS_PROFILE_NATIVE);
-    CHECK(options.widescreen == 0 && options.scaling == 0 && options.linear == 0);
-    CHECK(options.interpolation == 0 && options.vsync == 1 && options.fps_numerator == 0);
+    CHECK(!options.pgxp && options.dither && !options.scaling && !options.widescreen && !options.linear);
+    CHECK(hm_graphics_save(&options));
+    hm_graphics_load(&options);
+    CHECK(options.profile == HM_GRAPHICS_PROFILE_NATIVE && !options.scaling && !options.linear);
+    hm_graphics_profile_set(&options, HM_GRAPHICS_PROFILE_ENHANCE);
+    CHECK(options.pgxp && !options.dither && !options.scaling && !options.linear);
+    hm_graphics_profile_set(&options, HM_GRAPHICS_PROFILE_MODERN);
+    CHECK(options.pgxp && !options.dither && options.scaling && options.widescreen && options.linear == 2);
+    CHECK(options.antialiasing == HM_AA_FXAA);
     hm_user_data_stop();SDL_free(root);SDL_Quit();
     return 0;
 }

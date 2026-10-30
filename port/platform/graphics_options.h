@@ -7,6 +7,8 @@ typedef struct {
     int monitor, mode, width, height, linear, vsync, interpolation, scaling, widescreen, pgxp, dither;
     int renderer, gpu_active;           /* 0 = GPU Auto, 1 = Software; active is transient. */
     int antialiasing;
+    int profile;
+    int modern_linear, modern_scaling, modern_widescreen, modern_interpolation, modern_antialiasing;
     unsigned aa_capabilities; /* Transient supported-mode bitmask; never serialized. */
     int fps_numerator, fps_denominator; /* 0 = Native (30); -1 = Off (Unlimited). */
 } hm_graphics_options;
@@ -27,7 +29,8 @@ void hm_graphics_row_value(const hm_graphics_options *options, int item, char *t
                            size_t capacity);
 enum {
     HM_GRAPHICS_PROFILE_NATIVE = 0,
-    HM_GRAPHICS_PROFILE_MODERN = 1
+    HM_GRAPHICS_PROFILE_ENHANCE = 1,
+    HM_GRAPHICS_PROFILE_MODERN = 2
 };
 int hm_graphics_profile_get(const hm_graphics_options *options);
 void hm_graphics_profile_set(hm_graphics_options *options, int profile);

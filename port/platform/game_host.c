@@ -42,9 +42,9 @@
 #include "platform/graphics_options.h"
 #ifdef HMBTN_ENH_PGXP
 #include "enhance/pgxp/pgxp.h"
+#endif
 #ifdef HMBTN_ENH_DITHERING
 #include "enhance/dithering/dithering.h"
-#endif
 #endif
 #ifdef HMBTN_ENH_GAMEPLAY
 #include "platform/gameplay_options.h"
@@ -493,6 +493,7 @@ static void hm_host_pause(void) {
     hm_host_in_pause = 1;
     hm_pause_menu menu;
     hm_pause_open(&menu);
+    menu.graphics_modern = hm_options.profile == HM_GRAPHICS_PROFILE_MODERN;
     Uint64 before = SDL_GetTicksNS();
     hm_audio_output_pause(1);
     hm_host_reset_presentation();
@@ -743,6 +744,13 @@ static void hm_host_pause(void) {
                 int g_item = menu.selected;
                 if (hm_graphics_change(hm_device, hm_window, &hm_options, g_item,
                                        input == HM_PAUSE_LEFT ? -1 : 1)) {
+                    menu.graphics_modern = hm_options.profile == HM_GRAPHICS_PROFILE_MODERN;
+#ifdef HMBTN_ENH_PGXP
+                    hm_pgxp_set_enabled(hm_options.pgxp);
+#endif
+#ifdef HMBTN_ENH_DITHERING
+                    hm_dither_set_enabled(hm_options.dither);
+#endif
 #ifdef HMBTN_ENH_WIDESCREEN
                     int changed_w, changed_h;
                     if (SDL_GetWindowSizeInPixels(hm_window, &changed_w, &changed_h))
@@ -1718,7 +1726,7 @@ int hm_game_host_start(hm_disc *disc) {
     hm_pgxp_set_enabled(hm_options.pgxp);
 #endif
 #if defined(HMBTN_ENH_DITHERING)
-    hm_dither_set_enabled(0); /* Auto-applied: clean 32-bit smooth colors without dither noise */
+    hm_dither_set_enabled(hm_options.dither);
 #endif
 #ifdef HMBTN_GPU_RASTER
     hm_gpu_output = hm_gpu_renderer_create(hm_device);
