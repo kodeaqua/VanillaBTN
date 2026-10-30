@@ -19,7 +19,7 @@ struct hm_gpu_scene {
     const u16 *vram_pixels;
     u16 background;
     const char *failure;
-    int begun, texture_linear;
+    int begun, texture_filter;
     u64 offscreen_writes[32]; /* Conservative 16x16 VRAM tile footprint for offscreen writes. */
     u64 texture_reads[32]; /* Conservative 16x16 VRAM tile footprint. */
     unsigned multisamples;
@@ -603,8 +603,8 @@ static void hm_scene_command(void *context, const u32 *w, u32 available, int aft
 }
 hm_gpu_scene *hm_gpu_scene_create(void) { return calloc(1, sizeof(hm_gpu_scene)); }
 void hm_gpu_scene_destroy(hm_gpu_scene *s) { free(s); }
-void hm_gpu_scene_texture_filter(hm_gpu_scene *s, int linear) {
-    s->texture_linear = linear >= 0 && linear <= 2 ? linear : 0;
+void hm_gpu_scene_texture_filter(hm_gpu_scene *s, int filter_mode) {
+    s->texture_filter = filter_mode >= 0 && filter_mode <= 2 ? filter_mode : 0;
 }
 void hm_gpu_scene_multisamples(hm_gpu_scene *s, unsigned samples) {
     s->multisamples = samples == 2 || samples == 4 ? samples : 1;
@@ -697,7 +697,7 @@ int hm_gpu_scene_end(hm_gpu_scene *s, hm_replay_sink previous, hm_gpu_scene_data
     s->packed[8] = primitives;
     s->packed[9] = bins;
     s->packed[10] = s->count;
-    s->packed[11] = (u32)s->texture_linear;
+    s->packed[11] = (u32)s->texture_filter;
     s->packed[12] = s->native.x;
     s->packed[13] = s->native.w;
     s->packed[14] = s->background;
