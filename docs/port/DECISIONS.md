@@ -3504,3 +3504,20 @@ entries may increase GPU work or trigger existing safe fallback in dense scenes.
 The owner confirmed the reported line disappeared while idle and running with
 Modern, Scaling On, Widescreen Off, MSAA 4x, Nearest, Interpolation Off, VSync
 On and unlimited FPS. Other scenes, devices, and performance remain unverified.
+
+
+## ADR-130: Show fatigue within the optional stamina HUD
+
+Date: 2026-10-30
+
+Context: The owner requests a compact fatigue indicator alongside the existing
+optional stamina hearts, without changing original fatigue behavior.
+
+Decision: Extend the existing guarded port-only HUD frame and draw an original
+sleek 59-pixel fatigue gauge directly beneath the 10 hearts. Clamp the displayed value to
+0..100; the fill represents fatigue and changes color at 50 and 80. The
+existing Stamina HUD switch controls both rows and remains off by default.
+The helper reads the original fatigue value and does not write game state.
+
+Consequences: The frame is taller and remains hidden under the existing menu
+and transition conditions. Owner gameplay and layout validation are required.

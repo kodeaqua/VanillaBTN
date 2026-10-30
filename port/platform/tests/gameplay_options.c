@@ -12,6 +12,42 @@
 
 #define CHECK(x) do { if (!(x)) { fprintf(stderr, "Failed line %d: %s\n", __LINE__, #x); return 1; } } while (0)
 
+static int fatigue_render_checks(void) {
+    static u32 ot[64], buffer[256];
+    static FrameState frame;
+    FrameState *saved_frame = current_frame;
+    frame.otTags[0] = ot;
+    frame.workBase = (u8 *)buffer;
+    frame.workSize = sizeof(buffer);
+    current_frame = &frame;
+    hm_gameplay_options opt;
+    hm_gameplay_defaults(&opt);
+    hm_gameplay_set_active(&opt);
+    ResetGraph(0);
+    hm_vram_reset();
+    DRAWENV draw;
+    SetDefDrawEnv(&draw, 0, 0, 320, 240);
+    draw.dtd = 0;
+    draw.dfe = 1;
+    PutDrawEnv(&draw);
+    ClearOTagR(ot, 64);
+    GsSetWorkBase(buffer);
+    hm_gameplay_draw_fatigue_bar(14, 16, 50);
+    CHECK(GsGetWorkBase() == buffer); /* The OFF path emits nothing. */
+    opt.stamina_hud = 1;
+    hm_gameplay_set_active(&opt);
+    game_state.player.fatigue = 50;
+    hm_gameplay_draw_fatigue_bar(14, 16, game_state.player.fatigue);
+    CHECK(GsGetWorkBase() != buffer && game_state.player.fatigue == 50);
+    DrawOTag(ot + 63);
+    CHECK(hm_vram_pixel(50, 31) == ((0xc8 >> 3) | ((0x99 >> 3) << 5) | ((0x40 >> 3) << 10)));
+    CHECK(hm_vram_pixel(80, 31) == ((0x80 >> 3) | ((0x6c >> 3) << 5) | ((0x54 >> 3) << 10)));
+    hm_gameplay_defaults(&opt);
+    hm_gameplay_set_active(&opt);
+    current_frame = saved_frame;
+    return 0;
+}
+
 static int tile_render_checks(void) {
     static u32 ot[FRAME_OT_DEPTH], buffer[FRAME_PRIM_SIZE / 4];
     static FrameState frame;
@@ -138,6 +174,7 @@ static int tile_render_checks(void) {
 }
 
 int main(int argc, char **argv) {
+    CHECK(fatigue_render_checks() == 0);
     CHECK(tile_render_checks() == 0);
     CHECK(argc == 2 && SDL_Init(0));
     char *root = NULL;
@@ -167,6 +204,13 @@ int main(int argc, char **argv) {
     CHECK(hm_gameplay_wild_dog_enabled() == 1);
     CHECK(hm_gameplay_smart_bell() == 0);
     CHECK(hm_gameplay_stamina_hud() == 0);
+    CHECK(hm_gameplay_fatigue_fill(-1) == 0);
+    CHECK(hm_gameplay_fatigue_fill(0) == 0);
+    CHECK(hm_gameplay_fatigue_fill(1) == 1);
+    CHECK(hm_gameplay_fatigue_fill(50) == 29);
+    CHECK(hm_gameplay_fatigue_fill(99) == 58);
+    CHECK(hm_gameplay_fatigue_fill(100) == 59);
+    CHECK(hm_gameplay_fatigue_fill(101) == 59);
     CHECK(hm_gameplay_calendar_events() == 0);
     CHECK(hm_gameplay_roaming_horse() == 0);
     CHECK(hm_gameplay_fast_text() == 0);
