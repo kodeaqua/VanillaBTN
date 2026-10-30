@@ -25,9 +25,11 @@ void hm_software_output_destroy(hm_software_output *s) {
         free(s);
     }
 }
-void hm_software_output_filter(hm_software_output *s, int linear) {
-    if (s && s->surface.texture_linear != !!linear) {
-        s->surface.texture_linear = !!linear;
+void hm_software_output_filter(hm_software_output *s, int filter_mode) {
+    if (filter_mode < 0 || filter_mode > 2)
+        filter_mode = 0;
+    if (s && s->surface.texture_filter != filter_mode) {
+        s->surface.texture_filter = filter_mode;
         s->cached_serial = 0;
     }
 }
@@ -39,10 +41,10 @@ int hm_software_output_prepare(hm_software_output *s, u32 width, u32 height) {
     u16 *pixels = malloc((size_t)width * height * sizeof(*pixels));
     if (!pixels)
         return 0;
-    int linear = s->surface.texture_linear;
+    int filter_mode = s->surface.texture_filter;
     free(s->surface.pixels);
     s->surface = (hm_software_surface){
-        .pixels = pixels, .width = width, .height = height, .texture_linear = linear};
+        .pixels = pixels, .width = width, .height = height, .texture_filter = filter_mode};
     s->cached_serial = 0;
     return 1;
 }

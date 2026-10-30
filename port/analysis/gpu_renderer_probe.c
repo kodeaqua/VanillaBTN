@@ -27,7 +27,7 @@
     } while (0)
 static u8 actual[4096 * 2160 * 4];
 static u16 reference[4096 * 2160];
-static int origin_y, display_test, texture_linear;
+static int origin_y, display_test, texture_filter;
 static hm_vram_context saved_vram, work_vram;
 static u32 xy(int x, int y) { return (u16)x | ((u32)(u16)y << 16); }
 static void setup(void) {
@@ -222,7 +222,7 @@ static int hm_probe_presentation(SDL_GPUDevice *device, hm_gpu_renderer *rendere
 static int fixture(SDL_GPUDevice *device, hm_gpu_renderer *renderer, hm_gpu_scene *builder,
                    const u32 *words, u32 count, u32 width, u32 height, int tolerance) {
     setup();
-    hm_gpu_scene_texture_filter(builder, texture_linear);
+    hm_gpu_scene_texture_filter(builder, texture_filter);
     hm_replay_sink previous = hm_gpu_scene_begin(builder, width, height);
     RECT area = {0, (s16)origin_y, 32, 32};
     hm_replay_begin(&area);
@@ -231,7 +231,7 @@ static int fixture(SDL_GPUDevice *device, hm_gpu_renderer *renderer, hm_gpu_scen
     CHECK(hm_gpu_scene_end(builder, previous, &scene));
     setup();
     hm_gpu_execute_words(words, count);
-    if (width == 32 && height == 32 && !texture_linear) {
+    if (width == 32 && height == 32 && !texture_filter) {
         for (u32 y = 0; y < 32; ++y)
             for (u32 x = 0; x < 32; ++x)
                 reference[y * 32 + x] = hm_vram_pixel(x, y + (u32)origin_y);
@@ -242,7 +242,7 @@ static int fixture(SDL_GPUDevice *device, hm_gpu_renderer *renderer, hm_gpu_scen
         hm_software_surface surface = {.pixels = reference,
                                        .width = width,
                                        .height = height,
-                                       .texture_linear = texture_linear};
+                                       .texture_filter = texture_filter};
         previous = hm_replay_bind(hm_software_sink(&surface));
         hm_replay_begin(&area);
         hm_gpu_execute_words(words, count);
@@ -310,7 +310,7 @@ static int hm_probe_random_cases(SDL_GPUDevice *device, hm_gpu_renderer *rendere
                 }
         }
         if (n >= 1024 || fixture(device, renderer, builder, commands, n, 32, 32, 0)) {
-            fprintf(stderr, "Random batch %d, filter %d\n", batch, texture_linear);
+            fprintf(stderr, "Random batch %d, filter %d\n", batch, texture_filter);
             return 1;
         }
     }
@@ -433,7 +433,7 @@ static int hm_probe_wide_benchmark(SDL_GPUDevice *device, hm_gpu_renderer *rende
          ++filter) {
         const int passes = 25;
         hm_software_surface surface = {
-            .pixels = reference, .width = 1920, .height = 1080, .texture_linear = filter};
+            .pixels = reference, .width = 1920, .height = 1080, .texture_filter = filter};
         u64 start = SDL_GetTicksNS();
         for (int i = 0; i < passes; ++i) {
             work_vram = saved_vram;
@@ -516,7 +516,7 @@ static int hm_probe_widescreen(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
                     hm_software_surface surface = {.pixels = reference,
                                                    .width = width,
                                                    .height = height,
-                                                   .texture_linear = filter};
+                                                   .texture_filter = filter};
                     previous = hm_replay_bind(hm_software_sink(&surface));
                     hm_replay_begin(&area);
                     hm_probe_wide_draw();
@@ -755,7 +755,7 @@ int main(int argc, char **argv) {
 #endif
          ;
          ++filtering) {
-        texture_linear = filtering;
+        texture_filter = filtering;
         for (u32 depth = 0; depth < 3; ++depth)
             for (u32 mode = 0; mode < 4; ++mode) {
                 u32 page = 26 | (depth << 7) | (mode << 5), clut = (252 << 6) | 56;
@@ -784,7 +784,7 @@ int main(int argc, char **argv) {
 #endif
             }
     }
-    texture_linear = 0;
+    texture_filter = 0;
     u32 dialog_clip[] = {0xe4000000u | 31u | (63u << 10), 0x600000ff, xy(2, 2), xy(4, 4)};
     CHECK(!fixture(device, renderer, builder, dialog_clip, 4, 32, 32, 0));
     CHECK(!fixture(device, renderer, builder, dialog_clip, 4, 128, 96, 9));
@@ -792,9 +792,9 @@ int main(int argc, char **argv) {
     CHECK(!fixture(device, renderer, builder, safe_page, 5, 32, 32, 0));
     CHECK(!hm_probe_random_cases(device, renderer, builder));
 #ifdef HM_FILTER_REFERENCE
-    texture_linear = 1;
+    texture_filter = 1;
     CHECK(!hm_probe_random_cases(device, renderer, builder));
-    texture_linear = 0;
+    texture_filter = 0;
 #endif
     CHECK(!hm_probe_motion(device, renderer, builder));
 #ifdef HM_SCALE_REFERENCE

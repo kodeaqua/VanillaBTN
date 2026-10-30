@@ -184,7 +184,7 @@ static void hm_software_triangle(hm_software_surface *s, hm_software_vertex a, h
                 continue;
             }
 #ifdef HMBTN_ENH_FILTERING
-            if (textured && s->texture_linear) {
+            if (textured && s->texture_filter) {
                 hm_texture_shading shading = {.opcode = op,
                                               .rectangle = 0,
                                               .dither = d->dtd,
@@ -195,9 +195,9 @@ static void hm_software_triangle(hm_software_surface *s, hm_software_vertex a, h
                     shading.light[channel] = hm_software_interpolate(a.rgb[channel], b.rgb[channel],
                                                                      c.rgb[channel], w, area);
                 u16 filtered;
-                if (hm_texture_bilinear(hm_software_uv_q8(a.u, b.u, c.u, w, area),
-                                        hm_software_uv_q8(a.v, b.v, c.v, w, area), bounds, clut,
-                                        &shading, &filtered))
+                if (hm_texture_filter_sample(hm_software_uv_q8(a.u, b.u, c.u, w, area),
+                                             hm_software_uv_q8(a.v, b.v, c.v, w, area), bounds,
+                                             clut, &shading, s->texture_filter, &filtered))
                     hm_software_put(s, x, y, filtered, 0);
                 continue;
             }
@@ -289,7 +289,7 @@ static void hm_software_rectangle(hm_software_surface *s, const u32 *w, u32 avai
             if (dx < 0 || dy < 0 || dx >= width || dy >= height)
                 continue;
 #ifdef HMBTN_ENH_FILTERING
-            if (textured && s->texture_linear) {
+            if (textured && s->texture_filter) {
                 hm_texture_bounds bounds = {(s32)(w[2] & 255), (s32)((w[2] >> 8) & 255),
                                             (s32)(w[2] & 255) + width - 1,
                                             (s32)((w[2] >> 8) & 255) + height - 1};
@@ -303,7 +303,8 @@ static void hm_software_rectangle(hm_software_surface *s, const u32 *w, u32 avai
                 for (int c = 0; c < 3; ++c)
                     shading.light[c] = (w[0] >> (c * 8)) & 255;
                 u16 filtered;
-                if (hm_texture_bilinear(uq, vq, bounds, (u16)(w[2] >> 16), &shading, &filtered))
+                if (hm_texture_filter_sample(uq, vq, bounds, (u16)(w[2] >> 16), &shading,
+                                             s->texture_filter, &filtered))
                     hm_software_put(s, x, y, filtered, 0);
                 continue;
             }

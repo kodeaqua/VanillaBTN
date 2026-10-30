@@ -9,7 +9,7 @@ typedef struct {
 } hm_software_view;
 hm_software_output *hm_software_output_create(void);
 void hm_software_output_destroy(hm_software_output *output);
-void hm_software_output_filter(hm_software_output *output, int linear);
+void hm_software_output_filter(hm_software_output *output, int filter_mode);
 int hm_software_output_prepare(hm_software_output *output, u32 width, u32 height);
 hm_replay_sink hm_software_output_begin(hm_software_output *output);
 int hm_software_output_replay(hm_software_output *output, const hm_render_frame *live);

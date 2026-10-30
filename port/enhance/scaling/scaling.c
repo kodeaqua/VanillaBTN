@@ -10,7 +10,7 @@ int hm_scaling_enable(int enabled) {
         hm_scaling_output = hm_software_output_create();
     return hm_scaling_output != NULL;
 }
-void hm_scaling_filter(int linear) { hm_software_output_filter(hm_scaling_output, linear); }
+void hm_scaling_filter(int filter_mode) { hm_software_output_filter(hm_scaling_output, filter_mode); }
 int hm_scaling_prepare(u32 width, u32 height) {
     return hm_software_output_prepare(hm_scaling_output, width, height);
 }

@@ -8,7 +8,7 @@ typedef struct {
     u32 width, height;
     RECT area;
     int begun;
-    int texture_linear;
+    int texture_filter;
     u64 revision;
     int logical_x[4096], logical_y[4096];
     const hm_gpu_environment *environment;
