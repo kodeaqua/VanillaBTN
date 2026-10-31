@@ -111,7 +111,12 @@ frames. Coverage reporting separates those true fallback frames from temporarily
 unavailable swapchains, where no renderer can present. Android's audio service
 also reported zero hardware mixer underruns in a prior run. The ROM rejects
 `simpleperf` events (`cpu-cycles`, `cpu-clock`, and `task-clock`), preventing a
-function-level profile.
+function-level profile. A diagnostic update now reports why replay selection
+failed (no complete capture, no matching loading/bypass capture, mismatched
+draw/display areas, or a capture newer than the live tick). Windows unit tests
+cover the no-capture and area-mismatch cases. The updated Android build is
+installed for a new owner-run farm sample; no new device measurement is claimed
+yet.
 
 The probe's `--farm-benchmark` option renders 8,192 fixed 8x8 rectangles at
 320x240 and 960x720, with a fresh builder and an explicit GPU fence per frame.

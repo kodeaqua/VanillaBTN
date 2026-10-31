@@ -170,6 +170,8 @@ int main(void) {
     SetDefDispEnv(&other, 0, 240, 32, 32);
     PutDispEnv(&other);
     CHECK(!hm_frame_replay_serial(b, &live));
+    const char *failure = hm_frame_replay_failure(b);
+    CHECK(failure && strstr(failure, "draw area differs from display area") != NULL);
     other.disp.y = 0;
     PutDispEnv(&other);
     hm_vram_snapshot(&before);
@@ -205,6 +207,8 @@ int main(void) {
     CHECK(data.words[14] == 0x7fff);
     hm_render_invalidate();
     CHECK(!hm_frame_replay_serial(b, &live));
+    failure = hm_frame_replay_failure(b);
+    CHECK(failure && strstr(failure, "no complete captured scene") != NULL);
     u32 captured_fill[] = {0x020000ff, 0, 0x00040004};
     hm_render_begin(&live);
     hm_gpu_execute_words(captured_fill, 3);

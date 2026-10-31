@@ -21,6 +21,7 @@ struct hm_frame_replay {
     hm_vram_context work;
     int current, capturing, invalidated, references;
     const char *failure;
+    const char *selection_failure;
     u64 serial;
 };
 static hm_frame_replay *hm_shared_replay;
@@ -251,21 +252,51 @@ void hm_frame_replay_release(hm_frame_replay *s) {
     hm_shared_replay = NULL;
 }
 static hm_captured_frame *hm_capture_select(hm_frame_replay *s, const hm_render_frame *live) {
-    if (!s)
+    if (!s || !live) {
+        if (s)
+            s->selection_failure = "missing live frame metadata";
         return NULL;
+    }
     const RECT *display = &hm_gpu_environment_state()->display.disp;
+    int complete = 0, bypass_compatible = 0, clip_compatible = 0, future_rejected = 0;
     for (int i = 0; i < 2; ++i) {
         hm_captured_frame *f = &s->frames[s->current ^ i];
+        if (!f->complete)
+            continue;
+        ++complete;
+        if (live->bypass && !f->meta.bypass) {
+            continue;
+        }
+        ++bypass_compatible;
         const RECT *draw = &f->env.draw.clip;
         /* The simulation may enter a new area/cutscene before the next buffer
          * flip. Present the complete capture of the buffer actually scanned out;
          * the new simulation key is not the identity of those displayed pixels.
          * Interpolation keeps its separate, strict scene-key checks. */
-        if (f->complete && (!live->bypass || f->meta.bypass) && draw->x == display->x &&
-            draw->y == display->y && draw->w == display->w && draw->h == display->h &&
-            live->tick >= f->meta.tick)
+        if (draw->x != display->x || draw->y != display->y || draw->w != display->w ||
+            draw->h != display->h) {
+            continue;
+        }
+        ++clip_compatible;
+        if (live->tick < f->meta.tick) {
+            future_rejected = 1;
+            continue;
+        }
+        if (f->complete) {
+            s->selection_failure = NULL;
             return f;
+        }
     }
+    if (!complete)
+        s->selection_failure = "no complete captured scene";
+    else if (live->bypass && !bypass_compatible)
+        s->selection_failure = "loading frame has no matching bypass capture";
+    else if (!clip_compatible)
+        s->selection_failure = "captured draw area differs from display area";
+    else if (future_rejected)
+        s->selection_failure = "captured frame is newer than live frame tick";
+    else
+        s->selection_failure = "captured scene failed replay selection";
     return NULL;
 }
 u64 hm_frame_replay_serial(hm_frame_replay *s, const hm_render_frame *live) {
@@ -300,5 +331,7 @@ int hm_frame_replay_draw(hm_frame_replay *s, const hm_render_frame *live) {
     return 1;
 }
 const char *hm_frame_replay_failure(const hm_frame_replay *s) {
-    return s ? s->failure : NULL;
+    if (!s)
+        return NULL;
+    return s->failure ? s->failure : s->selection_failure;
 }
