@@ -4348,7 +4348,7 @@ check inventory caps and status effects during gameplay.
 
 ## ADR-163: Enable Viewport Scaling in Android Enhanced Profiles
 
-Date: 2026-10-31. Status: accepted.
+Date: 2026-10-31. Status: superseded by ADR-164.
 
 Context: The owner requested sharper Android output in Enhance PS1 and Modern,
 using the available display size where practical and retaining a mobile-safe
@@ -4361,3 +4361,24 @@ Native PS1 remains at native internal resolution.
 Consequences: The setting only affects Android's profile selection. Allocation
 or replay failure retains the existing safe fallback. Device performance,
 thermal behavior, and visual sharpness need owner validation.
+
+## ADR-164: Keep Android Enhanced Profiles at Native Internal Resolution
+
+Date: 2026-10-31. Status: accepted.
+
+Context: The owner reports worse performance after enabling viewport scaling on
+Android tablets, with a stronger slowdown on Adreno devices, and asks to revert
+the scaling change.
+
+Decision: Supersede ADR-163. Native PS1, Enhance PS1, and Modern profiles all
+keep internal rendering at the native PS1 scene resolution. Modern retains its
+16:9 viewport and bilinear final presentation; Enhance retains PGXP. The final
+image is enlarged only by the normal presentation blit/display path. Older
+settings containing `enhance.scaling=true` are ignored by Android profile
+selection.
+
+Consequences: Android no longer builds 720p internal scenes for these profiles,
+reducing compute and memory bandwidth on mobile GPUs. The Windows scaling option
+is unchanged. Android image sharpness and performance should be checked on the
+owner's tablet and Adreno device; agents must not claim a measured improvement
+without device timings.

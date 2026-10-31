@@ -5,7 +5,7 @@
 | Target | Current validation |
 | --- | --- |
 | Windows x86-64 | Release build and 125/125 tests pass. ASan/UBSan game build and all 125 tests pass. Synthetic VRAM scanout matches reference pixels on Vulkan and Direct3D 12. Full-playthrough parity remains unverified. |
-| Android arm64-v8a | Latest Release APK builds with AGP 9.5.0, Gradle 9.8.2, and NDK 30.0.16248370; signature and 16 KB APK zip-alignment checks pass. The owner-tested G100 farm sample reports 100% GPU output in two steady 600-frame windows, zero fallbacks, and two then zero direct VRAM scanouts. It holds 60-61 presents/s with 3.7-4.1 ms average presentation and zero audio-ring underruns/drops. The newest blank-frame path has not been playtested; 720p and other scenes/devices remain unverified. |
+| Android arm64-v8a | Latest Release APK builds with AGP 9.5.0, Gradle 9.8.2, and NDK 30.0.16248370; signature and 16 KB APK zip-alignment checks pass. The owner-tested G100 farm sample reports 100% GPU output in two steady 600-frame windows, zero fallbacks, and two then zero direct VRAM scanouts. It holds 60-61 presents/s with 3.7-4.1 ms average presentation and zero audio-ring underruns/drops. Android internal scaling was reverted by ADR-164 after lag reports; the new build awaits device timing. Other scenes/devices remain unverified. |
 | Linux x86-64 | Deferred to a separate Linux host; WSL is excluded. |
 | macOS universal | No macOS build has been validated. |
 | Matching build | The check target remains unverified on this Windows host because its separate Linux toolchain is unavailable. |
@@ -39,9 +39,10 @@ ASan/UBSan preset.
 
 Gradle reports deprecated APIs that may become errors with Gradle 10; the
 current pinned build succeeds. No interactive Windows playthrough was performed.
-The owner tested the latest Android APK in the farm on one tablet and reported
-smoother play. Full playthrough parity, 720p performance, other scenes,
-lifecycle behavior and other devices remain unverified.
+The owner tested the earlier Android APK in the farm on one tablet and reported
+smoother play. Full playthrough parity, other scenes, lifecycle behavior and
+other devices remain unverified. The latest scaling rollback has not been
+measured on the tablet.
 
 GPU Auto shares scene output at native and enhanced resolutions, with Software
 as the reference. It attempts every captured Android frame as well as desktop
@@ -51,11 +52,12 @@ Software mode, and diagnostic capture. GP0 polygon/line/rectangle encodings,
 clears, loads, copies and mask behavior have synthetic coverage. A Windows
 Direct3D 12 game-window replay reached 39,000 VBlanks with zero GPU fallbacks;
 the connected G100 previously reported 600/600 GPU farm frames at 384x240.
-Other scenes, 720p, device breadth, and full-playthrough parity remain
-unverified. The owner confirmed that the reported horizontal line disappeared
-in one farm scene with Modern, Scaling On, Widescreen Off, MSAA 4x, Nearest,
-Interpolation Off, VSync On, and unlimited FPS. The farm performance
-measurement is recorded below; other scenes, devices, 720p and broader
+Other scenes, device breadth, and full-playthrough parity remain unverified.
+Android now uses native internal resolution on all profiles (ADR-164). The
+owner confirmed that the reported horizontal line disappeared in one farm
+scene with Modern, Scaling On, Widescreen Off, MSAA 4x, Nearest, Interpolation
+Off, VSync On, and unlimited FPS. The farm performance measurement is recorded
+below; other scenes, devices, enhanced-resolution gameplay, and broader
 performance budgets remain unverified.
 
 Owner follow-up: the owner reports that sleep/save is now safe. The exact

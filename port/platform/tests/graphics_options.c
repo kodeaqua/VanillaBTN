@@ -64,7 +64,12 @@ int main(int argc, char **argv) {
     hm_graphics_profile_set(&options, HM_GRAPHICS_PROFILE_ENHANCE);
     CHECK(options.pgxp && !options.dither && !options.scaling && !options.linear);
     hm_graphics_profile_set(&options, HM_GRAPHICS_PROFILE_MODERN);
+#ifdef __ANDROID__
+    CHECK(options.pgxp && !options.dither && !options.scaling && options.widescreen &&
+          options.linear == 1);
+#else
     CHECK(options.pgxp && !options.dither && options.scaling && options.widescreen && options.linear == 2);
+#endif
     CHECK(options.antialiasing == HM_AA_FXAA);
     hm_user_data_stop();SDL_free(root);SDL_Quit();
     return 0;

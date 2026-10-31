@@ -114,8 +114,9 @@ Materialization replay averaged 1.1-1.7 ms (observed maximum 4.6 ms), down from
 20.3-24.1 ms in the prior farm sample; scene preparation averaged 2.0-3.2 ms.
 The game audio ring reported zero underruns and drops, with 2,056-2,791 queued
 frames. The owner reported that the result felt smoother. This measurement
-covers the tested farm scene and native scene size; 720p and other scenes remain
-unmeasured. One earlier sample reported 598/600 scene attempts through the GPU;
+covers the tested farm scene at native scene size. Android viewport scaling has
+since been disabled by ADR-164; performance after that rollback and other scenes
+remain unmeasured. One earlier sample reported 598/600 scene attempts through the GPU;
 the two fallbacks were missing complete captures during loading or invalidated
 frames. Coverage reporting separates those true fallback frames from temporarily
 unavailable swapchains, where no renderer can present. Android's audio service
@@ -147,8 +148,8 @@ underflows and drops. The complete captured output is kept locally under
 `build/port/windows-release/gpu-window-full.*.log`; it is build output and is
 not committed. This verifies the authored Windows farm replay, not all game
 areas or output sizes. Android runtime evidence remains the connected G100
-farm at 384x240; other devices, 720p, and Windows Vulkan gameplay remain
-unverified.
+farm at 384x240; other devices and Windows Vulkan gameplay remain unverified.
+Android enhanced profiles now stay at native internal resolution (ADR-164).
 
 The probe's `--farm-benchmark` option renders 8,192 fixed 8x8 rectangles at
 320x240 and 960x720, with a fresh builder and an explicit GPU fence per frame.

@@ -192,7 +192,8 @@ static int hm_host_scaling_prepare(void) {
         return 0;
     hm_host_output_size(&w, &h);
 #ifdef __ANDROID__
-    /* Cap scaling buffer on Android to 720p (ADR-105). */
+    /* Keep a conservative guard for any programmatic scaling request; shipped
+     * Android profiles use native internal resolution (ADR-164). */
     if (w > 1280 || h > 720) {
         if (hm_host_wide_active()) {
             w = 1280;
@@ -491,8 +492,8 @@ static int hm_host_gpu_present(const RECT *native_area) {
         }
         hm_host_output_size(&w, &h);
 #ifdef __ANDROID__
-        /* Cap internal scaling on Android to 720p (ADR-105),
-         * preventing 1080p thermal throttling while providing crisp HD scaling. */
+        /* Retain the mobile allocation guard for any future explicit scaling
+         * request; current Android profiles keep this path disabled (ADR-164). */
         if (w > 1280 || h > 720) {
             if (hm_host_wide_active()) {
                 w = 1280;
