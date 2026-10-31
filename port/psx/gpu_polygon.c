@@ -19,6 +19,18 @@ static s64 hm_edge(const hm_vertex *a, const hm_vertex *b, s32 x, s32 y) {
 static int hm_top_left(const hm_vertex *a, const hm_vertex *b) {
     return b->y < a->y || (b->y == a->y && b->x > a->x);
 }
+static u32 hm_first_set_tile(u64 mask) {
+#if defined(__GNUC__) || defined(__clang__)
+    return (u32)__builtin_ctzll(mask);
+#else
+    u32 index = 0;
+    while (!(mask & 1)) {
+        mask >>= 1;
+        ++index;
+    }
+    return index;
+#endif
+}
 static inline u32 hm_interpolate(u32 a, u32 b, u32 c, const s64 weight[3], s64 area, u64 inv_area) {
     s64 num = weight[0] * a + weight[1] * b + weight[2] * c + area / 2;
     if (num <= 0)
@@ -74,13 +86,23 @@ static void hm_triangle(hm_vertex a, hm_vertex b, hm_vertex c, u32 opcode, u16 c
         maxy = draw->clip.y + draw->clip.h;
     if (minx >= maxx || miny >= maxy)
         return;
+    int filter_writes = hm_vram_write_filter_active();
+    if (filter_writes && !hm_vram_write_filter_intersects(minx, miny, maxx, maxy))
+        return;
+    u64 filter_x_tiles = UINT64_MAX;
+    if (filter_writes) {
+        u32 first_tile = (u32)minx >> 4;
+        u32 last_tile = ((u32)maxx - 1) >> 4;
+        filter_x_tiles <<= first_tile;
+        if (last_tile < 63)
+            filter_x_tiles &= (UINT64_C(1) << (last_tile + 1)) - 1;
+    }
     int edge0 = hm_top_left(&b, &c), edge1 = hm_top_left(&c, &a), edge2 = hm_top_left(&a, &b);
     static const s8 dither[4][4] = {{-4, 0, -3, 1}, {2, -2, 3, -1}, {-3, 1, -4, 0}, {3, -1, 2, -2}};
     int textured = (opcode & 4) != 0, raw = textured && (opcode & 1), semi = (opcode & 2) != 0;
     u32 page = draw->tpage, depth = (page >> 7) & 3u;
     hm_vram_context *vram = hm_vram_mutable_state();
     u16 (*vram_pixels)[HM_VRAM_WIDTH] = vram->pixels;
-    int filter_writes = hm_vram_write_filter_active();
     u16 set_mask = vram->set_mask, check_mask = vram->check_mask;
     u32 blend_mode = (page >> 5) & 3u;
     int check_disp = !draw->dfe && state->display_enabled;
@@ -109,24 +131,38 @@ static void hm_triangle(hm_vertex a, hm_vertex b, hm_vertex c, u32 opcode, u16 c
         u64 allowed_tiles = hm_vram_write_filter_row((u32)y);
         if (filter_writes && !allowed_tiles)
             continue;
+        if (filter_writes) {
+            allowed_tiles &= filter_x_tiles;
+            if (!allowed_tiles)
+                continue;
+        }
         s64 weight[3] = {row0, row1, row2};
         u16 *vram_row = vram_pixels[y];
         u64 dirty_mask = 0;
         int row_disp = check_disp && y >= disp_y0 && y < disp_y1;
-        for (s32 x = minx; x < maxx; ++x, weight[0] += dx0, weight[1] += dx1, weight[2] += dx2) {
-            if (filter_writes && !(allowed_tiles & (UINT64_C(1) << ((u32)x >> 4)))) {
-                s32 tile_end = (s32)((((u32)x >> 4) + 1u) << 4);
-                if (tile_end > maxx)
-                    tile_end = maxx;
-                s32 skip = tile_end - x - 1;
-                if (skip > 0) {
-                    x += skip;
-                    weight[0] += dx0 * skip;
-                    weight[1] += dx1 * skip;
-                    weight[2] += dx2 * skip;
+        s32 x = minx;
+        while (x < maxx) {
+            s32 span_end = maxx;
+            if (filter_writes) {
+                u64 remaining_tiles = allowed_tiles & (UINT64_MAX << ((u32)x >> 4));
+                if (!remaining_tiles)
+                    break;
+                u32 tile_x = hm_first_set_tile(remaining_tiles);
+                s32 span_start = (s32)(tile_x << 4);
+                if (span_start > x) {
+                    s32 skipped = span_start - x;
+                    x = span_start;
+                    weight[0] += dx0 * skipped;
+                    weight[1] += dx1 * skipped;
+                    weight[2] += dx2 * skipped;
+                    continue;
                 }
-                continue;
+                span_end = (s32)((tile_x + 1) << 4);
+                if (span_end > maxx)
+                    span_end = maxx;
             }
+            for (; x < span_end; ++x, weight[0] += dx0, weight[1] += dx1,
+                                       weight[2] += dx2) {
             if (weight[0] < 0 || (!weight[0] && !edge0) || weight[1] < 0 ||
                 (!weight[1] && !edge1) || weight[2] < 0 || (!weight[2] && !edge2))
                 continue;
@@ -164,6 +200,7 @@ static void hm_triangle(hm_vertex a, hm_vertex b, hm_vertex c, u32 opcode, u16 c
                 }
             hm_gpu_fast_pixel(vram_row, &dirty_mask, x, color, semi && (!textured || (texel & 0x8000)),
                               blend_mode, set_mask, check_mask);
+            }
         }
         vram->dirty[(u32)y >> 4] |= dirty_mask;
     }

@@ -15,6 +15,18 @@ static s32 hm_signed11(u32 value) {
 }
 
 static s32 hm_limit(s32 value) { return value < 0 ? 0 : value > 31 ? 31 : value; }
+static u32 hm_first_set_tile(u64 mask) {
+#if defined(__GNUC__) || defined(__clang__)
+    return (u32)__builtin_ctzll(mask);
+#else
+    u32 index = 0;
+    while (!(mask & 1)) {
+        mask >>= 1;
+        ++index;
+    }
+    return index;
+#endif
+}
 
 void hm_gpu_pixel(s32 x, s32 y, u16 color, int blend) {
     const hm_gpu_environment *state = hm_gpu_environment_state();
@@ -93,10 +105,21 @@ static void hm_gpu_rectangle(const u32 *words, u32 opcode, u32 width, u32 height
     s32 y_end = y0 + (s32)height > clip_y1 ? clip_y1 - y0 : (s32)height;
     if (x_start >= x_end || y_start >= y_end)
         return;
+    int filter_writes = hm_vram_write_filter_active();
+    if (filter_writes &&
+        !hm_vram_write_filter_intersects(x0 + x_start, y0 + y_start, x0 + x_end, y0 + y_end))
+        return;
+    u64 filter_x_tiles = UINT64_MAX;
+    if (filter_writes) {
+        u32 first_tile = (u32)(x0 + x_start) >> 4;
+        u32 last_tile = (u32)(x0 + x_end - 1) >> 4;
+        filter_x_tiles <<= first_tile;
+        if (last_tile < 63)
+            filter_x_tiles &= (UINT64_C(1) << (last_tile + 1)) - 1;
+    }
     u32 page = draw->tpage, depth = (page >> 7) & 3u;
     hm_vram_context *vram = hm_vram_mutable_state();
     u16 (*vram_pixels)[HM_VRAM_WIDTH] = vram->pixels;
-    int filter_writes = hm_vram_write_filter_active();
     u16 set_mask = vram->set_mask, check_mask = vram->check_mask;
     u32 blend_mode = (page >> 5) & 3u;
     int check_disp = !draw->dfe && state->display_enabled;
@@ -119,39 +142,55 @@ static void hm_gpu_rectangle(const u32 *words, u32 opcode, u32 width, u32 height
         u64 allowed_tiles = hm_vram_write_filter_row((u32)py);
         if (filter_writes && !allowed_tiles)
             continue;
+        if (filter_writes) {
+            allowed_tiles &= filter_x_tiles;
+            if (!allowed_tiles)
+                continue;
+        }
         u16 *vram_row = vram_pixels[py];
         u64 dirty_mask = 0;
         int row_disp = check_disp && py >= disp_y0 && py < disp_y1;
-        for (s32 x = x_start; x < x_end; ++x) {
-            s32 px = x0 + x;
-            if (row_disp && px >= disp_x0 && px < disp_x1)
-                continue;
-            if (filter_writes && !(allowed_tiles & (UINT64_C(1) << ((u32)px >> 4)))) {
-                s32 tile_end = (s32)((((u32)px >> 4) + 1u) << 4);
-                if (tile_end > x0 + x_end)
-                    tile_end = x0 + x_end;
-                x += tile_end - px - 1;
-                continue;
-            }
-            u16 pixel = color;
-            int blend = semi;
-            if (textured) {
-                pixel = hm_gpu_fast_texel((const u16(*)[HM_VRAM_WIDTH])vram_pixels, page_x, page_y,
-                                          depth, mask_x, mask_y, tw_x, tw_y, clut_x, clut_y,
-                                          u0 + (u32)x, v0 + (u32)y);
-                if (!pixel)
+        s32 x = x_start;
+        while (x < x_end) {
+            s32 span_end = x_end;
+            if (filter_writes) {
+                u64 remaining_tiles = allowed_tiles & (UINT64_MAX << ((u32)(x0 + x) >> 4));
+                if (!remaining_tiles)
+                    break;
+                u32 tile_x = hm_first_set_tile(remaining_tiles);
+                s32 span_start = (s32)(tile_x << 4) - x0;
+                if (span_start > x) {
+                    x = span_start;
                     continue;
-                blend = blend && (pixel & 0x8000);
-                if (!raw) {
-                    u32 r = ((pixel & 31u) * light_r) / 128u;
-                    u32 g = (((pixel >> 5) & 31u) * light_g) / 128u;
-                    u32 b = (((pixel >> 10) & 31u) * light_b) / 128u;
-                    pixel = (u16)((pixel & 0x8000u) | (r > 31u ? 31u : r) |
-                                  ((g > 31u ? 31u : g) << 5) | ((b > 31u ? 31u : b) << 10));
                 }
+                span_end = (s32)((tile_x + 1) << 4) - x0;
+                if (span_end > x_end)
+                    span_end = x_end;
             }
-            hm_gpu_fast_pixel(vram_row, &dirty_mask, px, pixel, blend, blend_mode, set_mask,
-                              check_mask);
+            for (; x < span_end; ++x) {
+                s32 px = x0 + x;
+                if (row_disp && px >= disp_x0 && px < disp_x1)
+                    continue;
+                u16 pixel = color;
+                int blend = semi;
+                if (textured) {
+                    pixel = hm_gpu_fast_texel((const u16(*)[HM_VRAM_WIDTH])vram_pixels, page_x,
+                                              page_y, depth, mask_x, mask_y, tw_x, tw_y, clut_x,
+                                              clut_y, u0 + (u32)x, v0 + (u32)y);
+                    if (!pixel)
+                        continue;
+                    blend = blend && (pixel & 0x8000);
+                    if (!raw) {
+                        u32 r = ((pixel & 31u) * light_r) / 128u;
+                        u32 g = (((pixel >> 5) & 31u) * light_g) / 128u;
+                        u32 b = (((pixel >> 10) & 31u) * light_b) / 128u;
+                        pixel = (u16)((pixel & 0x8000u) | (r > 31u ? 31u : r) |
+                                      ((g > 31u ? 31u : g) << 5) | ((b > 31u ? 31u : b) << 10));
+                    }
+                }
+                hm_gpu_fast_pixel(vram_row, &dirty_mask, px, pixel, blend, blend_mode, set_mask,
+                                  check_mask);
+            }
         }
         vram->dirty[(u32)py >> 4] |= dirty_mask;
     }

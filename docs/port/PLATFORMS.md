@@ -5,7 +5,7 @@
 | Target | Current validation |
 | --- | --- |
 | Windows x86-64 | Release `-Game` build and package pass 124/124 tests; Windows ASan/UBSan suite passes 107/107. Full-playthrough parity remains unverified. |
-| Android arm64-v8a | Release APK built with AGP 9.5.0, Gradle 9.8.2, and NDK 30.0.16248370; native ELF and APK zip alignment checks pass for 16 KB pages. The connected Xiaomi MediaTek G100 rendered farm scenes through GPU Auto but suffered severe lag; an optimized APK is awaiting an owner run. |
+| Android arm64-v8a | Latest Release APK built with AGP 9.5.0, Gradle 9.8.2, and NDK 30.0.16248370; signature and 16 KB APK zip-alignment checks pass. On the connected Xiaomi MediaTek G100, the owner tested the farm at 60-61 ticks/presents per second with 1.1-1.7 ms average materialization replay and reported smoother play. Other scenes, 720p, and other devices remain unverified. |
 | Linux x86-64 | Deferred to a separate Linux host; WSL is excluded. |
 | macOS universal | No macOS build has been validated. |
 | Matching build | The check target remains unverified on this Windows host because its separate Linux toolchain is unavailable. |
@@ -39,8 +39,9 @@ ASan/UBSan preset.
 
 Gradle reports deprecated APIs that may become errors with Gradle 10; the
 current pinned build succeeds. No interactive Windows playthrough was performed.
-Android GPU device creation was checked on one tablet; scene rendering,
-lifecycle behavior, other devices, and gameplay remain unverified.
+The owner tested the latest Android APK in the farm on one tablet and reported
+smoother play. Full playthrough parity, 720p performance, other scenes,
+lifecycle behavior and other devices remain unverified.
 
 GPU Auto shares scene output at native and enhanced resolutions, with Software
 as the reference and CPU fallback for unsupported work. It now attempts every
@@ -51,7 +52,8 @@ captures, resource/device failures and untested game scenes remain CPU paths.
 Do not claim complete gameplay offload or full-playthrough parity. The owner
 confirmed that the reported horizontal line disappeared in one farm scene with
 Modern, Scaling On, Widescreen Off, MSAA 4x, Nearest, Interpolation Off, VSync
-On, and unlimited FPS. Other scenes/devices and performance remain unverified.
+On, and unlimited FPS. The farm performance measurement is recorded below;
+other scenes, devices, 720p and broader performance budgets remain unverified.
 
 Owner follow-up: the owner reports that sleep/save is now safe. The exact
 scenarios covered were not specified, so broad sleep, day-transition, save,
@@ -628,7 +630,12 @@ lists. On a Radeon RX Vega, the 8,192-rectangle synthetic farm probe improved
 D3D12 capture/upload/compute/fence from 1.926 to 1.830 ms at 320x240 and from
 3.976 to 2.714 ms at 960x720. Vulkan changed from 1.841 to 1.849 ms and from
 4.283 to 2.713 ms. Native-size changes are within run-level variation; larger
-output improved 32-37%. Scene payload fell 16.1%. The owner-run G100 build still
-logs 14-16 presents/s with 63-73 ms average present time; it has not yet run
-the packed-bin build. Actual Android improvement and Windows gameplay frame
-pacing remain unverified.
+output improved 32-37%. Scene payload fell 16.1%. The initial owner-run G100
+build logged 14-16 presents/s with 63-73 ms average present time. A later APK
+added exact changed-tile VRAM snapshot matching and selected-tile CPU
+materialization rasterization. On the connected G100 at native 384x240 in the
+farm, logcat measured 60-61 ticks/presents per second, 1.1-1.7 ms average
+materialization replay (4.6 ms observed maximum), and zero game-ring audio
+underflows/drops. The owner reported smoother play. This is an owner-tested
+single-scene result; 720p, other areas, audio quality beyond the ring counters,
+Windows gameplay pacing, and other Android devices remain unverified.

@@ -106,6 +106,7 @@ static hm_gpu_scene_data hm_gpu_cached;
 static u64 hm_gpu_cached_serial;
 enum { HM_GPU_COVERAGE_REPORT_FRAMES = 600 };
 static u32 hm_gpu_coverage_frames, hm_gpu_coverage_successes, hm_gpu_coverage_fallbacks;
+static u32 hm_gpu_coverage_skipped;
 static char hm_gpu_coverage_last_reason[160] = "none";
 #endif
 
@@ -223,6 +224,10 @@ typedef struct {
     Uint64 scene_ns, scene_max_ns;
     Uint64 replay_ns, replay_max_ns;
     Uint64 materialize_ns, materialize_max_ns;
+    Uint64 materialize_setup_ns, materialize_setup_max_ns;
+    Uint64 materialize_mask_ns, materialize_mask_max_ns;
+    Uint64 materialize_bind_ns, materialize_bind_max_ns;
+    Uint64 materialize_replay_ns, materialize_replay_max_ns;
     Uint64 pack_ns, pack_max_ns;
     Uint64 encode_ns, encode_max_ns;
     Uint64 acquire_ns, acquire_max_ns;
@@ -336,35 +341,47 @@ static int hm_host_submit(u32 image_width, u32 image_height, int linear, int wid
 }
 
 #ifdef HMBTN_GPU_RASTER
+static void hm_host_gpu_coverage_report(void) {
+    if (hm_gpu_coverage_frames < HM_GPU_COVERAGE_REPORT_FRAMES)
+        return;
+    u32 renderable = hm_gpu_coverage_successes + hm_gpu_coverage_fallbacks;
+    double percent = renderable ? (100.0 * (double)hm_gpu_coverage_successes / renderable) : 0.0;
+#ifdef __ANDROID__
+    __android_log_print(ANDROID_LOG_INFO, "VanillaBTN",
+                        "GPU scene coverage: %u/%u renderable (%.1f%%), %u fallback, %u skipped of %u attempts; last: %s",
+                        hm_gpu_coverage_successes, renderable, percent, hm_gpu_coverage_fallbacks,
+                        hm_gpu_coverage_skipped, hm_gpu_coverage_frames,
+                        hm_gpu_coverage_last_reason);
+#else
+    SDL_Log("GPU scene coverage: %u/%u renderable (%.1f%%), %u fallback, %u skipped of %u attempts; last: %s",
+            hm_gpu_coverage_successes, renderable, percent, hm_gpu_coverage_fallbacks,
+            hm_gpu_coverage_skipped, hm_gpu_coverage_frames, hm_gpu_coverage_last_reason);
+#endif
+    hm_gpu_coverage_frames = 0;
+    hm_gpu_coverage_successes = 0;
+    hm_gpu_coverage_fallbacks = 0;
+    hm_gpu_coverage_skipped = 0;
+    SDL_strlcpy(hm_gpu_coverage_last_reason, "none", sizeof(hm_gpu_coverage_last_reason));
+}
 static void hm_host_gpu_coverage_record(int success, const char *reason) {
     ++hm_gpu_coverage_frames;
-    if (success) {
+    if (success)
         ++hm_gpu_coverage_successes;
-    } else {
+    else {
         ++hm_gpu_coverage_fallbacks;
         if (reason && *reason)
             SDL_snprintf(hm_gpu_coverage_last_reason, sizeof(hm_gpu_coverage_last_reason), "%s",
                          reason);
     }
-    if (hm_gpu_coverage_frames < HM_GPU_COVERAGE_REPORT_FRAMES)
-        return;
-    double percent = hm_gpu_coverage_frames
-                         ? (100.0 * (double)hm_gpu_coverage_successes / hm_gpu_coverage_frames)
-                         : 0.0;
-#ifdef __ANDROID__
-    __android_log_print(ANDROID_LOG_INFO, "VanillaBTN",
-                        "GPU scene coverage: %u/%u frames (%.1f%%), %u fallback; last: %s",
-                        hm_gpu_coverage_successes, hm_gpu_coverage_frames, percent,
-                        hm_gpu_coverage_fallbacks, hm_gpu_coverage_last_reason);
-#else
-    SDL_Log("GPU scene coverage: %u/%u frames (%.1f%%), %u fallback; last: %s",
-            hm_gpu_coverage_successes, hm_gpu_coverage_frames, percent,
-            hm_gpu_coverage_fallbacks, hm_gpu_coverage_last_reason);
-#endif
-    hm_gpu_coverage_frames = 0;
-    hm_gpu_coverage_successes = 0;
-    hm_gpu_coverage_fallbacks = 0;
-    SDL_strlcpy(hm_gpu_coverage_last_reason, "none", sizeof(hm_gpu_coverage_last_reason));
+    hm_host_gpu_coverage_report();
+}
+static void hm_host_gpu_coverage_skip(const char *reason) {
+    ++hm_gpu_coverage_frames;
+    ++hm_gpu_coverage_skipped;
+    if (reason && *reason)
+        SDL_snprintf(hm_gpu_coverage_last_reason, sizeof(hm_gpu_coverage_last_reason), "%s",
+                     reason);
+    hm_host_gpu_coverage_report();
 }
 static int hm_host_gpu_present(const RECT *native_area) {
     if (!hm_gpu_output || !hm_gpu_commands || native_area->w <= 0 || native_area->h <= 0) {
@@ -479,19 +496,47 @@ static int hm_host_gpu_present(const RECT *native_area) {
         if (replayed && hm_gpu_scene_needs_materialization(hm_gpu_commands)) {
 #ifdef __ANDROID__
             Uint64 materialize_begin = SDL_GetTicksNS();
+            Uint64 materialize_setup_begin = materialize_begin;
+#endif
+#ifdef __ANDROID__
+            Uint64 materialize_mask_begin = SDL_GetTicksNS();
 #endif
             u64 materialization_tiles[HM_VRAM_DIRTY_ROWS];
             u32 materialization_tile_count =
                 hm_gpu_scene_materialization_mask(hm_gpu_commands, materialization_tiles);
 #ifdef __ANDROID__
+            Uint64 materialize_mask_spent = SDL_GetTicksNS() - materialize_mask_begin;
+            hm_gpu_perf.materialize_mask_ns += materialize_mask_spent;
+            if (materialize_mask_spent > hm_gpu_perf.materialize_mask_max_ns)
+                hm_gpu_perf.materialize_mask_max_ns = materialize_mask_spent;
             hm_gpu_perf.materialization_tile_count = materialization_tile_count;
 #else
             (void)materialization_tile_count;
 #endif
+#ifdef __ANDROID__
+            Uint64 materialize_bind_begin = SDL_GetTicksNS();
+#endif
             hm_gpu_scene_materialize_vram(hm_gpu_commands, 1);
             hm_vram_write_filter_begin(materialization_tiles);
             (void)hm_gpu_scene_begin(hm_gpu_commands, width, height);
+#ifdef __ANDROID__
+            Uint64 materialize_bind_spent = SDL_GetTicksNS() - materialize_bind_begin;
+            hm_gpu_perf.materialize_bind_ns += materialize_bind_spent;
+            if (materialize_bind_spent > hm_gpu_perf.materialize_bind_max_ns)
+                hm_gpu_perf.materialize_bind_max_ns = materialize_bind_spent;
+            Uint64 materialize_setup_spent = SDL_GetTicksNS() - materialize_setup_begin;
+            hm_gpu_perf.materialize_setup_ns += materialize_setup_spent;
+            if (materialize_setup_spent > hm_gpu_perf.materialize_setup_max_ns)
+                hm_gpu_perf.materialize_setup_max_ns = materialize_setup_spent;
+            Uint64 materialize_replay_begin = SDL_GetTicksNS();
+#endif
             replayed = hm_frame_replay_draw(hm_gpu_replay, &live);
+#ifdef __ANDROID__
+            Uint64 materialize_replay_spent = SDL_GetTicksNS() - materialize_replay_begin;
+            hm_gpu_perf.materialize_replay_ns += materialize_replay_spent;
+            if (materialize_replay_spent > hm_gpu_perf.materialize_replay_max_ns)
+                hm_gpu_perf.materialize_replay_max_ns = materialize_replay_spent;
+#endif
             hm_vram_write_filter_end();
             hm_gpu_scene_materialize_vram(hm_gpu_commands, 0);
 #ifdef __ANDROID__
@@ -562,7 +607,7 @@ static int hm_host_gpu_present(const RECT *native_area) {
         ++hm_gpu_perf.acquires;
 #endif
         hm_gpu_cached_serial = 0;
-        hm_host_gpu_coverage_record(0, "GPU swapchain temporarily unavailable");
+        hm_host_gpu_coverage_skip("GPU swapchain temporarily unavailable");
         return -1;
     }
 #ifdef __ANDROID__
@@ -1397,6 +1442,14 @@ static void hm_perf_tick_enter(Uint64 now) {
                                  ? (double)hm_gpu_perf.materialize_ns /
                                        hm_gpu_perf.materialized_replays / 1e6
                                  : 0;
+    double materialize_setup_avg = hm_gpu_perf.materialized_replays
+                                       ? (double)hm_gpu_perf.materialize_setup_ns /
+                                             hm_gpu_perf.materialized_replays / 1e6
+                                       : 0;
+    double materialize_replay_avg = hm_gpu_perf.materialized_replays
+                                        ? (double)hm_gpu_perf.materialize_replay_ns /
+                                              hm_gpu_perf.materialized_replays / 1e6
+                                        : 0;
     double pack_avg = hm_gpu_perf.packs
                           ? (double)hm_gpu_perf.pack_ns / hm_gpu_perf.packs / 1e6
                           : 0;
@@ -1417,10 +1470,12 @@ static void hm_perf_tick_enter(Uint64 now) {
                          : 0;
     hm_audio_output_stats audio_stats;
     hm_audio_output_get_stats(&audio_stats);
-    char gpu_detail[384];
+    char gpu_detail[512];
     snprintf(gpu_detail, sizeof(gpu_detail),
              " | scene=%ux%u p=%u bins=%u refs=%.1f/%u vram=%u %.1fKiB matTiles=%u"
-             " | ms scene=%.1f/%.1f replay=%.1f/%.1f mat=%.1f/%.1f pack=%.1f/%.1f"
+             " | ms scene=%.1f/%.1f replay=%.1f/%.1f mat=%.1f/%.1f"
+             " matSetup=%.1f/%.1f matMask=%.1f/%.1f matBind=%.1f/%.1f"
+             " matReplay=%.1f/%.1f pack=%.1f/%.1f"
              " enc=%.1f/%.1f acq=%.1f/%.1f blit=%.1f/%.1f sub=%.1f/%.1f matCount=%u/%u"
              " audio=%llu/%llu q=%u",
              hm_gpu_perf.width, hm_gpu_perf.height, hm_gpu_perf.primitive_count,
@@ -1432,6 +1487,24 @@ static void hm_perf_tick_enter(Uint64 now) {
              replay_avg, hm_gpu_perf.replays ? hm_gpu_perf.replay_max_ns / 1e6 : 0,
              materialize_avg,
              hm_gpu_perf.materialized_replays ? hm_gpu_perf.materialize_max_ns / 1e6 : 0,
+             materialize_setup_avg,
+             hm_gpu_perf.materialized_replays ? hm_gpu_perf.materialize_setup_max_ns / 1e6 : 0,
+             hm_gpu_perf.materialized_replays
+                 ? (double)hm_gpu_perf.materialize_mask_ns /
+                       hm_gpu_perf.materialized_replays / 1e6
+                 : 0,
+             hm_gpu_perf.materialized_replays
+                 ? hm_gpu_perf.materialize_mask_max_ns / 1e6
+                 : 0,
+             hm_gpu_perf.materialized_replays
+                 ? (double)hm_gpu_perf.materialize_bind_ns /
+                       hm_gpu_perf.materialized_replays / 1e6
+                 : 0,
+             hm_gpu_perf.materialized_replays
+                 ? hm_gpu_perf.materialize_bind_max_ns / 1e6
+                 : 0,
+             materialize_replay_avg,
+             hm_gpu_perf.materialized_replays ? hm_gpu_perf.materialize_replay_max_ns / 1e6 : 0,
              pack_avg, hm_gpu_perf.packs ? hm_gpu_perf.pack_max_ns / 1e6 : 0,
              encode_avg, hm_gpu_perf.encodes ? hm_gpu_perf.encode_max_ns / 1e6 : 0,
              acquire_avg, hm_gpu_perf.acquires ? hm_gpu_perf.acquire_max_ns / 1e6 : 0,

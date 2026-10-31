@@ -88,22 +88,28 @@ windows presented at 12-14 FPS, with 6.3-40.2 ms average GPU submit. This
 identifies the second CPU reference replay and its full-image snapshot lookup
 as the dominant measured cost. Thermal status remained normal.
 
-The private materialization replay now tracks 16x16 dirty-tile fingerprints,
-and filters CPU VRAM writes to tiles read by the captured scene. It skips
-unneeded horizontal tile spans in polygon and rectangle raster loops. Snapshot
-matches still use an exact full-image comparison after their hashes match. On
-the G100, the first APK with write filtering reduced measured average
-materialization from the earlier 97.5-142.9 ms range to 23.7-37.7 ms across
-sampled farm windows. Those windows reported 17.4-25.0 ms average presents and
-127-182 materialized tiles. The following tile-span build measured 21.2-26.6 ms
-materialization, 18.5-27.8 ms scene preparation, and 14.0-19.2 ms average
-presents at 384x240. The owner still reports lag and audio crackle. The current
-source further narrows the materialization mask to tiles that are both read and
-written by the scene. The 08:54 APK also reports the game's audio-ring underrun,
-dropped-frame, and queue counters alongside GPU timing. It is installed on the
-tablet; post-change gameplay and audio measurements are still pending. Android's
-audio service reported zero hardware mixer underruns during the prior run, but
-those counters do not include the game's private SDL audio ring. The ROM rejects
+The private materialization replay tracks 16x16 dirty-tile fingerprints and
+filters CPU VRAM writes to tiles read by the captured scene. Polygon and
+rectangle raster loops skip unneeded horizontal tile spans and reject primitive
+bounds that cannot touch selected materialization tiles. Earlier G100 APKs
+reduced replay from 97.5-142.9 ms to 20.3-26.6 ms, but the owner still reported
+lag and audio crackle. The tile-span-only APK did not improve farm timing.
+
+The 09:31 Release APK adds exact changed-tile tracking for VRAM snapshots. It
+avoids repeated 1 MiB comparisons when feedback reads match the baseline, while
+hash matches for non-baseline versions are confirmed by exact pixel comparisons
+over tiles that differ from the baseline. On the connected G100 at 384x240,
+the 09:33 farm sample measured 60-61 game ticks and presents per second.
+Materialization replay averaged 1.1-1.7 ms (observed maximum 4.6 ms), down from
+20.3-24.1 ms in the prior farm sample; scene preparation averaged 2.0-3.2 ms.
+The game audio ring reported zero underruns and drops, with 2,056-2,791 queued
+frames. The owner reported that the result felt smoother. This measurement
+covers the tested farm scene and native scene size; 720p and other scenes remain
+unmeasured. One earlier sample reported 598/600 scene attempts through the GPU;
+the two fallbacks were missing complete captures during loading or invalidated
+frames. Coverage reporting separates those true fallback frames from temporarily
+unavailable swapchains, where no renderer can present. Android's audio service
+also reported zero hardware mixer underruns in a prior run. The ROM rejects
 `simpleperf` events (`cpu-cycles`, `cpu-clock`, and `task-clock`), preventing a
 function-level profile.
 

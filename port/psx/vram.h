@@ -32,5 +32,6 @@ void hm_vram_write_filter_end(void);
 int hm_vram_write_filter_active(void);
 u64 hm_vram_write_filter_row(u32 y);
 int hm_vram_write_allowed(u32 x, u32 y);
+int hm_vram_write_filter_intersects(s32 x0, s32 y0, s32 x1, s32 y1);
 
 #endif

@@ -11,6 +11,21 @@ static void hm_line_segment(u32 xy0, u32 xy1, u32 color0, u32 color1, u32 opcode
     const DRAWENV *draw = &hm_gpu_environment_state()->draw;
     s32 x0 = hm_line_signed11(xy0) + draw->ofs[0], y0 = hm_line_signed11(xy0 >> 16) + draw->ofs[1];
     s32 x1 = hm_line_signed11(xy1) + draw->ofs[0], y1 = hm_line_signed11(xy1 >> 16) + draw->ofs[1];
+    if (hm_vram_write_filter_active()) {
+        s32 min_x = x0 < x1 ? x0 : x1, max_x = x0 > x1 ? x0 : x1;
+        s32 min_y = y0 < y1 ? y0 : y1, max_y = y0 > y1 ? y0 : y1;
+        if (min_x < draw->clip.x)
+            min_x = draw->clip.x;
+        if (min_y < draw->clip.y)
+            min_y = draw->clip.y;
+        if (max_x >= draw->clip.x + draw->clip.w)
+            max_x = draw->clip.x + draw->clip.w - 1;
+        if (max_y >= draw->clip.y + draw->clip.h)
+            max_y = draw->clip.y + draw->clip.h - 1;
+        if (min_x > max_x || min_y > max_y ||
+            !hm_vram_write_filter_intersects(min_x, min_y, max_x + 1, max_y + 1))
+            return;
+    }
     s32 dx = hm_line_abs(x1 - x0), dy = hm_line_abs(y1 - y0);
     if (dx > 1023 || dy > 511)
         return;

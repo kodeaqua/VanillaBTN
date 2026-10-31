@@ -271,7 +271,7 @@ int main(void) {
     CHECK(hm_gpu_scene_end(s, previous, &data));
     u64 feedback_tiles[HM_VRAM_DIRTY_ROWS];
     u32 feedback_tile_count = hm_gpu_scene_materialization_mask(s, feedback_tiles);
-    CHECK(feedback_tile_count > 0 && (feedback_tiles[0] & 1u));
+    CHECK(feedback_tile_count == 1 && (feedback_tiles[0] & 1u));
     CHECK(!(feedback_tiles[1] & (UINT64_C(1) << 1)));
     CHECK(!(feedback_tiles[0] & (UINT64_C(1) << 4)));
     hm_gpu_scene_materialize_vram(s, 1);
@@ -291,6 +291,20 @@ int main(void) {
     CHECK(data.vram_versions[2 * HM_VRAM_WIDTH + 2] == 31);
     CHECK(data.vram_versions[20 * HM_VRAM_WIDTH + 20] == 0);
     hm_gpu_scene_materialize_vram(s, 0);
+
+    /* A source tile written only after its texture read is not a feedback
+     * dependency and must not trigger private CPU materialization. */
+    setup(32, 32);
+    const u32 read_then_write[] = {0xe1000100, 0x65000000, 0x00140014, 0x00000000,
+                                   0x00040004, 0x600000ff, 0x00020002, 0x00040004};
+    previous = hm_gpu_scene_begin(s, 32, 32);
+    hm_replay_begin(&area);
+    hm_gpu_execute_words(read_then_write,
+                         sizeof(read_then_write) / sizeof(read_then_write[0]));
+    CHECK(!hm_gpu_scene_needs_materialization(s));
+    CHECK(hm_gpu_scene_end(s, previous, &data));
+    u64 read_then_write_tiles[HM_VRAM_DIRTY_ROWS];
+    CHECK(hm_gpu_scene_materialization_mask(s, read_then_write_tiles) == 0);
 
     /* Private replays track changed VRAM tiles so equivalent feedback reads
      * reuse a version instead of comparing every full 1 MiB snapshot. */
@@ -318,6 +332,31 @@ int main(void) {
     CHECK(data.words[data.words[8] + HM_SCENE_STRIDE + 40] == 1);
     CHECK(data.words[data.words[8] + HM_SCENE_STRIDE * 3 + 40] == 2);
     CHECK(data.words[data.words[8] + HM_SCENE_STRIDE * 4 + 40] == 2);
+
+    /* If replay writes a tile and then restores every pixel to the frame
+     * baseline, feedback reads reuse the baseline layer without a full-VRAM
+     * compare or a redundant snapshot copy. */
+    setup(64, 64);
+    hm_vram_snapshot(&private_vram);
+    native_vram = hm_vram_bind(&private_vram);
+    hm_vram_reset();
+    const u32 restore_feedback[] = {
+        0x600000ff, 0x00020002, 0x00010001,
+        0xe1000100,
+        0x65000001, 0x00280028, 0x000a000a, 0x00010001,
+        0x60000000, 0x00020002, 0x00010001,
+        0x65000001, 0x002a0028, 0x000a000a, 0x00010001};
+    hm_gpu_scene_materialize_vram(s, 1);
+    previous = hm_gpu_scene_begin(s, 64, 64);
+    hm_replay_begin(&private_area);
+    hm_gpu_execute_words(restore_feedback,
+                         sizeof(restore_feedback) / sizeof(restore_feedback[0]));
+    CHECK(hm_gpu_scene_end(s, previous, &data));
+    hm_vram_bind(native_vram);
+    hm_gpu_scene_materialize_vram(s, 0);
+    CHECK(data.vram_version_count == 1);
+    CHECK(data.words[data.words[8] + HM_SCENE_STRIDE + 40] == 1);
+    CHECK(data.words[data.words[8] + HM_SCENE_STRIDE * 3 + 40] == 0);
 
     setup(32, 32);
     previous = hm_gpu_scene_begin(s, 32, 32);
