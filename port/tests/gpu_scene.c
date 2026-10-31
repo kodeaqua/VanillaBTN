@@ -318,8 +318,7 @@ int main(void) {
     for (int i = 0; i < 257; ++i)
         hm_gpu_execute_words(rectangle, 3);
     CHECK(hm_gpu_scene_end(s, previous, &data));
-    CHECK(data.words[7] > HM_SCENE_BIN_WORDS &&
-          data.words[data.words[9]] == 257);
+    CHECK(data.words[7] == 16 && data.words[data.words[data.words[9]]] == 257);
     setup(1024, 512);
     area = (RECT){0, 0, 1024, 512};
     previous = hm_gpu_scene_begin(s, 32, 32);
@@ -367,10 +366,10 @@ int main(void) {
     hm_gpu_execute_words(safe_uv, 5);
     CHECK(hm_gpu_scene_needs_materialization(s));
     CHECK(hm_gpu_scene_end(s, previous, &data));
-    /* Multisample locations can cross a 16-pixel bin boundary even when the
+    /* Multisample locations can cross an 8-pixel bin boundary even when the
      * output pixel centre lies in the neighboring bin. */
-    const u32 triangles[2][4] = {{0x200000ff, 0x000c0002, 0x000c000a, 0x00100002},
-                                 {0x200000ff, 0x0002000c, 0x00020010, 0x000a000c}};
+    const u32 triangles[2][4] = {{0x200000ff, 0x00040002, 0x00040006, 0x00080002},
+                                 {0x200000ff, 0x00020004, 0x00020008, 0x00060004}};
     for (unsigned samples = 1; samples <= 4; samples *= 2) {
         for (int axis = 0; axis < 2; ++axis) {
             setup(32, 32);
@@ -379,9 +378,9 @@ int main(void) {
             hm_replay_begin(&area);
             hm_gpu_execute_words(triangles[axis], 4);
             CHECK(hm_gpu_scene_end(s, previous, &data));
-            int bin = axis ? 1 : 2;
-            CHECK(data.words[data.words[9] + bin * data.words[7]] ==
-                  (samples == 1 ? 0u : 1u));
+            int bin = axis ? 1 : 4;
+            u32 list = data.words[data.words[9] + bin];
+            CHECK(data.words[list] == (samples == 1 ? 0u : 1u));
         }
     }
     hm_gpu_scene_destroy(s);

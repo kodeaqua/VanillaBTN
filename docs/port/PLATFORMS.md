@@ -612,3 +612,15 @@ Inline transfers remain in replay captures; direct VRAM mutations still
 invalidate captures. This is synthetic Vulkan validation only. D3D12/Android,
 full-game captures, gameplay parity, allocation-failure behavior, and performance
 with transfer-heavy scenes remain unverified.
+
+### Farm-scene GPU bin optimization (ADR-153, 2026-10-31)
+
+The scene builder now uses 8x8 logical tiles and variable-length packed bin
+lists. On a Radeon RX Vega, the 8,192-rectangle synthetic farm probe improved
+D3D12 capture/upload/compute/fence from 1.926 to 1.830 ms at 320x240 and from
+3.976 to 2.714 ms at 960x720. Vulkan changed from 1.841 to 1.849 ms and from
+4.283 to 2.713 ms. Native-size changes are within run-level variation; larger
+output improved 32-37%. Scene payload fell 16.1%. The owner-run G100 build still
+logs 14-16 presents/s with 63-73 ms average present time; it has not yet run
+the packed-bin build. Actual Android improvement and Windows gameplay frame
+pacing remain unverified.

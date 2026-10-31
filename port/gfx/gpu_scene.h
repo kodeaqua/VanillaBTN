@@ -5,6 +5,8 @@
 enum {
     HM_SCENE_HEADER = 16,
     HM_SCENE_STRIDE = 41,
+    /* Smaller bins cut per-pixel candidate loops in dense game scenes. */
+    HM_SCENE_BIN_TILE_SIZE = 8,
     HM_SCENE_INITIAL_PRIMITIVES = 8192,
     HM_SCENE_BIN_WORDS = 257
 };

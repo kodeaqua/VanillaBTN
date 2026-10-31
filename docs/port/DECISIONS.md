@@ -4139,3 +4139,31 @@ outside an ordering-table capture, and unsupported or malformed GP0 streams
 retain the CPU reference fallback. Full interactive coverage remains
 unverified until owner gameplay testing reports zero unsupported or
 missing-capture fallbacks.
+
+## ADR-153: Pack Smaller GPU Scene Tile Bins
+
+Date: 2026-10-31. Status: accepted.
+
+Context: Dense scenes such as the farm made each output pixel examine too many
+unrelated primitives from 16x16 logical bins. A fixed 257-word slot per bin
+also made sparse scenes upload many unused indices. The G100 owner-run build
+reported 100% GPU scene coverage but only 14-16 presents/s, with 63-73 ms
+average present time and 3.5-4.0 ms guest-game time.
+
+Decision: Use 8x8 logical bins and pack them as a tile-offset table followed by
+variable-length `[count, primitive ids]` lists. Keep the complete primitive
+records and raster semantics unchanged. Preserve the general shader path and
+existing CPU safety fallback; do not trade scene coverage or image quality for
+the bin optimization.
+
+Consequences: On the same synthetic 8,192-rectangle farm-like workload using a
+Windows Radeon RX Vega, D3D12 capture/upload/compute/fence time changed from
+1.926 to 1.830 ms at 320x240 and from 3.976 to 2.714 ms at 960x720. Vulkan
+changed from 1.841 to 1.849 ms and from 4.283 to 2.713 ms, respectively. The
+native-size differences are within run-level variation; the larger-output
+results show a repeatable improvement.
+Scene payload fell from 1,651,952 to 1,385,920 bytes (16.1%). These are
+offscreen synthetic measurements, not gameplay FPS. The G100 has not run this
+new shader yet, so the reported Android lag remains an open owner test. A
+workgroup-shared bin cache was tried and removed because it did not improve
+the Windows benchmark.

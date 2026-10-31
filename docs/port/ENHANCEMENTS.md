@@ -10,7 +10,7 @@ compute path for mobile performance (ADR-123/124/131/132).
 | Area | Current state |
 | --- | --- |
 | Pause interface | ESC pause, Resume, Settings, and Exit Game are available by default per owner request; set enhance.pause_menu=false to turn it off. |
-| Renderer | GPU Auto attempts shared scene compute for every captured frame on desktop and Android. It handles all polygon, line, and rectangle opcode variants, clear/load/copy transfers, mask behavior, and ordered texture feedback. Software remains the reference fallback for direct/missing captures and device/resource failures; game-scene coverage and Android performance still need owner gameplay validation. |
+| Renderer | GPU Auto attempts shared scene compute for every captured frame on desktop and Android. It handles all polygon, line, and rectangle opcode variants, clear/load/copy transfers, mask behavior, and ordered texture feedback. Software remains the reference fallback for direct/missing captures and device/resource failures. The owner-run G100 build reaches 100% logged GPU scene coverage but currently runs at 14-16 presents/s; an 8x8 packed-bin optimization improves synthetic Windows farm timings and still needs G100 and Windows gameplay validation. |
 | Scaling and widescreen | Implemented as optional paths; both default OFF. Widescreen covers the implemented screens, but complete scene/device coverage and CPU fallback performance are unverified. |
 | Filtering and anti-aliasing | Nearest, Bilinear, xBR, FXAA, and GPU MSAA 2x/4x are implemented. FXAA/MSAA default OFF; MSAA requires GPU Auto. |
 | Interpolation | Optional and default OFF. Private primitive replay is limited to eligible farm views; Android clamps it off. It does not advance simulation. |

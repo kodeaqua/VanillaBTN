@@ -59,6 +59,27 @@ gameplay were not tested on the tablet. A prior Adreno 610-class measurement
 showed a 42.57 ms compute/blit submit; the all-frame Android policy is an
 explicit owner request and has not been profiled on the G100.
 
+The owner later ran the GPU Auto build on the connected G100. Read-only logcat
+reported repeated 600/600 GPU scene windows, but only 14-16 presents/s and
+62.7-73.2 ms average present time; guest-game time averaged 3.5-4.0 ms and the
+host reported 0% idle wait. This confirms the current Android compute path is
+covered but too slow. That running APK predates the uncommitted 8x8 packed-bin
+optimization below; it remains open and was not replaced during this work.
+
+The probe's `--farm-benchmark` option renders 8,192 fixed 8x8 rectangles at
+320x240 and 960x720, with a fresh builder and an explicit GPU fence per frame.
+On the local Windows Radeon RX Vega, D3D12 capture/upload/compute/fence time
+changed from 1.926 to 1.830 ms at 320x240 and from 3.976 to 2.714 ms at
+960x720 after switching to 8x8 packed bins. Vulkan changed from 1.841 to
+1.849 ms and from 4.283 to 2.713 ms, respectively. Native-size differences
+are within run-level variation; the larger-output results improve by 32-37%.
+Scene payload fell 16.1%,
+from 1,651,952 to 1,385,920 bytes. The baseline is a detached build of the
+previous 16x16 fixed-bin revision, using this exact rectangle workload. Full
+CPU-reference comparisons and the opcode sweep pass on both D3D12 and Vulkan.
+The new APK still needs an owner run on G100 and the farm; the synthetic
+desktop result does not prove the Android lag is fixed.
+
 This optional local diagnostic validates GPU presentation without game data.
 It is not a game screen or a primitive rasterizer. Default unit builds neither
 download SDL nor require a GPU. The SDL release and SHA-256 are pinned in the
