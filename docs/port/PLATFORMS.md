@@ -4,8 +4,8 @@
 
 | Target | Current validation |
 | --- | --- |
-| Windows x86-64 | Release `-Game` build and standalone package built; Release and ASan/UBSan suites pass 124/124. Full-playthrough parity remains unverified. |
-| Android arm64-v8a | Release APK built with AGP 9.5.0, Gradle 9.8.2, and NDK 30.0.16248370; native ELF and APK zip alignment checks pass for 16 KB pages. On the connected Xiaomi MediaTek G100 tablet, SDL JNI startup and Vulkan GPU device creation pass; rendering and gameplay remain unverified. |
+| Windows x86-64 | Release build and 124/124 tests pass. Focused ASan/UBSan graphics tests pass. Synthetic VRAM scanout matches reference pixels on Vulkan and Direct3D 12. Full-playthrough parity remains unverified. |
+| Android arm64-v8a | Latest Release APK built with AGP 9.5.0, Gradle 9.8.2, and NDK 30.0.16248370; signature and 16 KB APK zip-alignment checks pass. The owner-tested G100 farm sample reports 100% GPU output in two steady 600-frame windows, zero fallbacks, and two then zero direct VRAM scanouts. It holds 60-61 presents/s with 3.7-4.1 ms average presentation and zero audio-ring underruns/drops. 720p and other scenes/devices remain unverified. |
 | Linux x86-64 | Deferred to a separate Linux host; WSL is excluded. |
 | macOS universal | No macOS build has been validated. |
 | Matching build | The check target remains unverified on this Windows host because its separate Linux toolchain is unavailable. |
@@ -39,8 +39,9 @@ ASan/UBSan preset.
 
 Gradle reports deprecated APIs that may become errors with Gradle 10; the
 current pinned build succeeds. No interactive Windows playthrough was performed.
-Android GPU device creation was checked on one tablet; scene rendering,
-lifecycle behavior, other devices, and gameplay remain unverified.
+The owner tested the latest Android APK in the farm on one tablet and reported
+smoother play. Full playthrough parity, 720p performance, other scenes,
+lifecycle behavior and other devices remain unverified.
 
 GPU Auto shares scene output at native and enhanced resolutions, with Software
 as the reference and CPU fallback for unsupported work. It now attempts every
@@ -51,7 +52,8 @@ captures, resource/device failures and untested game scenes remain CPU paths.
 Do not claim complete gameplay offload or full-playthrough parity. The owner
 confirmed that the reported horizontal line disappeared in one farm scene with
 Modern, Scaling On, Widescreen Off, MSAA 4x, Nearest, Interpolation Off, VSync
-On, and unlimited FPS. Other scenes/devices and performance remain unverified.
+On, and unlimited FPS. The farm performance measurement is recorded below;
+other scenes, devices, 720p and broader performance budgets remain unverified.
 
 Owner follow-up: the owner reports that sleep/save is now safe. The exact
 scenarios covered were not specified, so broad sleep, day-transition, save,
@@ -286,10 +288,18 @@ dependencies. Invalid/unrecorded work and device/resource failures retain the
 software fallback. Native CPU VRAM compatibility remains authoritative. ADR-151
 supersedes ADR-132's Android selection gate: GPU Auto now attempts every
 captured Android frame, with Software and CPU fallback retained. The connected
-G100 has only passed device creation so far; scene rendering, performance and
-owner gameplay/device coverage remain unverified. The prior Adreno 610-class
-compute submit measured 42.57 ms, so this owner-requested policy may need further
-performance work on mobile hardware.
+MediaTek G100/Mali-G57 tablet logged 600/600 GPU scene frames, but the later
+8x8-bin build still presented at about 8 FPS in the farm. A diagnostic run at
+384x240 measured 204-219 ms average scene preparation per rebuild, compared
+with 17-19 ms GPU submission; guest-game time averaged 4.1-4.4 ms and thermal
+status was normal. A second diagnostic separated the cost: the materialization
+replay averaged 97.5-142.9 ms for 41-55 VRAM versions, while replay alone was
+about 0.7-1.9 ms and packing 0.0-0.1 ms. The scene builder now uses incremental
+16x16 dirty-tile fingerprints for that replay and keeps exact comparison on
+hash matches. The later G100 measurements are recorded below.
+Windows also remains reported as laggy; a single process/GPU counter sample
+showed about one CPU core saturated while the 3D engine was at 11%. The prior
+Adreno 610-class compute submit measured 42.57 ms.
 
 ### Optional texture filtering (2026-10-26)
 
@@ -620,7 +630,38 @@ lists. On a Radeon RX Vega, the 8,192-rectangle synthetic farm probe improved
 D3D12 capture/upload/compute/fence from 1.926 to 1.830 ms at 320x240 and from
 3.976 to 2.714 ms at 960x720. Vulkan changed from 1.841 to 1.849 ms and from
 4.283 to 2.713 ms. Native-size changes are within run-level variation; larger
-output improved 32-37%. Scene payload fell 16.1%. The owner-run G100 build still
-logs 14-16 presents/s with 63-73 ms average present time; it has not yet run
-the packed-bin build. Actual Android improvement and Windows gameplay frame
-pacing remain unverified.
+output improved 32-37%. Scene payload fell 16.1%. The initial owner-run G100
+build logged 14-16 presents/s with 63-73 ms average present time. A later APK
+added exact changed-tile VRAM snapshot matching and selected-tile CPU
+materialization rasterization. On the connected G100 at native 384x240 in the
+farm, logcat measured 60-61 ticks/presents per second, 1.1-1.7 ms average
+materialization replay (4.6 ms observed maximum), and zero game-ring audio
+underflows/drops. The owner reported smoother play. This is an owner-tested
+single-scene result; 720p, other areas, audio quality beyond the ring counters,
+Windows gameplay pacing, and other Android devices remain unverified.
+
+### GPU VRAM scanout fallback (2026-10-31)
+
+The PS1 alternates its draw and display pages, so a capture can be coherent but
+refer to the other half of VRAM. When no capture matches the visible page, GPU
+Auto now builds a zero-primitive scene that reads that page directly from the
+VRAM snapshot. A display area with zero width or height is counted as skipped
+because it has no pixels to present; missing captures and replay/packing
+failures now try GPU scanout before the CPU safety path. The G100 farm sample at
+384x240 recorded 589/589 visible frames on
+the GPU (100%), five VRAM scanouts, zero fallbacks, and 11 empty-area startup
+skips. The next two 600-frame windows reported 600/600 GPU frames with zero
+fallbacks and two then zero scanouts. Steady farm timing was 60-61 presents/s,
+3.7-4.1 ms average presentation, and 3.6-3.7 ms average guest-game time.
+Synthetic 2x scanout readback matched VRAM exactly on Windows Vulkan and
+Direct3D 12. These results cover the farm scene and native internal size only;
+Windows interactive gameplay, 720p, and other areas remain unverified.
+
+### Weather animation during dialogue pauses (2026-10-31)
+
+The native port now advances weather particle movement, age, and respawn while
+the game pause flag is set, so rain does not drain off-screen during NPC
+dialogue. Paused weather uses a private random sequence and restores the shared
+gameplay RNG each frame. The focused Windows regression test passes; actual
+rainy-dialogue behavior still needs owner gameplay confirmation on Windows and
+Android.

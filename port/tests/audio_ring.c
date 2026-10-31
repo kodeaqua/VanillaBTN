@@ -25,12 +25,17 @@ int main(void) {
           output[10] == 2500.0f / 32768);
     hm_audio_ring_init(&ring, 2);
     CHECK(hm_audio_ring_push(&ring, full, HM_AUDIO_RING_FRAMES) == HM_AUDIO_RING_FRAMES);
-    CHECK(hm_audio_ring_push(&ring, input, 1) == 0 && ring.dropped == 1);
+    CHECK(hm_audio_ring_push(&ring, input, 1) == 0 && atomic_load(&ring.dropped) == 1);
     for (u32 i = 0; i < 10000; ++i) {
         hm_audio_ring_read(&ring, output, 1, 2, 44100);
         hm_audio_ring_push(&ring, input, 1);
     }
     CHECK(atomic_load(&ring.write) > HM_AUDIO_RING_FRAMES);
-    CHECK(!ring.underflows);
+    CHECK(!atomic_load(&ring.underflows));
+
+    hm_audio_ring_init(&ring, 2);
+    hm_audio_ring_push(&ring, input, 5);
+    hm_audio_ring_read(&ring, output, 6, 2, 44100);
+    CHECK(atomic_load(&ring.underflows) > 0);
     return 0;
 }

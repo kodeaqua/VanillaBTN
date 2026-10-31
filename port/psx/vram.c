@@ -7,6 +7,8 @@
 static hm_vram_context hm_default_vram;
 static hm_vram_context *hm_context = &hm_default_vram;
 static u64 hm_vram_gen = 1;
+static u64 hm_write_filter[HM_VRAM_DIRTY_ROWS];
+static int hm_write_filter_enabled;
 /* MoveImage is synchronous in the native backend. Preserve overlapping source
  * pixels before writes, matching the source-preserving transfer contract. */
 static u16 hm_move_image_scratch[HM_VRAM_WIDTH * HM_VRAM_HEIGHT];
@@ -60,9 +62,58 @@ void hm_vram_acknowledge(u32 tile_y, u64 tiles) {
     hm_dirty[tile_y] &= ~tiles;
 }
 
+void hm_vram_write_filter_begin(const u64 tiles[HM_VRAM_DIRTY_ROWS]) {
+    if (!tiles)
+        hm_runtime_error("hm_vram_write_filter_begin", "null tile mask");
+    memcpy(hm_write_filter, tiles, sizeof(hm_write_filter));
+    hm_write_filter_enabled = 1;
+}
+
+void hm_vram_write_filter_end(void) { hm_write_filter_enabled = 0; }
+
+int hm_vram_write_filter_active(void) { return hm_write_filter_enabled; }
+
+u64 hm_vram_write_filter_row(u32 y) {
+    if (!hm_write_filter_enabled)
+        return UINT64_MAX;
+    return hm_write_filter[(y & 511u) >> 4];
+}
+
+int hm_vram_write_allowed(u32 x, u32 y) {
+    if (!hm_write_filter_enabled)
+        return 1;
+    u32 tile_x = (x & 1023u) >> 4, tile_y = (y & 511u) >> 4;
+    return (hm_write_filter[tile_y] & (UINT64_C(1) << tile_x)) != 0;
+}
+
+int hm_vram_write_filter_intersects(s32 x0, s32 y0, s32 x1, s32 y1) {
+    if (!hm_write_filter_enabled)
+        return 1;
+    if (x0 < 0)
+        x0 = 0;
+    if (y0 < 0)
+        y0 = 0;
+    if (x1 > HM_VRAM_WIDTH)
+        x1 = HM_VRAM_WIDTH;
+    if (y1 > HM_VRAM_HEIGHT)
+        y1 = HM_VRAM_HEIGHT;
+    if (x0 >= x1 || y0 >= y1)
+        return 0;
+    u32 first_tile_x = (u32)x0 >> 4, last_tile_x = (u32)(x1 - 1) >> 4;
+    u64 x_mask = UINT64_MAX << first_tile_x;
+    if (last_tile_x < 63)
+        x_mask &= (UINT64_C(1) << (last_tile_x + 1)) - 1;
+    for (u32 tile_y = (u32)y0 >> 4; tile_y <= ((u32)y1 - 1) >> 4; ++tile_y)
+        if (hm_write_filter[tile_y] & x_mask)
+            return 1;
+    return 0;
+}
+
 static void hm_vram_put(u32 x, u32 y, u16 value, int masked) {
     x &= 1023;
     y &= 511;
+    if (hm_write_filter_enabled && !hm_vram_write_allowed(x, y))
+        return;
     if (masked) {
         if (hm_vram[y][x] & hm_check_mask)
             return;

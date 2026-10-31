@@ -4,6 +4,7 @@
 #include "psx/gpu_raster.h"
 #include "psx/vram.h"
 #include <stdio.h>
+#include <string.h>
 #define CHECK(x)                                                                                   \
     do {                                                                                           \
         if (!(x)) {                                                                                \
@@ -97,6 +98,8 @@ int main(void) {
     live = capture();
     hm_vram_reset();
     CHECK(!hm_frame_replay_serial(replay, &live));
+    const char *failure = hm_frame_replay_failure(replay);
+    CHECK(failure && strstr(failure, "no complete captured scene") != NULL);
     hm_frame_replay_release(replay);
     return 0;
 }

@@ -861,3 +861,20 @@ ADR-144 adds `HMBTN_PORT && HMBTN_ENH_NPC_BONDS` guards in
 runtime dispatch, disabled-page recovery, and previous/next wrap limits. The
 exact original eight-page handler and wrap behavior remain in the matching-build
 branches. The farm overlay manifest records the normalized source hash.
+
+ADR-155 adds port-only weather particle stepping in
+`src/overlay/11_GF_FARM/world/weather.c`. Paused native dialogue continues
+particle movement and respawn with a private RNG state; the gameplay RNG is
+restored after each paused weather update. The original particle pause behavior
+remains unchanged in the matching-build branch, and the farm overlay manifest
+tracks the normalized source hash.
+
+ADR-080 preserves tile interaction flags while the native Walk Crops option makes
+field crops and weeds passable. This keeps wild/dead weed pickup and mature grass
+harvest reachable without changing movement when the option is OFF. The farm
+overlay manifest tracks the normalized source hash.
+
+ADR-156 extends the GPU VRAM scanout recovery path to captured scenes that fail
+replay or packing, with CPU rendering retained if scanout itself cannot be
+submitted. A GPU scene regression verifies scanout can rebuild after an
+unsupported GP0 opcode.

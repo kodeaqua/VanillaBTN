@@ -12,6 +12,9 @@ recorded as ordered GP0 transfers while a frame is captured. A native
 `DrawOTag` call without the normal frame wrapper creates its own bypass capture,
 covering the loading screen. The scene unit test sweeps every polygon, line and
 rectangle opcode encoding plus documented non-rendering GP0 NOP mirrors. The
+CPU command and scene tests sweep every opcode alias in the `0x80..0x9F` copy
+and `0xA0..0xBF` upload families; the offscreen GPU probe also renders
+noncanonical aliases and compares them with CPU output. The
 frame replay tests also cover capture streams larger than the previous
 65,536-word and 64-group limits. The GPU probe
 then renders all 96 primitive encodings with nondegenerate geometry and checks
@@ -20,9 +23,11 @@ semi-transparency modes. Each case is also checked to ensure the CPU reference
 actually changed at least one output pixel. Mask-set and
 mask-check behavior is preserved for load and VRAM-copy transfers. VRAM-to-CPU
 readback, IRQ requests, NOP/cache commands, and draw-environment state do not
-produce scene pixels. Malformed streams, raw VRAM changes outside an
-ordering-table capture, reserved texture depth, and GPU resource/device
-failures still use the reference path.
+produce scene pixels. Malformed streams, unsupported scene operations, and
+reserved texture depth retain the CPU reference path. When no coherent captured
+frame is available, GPU Auto can build a zero-primitive scene that scans the
+current visible VRAM page directly on the GPU. GPU resource/device failures
+retain the CPU reference safety path.
 Gameplay parity, device breadth, and frame-time budgets remain owner checks; see
 PLATFORMS.md and ENHANCEMENTS.md.
 
@@ -44,9 +49,10 @@ The core `gpu.vram` test also checks overlapping `MoveImage` copies, including
 wrap at the VRAM edge and mask-bit behavior. These transfers now snapshot their
 source before writing, so overlapping areas do not terminate the game.
 
-Android GPU Auto now attempts compute rendering for each captured frame. Every
-600 attempts, the host logs compute-scene coverage, fallback count, and the last
-fallback reason. Explicit Software mode remains available. Android's SDL GPU
+Android GPU Auto attempts compute rendering for each captured frame. Every
+600 attempts, the host logs scene coverage, direct GPU VRAM scanouts, fallback
+count, and the last fallback reason. Explicit Software mode remains available.
+Android's SDL GPU
 device uses SPIR-V only and disables optional Vulkan features
 unused by this compute renderer. The connected MediaTek G100 tablet reports a
 Mali-G57 MC2 Vulkan device with `shaderClipDistance` unavailable; SDL 3.2.28
@@ -62,9 +68,68 @@ explicit owner request and has not been profiled on the G100.
 The owner later ran the GPU Auto build on the connected G100. Read-only logcat
 reported repeated 600/600 GPU scene windows, but only 14-16 presents/s and
 62.7-73.2 ms average present time; guest-game time averaged 3.5-4.0 ms and the
-host reported 0% idle wait. This confirms the current Android compute path is
-covered but too slow. That running APK predates the uncommitted 8x8 packed-bin
-optimization below; it remains open and was not replaced during this work.
+host reported 0% idle wait. The owner then installed the 8x8 packed-bin build
+and reported continued lag on both Android and Windows. The connected G100's
+later logcat sample showed 8 presents/s, 143-150 ms average present time,
+503-547 ms maximum, 3.4-3.7 ms guest-game time, all observed presents on GPU,
+and 0% idle wait. Thermal status was normal (status 0; skin 42.1 C). The bin
+change therefore improves the synthetic desktop workload but has not resolved
+the real farm workload on this tablet.
+
+A read-only Windows sample during the owner's run showed the game process at
+98-101% of one logical CPU and the GPU 3D engine at 11% in one snapshot. This
+points toward CPU-side scene construction or driver submission, but one GPU
+sample is not a complete profile. The first diagnostic APK was installed and
+logged 8 presents/s at 384x240 with 619-624 primitives, 8.0 average/27 maximum
+bin references, and 155-157 KiB scene payload. Per-scene build time averaged
+204-219 ms (peaks 360-412 ms); encode averaged 6-9 ms and GPU submit 17-19 ms.
+Guest-game time remained about 4.1-4.4 ms. A second diagnostic APK split replay,
+VRAM materialization, and scene packing. In its farm run, scene preparation
+averaged 48.7-144.0 ms, materialization replay 97.5-142.9 ms, and packing
+rounded to 0.0-0.1 ms; scenes contained 41-55 VRAM versions. The sampled
+windows presented at 12-14 FPS, with 6.3-40.2 ms average GPU submit. This
+identifies the second CPU reference replay and its full-image snapshot lookup
+as the dominant measured cost. Thermal status remained normal.
+
+The private materialization replay tracks 16x16 dirty-tile fingerprints and
+filters CPU VRAM writes to tiles read by the captured scene. Polygon and
+rectangle raster loops skip unneeded horizontal tile spans and reject primitive
+bounds that cannot touch selected materialization tiles. Earlier G100 APKs
+reduced replay from 97.5-142.9 ms to 20.3-26.6 ms, but the owner still reported
+lag and audio crackle. The tile-span-only APK did not improve farm timing.
+
+The 09:31 Release APK adds exact changed-tile tracking for VRAM snapshots. It
+avoids repeated 1 MiB comparisons when feedback reads match the baseline, while
+hash matches for non-baseline versions are confirmed by exact pixel comparisons
+over tiles that differ from the baseline. On the connected G100 at 384x240,
+the 09:33 farm sample measured 60-61 game ticks and presents per second.
+Materialization replay averaged 1.1-1.7 ms (observed maximum 4.6 ms), down from
+20.3-24.1 ms in the prior farm sample; scene preparation averaged 2.0-3.2 ms.
+The game audio ring reported zero underruns and drops, with 2,056-2,791 queued
+frames. The owner reported that the result felt smoother. This measurement
+covers the tested farm scene and native scene size; 720p and other scenes remain
+unmeasured. One earlier sample reported 598/600 scene attempts through the GPU;
+the two fallbacks were missing complete captures during loading or invalidated
+frames. Coverage reporting separates those true fallback frames from temporarily
+unavailable swapchains, where no renderer can present. Android's audio service
+also reported zero hardware mixer underruns in a prior run. The ROM rejects
+`simpleperf` events (`cpu-cycles`, `cpu-clock`, and `task-clock`), preventing a
+function-level profile. A diagnostic update now reports why replay selection
+failed (no complete capture, no matching loading/bypass capture, mismatched
+draw/display areas, or a capture newer than the live tick). Windows unit tests
+cover no-capture and area-mismatch cases. A no-capture or unrenderable-capture
+frame now tries a zero-primitive GPU scene over the currently visible VRAM page
+before CPU safety fallback. A GPU scene test verifies recovery after an
+unsupported GP0 opcode. The connected
+G100's 09:52 farm sample reported 589/589 renderable frames through the GPU
+(100%), five direct VRAM scanouts, zero fallbacks, and 11 skipped attempts with
+an empty display area during startup. The next two windows each reported
+600/600 renderable frames, zero fallbacks, and two then zero direct scanouts.
+At 384x240, those steady farm windows held 60-61 presents/s; average game time
+was 3.6-3.7 ms, average present time 3.7-4.1 ms, and the audio ring reported
+zero underruns or drops. The VRAM scanout also passed a 2x pixel-exact readback
+probe on Windows Vulkan and Direct3D 12. Other areas, 720p, and Windows gameplay
+coverage remain unverified.
 
 The probe's `--farm-benchmark` option renders 8,192 fixed 8x8 rectangles at
 320x240 and 960x720, with a fresh builder and an explicit GPU fence per frame.
@@ -77,8 +142,7 @@ Scene payload fell 16.1%,
 from 1,651,952 to 1,385,920 bytes. The baseline is a detached build of the
 previous 16x16 fixed-bin revision, using this exact rectangle workload. Full
 CPU-reference comparisons and the opcode sweep pass on both D3D12 and Vulkan.
-The new APK still needs an owner run on G100 and the farm; the synthetic
-desktop result does not prove the Android lag is fixed.
+The synthetic desktop result does not prove Android farm performance is fixed.
 
 This optional local diagnostic validates GPU presentation without game data.
 It is not a game screen or a primitive rasterizer. Default unit builds neither

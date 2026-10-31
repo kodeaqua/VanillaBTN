@@ -1,6 +1,6 @@
 # Enhancements
 
-## Current status (2026-10-30)
+## Current status (2026-10-31)
 
 Graphics Mode offers Native PS1, Enhance PS1, and Modern. Modern effect
 selections are retained when another mode is active. Android has the same
@@ -10,14 +10,14 @@ compute path for mobile performance (ADR-123/124/131/132).
 | Area | Current state |
 | --- | --- |
 | Pause interface | ESC pause, Resume, Settings, and Exit Game are available by default per owner request; set enhance.pause_menu=false to turn it off. |
-| Renderer | GPU Auto attempts shared scene compute for every captured frame on desktop and Android. It handles all polygon, line, and rectangle opcode variants, clear/load/copy transfers, mask behavior, and ordered texture feedback. Software remains the reference fallback for direct/missing captures and device/resource failures. The owner-run G100 build reaches 100% logged GPU scene coverage but currently runs at 14-16 presents/s; an 8x8 packed-bin optimization improves synthetic Windows farm timings and still needs G100 and Windows gameplay validation. |
+| Renderer | GPU Auto attempts shared scene compute for every captured frame on desktop and Android. It handles all polygon, line, and rectangle opcode variants, clear/load/copy transfers, mask behavior, and ordered texture feedback. Missing or invalid scene captures now try direct GPU VRAM scanout; Software remains the reference fallback for device/resource failures. G100 logs reached 600/600 GPU scene frames but farm playback remained 8-14 FPS. Stage timing isolated 97.5-142.9 ms in CPU VRAM materialization; incremental dirty-tile snapshot fingerprints are built, with G100 performance validation pending. |
 | Scaling and widescreen | Implemented as optional paths; both default OFF. Widescreen covers the implemented screens, but complete scene/device coverage and CPU fallback performance are unverified. |
 | Filtering and anti-aliasing | Nearest, Bilinear, xBR, FXAA, and GPU MSAA 2x/4x are implemented. FXAA/MSAA default OFF; MSAA requires GPU Auto. |
 | Interpolation | Optional and default OFF. Private primitive replay is limited to eligible farm views; Android clamps it off. It does not advance simulation. |
 | Dithering and color | Native PS1 retains original dithering. Enhance PS1/Modern can bypass it; 8-bit shading is preserved only for selected opaque GPU paths. Other paths and Software output retain BGR555 precision. |
 | Controls | Gamepad and keyboard controls work. Mouse settings remain in the controls model, but in-game mouse/touch actions are disabled by ADR-136. Pause-menu mouse navigation remains available. |
 | Gameplay options | Optional gameplay enhancements default OFF, except wild-dog attacks stay ON to preserve the vanilla behavior. The stamina HUD includes hearts and a fatigue gauge. NPC Relationships adds a scrollable friendship/affection page and defaults OFF (ADR-144). Fast Text was removed from the menu and disabled pending a better multi-line pagination design (ADR-133). |
-| Android | Native PS1, Enhance PS1, and Modern profiles are available. GPU Auto attempts compute for captured scenes; scaling is capped at 720p, interpolation and desktop PGXP geometry remain disabled. Device/gameplay performance validation remains limited. |
+| Android | Native PS1, Enhance PS1, and Modern profiles are available. GPU Auto attempts compute for captured scenes; scaling is capped at 720p, interpolation and desktop PGXP geometry remain disabled. G100 farm performance is currently poor despite full sampled GPU scene coverage; see GPU_TESTING.md. |
 
 Graphics and gameplay settings are stored under Documents/VanillaBTN/settings.json
 on Windows. The ESC interface is the explicit runtime-default exception to the

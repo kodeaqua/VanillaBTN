@@ -615,8 +615,8 @@ found:
         /* PORT: Allow player to walk through wild weeds and crops - see docs/port/DECISIONS.md#adr-080 */
         if (hm_gameplay_walk_through_crops() &&
             (id == ITEM_WEEDS || id == ITEM_DEAD_WEED || (crop != CROP_NONE && crop != -1))) {
-            *query->flags = 0;
-            return 0;
+            /* Keep pickup/harvest flags while reporting a passable tile hit. */
+            return TILE_CLASS_PASSABLE;
         }
 #endif
         return TILE_CLASS_BLOCKED;

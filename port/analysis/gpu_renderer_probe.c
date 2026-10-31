@@ -432,18 +432,32 @@ static int hm_probe_dynamic_scene(SDL_GPUDevice *device, hm_gpu_renderer *render
 }
 static int hm_probe_texture_feedback(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
                                      hm_gpu_scene *builder) {
-    const u32 commands[] = {0x600000ff, 0x00020002, 0x00010001, 0xe1000100,
+    const u32 commands[] = {0x600000ff, 0x00020002, 0x00010001,
+                            0x6000ff00, 0x00140014, 0x00040004, 0xe1000100,
                             0x65000001, 0x00040004, 0x00020002, 0x00010001};
     setup();
-    hm_gpu_scene_materialize_vram(builder, 1);
     RECT area = {0, 0, 32, 32};
     hm_replay_sink previous = hm_gpu_scene_begin(builder, 32, 32);
     hm_replay_begin(&area);
     hm_gpu_execute_words(commands, sizeof commands / sizeof *commands);
     hm_gpu_scene_data scene;
     CHECK(hm_gpu_scene_end(builder, previous, &scene));
+    CHECK(hm_gpu_scene_needs_materialization(builder));
+    u64 materialization_tiles[HM_VRAM_DIRTY_ROWS];
+    CHECK(hm_gpu_scene_materialization_mask(builder, materialization_tiles) > 0);
+    hm_vram_snapshot(&work_vram);
+    hm_vram_context *native = hm_vram_bind(&work_vram);
+    hm_vram_write_filter_begin(materialization_tiles);
+    hm_gpu_scene_materialize_vram(builder, 1);
+    previous = hm_gpu_scene_begin(builder, 32, 32);
+    hm_replay_begin(&area);
+    hm_gpu_execute_words(commands, sizeof commands / sizeof *commands);
+    hm_vram_write_filter_end();
+    hm_vram_bind(native);
+    hm_gpu_scene_materialize_vram(builder, 0);
+    CHECK(hm_gpu_scene_end(builder, previous, &scene));
     CHECK(scene.vram_version_count == 1);
-    CHECK(scene.words[scene.words[8] + HM_SCENE_STRIDE + 40] == 1);
+    CHECK(scene.words[scene.words[8] + HM_SCENE_STRIDE * 2 + 40] == 1);
     CHECK(!readback(device, renderer, &scene, actual));
 
     setup();
@@ -462,7 +476,6 @@ static int hm_probe_texture_feedback(SDL_GPUDevice *device, hm_gpu_renderer *ren
                 }
             }
         }
-    hm_gpu_scene_materialize_vram(builder, 0);
     puts("Ordered VRAM texture feedback matches the CPU raster reference.");
     return 0;
 }
@@ -483,11 +496,11 @@ static void hm_probe_copy_seed(void) {
 static int hm_probe_vram_transfers(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
                                    hm_gpu_scene *builder) {
     const u32 commands[] = {
-        0x80000000, xy(1022, 510), xy(8, 8), xy(4, 4),
-        0xe6000001, 0x80000000, xy(8, 8), xy(10, 8), xy(4, 4),
-        0xe6000002, 0x80000000, xy(8, 8), xy(12, 8), xy(4, 4),
-        0xa0000000, xy(16, 8), xy(2, 1), 0x45671234,
-        0xe6000001, 0xa0000000, xy(18, 8), xy(2, 1), 0x45671234};
+        0x9f000000, xy(1022, 510), xy(8, 8), xy(4, 4),
+        0xe6000001, 0x8a000000, xy(8, 8), xy(10, 8), xy(4, 4),
+        0xe6000002, 0x81000000, xy(8, 8), xy(12, 8), xy(4, 4),
+        0xbf000000, xy(16, 8), xy(2, 1), 0x45671234,
+        0xe6000001, 0xa5000000, xy(18, 8), xy(2, 1), 0x45671234};
     hm_probe_copy_seed();
     RECT area = {0, 0, 32, 32};
     hm_replay_sink previous = hm_gpu_scene_begin(builder, 32, 32);
@@ -665,6 +678,37 @@ static int hm_probe_direct_transfer_capture(SDL_GPUDevice *device, hm_gpu_render
         }
     puts("Captured direct LoadImage, MoveImage and ClearImage match CPU readback.");
     puts("Unwrapped DrawOTag capture matches CPU readback.");
+    return 0;
+}
+static int hm_probe_vram_scanout(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
+                                 hm_gpu_scene *builder) {
+    origin_y = 240;
+    display_test = 1;
+    setup();
+    RECT area = {0, 240, 32, 32};
+    for (u32 y = 0; y < 32; ++y)
+        for (u32 x = 0; x < 32; ++x)
+            hm_vram_draw_pixel(x, y + 240, (u16)((x * 317 + y * 911) & 0x7fff));
+    hm_gpu_scene_data scene;
+    CHECK(hm_gpu_scene_scanout(builder, &area, 64, 64, &scene));
+    CHECK(scene.words[10] == 0);
+    CHECK(!readback(device, renderer, &scene, actual));
+    for (u32 y = 0; y < 64; ++y)
+        for (u32 x = 0; x < 64; ++x) {
+            u16 color = hm_vram_pixel(x / 2, 240 + y / 2);
+            for (u32 channel = 0; channel < 3; ++channel) {
+                u32 value = (color >> (channel * 5)) & 31;
+                u8 expected = (u8)((value << 3) | (value >> 2));
+                u8 got = actual[(y * 64 + x) * 4 + channel];
+                if (got != expected) {
+                    fprintf(stderr,
+                            "GPU VRAM scanout mismatch %u,%u channel %u: GPU %u CPU %u\n",
+                            x, y, channel, got, expected);
+                    return 1;
+                }
+            }
+        }
+    puts("GPU VRAM scanout at 2x matches the visible 15-bit VRAM page.");
     return 0;
 }
 static u32 hm_probe_random(void) {
@@ -1143,6 +1187,14 @@ int main(int argc, char **argv) {
     hm_gpu_renderer *renderer = hm_gpu_renderer_create(device);
     CHECK(renderer);
     hm_gpu_scene *builder = hm_gpu_scene_create();
+    if (argc > 2 && !SDL_strcmp(argv[2], "--vram-scanout")) {
+        CHECK(builder && !hm_probe_vram_scanout(device, renderer, builder));
+        hm_gpu_scene_destroy(builder);
+        hm_gpu_renderer_destroy(renderer);
+        SDL_DestroyGPUDevice(device);
+        SDL_Quit();
+        return 0;
+    }
     if (argc > 2 && !SDL_strcmp(argv[2], "--display-area")) {
         const u32 display[] = {0xe1000000, 0x600000ff, 0, xy(30, 30),
                                0xe1000400, 0x6000ff00, xy(4, 4), xy(20, 20)};

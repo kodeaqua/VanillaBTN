@@ -4,6 +4,7 @@
 #include "compat/types.h"
 
 enum { HM_VRAM_WIDTH = 1024, HM_VRAM_HEIGHT = 512 };
+enum { HM_VRAM_DIRTY_ROWS = HM_VRAM_HEIGHT / 16 };
 typedef struct {
     u16 pixels[HM_VRAM_HEIGHT][HM_VRAM_WIDTH];
     u64 dirty[HM_VRAM_HEIGHT / 16];
@@ -25,5 +26,12 @@ void hm_vram_mask(int set_mask, int check_mask);
 /* 16x16-word dirty tiles; the renderer acknowledges uploads explicitly. */
 u64 hm_vram_dirty_row(u32 tile_y);
 void hm_vram_acknowledge(u32 tile_y, u64 tiles);
+/* Restrict writes during a private reference replay to tiles read later. */
+void hm_vram_write_filter_begin(const u64 tiles[HM_VRAM_DIRTY_ROWS]);
+void hm_vram_write_filter_end(void);
+int hm_vram_write_filter_active(void);
+u64 hm_vram_write_filter_row(u32 y);
+int hm_vram_write_allowed(u32 x, u32 y);
+int hm_vram_write_filter_intersects(s32 x0, s32 y0, s32 x1, s32 y1);
 
 #endif

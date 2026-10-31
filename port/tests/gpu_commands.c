@@ -221,5 +221,131 @@ int main(void) {
     hm_gpu_execute_words(set_mask_load, 5);
     CHECK(hm_vram_pixel(62, 50) == 0x9234);
     CHECK(hm_vram_pixel(63, 50) == 0xc567);
+
+    /* GP0 memory-transfer commands ignore the low five opcode bits. */
+    for (u32 opcode = 0x80; opcode <= 0x9f; ++opcode) {
+        hm_vram_reset();
+        hm_vram_draw_pixel(7, 9, 0x4d2b);
+        const u32 copy_alias[] = {opcode << 24, 7u | (9u << 16), 20u | (30u << 16),
+                                  1u | (1u << 16)};
+        hm_gpu_execute_words(copy_alias, 4);
+        CHECK(hm_vram_pixel(20, 30) == 0x4d2b);
+    }
+    for (u32 opcode = 0xa0; opcode <= 0xbf; ++opcode) {
+        hm_vram_reset();
+        const u32 upload_alias[] = {opcode << 24, 20u | (30u << 16), 1u | (1u << 16),
+                                    0x00004d2b};
+        hm_gpu_execute_words(upload_alias, 4);
+        CHECK(hm_vram_pixel(20, 30) == 0x4d2b);
+    }
+
+    /* Private materialization writes only tiles that later texture reads use. */
+    ResetGraph(0);
+    DRAWENV filter_draw;
+    SetDefDrawEnv(&filter_draw, 0, 0, 32, 32);
+    filter_draw.dfe = 1;
+    PutDrawEnv(&filter_draw);
+    hm_vram_reset();
+    u64 materialization_tiles[HM_VRAM_DIRTY_ROWS] = {0};
+    materialization_tiles[0] = 1;
+    hm_vram_write_filter_begin(materialization_tiles);
+    CHECK(hm_vram_write_filter_intersects(0, 0, 16, 16));
+    CHECK(!hm_vram_write_filter_intersects(16, 0, 32, 16));
+    CHECK(!hm_vram_write_filter_intersects(1024, 0, 1040, 16));
+    const u32 filtered_rectangle[] = {0x600000ff, 2u | (2u << 16), 20u | (1u << 16)};
+    hm_gpu_execute_words(filtered_rectangle, 3);
+    hm_vram_write_filter_end();
+    CHECK(hm_vram_pixel(2, 2) == 31 && hm_vram_pixel(15, 2) == 31);
+    CHECK(hm_vram_pixel(16, 2) == 0 && hm_vram_pixel(21, 2) == 0);
+
+    hm_vram_write_filter_end();
+    hm_vram_reset();
+    const u32 filtered_triangle[] = {0x200000ff, 0x00020002, 0x001d0004, 0x0004001d};
+    hm_gpu_execute_words(filtered_triangle, 4);
+    u16 expected_triangle[32 * 32];
+    u32 allowed_triangle_pixels = 0;
+    for (u32 y = 0; y < 32; ++y)
+        for (u32 x = 0; x < 32; ++x) {
+            expected_triangle[y * 32 + x] = hm_vram_pixel(x, y);
+            if (x < 16 && y < 16 && expected_triangle[y * 32 + x])
+                ++allowed_triangle_pixels;
+        }
+    CHECK(allowed_triangle_pixels > 0);
+    hm_vram_reset();
+    hm_vram_write_filter_begin(materialization_tiles);
+    hm_gpu_execute_words(filtered_triangle, 4);
+    hm_vram_write_filter_end();
+    for (u32 y = 0; y < 32; ++y)
+        for (u32 x = 0; x < 32; ++x)
+            CHECK(hm_vram_pixel(x, y) == (x < 16 && y < 16 ? expected_triangle[y * 32 + x] : 0));
+
+    /* Sparse feedback masks rasterize only their selected horizontal tile
+     * spans while preserving the same pixels as the unfiltered triangle. */
+    ResetGraph(0);
+    DRAWENV sparse_draw;
+    SetDefDrawEnv(&sparse_draw, 0, 0, 64, 32);
+    sparse_draw.dfe = 1;
+    PutDrawEnv(&sparse_draw);
+    const u32 sparse_triangle[] = {0x200000ff, 0x00020002, 0x0002003d, 0x001d0002};
+    hm_vram_reset();
+    hm_gpu_execute_words(sparse_triangle, 4);
+    u16 expected_sparse[64 * 32];
+    for (u32 y = 0; y < 32; ++y)
+        for (u32 x = 0; x < 64; ++x)
+            expected_sparse[y * 64 + x] = hm_vram_pixel(x, y);
+    hm_vram_reset();
+    materialization_tiles[0] = (UINT64_C(1) << 0) | (UINT64_C(1) << 2);
+    hm_vram_write_filter_begin(materialization_tiles);
+    hm_gpu_execute_words(sparse_triangle, 4);
+    hm_vram_write_filter_end();
+    u32 first_span_pixels = 0, second_span_pixels = 0;
+    for (u32 y = 0; y < 32; ++y)
+        for (u32 x = 0; x < 64; ++x) {
+            int selected = y < 16 && (x < 16 || (x >= 32 && x < 48));
+            CHECK(hm_vram_pixel(x, y) == (selected ? expected_sparse[y * 64 + x] : 0));
+            if (selected && expected_sparse[y * 64 + x]) {
+                if (x < 16)
+                    ++first_span_pixels;
+                else
+                    ++second_span_pixels;
+            }
+        }
+    CHECK(first_span_pixels > 0 && second_span_pixels > 0);
+
+    /* Rectangle and sprite replay uses the same sparse horizontal mask. */
+    const u32 sparse_rectangle[] = {0x600000ff, 0x00020002, 60u | (30u << 16)};
+    hm_vram_reset();
+    hm_gpu_execute_words(sparse_rectangle, 3);
+    u16 expected_sparse_rectangle[64 * 32];
+    for (u32 y = 0; y < 32; ++y)
+        for (u32 x = 0; x < 64; ++x)
+            expected_sparse_rectangle[y * 64 + x] = hm_vram_pixel(x, y);
+    hm_vram_reset();
+    hm_vram_write_filter_begin(materialization_tiles);
+    hm_gpu_execute_words(sparse_rectangle, 3);
+    hm_vram_write_filter_end();
+    first_span_pixels = second_span_pixels = 0;
+    for (u32 y = 0; y < 32; ++y)
+        for (u32 x = 0; x < 64; ++x) {
+            int selected = y < 16 && (x < 16 || (x >= 32 && x < 48));
+            CHECK(hm_vram_pixel(x, y) == (selected ? expected_sparse_rectangle[y * 64 + x] : 0));
+            if (selected && expected_sparse_rectangle[y * 64 + x]) {
+                if (x < 16)
+                    ++first_span_pixels;
+                else
+                    ++second_span_pixels;
+            }
+        }
+    CHECK(first_span_pixels > 0 && second_span_pixels > 0);
+
+    hm_vram_reset();
+    materialization_tiles[0] = 1;
+    hm_vram_write_filter_begin(materialization_tiles);
+    RECT partial_upload = {14, 4, 4, 1};
+    const u32 partial_upload_pixels[] = {0x22221111, 0x44443333};
+    LoadImage(&partial_upload, partial_upload_pixels);
+    hm_vram_write_filter_end();
+    CHECK(hm_vram_pixel(14, 4) == 0x1111 && hm_vram_pixel(15, 4) == 0x2222);
+    CHECK(hm_vram_pixel(16, 4) == 0 && hm_vram_pixel(17, 4) == 0);
     return 0;
 }
