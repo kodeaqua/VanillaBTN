@@ -17,6 +17,8 @@ typedef struct {
     const u16 *vram_pixels; /* Builder-owned snapshot; valid until its next begin or destruction. */
     const u16 *vram_versions; /* Additional packed VRAM snapshots, one 1024x512 layer each. */
     u32 vram_version_count;
+    u32 primitive_count, tile_count, max_bin_count;
+    u64 total_bin_references;
     u64 revision;
     u32 width, height;
 } hm_gpu_scene_data;

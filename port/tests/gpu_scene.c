@@ -14,7 +14,7 @@
             return 1;                                                                              \
         }                                                                                          \
     } while (0)
-static hm_vram_context before, after;
+static hm_vram_context before, after, private_vram;
 static void setup(int width, int height) {
     hm_vram_reset();
     ResetGraph(0);
@@ -252,6 +252,34 @@ int main(void) {
     CHECK(data.vram_version_count == 1);
     CHECK(data.words[data.words[8] + HM_SCENE_STRIDE + 40] == 1);
     hm_gpu_scene_materialize_vram(s, 0);
+
+    /* Private replays track changed VRAM tiles so equivalent feedback reads
+     * reuse a version instead of comparing every full 1 MiB snapshot. */
+    setup(64, 64);
+    hm_vram_snapshot(&private_vram);
+    hm_vram_context *native_vram = hm_vram_bind(&private_vram);
+    hm_vram_reset();
+    const RECT private_area = {0, 0, 64, 64};
+    const u32 duplicate_feedback[] = {
+        0x600000ff, 0x00020002, 0x00010001, /* write in the source 16x16 tile */
+        0xe1000100,
+        0x65000001, 0x00280028, 0x000a000a, 0x00010001,
+        0x6000ff00, 0x00120002, 0x00010001, /* update a second tile */
+        0x65000001, 0x002a0028, 0x000a000a, 0x00010001,
+        0x65000001, 0x002c0028, 0x000a000a, 0x00010001};
+    hm_gpu_scene_materialize_vram(s, 1);
+    previous = hm_gpu_scene_begin(s, 64, 64);
+    hm_replay_begin(&private_area);
+    hm_gpu_execute_words(duplicate_feedback,
+                         sizeof(duplicate_feedback) / sizeof(duplicate_feedback[0]));
+    CHECK(hm_gpu_scene_end(s, previous, &data));
+    hm_vram_bind(native_vram);
+    hm_gpu_scene_materialize_vram(s, 0);
+    CHECK(data.vram_version_count == 2);
+    CHECK(data.words[data.words[8] + HM_SCENE_STRIDE + 40] == 1);
+    CHECK(data.words[data.words[8] + HM_SCENE_STRIDE * 3 + 40] == 2);
+    CHECK(data.words[data.words[8] + HM_SCENE_STRIDE * 4 + 40] == 2);
+
     setup(32, 32);
     previous = hm_gpu_scene_begin(s, 32, 32);
     hm_replay_begin(&area);

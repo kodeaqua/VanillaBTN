@@ -9,6 +9,8 @@
 #include "psx/vram.h"
 #include <stdlib.h>
 #include <string.h>
+enum { HM_SCENE_VRAM_TILE_SIZE = 16, HM_SCENE_VRAM_TILES_X = HM_VRAM_WIDTH / 16,
+       HM_SCENE_VRAM_TILES_Y = HM_VRAM_HEIGHT / 16 };
 struct hm_gpu_scene {
     u32 (*primitives)[HM_SCENE_STRIDE];
     u32 *bins;
@@ -17,6 +19,9 @@ struct hm_gpu_scene {
     u32 primitive_capacity, bin_stride;
     u16 vram_snapshot[HM_VRAM_HEIGHT][HM_VRAM_WIDTH];
     u16 *vram_versions;
+    u64 *vram_version_hashes;
+    u64 vram_tile_hashes[HM_SCENE_VRAM_TILES_X * HM_SCENE_VRAM_TILES_Y];
+    u64 vram_hash, vram_base_hash;
     u32 width, height, count, tiles_x, tiles_y;
     u32 vram_version_count, vram_version_capacity;
     u32 pending_transfer_indices[4], pending_transfer_count;
@@ -25,7 +30,7 @@ struct hm_gpu_scene {
     const u16 *vram_pixels;
     u16 background;
     const char *failure;
-    int begun, texture_filter, materialize_vram, needs_materialization;
+    int begun, texture_filter, materialize_vram, needs_materialization, vram_dirty_tracking;
     u64 written_tiles[32]; /* Conservative 16x16 VRAM tile footprint for prior writes. */
     u64 current_texture_tiles[32];
     u64 texture_reads[32]; /* Conservative 16x16 VRAM tile footprint. */
@@ -113,6 +118,49 @@ static s64 hm_scene_coordinate(hm_gpu_scene *s, u32 word, int shift, u32 fallbac
 static u32 hm_scene_scaled(s64 q, int origin, u32 size, int logical) {
     return (u32)hm_scene_floor((q - (s64)origin * 65536) * size * 256, (s64)logical * 65536);
 }
+static u64 hm_scene_vram_tile_hash(const u16 *pixels, u32 tile_x, u32 tile_y) {
+    const u64 prime = UINT64_C(1099511628211);
+    u64 hash = UINT64_C(14695981039346656037) ^ ((u64)tile_y << 32) ^ tile_x;
+    for (u32 y = 0; y < HM_SCENE_VRAM_TILE_SIZE; ++y) {
+        const u16 *row = pixels + (size_t)(tile_y * HM_SCENE_VRAM_TILE_SIZE + y) * HM_VRAM_WIDTH +
+                         tile_x * HM_SCENE_VRAM_TILE_SIZE;
+        for (u32 x = 0; x < HM_SCENE_VRAM_TILE_SIZE; ++x) {
+            hash = (hash ^ row[x]) * prime;
+        }
+    }
+    return hash;
+}
+static void hm_scene_vram_hash_init(hm_gpu_scene *s) {
+    const u16 *pixels = &s->vram_snapshot[0][0];
+    s->vram_hash = 0;
+    for (u32 y = 0; y < HM_SCENE_VRAM_TILES_Y; ++y)
+        for (u32 x = 0; x < HM_SCENE_VRAM_TILES_X; ++x) {
+            u32 index = y * HM_SCENE_VRAM_TILES_X + x;
+            s->vram_tile_hashes[index] = hm_scene_vram_tile_hash(pixels, x, y);
+            s->vram_hash ^= s->vram_tile_hashes[index];
+        }
+    s->vram_base_hash = s->vram_hash;
+    /* The copied baseline already includes any dirty tiles inherited by this
+     * private replay context. Future writes will mark their tiles again. */
+    for (u32 y = 0; y < HM_SCENE_VRAM_TILES_Y; ++y)
+        hm_vram_acknowledge(y, hm_vram_dirty_row(y));
+}
+static void hm_scene_vram_hash_update(hm_gpu_scene *s, const u16 *pixels) {
+    for (u32 y = 0; y < HM_SCENE_VRAM_TILES_Y; ++y) {
+        u64 dirty = hm_vram_dirty_row(y);
+        for (u32 x = 0; x < HM_SCENE_VRAM_TILES_X; ++x) {
+            u64 bit = UINT64_C(1) << x;
+            if (!(dirty & bit))
+                continue;
+            u32 index = y * HM_SCENE_VRAM_TILES_X + x;
+            u64 next = hm_scene_vram_tile_hash(pixels, x, y);
+            s->vram_hash ^= s->vram_tile_hashes[index] ^ next;
+            s->vram_tile_hashes[index] = next;
+        }
+        if (dirty)
+            hm_vram_acknowledge(y, dirty);
+    }
+}
 static int hm_scene_tiles(u64 tiles[32], u32 x, u32 y, u32 width, u32 height, int mark) {
     if (!width || !height)
         return 0;
@@ -146,15 +194,28 @@ static u32 hm_scene_snapshot(hm_gpu_scene *s, int allow_unmaterialized) {
     }
     const u16 *current = hm_vram_state()->pixels[0];
     size_t bytes = sizeof(s->vram_snapshot);
-    for (u32 i = 0; i < s->vram_version_count; ++i) {
-        const u16 *version = s->vram_versions + (size_t)i * HM_VRAM_WIDTH * HM_VRAM_HEIGHT;
-        if (!memcmp(version, current, bytes))
-            return i + 1;
+    if (s->vram_dirty_tracking) {
+        hm_scene_vram_hash_update(s, current);
+        if (s->vram_hash == s->vram_base_hash &&
+            !memcmp(s->vram_snapshot, current, bytes))
+            return 0;
+        for (u32 i = 0; i < s->vram_version_count; ++i) {
+            const u16 *version = s->vram_versions + (size_t)i * HM_VRAM_WIDTH * HM_VRAM_HEIGHT;
+            if (s->vram_version_hashes[i] == s->vram_hash && !memcmp(version, current, bytes))
+                return i + 1;
+        }
+    } else {
+        for (u32 i = 0; i < s->vram_version_count; ++i) {
+            const u16 *version = s->vram_versions + (size_t)i * HM_VRAM_WIDTH * HM_VRAM_HEIGHT;
+            if (!memcmp(version, current, bytes))
+                return i + 1;
+        }
     }
     if (s->vram_version_count == s->vram_version_capacity) {
         u32 capacity = s->vram_version_capacity ? s->vram_version_capacity * 2 : 2;
         if (capacity < s->vram_version_count ||
-            (size_t)capacity > SIZE_MAX / (HM_VRAM_WIDTH * HM_VRAM_HEIGHT * sizeof(u16))) {
+            (size_t)capacity > SIZE_MAX / (HM_VRAM_WIDTH * HM_VRAM_HEIGHT * sizeof(u16)) ||
+            (size_t)capacity > SIZE_MAX / sizeof(*s->vram_version_hashes)) {
             s->failure = "texture snapshot capacity";
             return 0;
         }
@@ -165,11 +226,19 @@ static u32 hm_scene_snapshot(hm_gpu_scene *s, int allow_unmaterialized) {
             return 0;
         }
         s->vram_versions = versions;
+        u64 *hashes = realloc(s->vram_version_hashes, (size_t)capacity * sizeof(*hashes));
+        if (!hashes) {
+            s->failure = "texture snapshot hash allocation";
+            return 0;
+        }
+        s->vram_version_hashes = hashes;
         s->vram_version_capacity = capacity;
     }
     u16 *destination = s->vram_versions +
                        (size_t)s->vram_version_count * HM_VRAM_WIDTH * HM_VRAM_HEIGHT;
     memcpy(destination, current, bytes);
+    if (s->vram_dirty_tracking)
+        s->vram_version_hashes[s->vram_version_count] = s->vram_hash;
     return ++s->vram_version_count;
 }
 static int hm_scene_texture_tiles(hm_gpu_scene *s, u32 x, u32 y, u32 width, u32 height,
@@ -389,7 +458,13 @@ static void hm_scene_begin_capture(void *context, const RECT *area) {
     }
     for (size_t i = 0; i < tile_count; ++i)
         s->bins[i * s->bin_stride] = 0;
+    /* The probe replay does not materialize feedback snapshots. Hash only the
+     * private replay that needs exact VRAM versions, avoiding a full hash pass
+     * on every ordinary frame. */
+    s->vram_dirty_tracking = !hm_vram_is_native() && s->materialize_vram;
     memcpy(s->vram_snapshot, hm_vram_state()->pixels, sizeof(s->vram_snapshot));
+    if (s->vram_dirty_tracking)
+        hm_scene_vram_hash_init(s);
     s->vram_pixels = &s->vram_snapshot[0][0];
     s->begun = 1;
 }
@@ -853,6 +928,7 @@ void hm_gpu_scene_destroy(hm_gpu_scene *s) {
     free(s->bins);
     free(s->packed);
     free(s->vram_versions);
+    free(s->vram_version_hashes);
     free(s);
 }
 void hm_gpu_scene_texture_filter(hm_gpu_scene *s, int filter_mode) {
@@ -933,6 +1009,7 @@ hm_replay_sink hm_gpu_scene_begin(hm_gpu_scene *s, u32 width, u32 height) {
     s->pending_transfer_count = 0;
     s->pending_transfer_requires_materialization = 0;
     s->vram_version_count = 0;
+    s->vram_dirty_tracking = 0;
     s->needs_materialization = 0;
     memset(s->written_tiles, 0, sizeof(s->written_tiles));
     memset(s->current_texture_tiles, 0, sizeof(s->current_texture_tiles));
@@ -963,6 +1040,8 @@ int hm_gpu_scene_end(hm_gpu_scene *s, hm_replay_sink previous, hm_gpu_scene_data
     }
     size_t bin_offset = primitives + primitive_words;
     size_t list_words = 0;
+    u32 max_bin_count = 0;
+    u64 total_bin_references = 0;
     for (size_t i = 0; i < tile_count; ++i) {
         u32 count = s->bins[i * s->bin_stride];
         if (list_words > SIZE_MAX - (size_t)count - 1) {
@@ -970,6 +1049,9 @@ int hm_gpu_scene_end(hm_gpu_scene *s, hm_replay_sink previous, hm_gpu_scene_data
             return 0;
         }
         list_words += (size_t)count + 1;
+        if (count > max_bin_count)
+            max_bin_count = count;
+        total_bin_references += count;
     }
     if (tile_count > SIZE_MAX - bin_offset || list_words > SIZE_MAX - bin_offset - tile_count) {
         s->failure = "scene size overflow";
@@ -1018,6 +1100,10 @@ int hm_gpu_scene_end(hm_gpu_scene *s, hm_replay_sink previous, hm_gpu_scene_data
                                 .vram_pixels = s->vram_pixels,
                                 .vram_versions = s->vram_versions,
                                 .vram_version_count = s->vram_version_count,
+                                .primitive_count = s->count,
+                                .tile_count = (u32)tile_count,
+                                .max_bin_count = max_bin_count,
+                                .total_bin_references = total_bin_references,
                                 .revision = ++s->revision,
                                 .width = s->width,
                                 .height = s->height};

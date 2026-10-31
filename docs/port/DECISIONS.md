@@ -4163,7 +4163,31 @@ changed from 1.841 to 1.849 ms and from 4.283 to 2.713 ms, respectively. The
 native-size differences are within run-level variation; the larger-output
 results show a repeatable improvement.
 Scene payload fell from 1,651,952 to 1,385,920 bytes (16.1%). These are
-offscreen synthetic measurements, not gameplay FPS. The G100 has not run this
-new shader yet, so the reported Android lag remains an open owner test. A
-workgroup-shared bin cache was tried and removed because it did not improve
-the Windows benchmark.
+offscreen synthetic measurements, not gameplay FPS. The owner did run this
+build on the G100 and still reported severe lag. Follow-up stage timing
+attributed most measured farm time to CPU VRAM materialization, so the bin
+change alone did not resolve the device issue. A workgroup-shared bin cache
+was tried and removed because it did not improve the Windows benchmark.
+
+## ADR-154: Fingerprint Private VRAM Snapshots by Dirty Tile
+
+Date: 2026-10-31. Status: accepted.
+
+Context: The G100 farm diagnostic measured 97.5-142.9 ms in the second CPU
+reference replay, which materializes VRAM versions for ordered texture feedback.
+That replay compared each 1 MiB VRAM image against every earlier version,
+causing quadratic full-image reads when a scene captured 41-55 versions.
+
+Decision: In private replay contexts that materialize VRAM, maintain a
+position-aware fingerprint per 16x16 VRAM tile. Initialize it from the copied
+frame baseline, then update only dirty tiles as the reference renderer writes.
+Use the aggregate fingerprint to shortlist prior versions; retain exact
+full-image comparison on matches. Skip fingerprint initialization in the
+ordinary probe replay and in native VRAM contexts.
+
+Consequences: This removes the repeated full-image scans when versions differ
+and preserves exact deduplication checks when fingerprints match. The Windows
+Release build and 124/124 tests pass, and the Android Release APK builds with
+NDK 30.0.16248370. G100 post-change gameplay timing is pending; no frame-rate
+improvement is claimed until the owner measures the updated APK. Windows
+gameplay performance has also not been remeasured.

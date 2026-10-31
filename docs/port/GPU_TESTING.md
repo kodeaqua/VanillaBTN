@@ -62,9 +62,35 @@ explicit owner request and has not been profiled on the G100.
 The owner later ran the GPU Auto build on the connected G100. Read-only logcat
 reported repeated 600/600 GPU scene windows, but only 14-16 presents/s and
 62.7-73.2 ms average present time; guest-game time averaged 3.5-4.0 ms and the
-host reported 0% idle wait. This confirms the current Android compute path is
-covered but too slow. That running APK predates the uncommitted 8x8 packed-bin
-optimization below; it remains open and was not replaced during this work.
+host reported 0% idle wait. The owner then installed the 8x8 packed-bin build
+and reported continued lag on both Android and Windows. The connected G100's
+later logcat sample showed 8 presents/s, 143-150 ms average present time,
+503-547 ms maximum, 3.4-3.7 ms guest-game time, all observed presents on GPU,
+and 0% idle wait. Thermal status was normal (status 0; skin 42.1 C). The bin
+change therefore improves the synthetic desktop workload but has not resolved
+the real farm workload on this tablet.
+
+A read-only Windows sample during the owner's run showed the game process at
+98-101% of one logical CPU and the GPU 3D engine at 11% in one snapshot. This
+points toward CPU-side scene construction or driver submission, but one GPU
+sample is not a complete profile. The first diagnostic APK was installed and
+logged 8 presents/s at 384x240 with 619-624 primitives, 8.0 average/27 maximum
+bin references, and 155-157 KiB scene payload. Per-scene build time averaged
+204-219 ms (peaks 360-412 ms); encode averaged 6-9 ms and GPU submit 17-19 ms.
+Guest-game time remained about 4.1-4.4 ms. A second diagnostic APK split replay,
+VRAM materialization, and scene packing. In its farm run, scene preparation
+averaged 48.7-144.0 ms, materialization replay 97.5-142.9 ms, and packing
+rounded to 0.0-0.1 ms; scenes contained 41-55 VRAM versions. The sampled
+windows presented at 12-14 FPS, with 6.3-40.2 ms average GPU submit. This
+identifies the second CPU reference replay and its full-image snapshot lookup
+as the dominant measured cost. Thermal status remained normal.
+
+The current source replaces repeated full-image snapshot scans in the private
+materialization replay with 16x16 dirty-tile fingerprints. It hashes only the
+materializing replay and still verifies matching fingerprints with an exact
+full-image comparison. Windows Release rebuilt with all 124 tests passing; the
+updated Android APK is built but has not yet been run on the G100. No post-change
+gameplay performance claim is established.
 
 The probe's `--farm-benchmark` option renders 8,192 fixed 8x8 rectangles at
 320x240 and 960x720, with a fresh builder and an explicit GPU fence per frame.
@@ -77,8 +103,7 @@ Scene payload fell 16.1%,
 from 1,651,952 to 1,385,920 bytes. The baseline is a detached build of the
 previous 16x16 fixed-bin revision, using this exact rectangle workload. Full
 CPU-reference comparisons and the opcode sweep pass on both D3D12 and Vulkan.
-The new APK still needs an owner run on G100 and the farm; the synthetic
-desktop result does not prove the Android lag is fixed.
+The synthetic desktop result does not prove Android farm performance is fixed.
 
 This optional local diagnostic validates GPU presentation without game data.
 It is not a game screen or a primitive rasterizer. Default unit builds neither

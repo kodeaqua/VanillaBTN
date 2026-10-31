@@ -4,8 +4,8 @@
 
 | Target | Current validation |
 | --- | --- |
-| Windows x86-64 | Release `-Game` build and standalone package built; Release and ASan/UBSan suites pass 124/124. Full-playthrough parity remains unverified. |
-| Android arm64-v8a | Release APK built with AGP 9.5.0, Gradle 9.8.2, and NDK 30.0.16248370; native ELF and APK zip alignment checks pass for 16 KB pages. On the connected Xiaomi MediaTek G100 tablet, SDL JNI startup and Vulkan GPU device creation pass; rendering and gameplay remain unverified. |
+| Windows x86-64 | Release `-Game` build and package pass 124/124 tests; Windows ASan/UBSan suite passes 107/107. Full-playthrough parity remains unverified. |
+| Android arm64-v8a | Release APK built with AGP 9.5.0, Gradle 9.8.2, and NDK 30.0.16248370; native ELF and APK zip alignment checks pass for 16 KB pages. The connected Xiaomi MediaTek G100 rendered farm scenes through GPU Auto but suffered severe lag; an optimized APK is awaiting an owner run. |
 | Linux x86-64 | Deferred to a separate Linux host; WSL is excluded. |
 | macOS universal | No macOS build has been validated. |
 | Matching build | The check target remains unverified on this Windows host because its separate Linux toolchain is unavailable. |
@@ -286,10 +286,18 @@ dependencies. Invalid/unrecorded work and device/resource failures retain the
 software fallback. Native CPU VRAM compatibility remains authoritative. ADR-151
 supersedes ADR-132's Android selection gate: GPU Auto now attempts every
 captured Android frame, with Software and CPU fallback retained. The connected
-G100 has only passed device creation so far; scene rendering, performance and
-owner gameplay/device coverage remain unverified. The prior Adreno 610-class
-compute submit measured 42.57 ms, so this owner-requested policy may need further
-performance work on mobile hardware.
+MediaTek G100/Mali-G57 tablet logged 600/600 GPU scene frames, but the later
+8x8-bin build still presented at about 8 FPS in the farm. A diagnostic run at
+384x240 measured 204-219 ms average scene preparation per rebuild, compared
+with 17-19 ms GPU submission; guest-game time averaged 4.1-4.4 ms and thermal
+status was normal. A second diagnostic separated the cost: the materialization
+replay averaged 97.5-142.9 ms for 41-55 VRAM versions, while replay alone was
+about 0.7-1.9 ms and packing 0.0-0.1 ms. The scene builder now uses incremental
+16x16 dirty-tile fingerprints for that replay and keeps exact comparison on
+hash matches; owner measurement on the G100 is pending.
+Windows also remains reported as laggy; a single process/GPU counter sample
+showed about one CPU core saturated while the 3D engine was at 11%. The prior
+Adreno 610-class compute submit measured 42.57 ms.
 
 ### Optional texture filtering (2026-10-26)
 
