@@ -50,10 +50,12 @@ uint interp_div(uint3 values,int3 w,int area){return (uint(w.x)*values.x+uint(w.
 uint interp_f(uint3 values,float3 w,float area){return uint(floor(dot(float3(values),w)/area+0.5));}
 #include "../../enhance/filtering/texture.hlsl"
 #include "../../enhance/antialiasing/msaa.hlsl"
+#define HM_SCENE_BIN_TILE_SIZE 8
 [numthreads(8,8,1)]
 void main(uint3 id:SV_DispatchThreadID){
     uint width=load_word(0),height=load_word(1);if(id.x>=width||id.y>=height)return;
     int2 origin=int2(load_word(2),load_word(3));uint2 logical_size=uint2(load_word(4),load_word(5));
+    uint tiles_x=load_word(6),bin_table=load_word(9);
     int2 local=int2(((2*id.xy+1)*logical_size)/(2*uint2(width,height)));
     int2 logical=origin+local;
     bool native=(width==logical_size.x&&height==logical_size.y);
@@ -63,7 +65,9 @@ void main(uint3 id:SV_DispatchThreadID){
     uint samples=load_word(15);if(samples!=2&&samples!=4)samples=1;
     uint sample_colors[4]={color,color,color,color};
     uint3 fine_colors[4]={expand555(color),expand555(color),expand555(color),expand555(color)};
-    uint bin=load_word(9)+uint((local.y/16)*int(load_word(6))+local.x/16)*load_word(7);
+    /* Header[9] points at tile offsets; each offset points to [count, ids...]. */
+    uint tile=uint((local.y/HM_SCENE_BIN_TILE_SIZE)*int(tiles_x)+local.x/HM_SCENE_BIN_TILE_SIZE);
+    uint bin=load_word(bin_table+tile);
     uint count=load_word(bin);
     [loop]for(uint item=0;item<count;++item){
         uint p=load_word(8)+load_word(bin+1+item)*41,op=word(p,1),flags=word(p,4);

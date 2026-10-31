@@ -333,8 +333,10 @@ static void hm_scene_add(hm_gpu_scene *s, u32 *p, int x0, int y0, int x1, int y1
         if (bin_x1 < s->area.x + s->area.w) ++bin_x1;
         if (bin_y1 < s->area.y + s->area.h) ++bin_y1;
     }
-    u32 bx0 = (u32)(bin_x0 - s->area.x) / 16, by0 = (u32)(bin_y0 - s->area.y) / 16;
-    u32 bx1 = (u32)(bin_x1 - 1 - s->area.x) / 16, by1 = (u32)(bin_y1 - 1 - s->area.y) / 16;
+    u32 bx0 = (u32)(bin_x0 - s->area.x) / HM_SCENE_BIN_TILE_SIZE,
+        by0 = (u32)(bin_y0 - s->area.y) / HM_SCENE_BIN_TILE_SIZE;
+    u32 bx1 = (u32)(bin_x1 - 1 - s->area.x) / HM_SCENE_BIN_TILE_SIZE,
+        by1 = (u32)(bin_y1 - 1 - s->area.y) / HM_SCENE_BIN_TILE_SIZE;
     for (u32 y = by0; y <= by1; ++y)
         for (u32 x = bx0; x <= bx1; ++x) {
             size_t bin_index = (size_t)y * s->tiles_x + x;
@@ -378,8 +380,8 @@ static void hm_scene_begin_capture(void *context, const RECT *area) {
     s->area = *area;
     s->native = hm_gpu_environment_state()->draw.clip;
     s->background = hm_gpu_background(&hm_gpu_environment_state()->draw);
-    s->tiles_x = ((u32)area->w + 15) / 16;
-    s->tiles_y = ((u32)area->h + 15) / 16;
+    s->tiles_x = ((u32)area->w + HM_SCENE_BIN_TILE_SIZE - 1) / HM_SCENE_BIN_TILE_SIZE;
+    s->tiles_y = ((u32)area->h + HM_SCENE_BIN_TILE_SIZE - 1) / HM_SCENE_BIN_TILE_SIZE;
     size_t tile_count = (size_t)s->tiles_x * s->tiles_y;
     if (!hm_scene_reserve_bins(s, tile_count, s->bin_stride)) {
         s->failure = "tile allocation";
@@ -954,14 +956,27 @@ int hm_gpu_scene_end(hm_gpu_scene *s, hm_replay_sink previous, hm_gpu_scene_data
         s->failure = "scene size overflow";
         return 0;
     }
-    size_t bin_offset = primitives + primitive_words;
     size_t tile_count = (size_t)s->tiles_x * s->tiles_y;
-    if (!s->bin_stride || tile_count > SIZE_MAX / s->bin_stride ||
-        bin_offset > SIZE_MAX - tile_count * s->bin_stride) {
+    if (!s->bin_stride || tile_count > UINT32_MAX || primitives > SIZE_MAX - primitive_words) {
         s->failure = "scene size overflow";
         return 0;
     }
-    size_t total = bin_offset + tile_count * s->bin_stride;
+    size_t bin_offset = primitives + primitive_words;
+    size_t list_words = 0;
+    for (size_t i = 0; i < tile_count; ++i) {
+        u32 count = s->bins[i * s->bin_stride];
+        if (list_words > SIZE_MAX - (size_t)count - 1) {
+            s->failure = "scene size overflow";
+            return 0;
+        }
+        list_words += (size_t)count + 1;
+    }
+    if (tile_count > SIZE_MAX - bin_offset || list_words > SIZE_MAX - bin_offset - tile_count) {
+        s->failure = "scene size overflow";
+        return 0;
+    }
+    size_t list_offset = bin_offset + tile_count;
+    size_t total = list_offset + list_words;
     if (total > UINT32_MAX || !hm_scene_reserve_packed(s, total)) {
         s->failure = "scene allocation";
         return 0;
@@ -974,7 +989,7 @@ int hm_gpu_scene_end(hm_gpu_scene *s, hm_replay_sink previous, hm_gpu_scene_data
     s->packed[4] = s->area.w;
     s->packed[5] = s->area.h;
     s->packed[6] = s->tiles_x;
-    s->packed[7] = s->bin_stride;
+    s->packed[7] = (u32)tile_count;
     s->packed[8] = (u32)primitives;
     s->packed[9] = (u32)bin_offset;
     s->packed[10] = s->count;
@@ -985,9 +1000,19 @@ int hm_gpu_scene_end(hm_gpu_scene *s, hm_replay_sink previous, hm_gpu_scene_data
     s->packed[15] = s->multisamples == 2 || s->multisamples == 4 ? s->multisamples : 1;
     memcpy(s->packed + primitives, s->primitives,
            (size_t)s->count * HM_SCENE_STRIDE * sizeof(u32));
-    for (size_t i = 0; i < tile_count; ++i)
-        memcpy(s->packed + bin_offset + i * s->bin_stride,
-               s->bins + i * s->bin_stride, (size_t)s->bin_stride * sizeof(u32));
+    /* Store a tile-offset table followed by compact [count, primitive ids]
+     * lists. Sparse farm tiles no longer reserve 256 unused IDs apiece. */
+    size_t cursor = list_offset;
+    for (size_t i = 0; i < tile_count; ++i) {
+        const u32 *bin = s->bins + i * s->bin_stride;
+        u32 count = bin[0];
+        s->packed[bin_offset + i] = (u32)cursor;
+        s->packed[cursor++] = count;
+        if (count) {
+            memcpy(s->packed + cursor, bin + 1, (size_t)count * sizeof(u32));
+            cursor += count;
+        }
+    }
     *data = (hm_gpu_scene_data){.words = s->packed,
                                 .bytes = total * sizeof(u32),
                                 .vram_pixels = s->vram_pixels,

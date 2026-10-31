@@ -401,7 +401,13 @@ static int hm_probe_dynamic_scene(SDL_GPUDevice *device, hm_gpu_renderer *render
                              SDL_arraysize(packet));
     hm_gpu_scene_data scene;
     CHECK(hm_gpu_scene_end(builder, previous, &scene));
-    CHECK(scene.words[10] == primitive_count && scene.words[7] > HM_SCENE_BIN_WORDS &&
+    u32 max_bin = 0;
+    for (u32 bin = 0; bin < scene.words[7]; ++bin) {
+        u32 list = scene.words[scene.words[9] + bin];
+        if (scene.words[list] > max_bin)
+            max_bin = scene.words[list];
+    }
+    CHECK(scene.words[10] == primitive_count && max_bin > HM_SCENE_BIN_WORDS &&
           scene.bytes > 65536);
     setup();
     for (u32 i = 0; i < primitive_count; ++i)
@@ -768,6 +774,85 @@ static int hm_probe_benchmark(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
                sizes[size][1], (double)(SDL_GetTicksNS() - gpu_start) / 1e6 / iterations);
     }
     hm_vram_bind(old);
+    return 0;
+}
+static int hm_probe_farm_benchmark(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
+                                   hm_gpu_scene *builder) {
+    enum { PRIMITIVES = 8192, ITERATIONS = 8 };
+    (void)builder;
+    hm_gpu_scene *farm_builder = hm_gpu_scene_create();
+    CHECK(farm_builder);
+    u32 *commands = malloc((size_t)PRIMITIVES * 3 * sizeof(*commands));
+    CHECK(commands);
+    for (u32 i = 0; i < PRIMITIVES; ++i) {
+        u32 x = (i % 40) * 8;
+        u32 y = ((i / 40) % 30) * 8;
+        commands[i * 3] = 0x60000000u | ((i * 97u) & 0xffffffu);
+        commands[i * 3 + 1] = x | (y << 16);
+        commands[i * 3 + 2] = 8u | (8u << 16);
+    }
+
+    setup();
+    DRAWENV draw;
+    SetDefDrawEnv(&draw, 0, 0, 320, 240);
+    draw.dtd = 0;
+    draw.dfe = 1;
+    PutDrawEnv(&draw);
+    DISPENV display;
+    SetDefDispEnv(&display, 0, 0, 320, 240);
+    PutDispEnv(&display);
+    SetDispMask(1);
+    RECT area = {0, 0, 320, 240};
+    hm_vram_snapshot(&saved_vram);
+    hm_vram_context *old = hm_vram_bind(&work_vram);
+    const u32 sizes[][2] = {{320, 240}, {960, 720}};
+    for (size_t size = 0; size < SDL_arraysize(sizes); ++size) {
+        hm_gpu_scene_data scene = {0};
+        u64 start = 0;
+        for (int frame = -1; frame < ITERATIONS; ++frame) {
+            work_vram = saved_vram;
+            hm_replay_sink previous =
+                hm_gpu_scene_begin(farm_builder, sizes[size][0], sizes[size][1]);
+            hm_replay_begin(&area);
+            hm_gpu_execute_words(commands, PRIMITIVES * 3);
+            CHECK(hm_gpu_scene_end(farm_builder, previous, &scene));
+            SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(device);
+            CHECK(command_buffer);
+            CHECK(hm_gpu_renderer_encode(renderer, command_buffer, &scene));
+            SDL_GPUFence *fence = SDL_SubmitGPUCommandBufferAndAcquireFence(command_buffer);
+            CHECK(fence);
+            CHECK(SDL_WaitForGPUFences(device, true, &fence, 1));
+            SDL_ReleaseGPUFence(device, fence);
+            if (frame == -1)
+                start = SDL_GetTicksNS();
+        }
+        u32 max_bin = 0, nonempty_bins = 0;
+        u32 tile_size = 8;
+        u32 tiles_x = (scene.words[4] + tile_size - 1) / tile_size;
+        u32 tile_count = tiles_x * ((scene.words[5] + tile_size - 1) / tile_size);
+        int packed_bins = scene.words[7] == tile_count;
+        if (!packed_bins) {
+            tile_size = 16;
+            tiles_x = (scene.words[4] + tile_size - 1) / tile_size;
+            tile_count = tiles_x * ((scene.words[5] + tile_size - 1) / tile_size);
+        }
+        for (u32 bin = 0; bin < tile_count; ++bin) {
+            u32 count = packed_bins
+                            ? scene.words[scene.words[scene.words[9] + bin]]
+                            : scene.words[scene.words[9] + bin * scene.words[7]];
+            if (count > max_bin)
+                max_bin = count;
+            nonempty_bins += count != 0;
+        }
+        printf("Farm-like GPU %ux%u: %u primitives, %zu-byte scene, tiles=%u "
+               "max-bin=%u occupied-bins=%u, %.3f ms/render\n",
+               sizes[size][0], sizes[size][1], scene.words[10], scene.bytes, tile_count,
+               max_bin, nonempty_bins,
+               (double)(SDL_GetTicksNS() - start) / 1e6 / ITERATIONS);
+    }
+    hm_vram_bind(old);
+    hm_gpu_scene_destroy(farm_builder);
+    free(commands);
     return 0;
 }
 #ifdef HMBTN_ENH_WIDESCREEN
@@ -1240,6 +1325,8 @@ int main(int argc, char **argv) {
         CHECK(!hm_probe_wide_benchmark(device, renderer, builder));
 #endif
     }
+    if (argc > 2 && !SDL_strcmp(argv[2], "--farm-benchmark"))
+        CHECK(!hm_probe_farm_benchmark(device, renderer, builder));
     hm_gpu_scene_destroy(builder);
     SDL_WaitForGPUIdle(device);
     hm_gpu_renderer_destroy(renderer);
