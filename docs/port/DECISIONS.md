@@ -2967,7 +2967,7 @@ Decision:
 Consequences:
 Mayor Thomas's intro cutscene, multi-line scrolling dialogues, character name inserts, page breaks, and choices advance rapidly and smoothly with Fast Text enabled without freezing or deadlocking. All 122 unit tests pass 100%.
 
-## ADR-105: Cap Enhance Scaling and SurfaceView backing buffer to 720p on Android
+## ADR-105: Cap Android enhanced internal rendering at 720p
 
 Date: 2026-10-29. Status: accepted.
 
@@ -2979,16 +2979,13 @@ Context:
    - Specifically cap Android Enhance Scaling to 720p maximum resolution.
 
 Decision:
-1. Cap Enhance Scaling Target Resolution to 720p on Android (port/platform/game_host.c):
-   - In hm_host_scaling_prepare and hm_host_gpu_present, enforce an Android resolution ceiling of 720p:
-     - 16:9 Widescreen: clamped to 1280x720.
-     - 4:3 Standard: clamped to 960x720.
-2. Configure Android SurfaceView Backing Buffer to 720p (SDLSurface.java):
-   - In surfaceChanged, when device display height exceeds 720p, set holder.setFixedSize(targetW, targetH) with targetH = 720 and targetW = Math.round(720.0f * aspect) (e.g. 1600x720 for 20:9 displays or 1280x720 for 16:9).
-   - The device Hardware Composer / Display Processor (HWC) upscales the 720p surface to the native 1080p+ panel in hardware with 0% GPU execution cost.
+1. Cap Android enhanced internal rendering at 720p in the scaling and GPU scene paths:
+   - 16:9 Widescreen: clamp to 1280x720.
+   - 4:3 Standard: clamp to 960x720.
+2. Keep the SDL SurfaceView at the display's native pixel size. The GPU presents the capped internal image into the native-size swapchain; no custom SurfaceView buffer size is assumed.
 
 Consequences:
-Enhance Scaling delivers crisp high-definition 720p visuals on Android with stable frame rates and reduced thermal load. Hardware upscaling handles presentation to 1080p+ display panels efficiently. All unit tests pass 100%.
+Enhance PS1 and Modern can render internally up to 720p on Android while the display surface remains native-sized. Native PS1 retains its native internal resolution. Device performance, thermals, and output sharpness still require device validation.
 
 ## ADR-106: Fix dialogue advance on confirmation button press (X/Cross/Circle) with Fast Text
 
