@@ -6,7 +6,7 @@ override this one for their subtree.
 
 ## 0. Mission
 
-### Current owner overrides (2026-10-25 to 2026-10-30)
+### Current owner overrides (2026-10-25 to 2026-10-31)
 
 - **Pure Vanilla Essence & Anti-Bloat Policy**: This project strictly rejects out-of-place,
   bloated, or game-breaking mods that ruin the authentic nostalgic essence of Harvest Moon:
@@ -19,6 +19,12 @@ override this one for their subtree.
 - The owner paused multilingual work on 2026-10-28. Its WIP is preserved in the
   named stash for `port/indonesian-language`; current runtime fixes belong on
   `fix` from main.
+- Android scaling rollback (2026-10-31): after the owner reported severe
+  slowdown on tablets, especially Adreno, Android Native PS1, Enhance PS1, and
+  Modern profiles must keep native internal scene resolution. Modern may retain
+  its 16:9 viewport and bilinear presentation; do not enable internal viewport
+  scaling in Android profiles. This supersedes ADR-163. Windows scaling remains
+  unchanged.
 
 - Prioritize Windows x86-64 native bring-up before Linux, macOS, and Android.
   Phase 1 targets Windows; retain the portable architecture for the other targets.
@@ -100,7 +106,8 @@ override this one for their subtree.
      from the menu and disabled pending a better multi-line pagination design
      (ADR-133).
   6. Rucksack reorganize screen strict category protection preventing tool/item cross-swapping (ADR-107).
-  7. Android arm64-v8a native support with 720p scaling limit.
+  7. Android arm64-v8a native support with native internal resolution in all
+     graphics profiles (ADR-164).
 
 These explicit owner decisions override conflicting roadmap, CI skeleton,
 workflow, and definition-of-done requirements below.

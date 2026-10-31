@@ -10,14 +10,14 @@ compute path for mobile performance (ADR-123/124/131/132).
 | Area | Current state |
 | --- | --- |
 | Pause interface | ESC pause, Resume, Settings, Goddess Blessings, and Exit Game are available by default per owner request; set enhance.pause_menu=false to turn it off. |
-| Renderer | GPU Auto attempts shared scene compute for every captured frame on desktop and Android. It handles all polygon, line, and rectangle opcode variants, clear/load/copy transfers, mask behavior, and ordered texture feedback. Missing or invalid scene captures try direct GPU VRAM scanout; CPU presentation remains for device/resource failures, explicit Software mode, and diagnostic capture. Windows Direct3D 12 completed a 39,000-VBlank farm replay with 48,599/48,599 renderable frames on GPU, zero fallbacks, eight direct scanouts, and one empty-area skip. The connected G100 previously reported 600/600 GPU farm frames and, after materialization optimization, 60-61 presents/s with zero audio underruns at 384x240. Broader device/scene coverage and 720p performance remain unverified. |
+| Renderer | GPU Auto attempts shared scene compute for every captured frame on desktop and Android. It handles all polygon, line, and rectangle opcode variants, clear/load/copy transfers, mask behavior, and ordered texture feedback. Missing or invalid scene captures try direct GPU VRAM scanout; CPU presentation remains for device/resource failures, explicit Software mode, and diagnostic capture. Windows Direct3D 12 completed a 39,000-VBlank farm replay with 48,599/48,599 renderable frames on GPU, zero fallbacks, eight direct scanouts, and one empty-area skip. The connected G100 previously reported 600/600 GPU farm frames and, after materialization optimization, 60-61 presents/s with zero audio underruns at 384x240. Broader device/scene coverage and scaled gameplay performance remain unverified. |
 | Scaling and widescreen | Implemented as optional paths; both default OFF. Widescreen covers the implemented screens, but complete scene/device coverage and CPU fallback performance are unverified. |
 | Filtering and anti-aliasing | Nearest, Bilinear, xBR, FXAA, and GPU MSAA 2x/4x are implemented. FXAA/MSAA default OFF; MSAA requires GPU Auto. |
 | Interpolation | Optional and default OFF. Private primitive replay is limited to eligible farm views; Android clamps it off. It does not advance simulation. |
 | Dithering and color | Native PS1 retains original dithering. Enhance PS1/Modern can bypass it; 8-bit shading is preserved only for selected opaque GPU paths. Other paths and Software output retain BGR555 precision. |
 | Controls | Gamepad, keyboard presets, and per-key keyboard remapping are available. Android adds a configurable virtual-pad action map, show/hide toggle, button-size setting, and drag-to-position layout editor. Mouse settings remain in the controls model, but in-game mouse/touch actions are disabled by ADR-136. |
 | Gameplay options | Optional gameplay enhancements default OFF, except wild-dog attacks stay ON to preserve vanilla behavior. Optional features include NPC Relationships (ADR-144), mature planted fodder-grass spread, half-speed outdoor farm time, and the reversible shipping-bin list. Goddess Blessings add gold, restore stamina/fatigue, and provide small amounts of fodder and animal feed. Fast Text remains removed pending a better multi-line pagination design (ADR-133). |
-| Android | Native PS1, Enhance PS1, and Modern profiles are available. Enhance PS1 and Modern request viewport scaling up to 720p; Native PS1 remains at native resolution. GPU Auto attempts compute for captured scenes; interpolation and desktop PGXP geometry remain disabled. The connected G100's later 384x240 farm sample held 60-61 presents/s with zero audio underruns; 720p and other device performance remain unmeasured. See GPU_TESTING.md. |
+| Android | Native PS1, Enhance PS1, and Modern profiles render internally at native PS1 scene resolution (ADR-164); Modern retains 16:9 and bilinear presentation, and Enhance retains PGXP. The Android scaler is disabled in all three profiles after tablet lag reports, especially on Adreno. GPU Auto attempts compute for captured scenes; interpolation and desktop PGXP geometry remain disabled. The connected G100's prior 384x240 farm sample held 60-61 presents/s with zero audio underruns; this rollback has not yet been measured on-device. See GPU_TESTING.md. |
 
 Graphics and gameplay settings are stored under Documents/VanillaBTN/settings.json
 on Windows. The ESC interface is the explicit runtime-default exception to the
@@ -25,7 +25,7 @@ general enhancement-OFF rule. Automated probes and the recorded Windows/G100
 runtime samples establish coverage only for their tested scenes and devices;
 they do not establish complete gameplay parity, all display modes, or broad
 performance. See GPU_TESTING.md and PLATFORMS.md.
-The 2026-10-31 gameplay/control batch is recorded in ADR-158 through ADR-163.
+The 2026-10-31 gameplay/control batch is recorded in ADR-158 through ADR-164.
 The shipping-bin list tracks exact item variants in process memory for the
 current play session; it does not extend the original save format, so its exact
 variant list is not restored after restarting or loading a save.
@@ -191,7 +191,7 @@ Enforces authentic inventory categorization in the rucksack reorganize screen:
 - Restricts mouse hover cursor tracking to the marked category until a swap is confirmed or cancelled.
 
 ### Android Platform Optimization & 720p Resolution Cap (ADR-105)
-- Enhance Scaling on Android is capped at a maximum internal resolution of 720p (1280x720) to balance visual crispness with battery life, thermal throttling, and sustained 60 FPS performance on mobile GPUs.
+- Historical: Android's internal 720p scaling cap was removed from the Enhanced profiles by ADR-164 after device lag reports. Current Android profiles stay at native internal resolution.
 - Android builds feature touch controls, Storage Access Framework (SAF) disc selection, and automatic audio device management.
 
 ### Tile Targeting visibility and ground row seams (ADR-111)
