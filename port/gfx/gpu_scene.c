@@ -749,6 +749,12 @@ static void hm_scene_transfer(hm_gpu_scene *s, u32 op, u32 color, u32 x, u32 y, 
         offset_y += part_height;
     }
 }
+static int hm_scene_nonrendering_opcode(u32 opcode) {
+    /* Mirrors of GP0(00h) are FIFO NOPs; the interrupt command changes GPU
+     * status, not the framebuffer. Keep these in the GPU scene stream. */
+    return opcode <= 1 || (opcode >= 0x04 && opcode <= 0x1f) || opcode == 0xe0 ||
+           (opcode >= 0xe7 && opcode <= 0xef);
+}
 static void hm_scene_command(void *context, const u32 *w, u32 available, int after) {
     hm_gpu_scene *s = context;
     if (!s->begun || s->failure || !available)
@@ -822,8 +828,8 @@ static void hm_scene_command(void *context, const u32 *w, u32 available, int aft
         hm_scene_rectangle(s, w, available);
     else if (op >= 0x40 && op <= 0x5f)
         hm_scene_line(s, w, available);
-    else if (op != 0 && op != 1 && !(op >= 0xe1 && op <= 0xe6))
-        s->failure = "inline VRAM transfer";
+    else if (!hm_scene_nonrendering_opcode(op) && !(op >= 0xe1 && op <= 0xe6))
+        s->failure = "unsupported GP0 opcode";
 }
 hm_gpu_scene *hm_gpu_scene_create(void) {
     hm_gpu_scene *s = calloc(1, sizeof(*s));

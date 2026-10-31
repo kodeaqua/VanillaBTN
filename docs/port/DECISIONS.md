@@ -4074,3 +4074,30 @@ SDL3 release. Replace the checked-in `org.libsdl.app` glue with the official
 Consequences: Android native JNI setup now completes with the matching SDL
 library. The connected tablet logs successful Vulkan device creation; no game
 scene was started during this diagnostic.
+
+## ADR-151: Attempt GPU Scene Output on Every Platform
+
+Date: 2026-10-31. Status: accepted.
+
+Context: ADR-132 kept Android on the selective texture-scanout path because an
+Adreno 610-class device measured a 42.57 ms compute/blit submit. The owner now
+requests full GPU scene coverage across the native and enhanced render modes.
+The scene builder also treated documented GP0 NOP mirrors as unsupported inline
+transfers, causing avoidable CPU fallback despite no framebuffer operation.
+
+Decision: In GPU Auto, attempt the shared SDL_GPU scene renderer for every
+captured frame on desktop and Android. Keep Software selectable and retain the
+per-frame CPU reference fallback for missing captures, unsupported commands,
+resource failures and unavailable GPU devices. Classify GP0(04h..1Eh), GP0(1Fh),
+GP0(E0h), and GP0(E7h..EFh) as non-pixel commands. Add an encoding sweep for all
+polygon, line, and rectangle opcodes and report scene-compute coverage in
+600-frame windows. Opcode classifications follow the public [PSX-SPX GPU
+specification](https://psx-spx.consoledev.net/graphicsprocessingunitgpu/).
+
+Consequences: Android GPU Auto now exercises the compute scene path by default;
+the connected MediaTek G100 device has passed SDL GPU initialization, but its
+scene throughput, thermals and gameplay output remain unverified. The previous
+Adreno measurement remains a known performance risk, and Software remains the
+runtime escape path. Coverage reports count submitted compute-scene frames, not
+all rendering work: native VRAM compatibility still executes on the CPU and
+unsupported/direct frames still use the reference renderer.

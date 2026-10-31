@@ -55,11 +55,12 @@ be consumed by an output backend while CPU reference scanout keeps its original
 pixel quantization. See ADR-053.
 
 Shared SDL_GPU execution lives in platform/gpu_renderer.c (ADR-054). GPU Auto
-attempts the shared scene renderer on every desktop frame, at native and
-viewport resolutions independently of scaling (ADR-138). Native pixel math is
-integer; optional fractional motion/enlarged coverage use fractional fields.
-Android retains its selective compute policy because of the mobile TBDR
-bottleneck recorded in ADR-132. SPIR-V/DXIL come from our HLSL under shaders/.
+attempts the shared scene renderer on every captured desktop and Android frame,
+at native and viewport resolutions independently of scaling (ADR-138/151).
+Native pixel math is integer; optional fractional motion/enlarged coverage use
+fractional fields. Android's all-frame compute policy follows the owner's
+coverage request; the mobile TBDR performance risk in ADR-132 remains unprofiled
+on the connected G100. SPIR-V/DXIL come from our HLSL under shaders/.
 Default builds use checked-in arrays; build-shaders.ps1 regenerates with pinned
 DXC. CMake rejects stale normalized source hashes. Unsupported cases retain
 software output.

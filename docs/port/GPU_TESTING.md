@@ -3,14 +3,20 @@
 ## Current game renderer status
 
 This file documents synthetic GPU checks, not a claim of complete game-scene
-coverage. The Windows game uses shared GPU scene output at native and enhanced
-resolutions and retains Software as a reference. Captured render-producing GP0
-commands are represented on the compute path: polygons, lines, rectangles,
-clear-image, load-image, VRAM-to-VRAM copies, and ordered VRAM feedback. Mask-set
-and mask-check behavior is preserved for load and VRAM-copy transfers. VRAM-to-CPU
+coverage. GPU Auto attempts shared GPU scene output for every captured desktop
+and Android frame, while Software remains the reference option. Captured
+render-producing GP0 commands are represented on the compute path: polygons,
+lines, rectangles, clear-image, load-image, VRAM-to-VRAM copies, and ordered
+VRAM feedback. The scene unit test sweeps every polygon, line and rectangle
+opcode encoding plus documented non-rendering GP0 NOP mirrors. The GPU probe
+then renders all 96 primitive encodings with nondegenerate geometry and checks
+GPU readback against CPU pixels, including applicable texture depths and
+semi-transparency modes. Each case is also checked to ensure the CPU reference
+actually changed at least one output pixel. Mask-set and
+mask-check behavior is preserved for load and VRAM-copy transfers. VRAM-to-CPU
 readback, IRQ requests, NOP/cache commands, and draw-environment state do not
-produce scene pixels. Malformed streams, missing/direct captures, reserved texture
-depth, and GPU resource/device failures still use the reference path.
+produce scene pixels. Malformed streams, missing/direct captures, reserved
+texture depth, and GPU resource/device failures still use the reference path.
 Gameplay parity, device breadth, and frame-time budgets remain owner checks; see
 PLATFORMS.md and ENHANCEMENTS.md.
 
@@ -21,22 +27,29 @@ VRAM copies, mask-set/check transfers, VRAM texture feedback,
 high-density tile bins, scene payloads above the former fixed buffer size,
 clipping, filtering, interpolation, multisampling, and expanded presentation.
 It starts no game window and requires no disc. On 2026-10-31, the expanded probe
-passed with SDL GPU's Vulkan and Direct3D 12 drivers. This is technical coverage
-of synthetic scenes only; owner gameplay testing remains necessary.
+and full primitive opcode sweep passed with SDL GPU's Vulkan and Direct3D 12
+drivers. This is technical coverage of synthetic scenes only; owner gameplay
+testing remains necessary. The isolated opcode sweep can also be run with
+`hmbtn_gpu_renderer_probe.exe <vulkan|direct3d12> --opcode-sweep`.
 
 The core `gpu.vram` test also checks overlapping `MoveImage` copies, including
 wrap at the VRAM edge and mask-bit behavior. These transfers now snapshot their
 source before writing, so overlapping areas do not terminate the game.
 
-Android's SDL GPU device uses SPIR-V only and disables optional Vulkan features
+Android GPU Auto now attempts compute rendering for each captured frame. Every
+600 attempts, the host logs compute-scene coverage, fallback count, and the last
+fallback reason. Explicit Software mode remains available. Android's SDL GPU
+device uses SPIR-V only and disables optional Vulkan features
 unused by this compute renderer. The connected MediaTek G100 tablet reports a
 Mali-G57 MC2 Vulkan device with `shaderClipDistance` unavailable; SDL 3.2.28
 rejected it before device creation. SDL 3.4.18 exposes the optional-feature
 properties needed to accept that device. After updating the SDL Java glue to
 3.4.18 as well, the rebuilt APK passed JNI startup and logged `GPU Device
 created and claimed successfully (Driver: vulkan)` on 2026-10-31. The app was
-stopped immediately after GPU initialization; rendering and gameplay were not
-tested on the tablet.
+stopped immediately after GPU initialization; rendering, frame rate and
+gameplay were not tested on the tablet. A prior Adreno 610-class measurement
+showed a 42.57 ms compute/blit submit; the all-frame Android policy is an
+explicit owner request and has not been profiled on the G100.
 
 This optional local diagnostic validates GPU presentation without game data.
 It is not a game screen or a primitive rasterizer. Default unit builds neither
