@@ -44,16 +44,19 @@ smoother play. Full playthrough parity, 720p performance, other scenes,
 lifecycle behavior and other devices remain unverified.
 
 GPU Auto shares scene output at native and enhanced resolutions, with Software
-as the reference and CPU fallback for unsupported work. It now attempts every
-captured Android frame as well as desktop frames; 600-frame reports expose scene
-compute successes and fallbacks. GP0 polygon/line/rectangle encodings, clears,
-loads, copies and mask behavior have synthetic coverage, but direct/missing
-captures, resource/device failures and untested game scenes remain CPU paths.
-Do not claim complete gameplay offload or full-playthrough parity. The owner
-confirmed that the reported horizontal line disappeared in one farm scene with
-Modern, Scaling On, Widescreen Off, MSAA 4x, Nearest, Interpolation Off, VSync
-On, and unlimited FPS. The farm performance measurement is recorded below;
-other scenes, devices, 720p and broader performance budgets remain unverified.
+as the reference. It attempts every captured Android frame as well as desktop
+frames; missing or rejected captures try direct GPU scanout from the visible
+VRAM page. CPU presentation remains for device/resource failures, explicit
+Software mode, and diagnostic capture. GP0 polygon/line/rectangle encodings,
+clears, loads, copies and mask behavior have synthetic coverage. A Windows
+Direct3D 12 game-window replay reached 39,000 VBlanks with zero GPU fallbacks;
+the connected G100 previously reported 600/600 GPU farm frames at 384x240.
+Other scenes, 720p, device breadth, and full-playthrough parity remain
+unverified. The owner confirmed that the reported horizontal line disappeared
+in one farm scene with Modern, Scaling On, Widescreen Off, MSAA 4x, Nearest,
+Interpolation Off, VSync On, and unlimited FPS. The farm performance
+measurement is recorded below; other scenes, devices, 720p and broader
+performance budgets remain unverified.
 
 Owner follow-up: the owner reports that sleep/save is now safe. The exact
 scenarios covered were not specified, so broad sleep, day-transition, save,
