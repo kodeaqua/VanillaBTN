@@ -4,16 +4,16 @@
 
 | Target | Current validation |
 | --- | --- |
-| Windows x86-64 | Release build and 124/124 tests pass. Focused ASan/UBSan graphics tests pass. Synthetic VRAM scanout matches reference pixels on Vulkan and Direct3D 12. Full-playthrough parity remains unverified. |
-| Android arm64-v8a | Latest Release APK built with AGP 9.5.0, Gradle 9.8.2, and NDK 30.0.16248370; signature and 16 KB APK zip-alignment checks pass. The owner-tested G100 farm sample reports 100% GPU output in two steady 600-frame windows, zero fallbacks, and two then zero direct VRAM scanouts. It holds 60-61 presents/s with 3.7-4.1 ms average presentation and zero audio-ring underruns/drops. 720p and other scenes/devices remain unverified. |
+| Windows x86-64 | Release build and 125/125 tests pass. ASan/UBSan game build and all 125 tests pass. Synthetic VRAM scanout matches reference pixels on Vulkan and Direct3D 12. Full-playthrough parity remains unverified. |
+| Android arm64-v8a | Latest Release APK builds with AGP 9.5.0, Gradle 9.8.2, and NDK 30.0.16248370; signature and 16 KB APK zip-alignment checks pass. The owner-tested G100 farm sample reports 100% GPU output in two steady 600-frame windows, zero fallbacks, and two then zero direct VRAM scanouts. It holds 60-61 presents/s with 3.7-4.1 ms average presentation and zero audio-ring underruns/drops. The newest blank-frame path has not been playtested; 720p and other scenes/devices remain unverified. |
 | Linux x86-64 | Deferred to a separate Linux host; WSL is excluded. |
 | macOS universal | No macOS build has been validated. |
 | Matching build | The check target remains unverified on this Windows host because its separate Linux toolchain is unavailable. |
 
 ### Core, Windows and Android audit (2026-10-31)
 
-The Windows Release preset builds and all 124 CTest cases pass; the ASan/UBSan
-preset also passes all 124. Android Release builds with the pinned NDK
+The Windows Release preset builds and all 125 CTest cases pass; the ASan/UBSan
+game build also passes all 125. Android Release builds with the pinned NDK
 30.0.16248370, Gradle 9.8.2 and AGP 9.5.0. The APK
 signature verifies; `zipalign -c -P 16 4` passes, and the native ELF load
 segments use 16 KB alignment. Android backup rules exclude imported disc
@@ -656,6 +656,15 @@ fallbacks and two then zero scanouts. Steady farm timing was 60-61 presents/s,
 Synthetic 2x scanout readback matched VRAM exactly on Windows Vulkan and
 Direct3D 12. These results cover the farm scene and native internal size only;
 Windows interactive gameplay, 720p, and other areas remain unverified.
+
+### GPU blank-frame output (2026-10-31)
+
+GPU Auto now clears the swapchain to black with a GPU render pass while the PS1
+display is disabled. This avoids CPU pixel conversion and upload for valid
+display-off frames. If the clear render pass cannot be created, the previous
+CPU scanout path remains available. Windows Release and ASan/UBSan game builds
+each pass all 125 tests, and the Android Release APK builds successfully. The
+blank-frame path still needs owner gameplay confirmation on both platforms.
 
 ### Weather animation during dialogue pauses (2026-10-31)
 
