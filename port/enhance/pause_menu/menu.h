@@ -7,7 +7,9 @@ typedef enum {
     HM_PAUSE_GRAPHICS,
     HM_PAUSE_GAMEPLAY,
     HM_PAUSE_CONTROLS,
-    HM_PAUSE_AUDIO
+    HM_PAUSE_AUDIO,
+    HM_PAUSE_BLESSINGS,
+    HM_PAUSE_SHIPPING
 } hm_pause_page;
 
 enum {
@@ -16,13 +18,29 @@ enum {
 #else
     HM_PAUSE_GRAPHICS_ITEMS = 11,
 #endif
+    HM_PAUSE_GAMEPLAY_ITEMS =
 #ifdef HMBTN_ENH_NPC_BONDS
-    HM_PAUSE_GAMEPLAY_ITEMS = 12,
+        12
 #else
-    HM_PAUSE_GAMEPLAY_ITEMS = 11,
+        11
 #endif
-    HM_PAUSE_CONTROLS_ITEMS = 3,
+#ifdef HMBTN_ENH_GRASS_SPREAD
+        + 1
+#endif
+#ifdef HMBTN_ENH_SLOW_FARM_TIME
+        + 1
+#endif
+#ifdef HMBTN_ENH_SHIPPING_BIN
+        + 1
+#endif
+        ,
+#ifdef __ANDROID__
+    HM_PAUSE_CONTROLS_ITEMS = 34,
+#else
+    HM_PAUSE_CONTROLS_ITEMS = 17,
+#endif
     HM_PAUSE_AUDIO_ITEMS = 3,
+    HM_PAUSE_BLESSINGS_ITEMS = 5,
     HM_PAUSE_VISIBLE_ROWS = 7
 };
 
@@ -42,7 +60,11 @@ typedef enum {
     HM_PAUSE_CHANGE_GRAPHICS,
     HM_PAUSE_CHANGE_GAMEPLAY,
     HM_PAUSE_CHANGE_CONTROLS,
-    HM_PAUSE_CHANGE_AUDIO
+    HM_PAUSE_CHANGE_AUDIO,
+    HM_PAUSE_USE_BLESSING,
+    HM_PAUSE_CHANGE_SHIPPING,
+    HM_PAUSE_REMAP_CONTROLS,
+    HM_PAUSE_EDIT_TOUCH_LAYOUT
 } hm_pause_action;
 
 typedef struct {
@@ -50,6 +72,7 @@ typedef struct {
     int selected;
     int first_visible;
     int graphics_modern;
+    int content_count;
 } hm_pause_menu;
 
 void hm_pause_open(hm_pause_menu *menu);

@@ -33,6 +33,9 @@ typedef struct {
     int tool_charge_gauge;
     int tile_targeting;
     int npc_bonds;
+    int grass_spread;
+    int slow_farm_time;
+    int shipping_bin;
 } hm_gameplay_runtime_options;
 
 static hm_gameplay_runtime_options active_options = {
@@ -49,7 +52,15 @@ static hm_gameplay_runtime_options active_options = {
     .tool_charge_gauge = 0,
     .tile_targeting = 0,
     .npc_bonds = 0,
+    .grass_spread = 0,
+    .slow_farm_time = 0,
+    .shipping_bin = 0,
 };
+
+#ifdef HMBTN_ENH_SHIPPING_BIN
+static u16 shipping_today[ITEM_COUNT];
+static int shipping_ui_requested;
+#endif
 
 int hm_gameplay_walk_through_crops(void) {
     return active_options.walk_through_crops;
@@ -117,6 +128,91 @@ int hm_gameplay_tile_targeting(void) {
 
 int hm_gameplay_npc_bonds(void) {
     return active_options.npc_bonds;
+}
+
+int hm_gameplay_grass_spread(void) {
+    return active_options.grass_spread;
+}
+
+int hm_gameplay_slow_farm_time(void) {
+    return active_options.slow_farm_time;
+}
+
+int hm_gameplay_shipping_bin(void) {
+    return active_options.shipping_bin;
+}
+
+void hm_gameplay_shipping_record(int item_id) {
+#ifdef HMBTN_ENH_SHIPPING_BIN
+    if (item_id >= 0 && item_id < ITEM_COUNT && shipping_today[item_id] < 65535)
+        shipping_today[item_id]++;
+#else
+    (void)item_id;
+#endif
+}
+
+void hm_gameplay_shipping_forget(int item_id) {
+#ifdef HMBTN_ENH_SHIPPING_BIN
+    if (item_id >= 0 && item_id < ITEM_COUNT && shipping_today[item_id] > 0)
+        shipping_today[item_id]--;
+#else
+    (void)item_id;
+#endif
+}
+
+int hm_gameplay_shipping_count(int item_id) {
+#ifdef HMBTN_ENH_SHIPPING_BIN
+    return item_id >= 0 && item_id < ITEM_COUNT ? shipping_today[item_id] : 0;
+#else
+    (void)item_id;
+    return 0;
+#endif
+}
+
+void hm_gameplay_shipping_clear(void) {
+#ifdef HMBTN_ENH_SHIPPING_BIN
+    memset(shipping_today, 0, sizeof(shipping_today));
+    shipping_ui_requested = 0;
+#endif
+}
+
+void hm_gameplay_shipping_request(void) {
+#ifdef HMBTN_ENH_SHIPPING_BIN
+    shipping_ui_requested = 1;
+#endif
+}
+
+int hm_gameplay_shipping_take_request(void) {
+#ifdef HMBTN_ENH_SHIPPING_BIN
+    int requested = shipping_ui_requested;
+    shipping_ui_requested = 0;
+    return requested;
+#else
+    return 0;
+#endif
+}
+
+static u32 hm_gameplay_grass_spread_hash(int year, int season, int day, int row, int column) {
+    u32 value = (u32)year * 0x9E3779B1u;
+    value ^= (u32)(season + 1) * 0x85EBCA6Bu;
+    value ^= (u32)(day + 1) * 0xC2B2AE35u;
+    value ^= (u32)(row + 1) * 0x27D4EB2Fu;
+    value ^= (u32)(column + 1) * 0x165667B1u;
+    value ^= value >> 16;
+    value *= 0x7FEB352Du;
+    value ^= value >> 15;
+    return value;
+}
+
+/* Half of the farm days are spread days for each mature tile. The direction is
+ * repeatable from date and position, so this enhancement never consumes the
+ * original game's random stream. */
+int hm_gameplay_grass_spread_due(int year, int season, int day, int row, int column) {
+    return (hm_gameplay_grass_spread_hash(year, season, day, row, column) & 1u) == 0;
+}
+
+int hm_gameplay_grass_spread_direction(int year, int season, int day, int row, int column) {
+    return (int)((hm_gameplay_grass_spread_hash(year, season, day, row, column) >> 8) & 3u);
 }
 
 

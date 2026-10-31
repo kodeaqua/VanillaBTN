@@ -129,7 +129,7 @@ class MainActivity : SDLActivity() {
 
     private fun setupGamepadOverlay() {
         val layout = mLayout ?: return
-        val overlay = VirtualGamepadView(this)
+        val overlay = VirtualGamepadView(this, targetDataDir ?: filesDir)
         gamepadOverlay = overlay
         val params = FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,

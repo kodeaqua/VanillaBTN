@@ -131,13 +131,40 @@ void hm_pause_draw(const hm_pause_assets *assets, u8 *rgba, const hm_pause_menu 
         for (size_t channel = 0; channel < 3; ++channel)
             rgba[pixel * 4 + channel] = (u8)((u32)rgba[pixel * 4 + channel] * 3 / 5);
     hm_canvas = rgba;
-    if (menu->page == HM_PAUSE_GRAPHICS || menu->page == HM_PAUSE_GAMEPLAY ||
-        menu->page == HM_PAUSE_CONTROLS || menu->page == HM_PAUSE_AUDIO) {
+    if (menu->page == HM_PAUSE_SHIPPING) {
+        hm_pause_original_frame(NULL, 12, 8, 296, 82);
+        hm_center(assets, "Rucksack", 14);
+        for (int i = 0; i < HM_PAUSE_RUCKSACK_ITEMS; ++i) {
+            int x = (i < 4) ? 24 : 168;
+            int y = 34 + (i % 4) * 13;
+            hm_text(assets, view ? view->rucksack_items[i] : NULL, x, y);
+        }
+        hm_pause_original_frame(NULL, 12, 94, 296, 104);
+        hm_center(assets, "Shipped Items", 100);
+        int first = menu->first_visible;
+        for (int row = 0; row < 4; ++row) {
+            int index = first + row;
+            int y = 124 + row * 17;
+            if (index >= (view ? view->shipping_count : 0))
+                break;
+            if (index == menu->selected)
+                hm_pause_original_frame(NULL, 20, y - 3, 280, 16);
+            hm_text(assets, view->shipping_items[index], 30, y);
+        }
+        if (!view || view->shipping_count == 0)
+            hm_center(assets, "No shipped items", 142);
+        hm_pause_original_frame(NULL, 12, 202, 296, 30);
+        hm_text(assets, "X Take    Up Down Select", 28, 207);
+        hm_text(assets, "ESC Close", 28, 219);
+    } else if (menu->page == HM_PAUSE_GRAPHICS || menu->page == HM_PAUSE_GAMEPLAY ||
+        menu->page == HM_PAUSE_CONTROLS || menu->page == HM_PAUSE_AUDIO ||
+        menu->page == HM_PAUSE_BLESSINGS) {
         hm_pause_original_frame(NULL, 12, 8, 296, 28);
         const char *title = menu->page == HM_PAUSE_GRAPHICS ? "Settings - Graphics"
                             : (menu->page == HM_PAUSE_GAMEPLAY ? "Settings - Gameplay"
                             : (menu->page == HM_PAUSE_CONTROLS ? "Settings - Controls"
-                                                               : "Settings - Audio"));
+                            : (menu->page == HM_PAUSE_BLESSINGS ? "Goddess Blessings"
+                                                               : "Settings - Audio")));
         hm_center(assets, title, 16);
         if (hm_pause_count(menu) > HM_PAUSE_VISIBLE_ROWS) {
             char range[16];
@@ -171,9 +198,11 @@ void hm_pause_draw(const hm_pause_assets *assets, u8 *rgba, const hm_pause_menu 
         hm_center(assets, root ? "Paused" : "Settings", top + 12);
         hm_pause_line(NULL, 84, top + 32, 236, top + 32, FRAME_DARK, 0);
         int row_start = top + (root ? 44 : 42);
-        hm_pause_original_frame(NULL, 80, row_start + menu->selected * 24 - 4, 160, 22);
+        int row_step = root ? 20 : 24;
+        hm_pause_original_frame(NULL, 80, row_start + menu->selected * row_step - 3, 160,
+                                root ? 19 : 22);
         for (int i = 0; i < hm_pause_count(menu); ++i) {
-            int y = row_start + i * 24;
+            int y = row_start + i * row_step;
             if (i == menu->selected)
                 hm_text(assets, "-", 90, y);
             hm_text(assets, hm_pause_label(menu, i), 108, y);

@@ -25,6 +25,17 @@ int hm_gameplay_fast_text(void);
 int hm_gameplay_tool_charge_gauge(void);
 int hm_gameplay_tile_targeting(void);
 int hm_gameplay_npc_bonds(void);
+int hm_gameplay_grass_spread(void);
+int hm_gameplay_slow_farm_time(void);
+int hm_gameplay_shipping_bin(void);
+void hm_gameplay_shipping_record(int item_id);
+void hm_gameplay_shipping_forget(int item_id);
+int hm_gameplay_shipping_count(int item_id);
+void hm_gameplay_shipping_clear(void);
+void hm_gameplay_shipping_request(void);
+int hm_gameplay_shipping_take_request(void);
+int hm_gameplay_grass_spread_due(int year, int season, int day, int row, int column);
+int hm_gameplay_grass_spread_direction(int year, int season, int day, int row, int column);
 
 void hm_gameplay_set_active(const void *options_ptr);
 

@@ -11,13 +11,16 @@
 int main(void) {
     hm_pause_menu menu;
     hm_pause_open(&menu);
-    CHECK(menu.page == HM_PAUSE_ROOT && hm_pause_count(&menu) == 3);
+    CHECK(menu.page == HM_PAUSE_ROOT && hm_pause_count(&menu) == 4);
     CHECK(!strcmp(hm_pause_label(&menu, 0), "Resume"));
-    CHECK(hm_pause_label(&menu, -1) == NULL && hm_pause_label(&menu, 3) == NULL);
+    CHECK(!strcmp(hm_pause_label(&menu, 2), "Goddess Blessings"));
+    CHECK(!strcmp(hm_pause_label(&menu, 3), "Exit Game"));
+    CHECK(hm_pause_label(&menu, -1) == NULL && hm_pause_label(&menu, 4) == NULL);
     CHECK(hm_pause_handle(&menu, HM_PAUSE_CONFIRM) == HM_PAUSE_RESUME);
-    CHECK(hm_pause_handle(&menu, HM_PAUSE_UP) == HM_PAUSE_NONE && menu.selected == 2);
+    CHECK(hm_pause_handle(&menu, HM_PAUSE_UP) == HM_PAUSE_NONE && menu.selected == 3);
     CHECK(hm_pause_handle(&menu, HM_PAUSE_CONFIRM) == HM_PAUSE_EXIT);
-    hm_pause_handle(&menu, HM_PAUSE_UP);
+    hm_pause_open(&menu);
+    hm_pause_handle(&menu, HM_PAUSE_DOWN);
     CHECK(hm_pause_handle(&menu, HM_PAUSE_CONFIRM) == HM_PAUSE_NONE);
     CHECK(menu.page == HM_PAUSE_SETTINGS && hm_pause_count(&menu) == 4);
     CHECK(!strcmp(hm_pause_label(&menu, 3), "Audio"));
@@ -88,9 +91,28 @@ int main(void) {
     CHECK(!strcmp(hm_pause_label(&menu, 2), "Mouse"));
     for (int i = 0; i < HM_PAUSE_CONTROLS_ITEMS; ++i) {
         CHECK(menu.selected == i);
-        CHECK(hm_pause_handle(&menu, HM_PAUSE_RIGHT) == HM_PAUSE_CHANGE_CONTROLS);
-        CHECK(hm_pause_handle(&menu, HM_PAUSE_LEFT) == HM_PAUSE_CHANGE_CONTROLS);
-        CHECK(hm_pause_handle(&menu, HM_PAUSE_CONFIRM) == HM_PAUSE_CHANGE_CONTROLS);
+        int option_row = i < 3;
+#ifdef __ANDROID__
+        option_row = option_row || (i >= 17 && i != 19);
+#endif
+        CHECK(hm_pause_handle(&menu, HM_PAUSE_RIGHT) ==
+              (option_row ? HM_PAUSE_CHANGE_CONTROLS : HM_PAUSE_NONE));
+        CHECK(hm_pause_handle(&menu, HM_PAUSE_LEFT) ==
+              (option_row ? HM_PAUSE_CHANGE_CONTROLS : HM_PAUSE_NONE));
+        hm_pause_action confirm = hm_pause_handle(&menu, HM_PAUSE_CONFIRM);
+        if (i < 3)
+            CHECK(confirm == HM_PAUSE_CHANGE_CONTROLS);
+        else if (i < 17)
+            CHECK(confirm == HM_PAUSE_REMAP_CONTROLS);
+#ifdef __ANDROID__
+        else if (i == 19)
+            CHECK(confirm == HM_PAUSE_EDIT_TOUCH_LAYOUT);
+        else
+            CHECK(confirm == HM_PAUSE_CHANGE_CONTROLS);
+#else
+        else
+            CHECK(confirm == HM_PAUSE_REMAP_CONTROLS);
+#endif
         hm_pause_handle(&menu, HM_PAUSE_DOWN);
     }
     hm_pause_handle(&menu, HM_PAUSE_BACK);
@@ -113,8 +135,25 @@ int main(void) {
     hm_pause_handle(&menu, HM_PAUSE_BACK);
     CHECK(menu.page == HM_PAUSE_SETTINGS && menu.selected == 3);
 
+    /* The owner support page is reachable independently from Settings. */
+    hm_pause_open(&menu);
+    hm_pause_handle(&menu, HM_PAUSE_DOWN);
+    hm_pause_handle(&menu, HM_PAUSE_DOWN);
+    CHECK(menu.selected == 2);
+    CHECK(hm_pause_handle(&menu, HM_PAUSE_CONFIRM) == HM_PAUSE_NONE);
+    CHECK(menu.page == HM_PAUSE_BLESSINGS && hm_pause_count(&menu) == HM_PAUSE_BLESSINGS_ITEMS);
+    CHECK(!strcmp(hm_pause_label(&menu, 0), "Add 10000G"));
+    CHECK(!strcmp(hm_pause_label(&menu, 1), "Restore stamina and fatigue"));
+    CHECK(!strcmp(hm_pause_label(&menu, 2), "Add 10 fodder"));
+    for (int i = 0; i < HM_PAUSE_BLESSINGS_ITEMS; ++i) {
+        CHECK(menu.selected == i);
+        CHECK(hm_pause_handle(&menu, HM_PAUSE_CONFIRM) == HM_PAUSE_USE_BLESSING);
+        hm_pause_handle(&menu, HM_PAUSE_DOWN);
+    }
+    CHECK(menu.selected == 0);
     hm_pause_handle(&menu, HM_PAUSE_BACK);
-    CHECK(menu.page == HM_PAUSE_ROOT && menu.selected == 1);
+    CHECK(menu.page == HM_PAUSE_ROOT && menu.selected == 2);
+
     CHECK(hm_pause_handle(&menu, HM_PAUSE_BACK) == HM_PAUSE_RESUME);
     hm_pause_open(&menu);
     CHECK(menu.selected == 0 && menu.page == HM_PAUSE_ROOT);

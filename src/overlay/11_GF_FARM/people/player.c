@@ -2755,7 +2755,18 @@ static s32 player_act_zone_front(FarmPlayer *player)
     case ZONE_SHIPPING_BOX:
         if (hit->facing == player->facing38)
         {
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_SHIPPING_BIN)
+            if (hm_gameplay_shipping_bin() && player->held[HELD_ITEM].id == ITEM_NOTHING &&
+                game_state.progress.clock.minuteOfDay < 17 * 60 &&
+                event_flag_get(EVENT_FLAG_SHIPMENT_SETTLED) != 1)
+            {
+                hm_gameplay_shipping_request();
+            }
+            else
+#endif
+            {
             player_submit_item_action(player, player->held[HELD_ITEM].id, hit->modelIndex);
+            }
         }
         return 0x22;
     case ZONE_CHICKEN_FEED_STORE:

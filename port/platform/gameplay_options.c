@@ -6,6 +6,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef HMBTN_ENH_NPC_BONDS
+#define HM_GAMEPLAY_EXTRA_INDEX 12
+#else
+#define HM_GAMEPLAY_EXTRA_INDEX 11
+#endif
+#define HM_GAMEPLAY_GRASS_SPREAD_INDEX HM_GAMEPLAY_EXTRA_INDEX
+#define HM_GAMEPLAY_SLOW_TIME_INDEX (HM_GAMEPLAY_EXTRA_INDEX + 1)
+#define HM_GAMEPLAY_SHIPPING_BIN_INDEX (HM_GAMEPLAY_EXTRA_INDEX + 2)
+
 void hm_gameplay_defaults(hm_gameplay_options *options) {
     if (!options)
         return;
@@ -22,6 +31,9 @@ void hm_gameplay_defaults(hm_gameplay_options *options) {
     options->tool_charge_gauge = 0;
     options->tile_targeting = 0;
     options->npc_bonds = 0;
+    options->grass_spread = 0;
+    options->slow_farm_time = 0;
+    options->shipping_bin = 0;
 }
 
 void hm_gameplay_load(hm_gameplay_options *options) {
@@ -63,6 +75,12 @@ void hm_gameplay_load(hm_gameplay_options *options) {
             options->tile_targeting = (val_len == 4 && !memcmp(val, "true", 4));
         if (hm_json_property(object, length, "npc_bonds", &val, &val_len) == 1)
             options->npc_bonds = (val_len == 4 && !memcmp(val, "true", 4));
+        if (hm_json_property(object, length, "grass_spread", &val, &val_len) == 1)
+            options->grass_spread = (val_len == 4 && !memcmp(val, "true", 4));
+        if (hm_json_property(object, length, "slow_farm_time", &val, &val_len) == 1)
+            options->slow_farm_time = (val_len == 4 && !memcmp(val, "true", 4));
+        if (hm_json_property(object, length, "shipping_bin", &val, &val_len) == 1)
+            options->shipping_bin = (val_len == 4 && !memcmp(val, "true", 4));
     }
     free(text);
     hm_gameplay_set_active(options);
@@ -99,6 +117,12 @@ int hm_gameplay_save(const hm_gameplay_options *options) {
                                           options->tile_targeting ? "true" : "false");
     ok &= hm_user_data_set_nested_setting("enhance", "npc_bonds",
                                           options->npc_bonds ? "true" : "false");
+    ok &= hm_user_data_set_nested_setting("enhance", "grass_spread",
+                                          options->grass_spread ? "true" : "false");
+    ok &= hm_user_data_set_nested_setting("enhance", "slow_farm_time",
+                                          options->slow_farm_time ? "true" : "false");
+    ok &= hm_user_data_set_nested_setting("enhance", "shipping_bin",
+                                          options->shipping_bin ? "true" : "false");
     return ok;
 }
 
@@ -140,8 +164,19 @@ int hm_gameplay_change(hm_gameplay_options *options, int item, int direction) {
     case 10:
         options->tile_targeting = !options->tile_targeting;
         break;
+#ifdef HMBTN_ENH_NPC_BONDS
     case 11:
         options->npc_bonds = !options->npc_bonds;
+        break;
+#endif
+    case HM_GAMEPLAY_GRASS_SPREAD_INDEX:
+        options->grass_spread = !options->grass_spread;
+        break;
+    case HM_GAMEPLAY_SLOW_TIME_INDEX:
+        options->slow_farm_time = !options->slow_farm_time;
+        break;
+    case HM_GAMEPLAY_SHIPPING_BIN_INDEX:
+        options->shipping_bin = !options->shipping_bin;
         break;
     default:
         return 0;
@@ -187,8 +222,19 @@ void hm_gameplay_value(const hm_gameplay_options *options, int item, char *text,
     case 10:
         snprintf(text, capacity, "Highlight targeted field tile grid");
         break;
+#ifdef HMBTN_ENH_NPC_BONDS
     case 11:
         snprintf(text, capacity, "Show NPC friendship and affection page");
+        break;
+#endif
+    case HM_GAMEPLAY_GRASS_SPREAD_INDEX:
+        snprintf(text, capacity, "Planted mature fodder grass spreads on the farm");
+        break;
+    case HM_GAMEPLAY_SLOW_TIME_INDEX:
+        snprintf(text, capacity, "Farm outdoor clock advances at half speed");
+        break;
+    case HM_GAMEPLAY_SHIPPING_BIN_INDEX:
+        snprintf(text, capacity, "Open shipped items and take them back before Zack");
         break;
     default:
         text[0] = 0;
@@ -233,8 +279,19 @@ void hm_gameplay_row_value(const hm_gameplay_options *options, int item, char *t
     case 10:
         snprintf(text, capacity, "%s", options->tile_targeting ? "On" : "Off");
         break;
+#ifdef HMBTN_ENH_NPC_BONDS
     case 11:
         snprintf(text, capacity, "%s", options->npc_bonds ? "On" : "Off");
+        break;
+#endif
+    case HM_GAMEPLAY_GRASS_SPREAD_INDEX:
+        snprintf(text, capacity, "%s", options->grass_spread ? "On" : "Off");
+        break;
+    case HM_GAMEPLAY_SLOW_TIME_INDEX:
+        snprintf(text, capacity, "%s", options->slow_farm_time ? "On" : "Off");
+        break;
+    case HM_GAMEPLAY_SHIPPING_BIN_INDEX:
+        snprintf(text, capacity, "%s", options->shipping_bin ? "On" : "Off");
         break;
     default:
         text[0] = 0;

@@ -4252,3 +4252,115 @@ Consequences: Display-off transitions stay on the GPU and remain black across
 all window sizes, including when the PS1 display rectangle is empty. Build and
 unit validation are required; visual transition behavior still needs owner
 playtesting.
+
+## ADR-158: Spread Mature Planted Fodder Grass
+
+Date: 2026-10-31. Status: accepted.
+
+Context: The owner requested gradual farm grass propagation, specifically from
+planted grass seed rather than weeds or wild grass, with new growth restricted
+to empty plots and no changes to unrelated random game behavior.
+
+Decision: Add an opt-in `grass_spread` gameplay setting. Each mature
+`ITEM_GRASS_SEEDS` tile gets a deterministic 50% daily spread attempt into one
+randomized cardinal neighbor. A neighbor must still be completely bare soil.
+Collect targets first, then apply them after scanning so a new plot cannot
+spread again that morning. New plots receive the same sown-soil and initial
+growth state as normal planting. The direction and timing hash does not consume
+the game's random stream.
+
+Consequences: Existing weeds and unplanted wild grass never spread. Obstacles,
+tilled soil, occupied crop plots, and field edges block growth. Windows and
+Android `-Game` builds compile this option; runtime default is OFF. A synthetic
+test covers deterministic timing and all four directions. Actual field visuals
+and growth remain owner gameplay checks.
+
+## ADR-159: Slow the Outdoor Farm Clock
+
+Date: 2026-10-31. Status: accepted.
+
+Context: The owner requested an optional slower clock limited to the outdoor
+farm, without changing simulation speed elsewhere.
+
+Decision: Add an opt-in `slow_farm_time` gameplay setting that advances the
+normal game clock on every other clock-frame callback while the active location
+is `PLACE_FARM`. Indoor scenes and queued fast-forward events keep their existing
+clock behavior. The simulation remains on the native update path.
+
+Consequences: Outdoor farm time advances at half its normal rate while enabled;
+all other locations remain unchanged. Runtime default is OFF. Interactive clock
+and event-schedule behavior remains owner-tested.
+
+## ADR-160: Reopen Shipped Items Before Settlement
+
+Date: 2026-10-31. Status: accepted.
+
+Context: The owner requested a shipping-bin screen using the game's window and
+font assets, with the rucksack above shipped items, and a way to reclaim an item
+before the 5:00/Zack settlement while preserving the existing throw action.
+
+Decision: When the player faces a shipping box with an empty hand, presses X,
+and settlement has not happened, open the original framed pause-style dialog.
+The top panel lists all rucksack slots; the lower panel lists shipped item
+variants and quantities. Confirming a row first validates rucksack capacity,
+then returns one item and reverses the shipment count, value, and fish tally.
+When an item is held, the original throw-to-bin action continues unchanged.
+The list closes at settlement and is cleared on the next clock reset.
+
+Consequences: An item can be reclaimed only before settlement, and a full
+rucksack leaves shipment state unchanged. Exact variant tracking is kept in
+process memory because the feature does not alter the vanilla save/card format;
+the item-variant list is therefore not restored after restarting or loading a
+save. Windows and Android `-Game` builds include the option, which defaults OFF.
+The owner must verify bin interaction and original throw behavior in gameplay.
+
+## ADR-161: Remap Keyboard and Android Touch Controls
+
+Date: 2026-10-31. Status: accepted.
+
+Context: The owner requested keyboard remapping and Android virtual-gamepad
+mapping, with the option to hide touch controls for a physical gamepad and to
+adjust on-screen button size and position.
+
+Decision: Add per-action keyboard capture with duplicate-key rejection. On
+Android, provide a virtual-pad enable switch, action mapping for each on-screen
+button, size choices from 70% to 140%, and an edit mode that saves normalized
+button positions. Keep virtual-pad actions on dedicated reserved SDL key codes
+so disabling keyboard input does not disable touch controls.
+
+Consequences: Keyboard and Android layout settings persist in user settings,
+not game saves. The Android layout editor provides Reset and Done controls.
+Windows and Android builds compile the keyboard mapping; only Android presents
+the virtual-pad editor. Device-specific touch feel remains owner-tested.
+
+## ADR-162: Add Optional Goddess Blessings
+
+Date: 2026-10-31. Status: accepted.
+
+Context: The owner requested a small support menu in the pause interface for
+useful player assistance, while keeping the additions simple and reversible.
+
+Decision: Add a `Goddess Blessings` page with five actions: add 10000G, restore
+stamina and fatigue, add 10 fodder, add 10 chicken feed, or add 10 fish food.
+Use existing estate inventory/gold helpers and reset stamina/fatigue state
+latches when restoring energy.
+
+Consequences: Blessings are explicitly requested actions available in the
+pause menu. They do not run automatically or alter save layout. The owner should
+check inventory caps and status effects during gameplay.
+
+## ADR-163: Enable Viewport Scaling in Android Enhanced Profiles
+
+Date: 2026-10-31. Status: accepted.
+
+Context: The owner requested sharper Android output in Enhance PS1 and Modern,
+using the available display size where practical and retaining a mobile-safe
+resolution cap.
+
+Decision: Selecting either enhanced profile enables the existing scaling path
+on Android. Its target follows the available viewport and is capped at 1280x720;
+Native PS1 remains at native internal resolution.
+
+Consequences: The setting only affects Android's profile selection. Allocation
+or replay failure retains the existing safe fallback. Device performance,
+thermal behavior, and visual sharpness need owner validation.

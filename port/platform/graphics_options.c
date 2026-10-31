@@ -27,7 +27,7 @@ void hm_graphics_profile_set(hm_graphics_options *o, int profile) {
     if (profile == HM_GRAPHICS_PROFILE_MODERN) {
         o->widescreen = 1;
         o->linear = 1;
-        o->scaling = 0;
+        o->scaling = 1;
         o->vsync = 1;
         o->fps_numerator = 0;
         o->fps_denominator = 1;
@@ -38,7 +38,7 @@ void hm_graphics_profile_set(hm_graphics_options *o, int profile) {
     } else if (profile == HM_GRAPHICS_PROFILE_ENHANCE) {
         o->widescreen = 0;
         o->linear = 0;
-        o->scaling = 0;
+        o->scaling = 1;
         o->vsync = 1;
         o->fps_numerator = 0;
         o->fps_denominator = 1;
