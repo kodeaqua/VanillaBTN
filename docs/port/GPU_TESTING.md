@@ -2,8 +2,8 @@
 
 ## Current game renderer status
 
-This file documents synthetic GPU checks, not a claim of complete game-scene
-coverage. GPU Auto attempts shared GPU scene output for every captured desktop
+This file documents synthetic GPU checks and bounded runtime samples, not a
+claim of complete game-scene coverage. GPU Auto attempts shared GPU scene output for every captured desktop
 and Android frame, while Software remains the reference option. Captured
 render-producing GP0 commands are represented on the compute path: polygons,
 lines, rectangles, clear-image, load-image, VRAM-to-VRAM copies, and ordered
@@ -23,13 +23,14 @@ semi-transparency modes. Each case is also checked to ensure the CPU reference
 actually changed at least one output pixel. Mask-set and
 mask-check behavior is preserved for load and VRAM-copy transfers. VRAM-to-CPU
 readback, IRQ requests, NOP/cache commands, and draw-environment state do not
-produce scene pixels. Malformed streams, unsupported scene operations, and
-reserved texture depth retain the CPU reference path. When no coherent captured
-frame is available, GPU Auto can build a zero-primitive scene that scans the
-current visible VRAM page directly on the GPU. GPU resource/device failures
-retain the CPU reference safety path.
-Gameplay parity, device breadth, and frame-time budgets remain owner checks; see
-PLATFORMS.md and ENHANCEMENTS.md.
+produce scene pixels. The scene builder rejects malformed streams, unsupported
+scene operations, and reserved texture depth; the host then attempts a
+zero-primitive GPU scanout of the current visible VRAM page. CPU reference
+presentation remains the safety path when that scanout or another GPU resource
+operation fails. Explicit Software mode and diagnostic frame capture also use
+the CPU reference intentionally.
+Gameplay parity, broader device coverage, and frame-time budgets remain
+unverified beyond the recorded samples; see PLATFORMS.md and ENHANCEMENTS.md.
 
 The SDL-enabled build provides `hmbtn_gpu_renderer_probe`, an offscreen GPU
 readback comparison against the CPU reference. It covers the primitive classes,
@@ -134,8 +135,20 @@ an empty display area during startup. The next two windows each reported
 At 384x240, those steady farm windows held 60-61 presents/s; average game time
 was 3.6-3.7 ms, average present time 3.7-4.1 ms, and the audio ring reported
 zero underruns or drops. The VRAM scanout also passed a 2x pixel-exact readback
-probe on Windows Vulkan and Direct3D 12. Other areas, 720p, and Windows gameplay
-coverage remain unverified.
+probe on Windows Vulkan and Direct3D 12.
+
+On 2026-10-31, the Windows Release game window completed the authored
+`new_game_farm.replay` at `HMBTN_BOOT_TICKS=39000` on SDL_GPU Direct3D 12 and
+exited with code 0 after 39,000 VBlanks. With diagnostic CPU frame capture
+disabled, its 81 coverage reports recorded 48,599/48,599 renderable frames on
+the GPU (100%), zero CPU fallbacks, eight direct VRAM scanouts, and one skipped
+attempt for an empty display area during startup. Audio reported zero
+underflows and drops. The complete captured output is kept locally under
+`build/port/windows-release/gpu-window-full.*.log`; it is build output and is
+not committed. This verifies the authored Windows farm replay, not all game
+areas or output sizes. Android runtime evidence remains the connected G100
+farm at 384x240; other devices, 720p, and Windows Vulkan gameplay remain
+unverified.
 
 The probe's `--farm-benchmark` option renders 8,192 fixed 8x8 rectangles at
 320x240 and 960x720, with a fresh builder and an explicit GPU fence per frame.
