@@ -50,8 +50,14 @@ wrap at the VRAM edge and mask-bit behavior. These transfers now snapshot their
 source before writing, so overlapping areas do not terminate the game.
 
 Android GPU Auto attempts compute rendering for each captured frame. Every
-600 attempts, the host logs scene coverage, direct GPU VRAM scanouts, fallback
+600 attempts, the host logs frame coverage, direct GPU VRAM scanouts, fallback
 count, and the last fallback reason. Explicit Software mode remains available.
+When the PS1 display is disabled, GPU Auto clears the swapchain directly through
+a GPU render pass instead of converting a black frame through the CPU upload
+path. CPU scanout remains available if that render pass cannot be created.
+The Windows Release and ASan/UBSan game builds each pass all 125 CTest cases;
+the Android Release APK builds successfully. This blank-frame path has not yet
+been exercised in an interactive game session.
 Android's SDL GPU
 device uses SPIR-V only and disables optional Vulkan features
 unused by this compute renderer. The connected MediaTek G100 tablet reports a

@@ -348,13 +348,13 @@ static void hm_host_gpu_coverage_report(void) {
     double percent = renderable ? (100.0 * (double)hm_gpu_coverage_successes / renderable) : 0.0;
 #ifdef __ANDROID__
     __android_log_print(ANDROID_LOG_INFO, "VanillaBTN",
-                        "GPU scene coverage: %u/%u renderable (%.1f%%; %u VRAM scanouts), %u fallback, %u skipped of %u attempts; last: %s",
+                        "GPU frame coverage: %u/%u renderable (%.1f%%; %u VRAM scanouts), %u fallback, %u skipped of %u attempts; last: %s",
                         hm_gpu_coverage_successes, renderable, percent, hm_gpu_coverage_scanouts,
                         hm_gpu_coverage_fallbacks, hm_gpu_coverage_skipped,
                         hm_gpu_coverage_frames,
                         hm_gpu_coverage_last_reason);
 #else
-    SDL_Log("GPU scene coverage: %u/%u renderable (%.1f%%; %u VRAM scanouts), %u fallback, %u skipped of %u attempts; last: %s",
+    SDL_Log("GPU frame coverage: %u/%u renderable (%.1f%%; %u VRAM scanouts), %u fallback, %u skipped of %u attempts; last: %s",
             hm_gpu_coverage_successes, renderable, percent, hm_gpu_coverage_scanouts,
             hm_gpu_coverage_fallbacks, hm_gpu_coverage_skipped, hm_gpu_coverage_frames,
             hm_gpu_coverage_last_reason);
@@ -391,17 +391,42 @@ static int hm_host_gpu_scanout_scene(const RECT *area, u32 width, u32 height) {
     hm_gpu_scene_multisamples(hm_gpu_commands, 1);
     return hm_gpu_scene_scanout(hm_gpu_commands, area, width, height, &hm_gpu_cached);
 }
-static int hm_host_gpu_present(const RECT *native_area) {
-    if (!hm_gpu_output || !hm_gpu_commands || !native_area) {
-        hm_host_gpu_coverage_record(0, "GPU renderer or display area unavailable");
-        return 0;
+static int hm_host_gpu_clear_present(void) {
+    SDL_GPUCommandBuffer *command = SDL_AcquireGPUCommandBuffer(hm_device);
+    if (!command)
+        hm_host_fail();
+    SDL_GPUTexture *swapchain = NULL;
+    Uint32 width, height;
+    if (!SDL_AcquireGPUSwapchainTexture(command, hm_window, &swapchain, &width, &height)) {
+        SDL_CancelGPUCommandBuffer(command);
+        hm_host_fail();
     }
-    if (native_area->w == 0 || native_area->h == 0) {
-        hm_host_gpu_coverage_skip("empty PS1 display area");
+    if (!swapchain) {
+        if (!SDL_CancelGPUCommandBuffer(command))
+            hm_host_fail();
+        hm_host_gpu_coverage_skip("GPU swapchain temporarily unavailable");
         return -1;
     }
-    if (native_area->w < 0 || native_area->h < 0) {
-        hm_host_gpu_coverage_record(0, "invalid PS1 display area");
+    SDL_GPUColorTargetInfo target = {.texture = swapchain,
+                                     .clear_color = {0, 0, 0, 1},
+                                     .load_op = SDL_GPU_LOADOP_CLEAR,
+                                     .store_op = SDL_GPU_STOREOP_STORE};
+    SDL_GPURenderPass *pass = SDL_BeginGPURenderPass(command, &target, 1, NULL);
+    if (!pass) {
+        if (!SDL_CancelGPUCommandBuffer(command))
+            hm_host_fail();
+        hm_host_gpu_coverage_record(0, "GPU blank-frame render pass unavailable");
+        return 0;
+    }
+    SDL_EndGPURenderPass(pass);
+    if (!SDL_SubmitGPUCommandBuffer(command))
+        hm_host_fail();
+    hm_host_gpu_coverage_record(1, NULL);
+    return 1;
+}
+static int hm_host_gpu_present(const RECT *native_area) {
+    if (!native_area) {
+        hm_host_gpu_coverage_record(0, "PS1 display area unavailable");
         return 0;
     }
 #ifdef HMBTN_ENH_PAUSE_MENU
@@ -414,6 +439,29 @@ static int hm_host_gpu_present(const RECT *native_area) {
         return 0;
     }
 #endif
+    /* The native output is black while the PS1 display is disabled. Keep this
+     * valid blank frame on the GPU instead of converting/uploading black pixels
+     * through the software scanout path. */
+    if (!hm_gpu_environment_state()->display_enabled) {
+        hm_gpu_cached_serial = 0;
+        if (!hm_device || !hm_window) {
+            hm_host_gpu_coverage_record(0, "GPU device or window unavailable for blank frame");
+            return 0;
+        }
+        return hm_host_gpu_clear_present();
+    }
+    if (!hm_gpu_output || !hm_gpu_commands) {
+        hm_host_gpu_coverage_record(0, "GPU scene renderer unavailable");
+        return 0;
+    }
+    if (native_area->w == 0 || native_area->h == 0) {
+        hm_host_gpu_coverage_skip("empty PS1 display area");
+        return -1;
+    }
+    if (native_area->w < 0 || native_area->h < 0) {
+        hm_host_gpu_coverage_record(0, "invalid PS1 display area");
+        return 0;
+    }
     if (!hm_gpu_replay) {
         hm_gpu_replay = hm_frame_replay_acquire();
         hm_gpu_cached_serial = 0;
@@ -1120,7 +1168,7 @@ static int hm_host_present_scanout(u64 tick) {
     hm_options.gpu_active = 0;
 #endif
 #ifdef HMBTN_GPU_RASTER
-    if (state->display_enabled) {
+    {
         int gpu_res = hm_host_gpu_present(area);
         if (gpu_res != 0) {
 #ifdef HMBTN_ENH_PAUSE_MENU

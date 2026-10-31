@@ -4235,3 +4235,20 @@ the display through GPU Auto without pretending their command streams were
 successfully replayed. A regression verifies that scanout can rebuild after an
 unsupported GP0 scene. Other scene/device coverage and interactive gameplay
 remain unverified.
+
+## ADR-157: Clear Disabled PS1 Display Frames on the GPU
+
+Date: 2026-10-31. Status: accepted.
+
+Context: When the PS1 disabled its display, GPU Auto skipped scene presentation
+and the host built a black frame through the CPU scanout/upload path. This was a
+valid frame that did not need VRAM conversion or a transfer buffer.
+
+Decision: In GPU Auto, acquire the swapchain and clear it to opaque black with a
+GPU render pass. Keep explicit Software mode unchanged and retain the CPU scanout
+path if the GPU clear pass cannot be created.
+
+Consequences: Display-off transitions stay on the GPU and remain black across
+all window sizes, including when the PS1 display rectangle is empty. Build and
+unit validation are required; visual transition behavior still needs owner
+playtesting.
