@@ -27,10 +27,106 @@ static void setup(int width, int height) {
     SetDefDispEnv(&display, 0, 0, width, height);
     PutDispEnv(&display);
 }
+static int scene_accepts(hm_gpu_scene *scene, const u32 *words, u32 count, u32 *primitive_count) {
+    RECT area = {0, 0, 32, 32};
+    hm_gpu_scene_data data;
+    hm_replay_sink previous = hm_gpu_scene_begin(scene, 32, 32);
+    hm_replay_begin(&area);
+    hm_gpu_execute_words(words, count);
+    if (!hm_gpu_scene_end(scene, previous, &data)) {
+        fprintf(stderr, "GPU scene rejected GP0 opcode 0x%02x: %s\n", words[0] >> 24,
+                hm_gpu_scene_fallback(scene));
+        return 0;
+    }
+    if (primitive_count)
+        *primitive_count = data.words[10];
+    return 1;
+}
 int main(void) {
     hm_gpu_scene *s = hm_gpu_scene_create();
     CHECK(s);
     setup(32, 32);
+    /* Audit every render-producing primitive opcode and documented NOP mirror. */
+    u32 packet[32] = {0};
+    for (u32 opcode = 0x20; opcode <= 0x3f; ++opcode) {
+        u32 vertices = (opcode & 8) ? 4 : 3;
+        u32 count = 1, primitive_count = 0;
+        memset(packet, 0, sizeof(packet));
+        packet[0] = (opcode << 24) | 0x00e08040;
+        for (u32 vertex = 0; vertex < vertices; ++vertex) {
+            if (vertex && (opcode & 16))
+                packet[count++] = 0x0020c0f0 - vertex * 0x00001020;
+            static const u32 positions[] = {0x00020002, 0x0003001a, 0x001a0004, 0x001b001b};
+            packet[count++] = positions[vertex];
+            if (opcode & 4) {
+                u32 clut = (252u << 6) | 56u, page = 26u | (((opcode >> 7) & 3u) << 7);
+                packet[count++] = (vertex == 0 ? clut : vertex == 1 ? page : 0) << 16 |
+                                  ((vertex * 7) << 8) | (vertex * 5);
+            }
+        }
+        CHECK(scene_accepts(s, packet, count, &primitive_count));
+        CHECK(primitive_count == (vertices == 4 ? 2u : 1u));
+    }
+    for (u32 opcode = 0x40; opcode <= 0x5f; ++opcode) {
+        memset(packet, 0, sizeof(packet));
+        packet[0] = (opcode << 24) | 0x00e08040;
+        packet[1] = 0x00020002;
+        u32 count = 2;
+        if (opcode & 8) {
+            if (opcode & 16)
+                packet[count++] = 0x0020d0f0;
+            packet[count++] = 0x0003001a;
+            if (opcode & 16)
+                packet[count++] = 0x00f020c0;
+            packet[count++] = 0x001a001b;
+            packet[count++] = 0x50005000;
+        } else {
+            if (opcode & 16)
+                packet[count++] = 0x0020d0f0;
+            packet[count++] = 0x001a001b;
+        }
+        u32 primitive_count = 0;
+        CHECK(scene_accepts(s, packet, count, &primitive_count));
+        CHECK(primitive_count > 0);
+    }
+    for (u32 opcode = 0x60; opcode <= 0x7f; ++opcode) {
+        memset(packet, 0, sizeof(packet));
+        packet[0] = (opcode << 24) | 0x00e08040;
+        packet[1] = 0x00020002;
+        u32 size = (opcode >> 3) & 3;
+        u32 count = 2 + ((opcode & 4) != 0) + (size == 0);
+        if (opcode & 4)
+            packet[2] = ((252u << 6) | 56u) << 16;
+        if (size == 0)
+            packet[count - 1] = 7 | (6 << 16);
+        u32 primitive_count = 0;
+        CHECK(scene_accepts(s, packet, count, &primitive_count));
+        CHECK(primitive_count == 1);
+    }
+    const u8 no_output_opcodes[] = {0x00, 0x01, 0x1f, 0xe0};
+    for (size_t i = 0; i < sizeof(no_output_opcodes); ++i) {
+        u32 nop = (u32)no_output_opcodes[i] << 24, primitive_count = UINT32_MAX;
+        CHECK(scene_accepts(s, &nop, 1, &primitive_count));
+        CHECK(primitive_count == 0);
+    }
+    for (u32 opcode = 0x04; opcode <= 0x1e; ++opcode) {
+        u32 nop = opcode << 24, primitive_count = UINT32_MAX;
+        CHECK(scene_accepts(s, &nop, 1, &primitive_count));
+        CHECK(primitive_count == 0);
+    }
+    for (u32 opcode = 0xe7; opcode <= 0xef; ++opcode) {
+        u32 nop = opcode << 24, primitive_count = UINT32_MAX;
+        CHECK(scene_accepts(s, &nop, 1, &primitive_count));
+        CHECK(primitive_count == 0);
+    }
+    u32 unknown = 0x03000000;
+    RECT unknown_area = {0, 0, 32, 32};
+    hm_replay_sink previous = hm_gpu_scene_begin(s, 32, 32);
+    hm_replay_begin(&unknown_area);
+    hm_gpu_execute_words(&unknown, 1);
+    hm_gpu_scene_data unknown_data;
+    CHECK(!hm_gpu_scene_end(s, previous, &unknown_data));
+    CHECK(strstr(hm_gpu_scene_fallback(s), "unsupported GP0 opcode") != NULL);
     u32 rectangle[] = {0x600000ff, 0x00020002, 0x00040004};
     hm_frame_replay *a = hm_frame_replay_acquire(), *b = hm_frame_replay_acquire();
     CHECK(a && b);
@@ -55,7 +151,7 @@ int main(void) {
     hm_vram_snapshot(&before);
     hm_gpu_environment env = *hm_gpu_environment_state();
     u64 ticks = hm_timing_ticks();
-    hm_replay_sink previous = hm_gpu_scene_begin(s, 32, 32);
+    previous = hm_gpu_scene_begin(s, 32, 32);
     hm_gpu_scene_data data;
     CHECK(hm_frame_replay_draw(b, &live) && hm_gpu_scene_end(s, previous, &data));
     CHECK(data.width == 32 && data.height == 32 && data.bytes >= HM_SCENE_HEADER * sizeof(u32));

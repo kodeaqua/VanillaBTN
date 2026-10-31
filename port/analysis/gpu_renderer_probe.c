@@ -277,6 +277,110 @@ static int fixture(SDL_GPUDevice *device, hm_gpu_renderer *renderer, hm_gpu_scen
     CHECK(!differences);
     return 0;
 }
+static int hm_probe_reference_has_drawn_pixel(u32 width, u32 height) {
+    for (u32 i = 0; i < width * height; ++i)
+        if (reference[i] != 0x4210)
+            return 1;
+    return 0;
+}
+static int hm_probe_primitive_opcode_sweep(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
+                                           hm_gpu_scene *builder) {
+    static const u32 polygon_xy[] = {0x00020002, 0x0003001a, 0x001a0004, 0x001b001b};
+    static const u32 line_xy[] = {0x00020002, 0x0003001a, 0x001a001b};
+    const u32 clut = (252u << 6) | 56u;
+    for (u32 opcode = 0x20; opcode <= 0x3f; ++opcode) {
+        int textured = (opcode & 4) != 0, semi = (opcode & 2) != 0;
+        u32 depths = textured ? 3 : 1, modes = textured || semi ? 4 : 1;
+        for (u32 depth = 0; depth < depths; ++depth)
+            for (u32 mode = 0; mode < modes; ++mode) {
+                u32 words[16] = {0}, count = 0;
+                u32 vertices = (opcode & 8) ? 4 : 3;
+                u32 page = 26u | (depth << 7) | (mode << 5);
+                words[count++] = (opcode << 24) | 0x00e08040;
+                for (u32 vertex = 0; vertex < vertices; ++vertex) {
+                    if (vertex && (opcode & 16))
+                        words[count++] = 0x0020c0f0 - vertex * 0x00001020;
+                    words[count++] = polygon_xy[vertex];
+                    if (textured) {
+                        u32 uv_page = vertex == 0 ? clut : vertex == 1 ? page : 0;
+                        words[count++] = (uv_page << 16) | ((vertex * 7) << 8) | (vertex * 5);
+                    }
+                }
+                if (fixture(device, renderer, builder, words, count, 32, 32, 0)) {
+                    fprintf(stderr, "Primitive opcode 0x%02x depth %u mode %u GPU fixture failed\n",
+                            opcode, depth, mode);
+                    return 1;
+                }
+                if (!hm_probe_reference_has_drawn_pixel(32, 32)) {
+                    fprintf(stderr, "Primitive opcode 0x%02x depth %u mode %u drew no CPU pixels\n",
+                            opcode, depth, mode);
+                    return 1;
+                }
+            }
+    }
+    for (u32 opcode = 0x40; opcode <= 0x5f; ++opcode) {
+        int semi = (opcode & 2) != 0;
+        u32 modes = semi ? 4 : 1;
+        for (u32 mode = 0; mode < modes; ++mode) {
+            u32 words[12] = {0}, count = 0;
+            words[count++] = 0xe1000000 | (mode << 5);
+            words[count++] = (opcode << 24) | 0x00e08040;
+            words[count++] = line_xy[0];
+            if (opcode & 8) {
+                if (opcode & 16)
+                    words[count++] = 0x0020d0f0;
+                words[count++] = line_xy[1];
+                if (opcode & 16)
+                    words[count++] = 0x00f020c0;
+                words[count++] = line_xy[2];
+                words[count++] = 0x50005000;
+            } else {
+                if (opcode & 16)
+                    words[count++] = 0x0020d0f0;
+                words[count++] = line_xy[2];
+            }
+            if (fixture(device, renderer, builder, words, count, 32, 32, 0)) {
+                fprintf(stderr, "Primitive opcode 0x%02x mode %u GPU fixture failed\n", opcode,
+                        mode);
+                return 1;
+            }
+            if (!hm_probe_reference_has_drawn_pixel(32, 32)) {
+                fprintf(stderr, "Primitive opcode 0x%02x mode %u drew no CPU pixels\n", opcode,
+                        mode);
+                return 1;
+            }
+        }
+    }
+    for (u32 opcode = 0x60; opcode <= 0x7f; ++opcode) {
+        int textured = (opcode & 4) != 0, semi = (opcode & 2) != 0;
+        u32 depths = textured ? 3 : 1, modes = textured || semi ? 4 : 1;
+        for (u32 depth = 0; depth < depths; ++depth)
+            for (u32 mode = 0; mode < modes; ++mode) {
+                u32 words[8] = {0}, count = 0;
+                u32 size = (opcode >> 3) & 3;
+                u32 page = 26u | (depth << 7) | (mode << 5);
+                words[count++] = 0xe1000000 | page;
+                words[count++] = (opcode << 24) | 0x00e08040;
+                words[count++] = 0x00020002;
+                if (textured)
+                    words[count++] = (clut << 16) | 0x00000104;
+                if (size == 0)
+                    words[count++] = 7 | (6 << 16);
+                if (fixture(device, renderer, builder, words, count, 32, 32, 0)) {
+                    fprintf(stderr, "Primitive opcode 0x%02x depth %u mode %u GPU fixture failed\n",
+                            opcode, depth, mode);
+                    return 1;
+                }
+                if (!hm_probe_reference_has_drawn_pixel(32, 32)) {
+                    fprintf(stderr, "Primitive opcode 0x%02x depth %u mode %u drew no CPU pixels\n",
+                            opcode, depth, mode);
+                    return 1;
+                }
+            }
+    }
+    puts("Primitive opcode sweep: every polygon, line and rectangle encoding matched CPU readback.");
+    return 0;
+}
 static int hm_probe_dynamic_scene(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
                                   hm_gpu_scene *builder) {
     const u32 primitive_count = HM_SCENE_INITIAL_PRIMITIVES + 1;
@@ -882,6 +986,14 @@ int main(int argc, char **argv) {
         SDL_Quit();
         return 0;
     }
+    if (argc > 2 && !SDL_strcmp(argv[2], "--opcode-sweep")) {
+        CHECK(builder && !hm_probe_primitive_opcode_sweep(device, renderer, builder));
+        hm_gpu_scene_destroy(builder);
+        hm_gpu_renderer_destroy(renderer);
+        SDL_DestroyGPUDevice(device);
+        SDL_Quit();
+        return 0;
+    }
 #ifdef HM_INTERPOLATION_REFERENCE
     if (argc > 2 && !SDL_strcmp(argv[2], "--tile-seams")) {
         CHECK(builder && !hm_probe_tile_seams(device, renderer, builder) &&
@@ -898,6 +1010,7 @@ int main(int argc, char **argv) {
     CHECK(!hm_probe_texture_feedback(device, renderer, builder));
     CHECK(!hm_probe_vram_transfers(device, renderer, builder));
     CHECK(!hm_probe_dynamic_scene(device, renderer, builder));
+    CHECK(!hm_probe_primitive_opcode_sweep(device, renderer, builder));
     u32 shapes[] = {0x200000ff, xy(1, 1),   xy(26, 4), xy(5, 26),  0x300000ff,
                     xy(3, 3),   0x0000ff00, xy(29, 7), 0x00ff0000, xy(8, 29),
                     0x2800ff00, xy(2, 2),   xy(12, 3), xy(3, 13),  xy(13, 14)};

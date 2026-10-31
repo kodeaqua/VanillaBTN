@@ -104,7 +104,9 @@ static hm_gpu_scene *hm_gpu_commands;
 static hm_frame_replay *hm_gpu_replay;
 static hm_gpu_scene_data hm_gpu_cached;
 static u64 hm_gpu_cached_serial;
-static int hm_gpu_fallback_reported;
+enum { HM_GPU_COVERAGE_REPORT_FRAMES = 600 };
+static u32 hm_gpu_coverage_frames, hm_gpu_coverage_successes, hm_gpu_coverage_fallbacks;
+static char hm_gpu_coverage_last_reason[160] = "none";
 #endif
 
 #if defined(HMBTN_ENH_FILTERING) || defined(HMBTN_ENH_WIDESCREEN)
@@ -256,37 +258,6 @@ static int hm_host_wide_active(void) {
     return 0;
 #endif
 }
-static int hm_host_needs_replay(void) {
-#ifdef __ANDROID__
-    int needed = 0;
-#else
-    /* GPU Auto attempts the shared scene renderer on every desktop frame,
-     * including native-resolution output. Unsupported scenes still fall back
-     * to the software reference in hm_host_gpu_present. */
-    int needed = 1;
-#endif
-#ifdef HMBTN_ENH_PAUSE_MENU
-#ifdef HMBTN_ENH_SCALING
-    needed |= hm_options.scaling != 0;
-#endif
-#ifdef HMBTN_ENH_WIDESCREEN
-    needed |= hm_host_wide_active() != 0;
-#endif
-#ifdef HMBTN_ENH_INTERPOLATION
-    needed |= hm_options.interpolation != 0;
-#endif
-#ifdef HM_HOST_AA
-    needed |= hm_options.antialiasing >= HM_AA_MSAA2;
-#endif
-#ifdef HMBTN_ENH_PGXP
-    needed |= hm_options.pgxp != 0;
-#endif
-#ifdef HMBTN_ENH_FILTERING
-    needed |= hm_options.linear == 2;
-#endif
-#endif
-    return needed;
-}
 #if defined(HMBTN_ENH_SCALING) && defined(HMBTN_ENH_PAUSE_MENU)
 static void hm_host_output_size(int *w, int *h) {
     if (hm_host_wide_active())
@@ -349,23 +320,45 @@ static int hm_host_submit(u32 image_width, u32 image_height, int linear, int wid
 }
 
 #ifdef HMBTN_GPU_RASTER
-static int hm_host_gpu_present(const RECT *native_area) {
-    if (!hm_gpu_output || !hm_gpu_commands || native_area->w <= 0 || native_area->h <= 0)
-        return 0;
-#ifdef HMBTN_ENH_PAUSE_MENU
-    int need_gpu = hm_host_needs_replay();
+static void hm_host_gpu_coverage_record(int success, const char *reason) {
+    ++hm_gpu_coverage_frames;
+    if (success) {
+        ++hm_gpu_coverage_successes;
+    } else {
+        ++hm_gpu_coverage_fallbacks;
+        if (reason && *reason)
+            SDL_snprintf(hm_gpu_coverage_last_reason, sizeof(hm_gpu_coverage_last_reason), "%s",
+                         reason);
+    }
+    if (hm_gpu_coverage_frames < HM_GPU_COVERAGE_REPORT_FRAMES)
+        return;
+    double percent = hm_gpu_coverage_frames
+                         ? (100.0 * (double)hm_gpu_coverage_successes / hm_gpu_coverage_frames)
+                         : 0.0;
 #ifdef __ANDROID__
-    /* On mobile TBDR GPUs (e.g. Adreno 610), the 1.5 MB ByteAddressBuffer compute
-     * shader has no L2 SSBO cache and causes heavy ~40-60 ms stalls.
-     * Hardware texture scanout path delivers rock-solid 60 FPS (<5 ms) with hardware
-     * bilinear filtering and 16:9 widescreen. */
-    need_gpu = hm_options.scaling != 0 || hm_options.linear == 2
-#ifdef HM_HOST_AA
-               || hm_options.antialiasing >= HM_AA_MSAA2
+    __android_log_print(ANDROID_LOG_INFO, "VanillaBTN",
+                        "GPU scene coverage: %u/%u frames (%.1f%%), %u fallback; last: %s",
+                        hm_gpu_coverage_successes, hm_gpu_coverage_frames, percent,
+                        hm_gpu_coverage_fallbacks, hm_gpu_coverage_last_reason);
+#else
+    SDL_Log("GPU scene coverage: %u/%u frames (%.1f%%), %u fallback; last: %s",
+            hm_gpu_coverage_successes, hm_gpu_coverage_frames, percent,
+            hm_gpu_coverage_fallbacks, hm_gpu_coverage_last_reason);
 #endif
-        ;
-#endif
-    if (hm_options.renderer || !need_gpu) {
+    hm_gpu_coverage_frames = 0;
+    hm_gpu_coverage_successes = 0;
+    hm_gpu_coverage_fallbacks = 0;
+    SDL_strlcpy(hm_gpu_coverage_last_reason, "none", sizeof(hm_gpu_coverage_last_reason));
+}
+static int hm_host_gpu_present(const RECT *native_area) {
+    if (!hm_gpu_output || !hm_gpu_commands || native_area->w <= 0 || native_area->h <= 0) {
+        hm_host_gpu_coverage_record(0, "GPU renderer or display area unavailable");
+        return 0;
+    }
+#ifdef HMBTN_ENH_PAUSE_MENU
+    /* GPU Auto submits every captured scene on desktop and Android. The
+     * explicit Software mode and per-frame CPU fallback remain available. */
+    if (hm_options.renderer) {
         hm_frame_replay_release(hm_gpu_replay);
         hm_gpu_replay = NULL;
         hm_gpu_cached_serial = 0;
@@ -375,8 +368,10 @@ static int hm_host_gpu_present(const RECT *native_area) {
     if (!hm_gpu_replay) {
         hm_gpu_replay = hm_frame_replay_acquire();
         hm_gpu_cached_serial = 0;
-        if (!hm_gpu_replay)
+        if (!hm_gpu_replay) {
+            hm_host_gpu_coverage_record(0, "frame replay allocation or observer registration failed");
             return 0;
+        }
     }
     /* Diagnostic capture deliberately uses the software reference. */
     if (SDL_getenv("HMBTN_CAPTURE_FRAME"))
@@ -389,8 +384,10 @@ static int hm_host_gpu_present(const RECT *native_area) {
 #if defined(HMBTN_ENH_SCALING) && defined(HMBTN_ENH_PAUSE_MENU)
     if (hm_options.scaling) {
         int w, h;
-        if (!SDL_GetWindowSizeInPixels(hm_window, &w, &h) || w <= 0 || h <= 0)
+        if (!SDL_GetWindowSizeInPixels(hm_window, &w, &h) || w <= 0 || h <= 0) {
+            hm_host_gpu_coverage_record(0, "GPU output size unavailable");
             return 0;
+        }
         hm_host_output_size(&w, &h);
 #ifdef __ANDROID__
         /* Cap internal scaling on Android to 720p (ADR-105),
@@ -407,6 +404,7 @@ static int hm_host_gpu_present(const RECT *native_area) {
 #endif
         if (w > 4096 || h > 4096) {
             hm_host_scaling_unavailable();
+            hm_host_gpu_coverage_record(0, "GPU output exceeds 4096 pixels per axis");
             return 0;
         }
         width = (u32)w;
@@ -454,10 +452,9 @@ static int hm_host_gpu_present(const RECT *native_area) {
             hm_gpu_scene_materialize_vram(hm_gpu_commands, 0);
         }
         if (!hm_gpu_scene_end(hm_gpu_commands, previous, &hm_gpu_cached) || !replayed) {
-            if (serial && !hm_gpu_fallback_reported) {
-                fprintf(stderr, "GPU scene fallback: %s\n", hm_gpu_scene_fallback(hm_gpu_commands));
-                hm_gpu_fallback_reported = 1;
-            }
+            hm_host_gpu_coverage_record(
+                0, serial ? hm_gpu_scene_fallback(hm_gpu_commands)
+                          : "no complete captured scene (loading, bypass, or invalidated frame)");
             return 0;
         }
         hm_gpu_cached_serial = cache_serial;
@@ -475,6 +472,7 @@ static int hm_host_gpu_present(const RECT *native_area) {
     if (!swapchain) {
         SDL_CancelGPUCommandBuffer(command);
         hm_gpu_cached_serial = 0;
+        hm_host_gpu_coverage_record(0, "GPU swapchain temporarily unavailable");
         return -1;
     }
     SDL_GPUTexture *image = hm_gpu_renderer_encode(hm_gpu_output, command, &hm_gpu_cached);
@@ -483,10 +481,7 @@ static int hm_host_gpu_present(const RECT *native_area) {
         /* The scene was cached before encode. A failed encode must not make a
          * later attempt look like a successfully presented frame. */
         hm_gpu_cached_serial = 0;
-        if (!hm_gpu_fallback_reported) {
-            fprintf(stderr, "GPU output unavailable; using software rendering\n");
-            hm_gpu_fallback_reported = 1;
-        }
+        hm_host_gpu_coverage_record(0, SDL_GetError());
         return 0;
     }
     int linear = 0;
@@ -497,6 +492,7 @@ static int hm_host_gpu_present(const RECT *native_area) {
                  hm_host_wide_active());
     if (!SDL_SubmitGPUCommandBuffer(command))
         hm_host_fail();
+    hm_host_gpu_coverage_record(1, NULL);
     return 1;
 }
 #endif
@@ -1797,7 +1793,7 @@ int hm_game_host_start(hm_disc *disc) {
     hm_gpu_output = hm_gpu_renderer_create(hm_device);
     if (hm_gpu_output) {
         hm_gpu_commands = hm_gpu_scene_create();
-        if (hm_host_needs_replay() && !hm_options.renderer)
+        if (!hm_options.renderer)
             hm_gpu_replay = hm_frame_replay_acquire();
     }
     if (!hm_gpu_output || !hm_gpu_commands) {
@@ -1866,7 +1862,6 @@ void hm_game_host_stop(void) {
     hm_gpu_commands = NULL;
     hm_gpu_cached = (hm_gpu_scene_data){0};
     hm_gpu_cached_serial = 0;
-    hm_gpu_fallback_reported = 0;
 #endif
     hm_audio_output_stop();
     if (hm_device) {

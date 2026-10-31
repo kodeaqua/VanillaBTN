@@ -549,9 +549,13 @@ sprite movement is tested across a logical tile boundary. Native CPU VRAM
 remains authoritative, and normal output has no GPU readback/fence wait.
 
 The no-window probe also checks 2048 deterministic random primitives against
-CPU. Inline transfers, source feedback, offscreen dependencies, capacity limits
-and unsupported shader formats retain software output. Real gameplay/device
-coverage is not complete. Own HLSL and generated arrays are hash-checked; DXC
+CPU. GP0 fill, upload and VRAM-copy transfers are ordered scene records;
+texture feedback after an earlier scene write is materialized through the CPU
+reference and then sampled from an immutable GPU VRAM version. Direct VRAM
+mutations outside a captured command stream, missing captures, malformed work,
+and unavailable resources still retain software output. Android GPU Auto now
+attempts each captured frame after ADR-151; performance and complete gameplay
+coverage remain unverified. Own HLSL and generated arrays are hash-checked; DXC
 is a pinned ignored developer tool, not a runtime dependency. Source game files
 and matching guards remain unchanged. See ADR-054 and THIRD_PARTY.md.
 

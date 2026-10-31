@@ -43,8 +43,12 @@ Android GPU device creation was checked on one tablet; scene rendering,
 lifecycle behavior, other devices, and gameplay remain unverified.
 
 GPU Auto shares scene output at native and enhanced resolutions, with Software
-as the reference and CPU fallback for unsupported work. Coverage is partial;
-do not claim complete GPU offload or full-playthrough parity. The owner
+as the reference and CPU fallback for unsupported work. It now attempts every
+captured Android frame as well as desktop frames; 600-frame reports expose scene
+compute successes and fallbacks. GP0 polygon/line/rectangle encodings, clears,
+loads, copies and mask behavior have synthetic coverage, but direct/missing
+captures, resource/device failures and untested game scenes remain CPU paths.
+Do not claim complete gameplay offload or full-playthrough parity. The owner
 confirmed that the reported horizontal line disappeared in one farm scene with
 Modern, Scaling On, Widescreen Off, MSAA 4x, Nearest, Interpolation Off, VSync
 On, and unlimited FPS. Other scenes/devices and performance remain unverified.
@@ -279,9 +283,13 @@ output benefit. They are not gameplay FPS or a port-overhead guarantee. ADR-138
 makes desktop GPU Auto attempt every frame. ADR-147 removes fixed scene/bin
 capacity fallbacks and supports ordered GP0 clear/upload and texture-feedback
 dependencies. Invalid/unrecorded work and device/resource failures retain the
-software fallback. Native CPU VRAM compatibility remains authoritative. Android
-keeps the selective GPU policy from ADR-132. Owner gameplay/device coverage
-remains unverified.
+software fallback. Native CPU VRAM compatibility remains authoritative. ADR-151
+supersedes ADR-132's Android selection gate: GPU Auto now attempts every
+captured Android frame, with Software and CPU fallback retained. The connected
+G100 has only passed device creation so far; scene rendering, performance and
+owner gameplay/device coverage remain unverified. The prior Adreno 610-class
+compute submit measured 42.57 ms, so this owner-requested policy may need further
+performance work on mobile hardware.
 
 ### Optional texture filtering (2026-10-26)
 
