@@ -146,13 +146,14 @@ static void hm_gpu_rectangle(const u32 *words, u32 opcode, u32 width, u32 height
 
 static u32 hm_gpu_command(const u32 *words, u32 available) {
     u32 opcode = words[0] >> 24;
+    u32 transfer = opcode & 0xe0u;
     if (opcode == 0 || opcode == 1)
         return 1; /* NOP / cache invalidate: direct VRAM reads have no stale cache. */
     if (opcode >= 0xE1 && opcode <= 0xE6) {
         hm_gpu_environment_command(words[0]);
         return 1;
     }
-    if (opcode == 0xA0 || opcode == 2) {
+    if (transfer == 0xa0u || opcode == 2) {
         if (available < 3)
             return available;
         RECT area = {(s16)words[1], (s16)(words[1] >> 16), (s16)words[2], (s16)(words[2] >> 16)};
@@ -173,7 +174,7 @@ static u32 hm_gpu_command(const u32 *words, u32 available) {
         hm_render_transfer_command_end();
         return length;
     }
-    if (opcode == 0x80) {
+    if (transfer == 0x80u) {
         if (available < 4)
             return available;
         RECT source = {(s16)(words[1] & 1023u), (s16)((words[1] >> 16) & 511u),

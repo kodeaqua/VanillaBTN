@@ -413,6 +413,7 @@ static void hm_software_command(void *context, const u32 *w, u32 available, int 
     if (!s->begun || !available)
         return;
     u32 op = w[0] >> 24;
+    u32 transfer = op & 0xe0u;
     if (!after) {
         if (op >= 0x20 && op <= 0x3f)
             hm_software_polygon(s, w, available);
@@ -420,23 +421,38 @@ static void hm_software_command(void *context, const u32 *w, u32 available, int 
             hm_software_rectangle(s, w, available);
         else if (op >= 0x40 && op <= 0x5f)
             hm_software_line(s, w, available);
-    } else if ((op == 2 || op == 0xa0) && available >= 3) {
-        int rx = (s16)w[1], ry = (s16)(w[1] >> 16), rw = (s16)w[2], rh = (s16)(w[2] >> 16);
-        if (op == 0xa0) {
+    } else if ((op == 2 || transfer == 0xa0u || transfer == 0x80u) &&
+               available >= (transfer == 0x80u ? 4u : 3u)) {
+        int rx, ry;
+        u32 rw, rh;
+        if (transfer == 0x80u) {
+            rx = (int)(w[2] & 1023u);
+            ry = (int)((w[2] >> 16) & 511u);
+            rw = w[3] & 1023u;
+            rh = (w[3] >> 16) & 511u;
+            rw = rw ? rw : 1024u;
+            rh = rh ? rh : 512u;
+        } else {
+            rx = (s16)w[1];
+            ry = (s16)(w[1] >> 16);
+            rw = (u16)w[2];
+            rh = (u16)(w[2] >> 16);
+        }
+        if (transfer == 0xa0u) {
             rx &= 1023;
             ry &= 511;
-            rw = (((u32)rw - 1) & 1023) + 1;
-            rh = (((u32)rh - 1) & 511) + 1;
-        } else {
+            rw = ((rw - 1) & 1023u) + 1u;
+            rh = ((rh - 1) & 511u) + 1u;
+        } else if (op == 2) {
             rx &= 0x3f0;
             ry &= 511;
-            rw = (((u32)rw & 1023) + 15) & ~15u;
-            rh &= 511;
+            rw = ((rw & 1023u) + 15u) & ~15u;
+            rh &= 511u;
         }
         for (u32 y = 0; y < s->height; ++y)
             for (u32 x = 0; x < s->width; ++x) {
                 int lx = hm_software_logical_x(s, (int)x), ly = hm_software_logical_y(s, (int)y);
-                if ((((u32)(lx - rx)) & 1023) < (u32)rw && (((u32)(ly - ry)) & 511) < (u32)rh)
+                if ((((u32)(lx - rx)) & 1023u) < rw && (((u32)(ly - ry)) & 511u) < rh)
                     s->pixels[(size_t)y * s->width + x] = hm_vram_pixel((u32)lx, (u32)ly);
             }
     }

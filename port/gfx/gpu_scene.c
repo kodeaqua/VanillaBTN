@@ -838,10 +838,11 @@ static void hm_scene_command(void *context, const u32 *w, u32 available, int aft
     hm_gpu_scene *s = context;
     if (!s->begun || s->failure || !available)
         return;
-    u32 op = w[0] >> 24;
-    if (op == 2 || op == 0x80 || op == 0xa0) {
+    u32 op = w[0] >> 24, transfer = op & 0xe0u;
+    int copy = transfer == 0x80u, upload = transfer == 0xa0u;
+    if (op == 2 || copy || upload) {
         if (after) {
-            if (op == 0xa0 && s->pending_transfer_count) {
+            if (upload && s->pending_transfer_count) {
                 u32 layer = hm_scene_snapshot(s, !s->pending_transfer_requires_materialization);
                 for (u32 i = 0; i < s->pending_transfer_count; ++i)
                     s->primitives[s->pending_transfer_indices[i]][40] = layer;
@@ -850,7 +851,7 @@ static void hm_scene_command(void *context, const u32 *w, u32 available, int aft
             s->pending_transfer_requires_materialization = 0;
             return;
         }
-        u32 header_words = op == 0x80 ? 4u : 3u;
+        u32 header_words = copy ? 4u : 3u;
         if (available < header_words) {
             s->failure = "truncated VRAM transfer";
             return;
@@ -858,7 +859,7 @@ static void hm_scene_command(void *context, const u32 *w, u32 available, int aft
         u32 x = w[1] & 1023u, y = (w[1] >> 16) & 511u;
         u32 width, height;
         u32 source_x = 0, source_y = 0, source_layer = 0;
-        if (op == 0x80) {
+        if (copy) {
             source_x = x;
             source_y = y;
             x = w[2] & 1023u;
@@ -873,7 +874,7 @@ static void hm_scene_command(void *context, const u32 *w, u32 available, int aft
                     s->needs_materialization = 1;
                 source_layer = hm_scene_snapshot(s, s->materialize_vram);
             }
-        } else if (op == 0xa0) {
+        } else if (upload) {
             width = (((w[2] & 0xffffu) - 1) & 1023u) + 1;
             height = (((w[2] >> 16) - 1) & 511u) + 1;
             size_t payload_words = ((size_t)width * height + 1) / 2;
@@ -886,7 +887,7 @@ static void hm_scene_command(void *context, const u32 *w, u32 available, int aft
             width = ((w[2] & 1023u) + 15u) & ~15u;
             height = (w[2] >> 16) & 511u;
         }
-        if (op == 0xa0) {
+        if (upload) {
             s->pending_transfer_requires_materialization = !s->materialize_vram &&
                                                           hm_scene_has_writes(s);
             if (s->pending_transfer_requires_materialization)
@@ -895,7 +896,8 @@ static void hm_scene_command(void *context, const u32 *w, u32 available, int aft
         s->pending_transfer_count = 0;
         u32 color = ((w[0] & 255u) >> 3) | (((w[0] >> 8) & 255u) >> 3) << 5 |
                     (((w[0] >> 16) & 255u) >> 3) << 10;
-        hm_scene_transfer(s, op, color, x, y, width, height, source_x, source_y,
+        u32 canonical_op = copy ? 0x80u : upload ? 0xa0u : 2u;
+        hm_scene_transfer(s, canonical_op, color, x, y, width, height, source_x, source_y,
                           source_layer);
         return;
     }

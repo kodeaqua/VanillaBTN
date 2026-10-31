@@ -173,16 +173,18 @@ static void hm_capture_direct_command(void *context, const u32 *words, u32 count
     hm_frame_replay *s = context;
     if (!payload && s->capturing && count >= 3) {
         u32 opcode = words[0] >> 24;
-        if (opcode == 2 || opcode == 0x80 || opcode == 0xa0) {
+        u32 transfer = opcode & 0xe0u;
+        int copy = transfer == 0x80u, upload = transfer == 0xa0u;
+        if (opcode == 2 || copy || upload) {
             u32 x = 0, y = 0, width = 0, height = 0;
-            if (opcode == 0x80) {
+            if (copy) {
                 if (count >= 4) {
                     x = words[2] & 1023u;
                     y = (words[2] >> 16) & 511u;
                     width = (((words[3] & 0xffffu) - 1u) & 1023u) + 1u;
                     height = (((words[3] >> 16) - 1u) & 511u) + 1u;
                 }
-            } else if (opcode == 0xa0) {
+            } else if (upload) {
                 x = words[1] & 1023u;
                 y = (words[1] >> 16) & 511u;
                 width = (((words[2] & 0xffffu) - 1u) & 1023u) + 1u;

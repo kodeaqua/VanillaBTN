@@ -42,6 +42,20 @@ static int scene_accepts(hm_gpu_scene *scene, const u32 *words, u32 count, u32 *
         *primitive_count = data.words[10];
     return 1;
 }
+static int scene_accepts_transfer(hm_gpu_scene *scene, const u32 *words, u32 count,
+                                  u32 expected_opcode) {
+    RECT area = {0, 0, 32, 32};
+    hm_gpu_scene_data data;
+    hm_replay_sink previous = hm_gpu_scene_begin(scene, 32, 32);
+    hm_replay_begin(&area);
+    hm_gpu_execute_words(words, count);
+    if (!hm_gpu_scene_end(scene, previous, &data)) {
+        fprintf(stderr, "GPU scene rejected transfer opcode 0x%02x: %s\n", words[0] >> 24,
+                hm_gpu_scene_fallback(scene));
+        return 0;
+    }
+    return data.words[10] == 1 && data.words[data.words[8] + 1] == expected_opcode;
+}
 int main(void) {
     hm_gpu_scene *s = hm_gpu_scene_create();
     CHECK(s);
@@ -118,6 +132,16 @@ int main(void) {
         u32 nop = opcode << 24, primitive_count = UINT32_MAX;
         CHECK(scene_accepts(s, &nop, 1, &primitive_count));
         CHECK(primitive_count == 0);
+    }
+    for (u32 opcode = 0x80; opcode <= 0x9f; ++opcode) {
+        const u32 copy_alias[] = {opcode << 24, 0x00020002, 0x00060006,
+                                  1u | (1u << 16)};
+        CHECK(scene_accepts_transfer(s, copy_alias, 4, 0x80));
+    }
+    for (u32 opcode = 0xa0; opcode <= 0xbf; ++opcode) {
+        const u32 upload_alias[] = {opcode << 24, 0x00060006, 1u | (1u << 16),
+                                    0x00004d2b};
+        CHECK(scene_accepts_transfer(s, upload_alias, 4, 0xa0));
     }
     u32 unknown = 0xf0000000;
     RECT unknown_area = {0, 0, 32, 32};

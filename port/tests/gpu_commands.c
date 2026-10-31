@@ -221,5 +221,22 @@ int main(void) {
     hm_gpu_execute_words(set_mask_load, 5);
     CHECK(hm_vram_pixel(62, 50) == 0x9234);
     CHECK(hm_vram_pixel(63, 50) == 0xc567);
+
+    /* GP0 memory-transfer commands ignore the low five opcode bits. */
+    for (u32 opcode = 0x80; opcode <= 0x9f; ++opcode) {
+        hm_vram_reset();
+        hm_vram_draw_pixel(7, 9, 0x4d2b);
+        const u32 copy_alias[] = {opcode << 24, 7u | (9u << 16), 20u | (30u << 16),
+                                  1u | (1u << 16)};
+        hm_gpu_execute_words(copy_alias, 4);
+        CHECK(hm_vram_pixel(20, 30) == 0x4d2b);
+    }
+    for (u32 opcode = 0xa0; opcode <= 0xbf; ++opcode) {
+        hm_vram_reset();
+        const u32 upload_alias[] = {opcode << 24, 20u | (30u << 16), 1u | (1u << 16),
+                                    0x00004d2b};
+        hm_gpu_execute_words(upload_alias, 4);
+        CHECK(hm_vram_pixel(20, 30) == 0x4d2b);
+    }
     return 0;
 }

@@ -12,6 +12,9 @@ recorded as ordered GP0 transfers while a frame is captured. A native
 `DrawOTag` call without the normal frame wrapper creates its own bypass capture,
 covering the loading screen. The scene unit test sweeps every polygon, line and
 rectangle opcode encoding plus documented non-rendering GP0 NOP mirrors. The
+CPU command and scene tests sweep every opcode alias in the `0x80..0x9F` copy
+and `0xA0..0xBF` upload families; the offscreen GPU probe also renders
+noncanonical aliases and compares them with CPU output. The
 frame replay tests also cover capture streams larger than the previous
 65,536-word and 64-group limits. The GPU probe
 then renders all 96 primitive encodings with nondegenerate geometry and checks
@@ -89,8 +92,13 @@ The current source replaces repeated full-image snapshot scans in the private
 materialization replay with 16x16 dirty-tile fingerprints. It hashes only the
 materializing replay and still verifies matching fingerprints with an exact
 full-image comparison. Windows Release rebuilt with all 124 tests passing; the
-updated Android APK is built but has not yet been run on the G100. No post-change
-gameplay performance claim is established.
+updated Android APK is built but has not yet been run on the G100. Package
+manager reports that the APK currently open on the tablet was installed at
+08:17, before the current source build. Its 08:31 log still shows 133-148 ms
+materialization and 86-93 ms average presents, so those values do not measure
+the snapshot change. The ROM rejects `simpleperf` events (`cpu-cycles`,
+`cpu-clock`, and `task-clock`), preventing a function-level profile. No
+post-change gameplay performance claim is established.
 
 The probe's `--farm-benchmark` option renders 8,192 fixed 8x8 rectangles at
 320x240 and 960x720, with a fresh builder and an explicit GPU fence per frame.

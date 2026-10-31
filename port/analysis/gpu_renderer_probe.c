@@ -483,11 +483,11 @@ static void hm_probe_copy_seed(void) {
 static int hm_probe_vram_transfers(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
                                    hm_gpu_scene *builder) {
     const u32 commands[] = {
-        0x80000000, xy(1022, 510), xy(8, 8), xy(4, 4),
-        0xe6000001, 0x80000000, xy(8, 8), xy(10, 8), xy(4, 4),
-        0xe6000002, 0x80000000, xy(8, 8), xy(12, 8), xy(4, 4),
-        0xa0000000, xy(16, 8), xy(2, 1), 0x45671234,
-        0xe6000001, 0xa0000000, xy(18, 8), xy(2, 1), 0x45671234};
+        0x9f000000, xy(1022, 510), xy(8, 8), xy(4, 4),
+        0xe6000001, 0x8a000000, xy(8, 8), xy(10, 8), xy(4, 4),
+        0xe6000002, 0x81000000, xy(8, 8), xy(12, 8), xy(4, 4),
+        0xbf000000, xy(16, 8), xy(2, 1), 0x45671234,
+        0xe6000001, 0xa5000000, xy(18, 8), xy(2, 1), 0x45671234};
     hm_probe_copy_seed();
     RECT area = {0, 0, 32, 32};
     hm_replay_sink previous = hm_gpu_scene_begin(builder, 32, 32);
