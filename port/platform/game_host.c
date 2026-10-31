@@ -374,8 +374,10 @@ static int hm_host_gpu_present(const RECT *native_area) {
         }
     }
     /* Diagnostic capture deliberately uses the software reference. */
-    if (SDL_getenv("HMBTN_CAPTURE_FRAME"))
+    if (SDL_getenv("HMBTN_CAPTURE_FRAME")) {
+        hm_host_gpu_coverage_record(0, "diagnostic software frame capture requested");
         return 0;
+    }
     RECT output_area = *native_area;
 #ifdef HMBTN_ENH_WIDESCREEN
     output_area = hm_widescreen_area(output_area);
@@ -452,8 +454,11 @@ static int hm_host_gpu_present(const RECT *native_area) {
             hm_gpu_scene_materialize_vram(hm_gpu_commands, 0);
         }
         if (!hm_gpu_scene_end(hm_gpu_commands, previous, &hm_gpu_cached) || !replayed) {
+            const char *reason = serial
+                                     ? hm_gpu_scene_fallback(hm_gpu_commands)
+                                     : hm_frame_replay_failure(hm_gpu_replay);
             hm_host_gpu_coverage_record(
-                0, serial ? hm_gpu_scene_fallback(hm_gpu_commands)
+                0, reason ? reason
                           : "no complete captured scene (loading, bypass, or invalidated frame)");
             return 0;
         }

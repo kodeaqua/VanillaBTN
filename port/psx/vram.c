@@ -100,6 +100,21 @@ s32 LoadImage(const RECT *area, const u32 *pixels) {
     hm_vram_area(area, pixels, "LoadImage");
     u32 width = (((u32)area->w - 1) & 1023) + 1;
     u32 height = (((u32)area->h - 1) & 511) + 1;
+    u32 header[] = {0xa0000000u,
+                    (u16)area->x | ((u32)(u16)area->y << 16),
+                    (u16)area->w | ((u32)(u16)area->h << 16)};
+    int capture = hm_vram_is_native() && hm_render_direct_transfer_begin();
+    if (capture) {
+        hm_render_direct_transfer_command(header, 3, 0);
+        u32 pixel_count = width * height;
+        u32 full_words = pixel_count / 2;
+        if (full_words)
+            hm_render_direct_transfer_command(pixels, full_words, 1);
+        if (pixel_count & 1) {
+            u32 last_pixel = ((const u16 *)pixels)[pixel_count - 1];
+            hm_render_direct_transfer_command(&last_pixel, 1, 1);
+        }
+    }
     hm_vram_transfer((u32)area->x, (u32)area->y, width, height);
     const u8 *in = (const u8 *)pixels;
     for (u32 y = 0; y < height; ++y)
@@ -108,6 +123,7 @@ s32 LoadImage(const RECT *area, const u32 *pixels) {
             hm_vram_put((u32)area->x + x, (u32)area->y + y, value, 1);
             in += 2;
         }
+    hm_render_direct_transfer_end(capture);
     return 0;
 }
 
@@ -135,11 +151,18 @@ s32 ClearImage(const RECT *area, u8 r, u8 g, u8 b) {
     u32 y0 = (u32)area->y & 511;
     u32 width = (((u32)area->w & 1023) + 15) & ~15u;
     u32 height = (u32)area->h & 511;
+    u32 command[] = {0x02000000u | r | ((u32)g << 8) | ((u32)b << 16),
+                     (u16)area->x | ((u32)(u16)area->y << 16),
+                     (u16)area->w | ((u32)(u16)area->h << 16)};
+    int capture = hm_vram_is_native() && hm_render_direct_transfer_begin();
+    if (capture)
+        hm_render_direct_transfer_command(command, 3, 0);
     hm_vram_transfer(x0, y0, width, height);
     u16 color = (u16)((r >> 3) | ((g >> 3) << 5) | ((b >> 3) << 10));
     for (u32 y = 0; y < height; ++y)
         for (u32 x = 0; x < width; ++x)
             hm_vram_put(x0 + x, y0 + y, color, 0);
+    hm_render_direct_transfer_end(capture);
     return 0;
 }
 
@@ -156,6 +179,13 @@ s32 MoveImage(const RECT *area, s32 x, s32 y) {
     u32 dx = (u32)x & 1023, dy = (u32)y & 511;
     u32 width = (((u32)area->w - 1) & 1023) + 1;
     u32 height = (((u32)area->h - 1) & 511) + 1;
+    u32 command[] = {0x80000000u,
+                     sx | (sy << 16),
+                     dx | (dy << 16),
+                     (u16)area->w | ((u32)(u16)area->h << 16)};
+    int capture = hm_vram_is_native() && hm_render_direct_transfer_begin();
+    if (capture)
+        hm_render_direct_transfer_command(command, 4, 0);
     int overlap_x = ((dx - sx) & 1023) < width || ((sx - dx) & 1023) < width;
     int overlap_y = ((dy - sy) & 511) < height || ((sy - dy) & 511) < height;
     int overlap = overlap_x && overlap_y;
@@ -172,6 +202,7 @@ s32 MoveImage(const RECT *area, s32 x, s32 y) {
                         overlap ? hm_move_image_scratch[row * width + column]
                                 : hm_vram_pixel(sx + column, sy + row),
                         1);
+    hm_render_direct_transfer_end(capture);
     return 0;
 }
 

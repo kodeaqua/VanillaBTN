@@ -103,7 +103,7 @@ int main(void) {
         CHECK(scene_accepts(s, packet, count, &primitive_count));
         CHECK(primitive_count == 1);
     }
-    const u8 no_output_opcodes[] = {0x00, 0x01, 0x1f, 0xe0};
+    const u8 no_output_opcodes[] = {0x00, 0x01, 0x03, 0x1f, 0xc0, 0xdf, 0xe0};
     for (size_t i = 0; i < sizeof(no_output_opcodes); ++i) {
         u32 nop = (u32)no_output_opcodes[i] << 24, primitive_count = UINT32_MAX;
         CHECK(scene_accepts(s, &nop, 1, &primitive_count));
@@ -119,7 +119,7 @@ int main(void) {
         CHECK(scene_accepts(s, &nop, 1, &primitive_count));
         CHECK(primitive_count == 0);
     }
-    u32 unknown = 0x03000000;
+    u32 unknown = 0xf0000000;
     RECT unknown_area = {0, 0, 32, 32};
     hm_replay_sink previous = hm_gpu_scene_begin(s, 32, 32);
     hm_replay_begin(&unknown_area);
@@ -187,12 +187,30 @@ int main(void) {
     hm_render_packet(captured_fill, 3);
     hm_render_end();
     CHECK(hm_frame_replay_serial(b, &live));
+    u32 transfer_pixels[] = {0x00005678};
+    RECT direct_load = {1, 1, 1, 1}, direct_move = {1, 1, 1, 1};
     RECT direct_clear = {0, 0, 16, 16};
     hm_render_begin(&live);
+    CHECK(LoadImage(&direct_load, transfer_pixels) == 0);
+    CHECK(MoveImage(&direct_move, 3, 3) == 0);
     ClearImage(&direct_clear, 0, 255, 0);
     hm_render_packet(rectangle, 3);
     hm_render_end();
-    CHECK(!hm_frame_replay_serial(b, &live));
+    CHECK(hm_frame_replay_serial(b, &live));
+    previous = hm_gpu_scene_begin(s, 32, 32);
+    CHECK(hm_frame_replay_draw(b, &live));
+    CHECK(hm_gpu_scene_end(s, previous, &data));
+    int saw_load = 0, saw_move = 0, saw_clear = 0;
+    const u32 *direct_primitives = data.words + data.words[8];
+    for (u32 i = 0; i < data.words[10]; ++i) {
+        const u32 *primitive = direct_primitives + (size_t)i * HM_SCENE_STRIDE;
+        if (primitive[0] != 2)
+            continue;
+        saw_load |= primitive[1] == 0xa0;
+        saw_move |= primitive[1] == 0x80;
+        saw_clear |= primitive[1] == 2;
+    }
+    CHECK(saw_load && saw_move && saw_clear);
     hm_frame_replay_release(b);
     /* GPU geometry consumes only output: it must not run the CPU raster a second
      * time, while embedded polygon tpages still affect subsequent sprites. */

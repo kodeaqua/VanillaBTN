@@ -7,16 +7,22 @@ coverage. GPU Auto attempts shared GPU scene output for every captured desktop
 and Android frame, while Software remains the reference option. Captured
 render-producing GP0 commands are represented on the compute path: polygons,
 lines, rectangles, clear-image, load-image, VRAM-to-VRAM copies, and ordered
-VRAM feedback. The scene unit test sweeps every polygon, line and rectangle
-opcode encoding plus documented non-rendering GP0 NOP mirrors. The GPU probe
+VRAM feedback. Direct `LoadImage`, `ClearImage`, and `MoveImage` calls are
+recorded as ordered GP0 transfers while a frame is captured. A native
+`DrawOTag` call without the normal frame wrapper creates its own bypass capture,
+covering the loading screen. The scene unit test sweeps every polygon, line and
+rectangle opcode encoding plus documented non-rendering GP0 NOP mirrors. The
+frame replay tests also cover capture streams larger than the previous
+65,536-word and 64-group limits. The GPU probe
 then renders all 96 primitive encodings with nondegenerate geometry and checks
 GPU readback against CPU pixels, including applicable texture depths and
 semi-transparency modes. Each case is also checked to ensure the CPU reference
 actually changed at least one output pixel. Mask-set and
 mask-check behavior is preserved for load and VRAM-copy transfers. VRAM-to-CPU
 readback, IRQ requests, NOP/cache commands, and draw-environment state do not
-produce scene pixels. Malformed streams, missing/direct captures, reserved
-texture depth, and GPU resource/device failures still use the reference path.
+produce scene pixels. Malformed streams, raw VRAM changes outside an
+ordering-table capture, reserved texture depth, and GPU resource/device
+failures still use the reference path.
 Gameplay parity, device breadth, and frame-time budgets remain owner checks; see
 PLATFORMS.md and ENHANCEMENTS.md.
 
@@ -26,10 +32,12 @@ texture depths and blend modes, clear/load/copy ordering, wrapped and overlappin
 VRAM copies, mask-set/check transfers, VRAM texture feedback,
 high-density tile bins, scene payloads above the former fixed buffer size,
 clipping, filtering, interpolation, multisampling, and expanded presentation.
-It starts no game window and requires no disc. On 2026-10-31, the expanded probe
-and full primitive opcode sweep passed with SDL GPU's Vulkan and Direct3D 12
-drivers. This is technical coverage of synthetic scenes only; owner gameplay
-testing remains necessary. The isolated opcode sweep can also be run with
+It starts no game window and requires no disc. The probe includes CPU/GPU
+readback comparisons for captured direct VRAM API operations and an unwrapped
+`DrawOTag`. On 2026-10-31, the expanded probe and full primitive opcode sweep
+passed with SDL GPU's Vulkan and Direct3D 12 drivers. This is technical
+coverage of synthetic scenes only; owner gameplay testing remains necessary.
+The isolated opcode sweep can also be run with
 `hmbtn_gpu_renderer_probe.exe <vulkan|direct3d12> --opcode-sweep`.
 
 The core `gpu.vram` test also checks overlapping `MoveImage` copies, including

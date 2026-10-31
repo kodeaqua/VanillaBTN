@@ -4,7 +4,10 @@
 /* Offscreen, synthetic GPU readback. Never opens a window or starts the game. */
 #include "platform/gpu_present.h"
 #include "platform/gpu_renderer.h"
+#include "gfx/frame_events.h"
+#include "gfx/frame_replay.h"
 #include "psx/gpu_environment.h"
+#include "psx/gpu_links.h"
 #include "psx/gpu_raster.h"
 #include "psx/vram.h"
 #include "enhance/dithering/dithering.h"
@@ -564,6 +567,100 @@ static int hm_probe_vram_transfers(SDL_GPUDevice *device, hm_gpu_renderer *rende
     puts("GPU VRAM copy wrap/overlap and masked copy/load transfers match the CPU reference.");
     return 0;
 }
+static int hm_probe_direct_transfer_capture(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
+                                           hm_gpu_scene *builder) {
+    setup();
+    DISPENV display;
+    SetDefDispEnv(&display, 0, 0, 32, 32);
+    PutDispEnv(&display);
+    const u32 pixel[] = {0x00007c1f};
+    const u32 tile[] = {0x600000ff, xy(2, 2), xy(4, 4)};
+    RECT load = {20, 20, 1, 1}, move = {20, 20, 1, 1}, clear = {0, 0, 16, 16};
+    hm_frame_replay *replay = hm_frame_replay_acquire();
+    CHECK(replay);
+    hm_render_frame live = {.tick = 2};
+    hm_render_begin(&live);
+    CHECK(LoadImage(&load, pixel) == 0);
+    CHECK(MoveImage(&move, 30, 30) == 0);
+    CHECK(ClearImage(&clear, 0, 255, 0) == 0);
+    hm_gpu_execute_words(tile, SDL_arraysize(tile));
+    hm_render_packet(tile, SDL_arraysize(tile));
+    hm_render_end();
+    CHECK(hm_frame_replay_serial(replay, &live));
+    hm_replay_sink previous = hm_gpu_scene_begin(builder, 32, 32);
+    CHECK(hm_frame_replay_draw(replay, &live));
+    if (hm_gpu_scene_needs_materialization(builder)) {
+        hm_gpu_scene_materialize_vram(builder, 1);
+        (void)hm_gpu_scene_begin(builder, 32, 32);
+        CHECK(hm_frame_replay_draw(replay, &live));
+        hm_gpu_scene_materialize_vram(builder, 0);
+    }
+    hm_gpu_scene_data scene;
+    CHECK(hm_gpu_scene_end(builder, previous, &scene));
+    CHECK(!readback(device, renderer, &scene, actual));
+
+    setup();
+    SetDefDispEnv(&display, 0, 0, 32, 32);
+    PutDispEnv(&display);
+    CHECK(LoadImage(&load, pixel) == 0);
+    CHECK(MoveImage(&move, 30, 30) == 0);
+    CHECK(ClearImage(&clear, 0, 255, 0) == 0);
+    hm_gpu_execute_words(tile, SDL_arraysize(tile));
+    for (u32 y = 0; y < 32; ++y)
+        for (u32 x = 0; x < 32; ++x)
+            reference[y * 32 + x] = hm_vram_pixel(x, y);
+    for (u32 y = 0; y < 32; ++y)
+        for (u32 x = 0; x < 32; ++x) {
+            u16 color = reference[y * 32 + x];
+            for (u32 channel = 0; channel < 3; ++channel) {
+                u32 value = (color >> (channel * 5)) & 31;
+                u8 expected = (u8)((value << 3) | (value >> 2));
+                u8 got = actual[(y * 32 + x) * 4 + channel];
+                if (got != expected) {
+                    fprintf(stderr,
+                            "Direct transfer capture mismatch %u,%u channel %u: GPU %u CPU %u\n",
+                            x, y, channel, got, expected);
+                    return 1;
+                }
+            }
+        }
+
+    /* A native DrawOTag call without the main-loop wrapper auto-captures as a
+     * bypass frame, covering the loading-screen call site. */
+    setup();
+    SetDefDispEnv(&display, 0, 0, 32, 32);
+    PutDispEnv(&display);
+    const u32 ot[] = {3u << 24 | HM_GPU_LINK_END, tile[0], tile[1], tile[2]};
+    DrawOTag((u32 *)ot);
+    live = (hm_render_frame){.tick = 2};
+    CHECK(hm_frame_replay_serial(replay, &live));
+    previous = hm_gpu_scene_begin(builder, 32, 32);
+    CHECK(hm_frame_replay_draw(replay, &live));
+    CHECK(hm_gpu_scene_end(builder, previous, &scene));
+    hm_frame_replay_release(replay);
+    CHECK(!readback(device, renderer, &scene, actual));
+    for (u32 y = 0; y < 32; ++y)
+        for (u32 x = 0; x < 32; ++x)
+            reference[y * 32 + x] = hm_vram_pixel(x, y);
+    for (u32 y = 0; y < 32; ++y)
+        for (u32 x = 0; x < 32; ++x) {
+            u16 color = reference[y * 32 + x];
+            for (u32 channel = 0; channel < 3; ++channel) {
+                u32 value = (color >> (channel * 5)) & 31;
+                u8 expected = (u8)((value << 3) | (value >> 2));
+                u8 got = actual[(y * 32 + x) * 4 + channel];
+                if (got != expected) {
+                    fprintf(stderr,
+                            "Direct DrawOTag capture mismatch %u,%u channel %u: GPU %u CPU %u\n",
+                            x, y, channel, got, expected);
+                    return 1;
+                }
+            }
+        }
+    puts("Captured direct LoadImage, MoveImage and ClearImage match CPU readback.");
+    puts("Unwrapped DrawOTag capture matches CPU readback.");
+    return 0;
+}
 static u32 hm_probe_random(void) {
     static u32 value = 0x98765432;
     value ^= value << 13;
@@ -1009,6 +1106,7 @@ int main(int argc, char **argv) {
     printf("Offscreen GPU renderer: %s\n", SDL_GetGPUDeviceDriver(device));
     CHECK(!hm_probe_texture_feedback(device, renderer, builder));
     CHECK(!hm_probe_vram_transfers(device, renderer, builder));
+    CHECK(!hm_probe_direct_transfer_capture(device, renderer, builder));
     CHECK(!hm_probe_dynamic_scene(device, renderer, builder));
     CHECK(!hm_probe_primitive_opcode_sweep(device, renderer, builder));
     u32 shapes[] = {0x200000ff, xy(1, 1),   xy(26, 4), xy(5, 26),  0x300000ff,

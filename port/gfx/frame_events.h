@@ -20,11 +20,13 @@ typedef struct {
     void (*end)(void *context);
     void (*invalidate)(void *context);
     void (*transfer)(void *context, s32 x, s32 y, u32 width, u32 height);
+    void (*direct_command)(void *context, const u32 *words, u32 count, int payload);
 } hm_render_observer;
 /* Single game-thread, read-only observation of native command execution. */
 int hm_render_subscribe(hm_render_observer observer);
 void hm_render_unsubscribe(void *context);
 void hm_render_begin(const hm_render_frame *frame);
+int hm_render_capture_active(void);
 void hm_render_group(int world);
 void hm_render_packet(const u32 *words, u32 count);
 void hm_render_end(void);
@@ -33,5 +35,9 @@ void hm_render_invalidate(void);
 void hm_render_transfer(s32 x, s32 y, u32 width, u32 height);
 void hm_render_transfer_command_begin(void);
 void hm_render_transfer_command_end(void);
+/* Capture direct VRAM API operations in the active scene's GP0 stream. */
+int hm_render_direct_transfer_begin(void);
+void hm_render_direct_transfer_command(const u32 *words, u32 count, int payload);
+void hm_render_direct_transfer_end(int active);
 void hm_render_direct_draw(s32 x, s32 y, u32 width, u32 height);
 #endif

@@ -52,6 +52,16 @@ static void transfer(void *opaque, s32 x, s32 y, u32 width, u32 height) {
         }
     }
 }
+static void direct_command(void *opaque, const u32 *words, u32 count, int payload) {
+    interpolation *s = opaque;
+    (void)words;
+    (void)count;
+    (void)payload;
+    if (!s->capturing)
+        return;
+    s->frames[s->current].complete = 0;
+    s->capturing = s->ready = 0;
+}
 
 static void invalidate(void *opaque) {
     interpolation *s = opaque;
@@ -347,7 +357,8 @@ int hm_interpolation_enable(int enabled) {
     if (!state)
         return 0;
     if (!hm_render_subscribe(
-            (hm_render_observer){state, begin, group, packet, end, invalidate, transfer})) {
+            (hm_render_observer){state, begin, group, packet, end, invalidate, transfer,
+                                 direct_command})) {
         free(state);
         state = NULL;
         return 0;
