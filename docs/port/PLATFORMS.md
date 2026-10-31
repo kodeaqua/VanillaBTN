@@ -4,8 +4,8 @@
 
 | Target | Current validation |
 | --- | --- |
-| Windows x86-64 | Release `-Game` build and package pass 124/124 tests; Windows ASan/UBSan suite passes 107/107. Full-playthrough parity remains unverified. |
-| Android arm64-v8a | Latest Release APK built with AGP 9.5.0, Gradle 9.8.2, and NDK 30.0.16248370; signature and 16 KB APK zip-alignment checks pass. On the connected Xiaomi MediaTek G100, the owner tested the farm at 60-61 ticks/presents per second with 1.1-1.7 ms average materialization replay and reported smoother play. Other scenes, 720p, and other devices remain unverified. |
+| Windows x86-64 | Release build and 124/124 tests pass. Focused ASan/UBSan graphics tests pass. Synthetic VRAM scanout matches reference pixels on Vulkan and Direct3D 12. Full-playthrough parity remains unverified. |
+| Android arm64-v8a | Latest Release APK built with AGP 9.5.0, Gradle 9.8.2, and NDK 30.0.16248370; signature and 16 KB APK zip-alignment checks pass. The owner-tested G100 farm sample reports 100% GPU output in two steady 600-frame windows, zero fallbacks, and two then zero direct VRAM scanouts. It holds 60-61 presents/s with 3.7-4.1 ms average presentation and zero audio-ring underruns/drops. 720p and other scenes/devices remain unverified. |
 | Linux x86-64 | Deferred to a separate Linux host; WSL is excluded. |
 | macOS universal | No macOS build has been validated. |
 | Matching build | The check target remains unverified on this Windows host because its separate Linux toolchain is unavailable. |
@@ -296,7 +296,7 @@ status was normal. A second diagnostic separated the cost: the materialization
 replay averaged 97.5-142.9 ms for 41-55 VRAM versions, while replay alone was
 about 0.7-1.9 ms and packing 0.0-0.1 ms. The scene builder now uses incremental
 16x16 dirty-tile fingerprints for that replay and keeps exact comparison on
-hash matches; owner measurement on the G100 is pending.
+hash matches. The later G100 measurements are recorded below.
 Windows also remains reported as laggy; a single process/GPU counter sample
 showed about one CPU core saturated while the 3D engine was at 11%. The prior
 Adreno 610-class compute submit measured 42.57 ms.
@@ -639,3 +639,19 @@ materialization replay (4.6 ms observed maximum), and zero game-ring audio
 underflows/drops. The owner reported smoother play. This is an owner-tested
 single-scene result; 720p, other areas, audio quality beyond the ring counters,
 Windows gameplay pacing, and other Android devices remain unverified.
+
+### GPU VRAM scanout fallback (2026-10-31)
+
+The PS1 alternates its draw and display pages, so a capture can be coherent but
+refer to the other half of VRAM. When no capture matches the visible page, GPU
+Auto now builds a zero-primitive scene that reads that page directly from the
+VRAM snapshot. A display area with zero width or height is counted as skipped
+because it has no pixels to present; renderer/resource failures retain the CPU
+safety path. The G100 farm sample at 384x240 recorded 589/589 visible frames on
+the GPU (100%), five VRAM scanouts, zero fallbacks, and 11 empty-area startup
+skips. The next two 600-frame windows reported 600/600 GPU frames with zero
+fallbacks and two then zero scanouts. Steady farm timing was 60-61 presents/s,
+3.7-4.1 ms average presentation, and 3.6-3.7 ms average guest-game time.
+Synthetic 2x scanout readback matched VRAM exactly on Windows Vulkan and
+Direct3D 12. These results cover the farm scene and native internal size only;
+Windows interactive gameplay, 720p, and other areas remain unverified.

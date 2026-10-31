@@ -680,6 +680,37 @@ static int hm_probe_direct_transfer_capture(SDL_GPUDevice *device, hm_gpu_render
     puts("Unwrapped DrawOTag capture matches CPU readback.");
     return 0;
 }
+static int hm_probe_vram_scanout(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
+                                 hm_gpu_scene *builder) {
+    origin_y = 240;
+    display_test = 1;
+    setup();
+    RECT area = {0, 240, 32, 32};
+    for (u32 y = 0; y < 32; ++y)
+        for (u32 x = 0; x < 32; ++x)
+            hm_vram_draw_pixel(x, y + 240, (u16)((x * 317 + y * 911) & 0x7fff));
+    hm_gpu_scene_data scene;
+    CHECK(hm_gpu_scene_scanout(builder, &area, 64, 64, &scene));
+    CHECK(scene.words[10] == 0);
+    CHECK(!readback(device, renderer, &scene, actual));
+    for (u32 y = 0; y < 64; ++y)
+        for (u32 x = 0; x < 64; ++x) {
+            u16 color = hm_vram_pixel(x / 2, 240 + y / 2);
+            for (u32 channel = 0; channel < 3; ++channel) {
+                u32 value = (color >> (channel * 5)) & 31;
+                u8 expected = (u8)((value << 3) | (value >> 2));
+                u8 got = actual[(y * 64 + x) * 4 + channel];
+                if (got != expected) {
+                    fprintf(stderr,
+                            "GPU VRAM scanout mismatch %u,%u channel %u: GPU %u CPU %u\n",
+                            x, y, channel, got, expected);
+                    return 1;
+                }
+            }
+        }
+    puts("GPU VRAM scanout at 2x matches the visible 15-bit VRAM page.");
+    return 0;
+}
 static u32 hm_probe_random(void) {
     static u32 value = 0x98765432;
     value ^= value << 13;
@@ -1156,6 +1187,14 @@ int main(int argc, char **argv) {
     hm_gpu_renderer *renderer = hm_gpu_renderer_create(device);
     CHECK(renderer);
     hm_gpu_scene *builder = hm_gpu_scene_create();
+    if (argc > 2 && !SDL_strcmp(argv[2], "--vram-scanout")) {
+        CHECK(builder && !hm_probe_vram_scanout(device, renderer, builder));
+        hm_gpu_scene_destroy(builder);
+        hm_gpu_renderer_destroy(renderer);
+        SDL_DestroyGPUDevice(device);
+        SDL_Quit();
+        return 0;
+    }
     if (argc > 2 && !SDL_strcmp(argv[2], "--display-area")) {
         const u32 display[] = {0xe1000000, 0x600000ff, 0, xy(30, 30),
                                0xe1000400, 0x6000ff00, xy(4, 4), xy(20, 20)};

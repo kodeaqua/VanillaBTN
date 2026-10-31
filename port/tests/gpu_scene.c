@@ -60,6 +60,17 @@ int main(void) {
     hm_gpu_scene *s = hm_gpu_scene_create();
     CHECK(s);
     setup(32, 32);
+    const RECT scanout_area = {0, 240, 32, 32};
+    for (u32 y = 0; y < 32; ++y)
+        for (u32 x = 0; x < 32; ++x)
+            hm_vram_draw_pixel(x, 240 + y, (u16)((x * 317 + y * 911) & 0x7fff));
+    hm_gpu_environment saved_environment = *hm_gpu_environment_state();
+    hm_gpu_scene_data scanout;
+    CHECK(hm_gpu_scene_scanout(s, &scanout_area, 64, 64, &scanout));
+    CHECK(scanout.words[10] == 0 && scanout.words[2] == 0 && scanout.words[3] == 240 &&
+          scanout.words[4] == 32 && scanout.words[5] == 32);
+    CHECK(!memcmp(&saved_environment, hm_gpu_environment_state(), sizeof(saved_environment)));
+    CHECK(scanout.vram_pixels[240 * HM_VRAM_WIDTH + 17] == hm_vram_pixel(17, 240));
     /* Audit every render-producing primitive opcode and documented NOP mirror. */
     u32 packet[32] = {0};
     for (u32 opcode = 0x20; opcode <= 0x3f; ++opcode) {

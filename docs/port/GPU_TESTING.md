@@ -23,9 +23,11 @@ semi-transparency modes. Each case is also checked to ensure the CPU reference
 actually changed at least one output pixel. Mask-set and
 mask-check behavior is preserved for load and VRAM-copy transfers. VRAM-to-CPU
 readback, IRQ requests, NOP/cache commands, and draw-environment state do not
-produce scene pixels. Malformed streams, raw VRAM changes outside an
-ordering-table capture, reserved texture depth, and GPU resource/device
-failures still use the reference path.
+produce scene pixels. Malformed streams, unsupported scene operations, and
+reserved texture depth retain the CPU reference path. When no coherent captured
+frame is available, GPU Auto can build a zero-primitive scene that scans the
+current visible VRAM page directly on the GPU. GPU resource/device failures
+retain the CPU reference safety path.
 Gameplay parity, device breadth, and frame-time budgets remain owner checks; see
 PLATFORMS.md and ENHANCEMENTS.md.
 
@@ -47,9 +49,10 @@ The core `gpu.vram` test also checks overlapping `MoveImage` copies, including
 wrap at the VRAM edge and mask-bit behavior. These transfers now snapshot their
 source before writing, so overlapping areas do not terminate the game.
 
-Android GPU Auto now attempts compute rendering for each captured frame. Every
-600 attempts, the host logs compute-scene coverage, fallback count, and the last
-fallback reason. Explicit Software mode remains available. Android's SDL GPU
+Android GPU Auto attempts compute rendering for each captured frame. Every
+600 attempts, the host logs scene coverage, direct GPU VRAM scanouts, fallback
+count, and the last fallback reason. Explicit Software mode remains available.
+Android's SDL GPU
 device uses SPIR-V only and disables optional Vulkan features
 unused by this compute renderer. The connected MediaTek G100 tablet reports a
 Mali-G57 MC2 Vulkan device with `shaderClipDistance` unavailable; SDL 3.2.28
@@ -114,9 +117,17 @@ also reported zero hardware mixer underruns in a prior run. The ROM rejects
 function-level profile. A diagnostic update now reports why replay selection
 failed (no complete capture, no matching loading/bypass capture, mismatched
 draw/display areas, or a capture newer than the live tick). Windows unit tests
-cover the no-capture and area-mismatch cases. The updated Android build is
-installed for a new owner-run farm sample; no new device measurement is claimed
-yet.
+cover the no-capture and area-mismatch cases. A no-capture frame now builds a
+zero-primitive GPU scene over the currently visible VRAM page. The connected
+G100's 09:52 farm sample reported 589/589 renderable frames through the GPU
+(100%), five direct VRAM scanouts, zero fallbacks, and 11 skipped attempts with
+an empty display area during startup. The next two windows each reported
+600/600 renderable frames, zero fallbacks, and two then zero direct scanouts.
+At 384x240, those steady farm windows held 60-61 presents/s; average game time
+was 3.6-3.7 ms, average present time 3.7-4.1 ms, and the audio ring reported
+zero underruns or drops. The VRAM scanout also passed a 2x pixel-exact readback
+probe on Windows Vulkan and Direct3D 12. Other areas, 720p, and Windows gameplay
+coverage remain unverified.
 
 The probe's `--farm-benchmark` option renders 8,192 fixed 8x8 rectangles at
 320x240 and 960x720, with a fresh builder and an explicit GPU fence per frame.

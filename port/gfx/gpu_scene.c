@@ -1190,6 +1190,19 @@ int hm_gpu_scene_end(hm_gpu_scene *s, hm_replay_sink previous, hm_gpu_scene_data
                                 .height = s->height};
     return 1;
 }
+int hm_gpu_scene_scanout(hm_gpu_scene *s, const RECT *area, u32 width, u32 height,
+                         hm_gpu_scene_data *data) {
+    if (!s || !area || !data)
+        return 0;
+    hm_gpu_environment scanout_environment = *hm_gpu_environment_state();
+    scanout_environment.draw.clip = *area;
+    hm_gpu_environment *previous_environment = hm_gpu_environment_bind(&scanout_environment);
+    hm_replay_sink previous = hm_gpu_scene_begin(s, width, height);
+    hm_replay_begin(area);
+    int ready = hm_gpu_scene_end(s, previous, data);
+    hm_gpu_environment_bind(previous_environment);
+    return ready;
+}
 const char *hm_gpu_scene_fallback(const hm_gpu_scene *s) {
     return s->failure ? s->failure : "missing frame history";
 }

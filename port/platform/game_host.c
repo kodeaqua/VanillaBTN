@@ -106,7 +106,7 @@ static hm_gpu_scene_data hm_gpu_cached;
 static u64 hm_gpu_cached_serial;
 enum { HM_GPU_COVERAGE_REPORT_FRAMES = 600 };
 static u32 hm_gpu_coverage_frames, hm_gpu_coverage_successes, hm_gpu_coverage_fallbacks;
-static u32 hm_gpu_coverage_skipped;
+static u32 hm_gpu_coverage_scanouts, hm_gpu_coverage_skipped;
 static char hm_gpu_coverage_last_reason[160] = "none";
 #endif
 
@@ -348,18 +348,21 @@ static void hm_host_gpu_coverage_report(void) {
     double percent = renderable ? (100.0 * (double)hm_gpu_coverage_successes / renderable) : 0.0;
 #ifdef __ANDROID__
     __android_log_print(ANDROID_LOG_INFO, "VanillaBTN",
-                        "GPU scene coverage: %u/%u renderable (%.1f%%), %u fallback, %u skipped of %u attempts; last: %s",
-                        hm_gpu_coverage_successes, renderable, percent, hm_gpu_coverage_fallbacks,
-                        hm_gpu_coverage_skipped, hm_gpu_coverage_frames,
+                        "GPU scene coverage: %u/%u renderable (%.1f%%; %u VRAM scanouts), %u fallback, %u skipped of %u attempts; last: %s",
+                        hm_gpu_coverage_successes, renderable, percent, hm_gpu_coverage_scanouts,
+                        hm_gpu_coverage_fallbacks, hm_gpu_coverage_skipped,
+                        hm_gpu_coverage_frames,
                         hm_gpu_coverage_last_reason);
 #else
-    SDL_Log("GPU scene coverage: %u/%u renderable (%.1f%%), %u fallback, %u skipped of %u attempts; last: %s",
-            hm_gpu_coverage_successes, renderable, percent, hm_gpu_coverage_fallbacks,
-            hm_gpu_coverage_skipped, hm_gpu_coverage_frames, hm_gpu_coverage_last_reason);
+    SDL_Log("GPU scene coverage: %u/%u renderable (%.1f%%; %u VRAM scanouts), %u fallback, %u skipped of %u attempts; last: %s",
+            hm_gpu_coverage_successes, renderable, percent, hm_gpu_coverage_scanouts,
+            hm_gpu_coverage_fallbacks, hm_gpu_coverage_skipped, hm_gpu_coverage_frames,
+            hm_gpu_coverage_last_reason);
 #endif
     hm_gpu_coverage_frames = 0;
     hm_gpu_coverage_successes = 0;
     hm_gpu_coverage_fallbacks = 0;
+    hm_gpu_coverage_scanouts = 0;
     hm_gpu_coverage_skipped = 0;
     SDL_strlcpy(hm_gpu_coverage_last_reason, "none", sizeof(hm_gpu_coverage_last_reason));
 }
@@ -383,9 +386,22 @@ static void hm_host_gpu_coverage_skip(const char *reason) {
                      reason);
     hm_host_gpu_coverage_report();
 }
+static int hm_host_gpu_scanout_scene(const RECT *area, u32 width, u32 height) {
+    hm_gpu_scene_texture_filter(hm_gpu_commands, 0);
+    hm_gpu_scene_multisamples(hm_gpu_commands, 1);
+    return hm_gpu_scene_scanout(hm_gpu_commands, area, width, height, &hm_gpu_cached);
+}
 static int hm_host_gpu_present(const RECT *native_area) {
-    if (!hm_gpu_output || !hm_gpu_commands || native_area->w <= 0 || native_area->h <= 0) {
+    if (!hm_gpu_output || !hm_gpu_commands || !native_area) {
         hm_host_gpu_coverage_record(0, "GPU renderer or display area unavailable");
+        return 0;
+    }
+    if (native_area->w == 0 || native_area->h == 0) {
+        hm_host_gpu_coverage_skip("empty PS1 display area");
+        return -1;
+    }
+    if (native_area->w < 0 || native_area->h < 0) {
+        hm_host_gpu_coverage_record(0, "invalid PS1 display area");
         return 0;
     }
 #ifdef HMBTN_ENH_PAUSE_MENU
@@ -461,6 +477,7 @@ static int hm_host_gpu_present(const RECT *native_area) {
     texture_filter = (u32)hm_options.linear;
 #endif
     u64 cache_serial = interpolate ? 0 : serial;
+    int scanout_only = 0;
     if (!cache_serial || hm_gpu_cached_serial != cache_serial || hm_gpu_cached.width != width ||
         hm_gpu_cached.height != height ||
         (hm_gpu_cached.words && (hm_gpu_cached.words[11] != texture_filter ||
@@ -577,12 +594,20 @@ static int hm_host_gpu_present(const RECT *native_area) {
             const char *reason = serial
                                      ? hm_gpu_scene_fallback(hm_gpu_commands)
                                      : hm_frame_replay_failure(hm_gpu_replay);
-            hm_host_gpu_coverage_record(
-                0, reason ? reason
-                          : "no complete captured scene (loading, bypass, or invalidated frame)");
-            return 0;
+            if (!serial && hm_host_gpu_scanout_scene(native_area, width, height)) {
+                /* The PS1 can display the opposite half of its double buffer
+                 * from the one currently being drawn. With no coherent scene
+                 * capture, scan that exact visible VRAM page on the GPU. */
+                scanout_only = 1;
+            } else {
+                hm_host_gpu_coverage_record(
+                    0, reason ? reason
+                              : "no complete captured scene (loading, bypass, or invalidated frame)");
+                return 0;
+            }
         }
-        hm_gpu_cached_serial = cache_serial;
+        if (!scanout_only)
+            hm_gpu_cached_serial = cache_serial;
     }
 #ifdef __ANDROID__
     Uint64 acquire_begin = SDL_GetTicksNS();
@@ -660,6 +685,8 @@ static int hm_host_gpu_present(const RECT *native_area) {
         hm_gpu_perf.submit_max_ns = submit_spent;
     ++hm_gpu_perf.submits;
 #endif
+    if (scanout_only)
+        ++hm_gpu_coverage_scanouts;
     hm_host_gpu_coverage_record(1, NULL);
     return 1;
 }

@@ -33,5 +33,8 @@ u32 hm_gpu_scene_materialization_mask(const hm_gpu_scene *scene,
                                       u64 tiles[HM_VRAM_DIRTY_ROWS]);
 hm_replay_sink hm_gpu_scene_begin(hm_gpu_scene *scene, u32 width, u32 height);
 int hm_gpu_scene_end(hm_gpu_scene *scene, hm_replay_sink previous, hm_gpu_scene_data *data);
+/* Build an empty GPU scene that scans the selected visible area from live VRAM. */
+int hm_gpu_scene_scanout(hm_gpu_scene *scene, const RECT *area, u32 width, u32 height,
+                         hm_gpu_scene_data *data);
 const char *hm_gpu_scene_fallback(const hm_gpu_scene *scene);
 #endif
