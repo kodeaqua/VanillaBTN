@@ -4089,15 +4089,53 @@ Decision: In GPU Auto, attempt the shared SDL_GPU scene renderer for every
 captured frame on desktop and Android. Keep Software selectable and retain the
 per-frame CPU reference fallback for missing captures, unsupported commands,
 resource failures and unavailable GPU devices. Classify GP0(04h..1Eh), GP0(1Fh),
-GP0(E0h), and GP0(E7h..EFh) as non-pixel commands. Add an encoding sweep for all
-polygon, line, and rectangle opcodes and report scene-compute coverage in
-600-frame windows. Opcode classifications follow the public [PSX-SPX GPU
-specification](https://psx-spx.consoledev.net/graphicsprocessingunitgpu/).
+GP0(E0h), GP0(E7h..EFh), and GP0(C0h..DFh) as commands that do not write scene
+pixels. Also accept GP0(03h) as non-pixel because this port's reference command
+executor skips it without a VRAM effect; its hardware meaning remains
+undocumented. Add an encoding sweep for all polygon, line, and rectangle
+opcodes and report scene-compute coverage in 600-frame windows. Opcode
+classifications follow the public [PSX-SPX GPU specification](https://psx-spx.consoledev.net/graphicsprocessingunitgpu/).
 
 Consequences: Android GPU Auto now exercises the compute scene path by default;
 the connected MediaTek G100 device has passed SDL GPU initialization, but its
 scene throughput, thermals and gameplay output remain unverified. The previous
 Adreno measurement remains a known performance risk, and Software remains the
 runtime escape path. Coverage reports count submitted compute-scene frames, not
-all rendering work: native VRAM compatibility still executes on the CPU and
-unsupported/direct frames still use the reference renderer.
+all rendering work: native VRAM compatibility still executes on the CPU, and
+unsupported scenes or unreconstructable frames still use the reference renderer.
+
+## ADR-152: Preserve Direct VRAM Operations in GPU Frame Captures
+
+Date: 2026-10-31. Status: accepted.
+
+Context: The frame replay capture had fixed limits of 65,536 command words and
+64 render groups. It also invalidated the active capture whenever a direct
+`LoadImage`, `ClearImage`, or `MoveImage` modified VRAM between draw-environment
+setup and ordering-table submission. Fully captured loading/bypass scenes were
+excluded from GPU replay even though their command streams were available, and
+the loading screen had one `DrawOTag` call outside the normal frame wrapper.
+
+Decision: Grow frame command and group storage on demand, retaining allocations
+for reuse and reporting allocation/overflow failures to GPU coverage logging.
+During an active native frame capture, encode direct VRAM API operations as
+ordered GP0 transfer records and copy `LoadImage` payloads into the replay
+buffer. For native `DrawOTag` calls made without an outer frame capture,
+invalidate older captures and create a bypass capture around the ordering
+table. Permit a complete bypass capture to render when the live frame is itself
+marked bypass; continue using CPU rendering when no complete current bypass
+capture exists. Mark interpolation ineligible for
+frames containing direct API transfers because its motion matcher does not
+model those transfer records.
+
+Consequences: Frame replay no longer falls back because of the old fixed word
+or group caps, and direct image/clear/copy calls can participate in the shared
+GPU scene path without changing CPU VRAM semantics. Regression tests cover odd
+pixel `LoadImage` payloads, all three direct transfer operations, more than
+65,536 words, more than 64 groups, low-level uncaptured `DrawOTag`, and captured
+bypass frames. A synthetic Vulkan and Direct3D 12 readback probe also verifies
+the direct-transfer and unwrapped-OT paths against CPU pixels. Device resource
+limits, allocation failure, raw VRAM changes
+outside an ordering-table capture, and unsupported or malformed GP0 streams
+retain the CPU reference fallback. Full interactive coverage remains
+unverified until owner gameplay testing reports zero unsupported or
+missing-capture fallbacks.

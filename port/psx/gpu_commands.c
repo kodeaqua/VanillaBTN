@@ -4,6 +4,7 @@
 #include "psx/gpu_environment.h"
 #include "psx/gpu_links.h"
 #include "psx/gpu_raster.h"
+#include "psx/timing.h"
 #include "psx/vram.h"
 #include <libgpu.h>
 #include <stdio.h>
@@ -225,10 +226,21 @@ void hm_gpu_execute_words(const u32 *words, u32 count) {
 void DrawOTag(u32 *table) {
     if (!table || ((uintptr_t)table & 3))
         hm_runtime_error("DrawOTag", "null or unaligned OT");
-    if (hm_vram_is_native()) {
-        hm_vram_bump_generation();
+    int native_vram = hm_vram_is_native();
+    int capture = native_vram && !hm_render_capture_active();
+    if (capture) {
         const RECT *clip = &hm_gpu_environment_state()->draw.clip;
         hm_render_direct_draw(clip->x, clip->y, (u32)clip->w, (u32)clip->h);
+        hm_render_frame frame = {.tick = hm_timing_ticks(), .bypass = 1};
+        hm_render_begin(&frame);
+        hm_render_group(0);
+    }
+    if (native_vram) {
+        hm_vram_bump_generation();
+        if (!capture) {
+            const RECT *clip = &hm_gpu_environment_state()->draw.clip;
+            hm_render_direct_draw(clip->x, clip->y, (u32)clip->w, (u32)clip->h);
+        }
     }
     const u32 *packet = table;
     const u32 *slow = table;
@@ -241,8 +253,11 @@ void DrawOTag(u32 *table) {
             at += length;
         }
         packet = hm_gpu_link_decode(tag);
-        if (!packet)
+        if (!packet) {
+            if (capture)
+                hm_render_end();
             return;
+        }
 
         /* Floyd's cycle-finding: advance tortoise every 2 steps */
         if (visited & 1) {
@@ -250,8 +265,12 @@ void DrawOTag(u32 *table) {
             slow = hm_gpu_link_decode(slow_tag);
             if (slow == packet) {
                 /* Gracefully break detected cycle without crashing process */
+                if (capture)
+                    hm_render_end();
                 return;
             }
         }
     }
+    if (capture)
+        hm_render_end();
 }

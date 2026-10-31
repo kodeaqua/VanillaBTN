@@ -66,10 +66,34 @@ int main(void) {
     RECT wrapped = {1023, 511, 2, 2};
     LoadImage(&wrapped, pixels);
     CHECK(!hm_frame_replay_serial(replay, &live));
+    /* Direct VRAM operations inside a captured OT are preserved as GP0 events. */
+    live = capture();
+    hm_render_begin(&live);
+    RECT direct_rect = {0, 0, 16, 16};
+    ClearImage(&direct_rect, 0, 0, 0);
+    u32 nop = 0;
+    hm_render_packet(&nop, 1);
+    hm_render_end();
+    CHECK(hm_frame_replay_serial(replay, &live));
+    /* Captures grow past the former 64K-word and 64-group fixed limits. */
+    hm_render_frame large = {.key = 8, .tick = 4};
+    u32 nops[1024] = {0};
+    hm_render_begin(&large);
+    for (int i = 0; i < 140; ++i) {
+        hm_render_group(i & 1);
+        hm_render_packet(nops, 1024);
+    }
+    hm_render_end();
+    CHECK(hm_frame_replay_serial(replay, &large));
+    hm_render_frame bypass = {.key = 9, .tick = 6, .bypass = 1};
+    hm_render_begin(&bypass);
+    hm_render_packet(nops, 3);
+    hm_render_end();
+    CHECK(hm_frame_replay_serial(replay, &bypass));
     live = capture();
     u32 direct[] = {3u << 24 | HM_GPU_LINK_END, 0x6000ff00, 0, 0x00010001};
     DrawOTag(direct); /* Loading draws outside the normal capture hook. */
-    CHECK(!hm_frame_replay_serial(replay, &live));
+    CHECK(hm_frame_replay_serial(replay, &live));
     live = capture();
     hm_vram_reset();
     CHECK(!hm_frame_replay_serial(replay, &live));

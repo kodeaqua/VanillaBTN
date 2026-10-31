@@ -32,6 +32,7 @@ void hm_render_begin(const hm_render_frame *frame) {
         if (observers[i].begin)
             observers[i].begin(observers[i].context, frame);
 }
+int hm_render_capture_active(void) { return hm_capturing; }
 void hm_render_group(int world) {
     hm_group_base = hm_group_effective = !!world;
     for (int i = 0; i < OBSERVERS; ++i)
@@ -72,6 +73,23 @@ void hm_render_transfer(s32 x, s32 y, u32 width, u32 height) {
 void hm_render_transfer_command_begin(void) { ++hm_transfer_command_depth; }
 void hm_render_transfer_command_end(void) {
     if (hm_transfer_command_depth)
+        --hm_transfer_command_depth;
+}
+int hm_render_direct_transfer_begin(void) {
+    if (!hm_capturing || hm_transfer_command_depth)
+        return 0;
+    ++hm_transfer_command_depth;
+    return 1;
+}
+void hm_render_direct_transfer_command(const u32 *words, u32 count, int payload) {
+    if (!hm_capturing || hm_transfer_command_depth != 1 || (!words && count))
+        return;
+    for (int i = 0; i < OBSERVERS; ++i)
+        if (observers[i].direct_command)
+            observers[i].direct_command(observers[i].context, words, count, payload);
+}
+void hm_render_direct_transfer_end(int active) {
+    if (active && hm_transfer_command_depth)
         --hm_transfer_command_depth;
 }
 void hm_render_direct_draw(s32 x, s32 y, u32 width, u32 height) {

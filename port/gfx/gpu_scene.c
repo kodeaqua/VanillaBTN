@@ -751,9 +751,11 @@ static void hm_scene_transfer(hm_gpu_scene *s, u32 op, u32 color, u32 x, u32 y, 
 }
 static int hm_scene_nonrendering_opcode(u32 opcode) {
     /* Mirrors of GP0(00h) are FIFO NOPs; the interrupt command changes GPU
-     * status, not the framebuffer. Keep these in the GPU scene stream. */
-    return opcode <= 1 || (opcode >= 0x04 && opcode <= 0x1f) || opcode == 0xe0 ||
-           (opcode >= 0xe7 && opcode <= 0xef);
+     * status, not the framebuffer. GP0(03h) is undocumented and the native
+     * command executor also skips it without changing VRAM. GP0(C0h..DFh)
+     * request VRAM-to-CPU data and do not write the displayed scene. */
+    return opcode <= 1 || opcode == 3 || (opcode >= 0x04 && opcode <= 0x1f) || opcode == 0xe0 ||
+           (opcode >= 0xc0 && opcode <= 0xdf) || (opcode >= 0xe7 && opcode <= 0xef);
 }
 static void hm_scene_command(void *context, const u32 *w, u32 available, int after) {
     hm_gpu_scene *s = context;
