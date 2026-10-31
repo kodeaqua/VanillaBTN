@@ -15,6 +15,9 @@
 #include "farm_state.h"
 #include "player.h"
 #include "screen_fade.h"
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_SLOW_FARM_TIME)
+#include "scene.h"
+#endif
 #include "villager.h"
 #include "weather.h"
 
@@ -77,6 +80,9 @@ static s32 clock_pending;
 static u32 clock_stepping;
 static s32 clock_fast_forward_left;
 static s32 clock_end_flag;
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_SLOW_FARM_TIME)
+static u8 clock_slow_farm_phase;
+#endif
 
 /* Finish a clock fast-forward: tick through the remaining minutes, then reset the
  * schedule (before 6:00) or pick up the day's schedule, and run the overnight finish
@@ -174,6 +180,9 @@ void clock_reset(void) {
     clock_stepping = 0;
     clock_pending = 0;
     clock_fast_forward_left = 0;
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_SHIPPING_BIN)
+    hm_gameplay_shipping_clear();
+#endif
     clock_update_date_flags(farm->progress.clock.date.weekday);
     clock_set_season_flag(farm->progress.clock.date.season);
     if (clock_date_index(farm->progress.clock.date.season, farm->progress.clock.date.day) != 0) {
@@ -253,6 +262,16 @@ void clock_advance_minute(void) {
     totals = &game_state.progress.clock.elapsed;
     limit = one_minute;
     game_state.globalFlags |= GLOBAL_FLAG_CLOCK_TICKED;
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_SLOW_FARM_TIME)
+    if (clock_pending == 0 && hm_gameplay_slow_farm_time() &&
+        farm_area.mode.place.location == PLACE_FARM) {
+        clock_slow_farm_phase ^= 1;
+        if (clock_slow_farm_phase)
+            return;
+    } else {
+        clock_slow_farm_phase = 0;
+    }
+#endif
     system->clockFrames++;
     if (game_state.debugFlags & DEBUG_FLAG_HISPEED_TIME) {
         limit = limit / CLOCK_HISPEED_DIVISOR + 1;

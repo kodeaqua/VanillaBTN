@@ -411,6 +411,56 @@ void field_daily_tick(void) {
             }
         }
     }
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_GRASS_SPREAD)
+    if (hm_gameplay_grass_spread()) {
+        static const s16 spread_dx[4] = {0, 1, 0, -1};
+        static const s16 spread_dy[4] = {-1, 0, 1, 0};
+        u8 spread_targets[FIELD_ROWS][FIELD_COLS] = {{0}};
+        s16 mature_stage = crop_grown_stage(ITEM_GRASS_SEEDS);
+        s32 day = game_state.progress.clock.date.day;
+        s32 season = game_state.progress.clock.date.season;
+        s32 year = game_state.progress.clock.date.year;
+        s32 y;
+        s32 x;
+
+        /* The field tile keeps ITEM_GRASS_SEEDS as its value through growth. We
+         * only spread those planted fodder-grass cells, never weeds. */
+        for (y = 0; y < FIELD_ROWS; y++) {
+            for (x = 0; x < FIELD_COLS; x++) {
+                FarmFieldTile *parent = &game_state.fieldTiles[y].rows[x];
+                if (parent->value != ITEM_GRASS_SEEDS || parent->kind < mature_stage ||
+                    !hm_gameplay_grass_spread_due(year, season, day, (int)y, (int)x))
+                    continue;
+
+                s32 direction = hm_gameplay_grass_spread_direction(
+                    year, season, day, (int)y, (int)x);
+                s32 nx = x + spread_dx[direction];
+                s32 ny = y + spread_dy[direction];
+                FarmFieldTile *target = field_tile_at(0, (s16)nx, (s16)ny);
+                if (target == 0 || target->value != ITEM_SOIL || target->ground != ITEM_SOIL)
+                    continue;
+
+                spread_targets[ny][nx] = 1;
+            }
+        }
+
+        /* Apply after scanning so new plants cannot become parents on the same
+         * morning. Their tile state matches a normally planted grass seed. */
+        for (y = 0; y < FIELD_ROWS; y++) {
+            for (x = 0; x < FIELD_COLS; x++) {
+                FarmFieldTile *target = &game_state.fieldTiles[y].rows[x];
+                if (!spread_targets[y][x] || target->value != ITEM_SOIL ||
+                    target->ground != ITEM_SOIL)
+                    continue;
+                target->value = ITEM_GRASS_SEEDS;
+                target->ground = ITEM_SOWN_SOIL;
+                target->kind = 0;
+                target->unused5 = 0;
+                target->growthFlags = 0;
+            }
+        }
+    }
+#endif
 }
 
 /* 1 when the farm is in `mode` and the cell's tile has no bit 3 hit. */

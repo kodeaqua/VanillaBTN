@@ -51,6 +51,19 @@ int main(int argc, char **argv) {
     CHECK(loaded.keyboard_layout == HM_KEYBOARD_LAYOUT_WASD);
     CHECK(loaded.mouse_mode == HM_MOUSE_MODE_ACTION);
 
+    /* Rebinding assigns a free scancode and rejects duplicate assignments. */
+    CHECK(hm_controls_bind(&loaded, 9, SDL_SCANCODE_C) == 1);
+    CHECK(loaded.keyboard_layout == HM_KEYBOARD_LAYOUT_CUSTOM);
+    CHECK(loaded.keyboard_mapping[6] == SDL_SCANCODE_C);
+    CHECK(hm_controls_bind(&loaded, 10, SDL_SCANCODE_C) == 0);
+#ifdef __ANDROID__
+    CHECK(loaded.virtual_pad_mapping[4] == 6);
+    CHECK(hm_controls_change(&loaded, HM_VIRTUAL_PAD_ROWS_START + 4, 1) == 1);
+    CHECK(loaded.virtual_pad_mapping[4] == 7);
+    hm_controls_row_value(&loaded, HM_VIRTUAL_PAD_ROWS_START + 4, val, sizeof(val));
+    CHECK(!strcmp(val, "Square"));
+#endif
+
     /* Check helper descriptions fit 34-char font box */
     for (int i = 0; i < 3; ++i) {
         char desc[128];

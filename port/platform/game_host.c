@@ -1,4 +1,7 @@
 #include "farm_state.h"
+#include "estate.h"
+#include "event_flags.h"
+#include "people/player.h"
 #if defined(__ANDROID__)
 #include <android/log.h>
 #endif
@@ -47,6 +50,7 @@
 #include "enhance/dithering/dithering.h"
 #endif
 #ifdef HMBTN_ENH_GAMEPLAY
+#include "enhance/gameplay/gameplay.h"
 #include "platform/gameplay_options.h"
 #endif
 #ifdef HMBTN_ENH_ANTIALIASING
@@ -61,6 +65,8 @@
 #include "psx/vram.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
+#include "items.h"
+#include "picture_cells.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -465,10 +471,6 @@ static int hm_host_gpu_present(const RECT *native_area) {
     if (!hm_gpu_replay) {
         hm_gpu_replay = hm_frame_replay_acquire();
         hm_gpu_cached_serial = 0;
-        if (!hm_gpu_replay) {
-            hm_host_gpu_coverage_record(0, "frame replay allocation or observer registration failed");
-            return 0;
-        }
     }
     /* Diagnostic capture deliberately uses the software reference. */
     if (SDL_getenv("HMBTN_CAPTURE_FRAME")) {
@@ -511,7 +513,7 @@ static int hm_host_gpu_present(const RECT *native_area) {
     }
 #endif
     hm_render_frame live = hm_game_render_frame();
-    u64 serial = hm_frame_replay_serial(hm_gpu_replay, &live);
+    u64 serial = hm_gpu_replay ? hm_frame_replay_serial(hm_gpu_replay, &live) : 0;
     int interpolate = 0;
 #if defined(HMBTN_ENH_INTERPOLATION) && defined(HMBTN_ENH_PAUSE_MENU)
     interpolate = hm_options.interpolation && live.eligible;
@@ -525,8 +527,20 @@ static int hm_host_gpu_present(const RECT *native_area) {
     texture_filter = (u32)hm_options.linear;
 #endif
     u64 cache_serial = interpolate ? 0 : serial;
-    int scanout_only = 0;
-    if (!cache_serial || hm_gpu_cached_serial != cache_serial || hm_gpu_cached.width != width ||
+    int scanout_only = hm_gpu_replay == NULL;
+    if (scanout_only) {
+        /* Replay capture is only one source of a frame. If observer or buffer
+         * allocation fails, the live VRAM page can still be rendered directly
+         * by the GPU before falling back to the CPU reference. */
+        hm_gpu_cached_serial = 0;
+        hm_gpu_cached = (hm_gpu_scene_data){0};
+        if (!hm_host_gpu_scanout_scene(native_area, width, height)) {
+            hm_host_gpu_coverage_record(
+                0, "frame replay allocation failed and GPU VRAM scanout was unavailable");
+            return 0;
+        }
+    } else if (!cache_serial || hm_gpu_cached_serial != cache_serial ||
+        hm_gpu_cached.width != width ||
         hm_gpu_cached.height != height ||
         (hm_gpu_cached.words && (hm_gpu_cached.words[11] != texture_filter ||
                                 hm_gpu_cached.words[15] != multisamples))) {
@@ -741,11 +755,161 @@ static int hm_host_gpu_present(const RECT *native_area) {
 #endif
 
 #ifdef HMBTN_ENH_PAUSE_MENU
-static void hm_host_pause(void) {
+#ifdef HMBTN_ENH_SHIPPING_BIN
+static u16 hm_pause_shipping_ids[ITEM_COUNT];
+static char hm_pause_shipping_text[ITEM_COUNT][32];
+static char hm_pause_rucksack_text[HM_PAUSE_RUCKSACK_ITEMS][32];
+
+static const char *hm_pause_item_name(int id) {
+    static const char *const crop_names[15] = {
+        "Turnip", "Potato", "Cucumber", "Strawberry", "Cabbage", "Tomato", "Corn",
+        "Onion", "Pumpkin", "Pineapple", "Eggplant", "Carrot", "Sweet Potato",
+        "Spinach", "Green Pepper"};
+    if (id >= ITEM_TURNIP && id < ITEM_GRASS)
+        return crop_names[id - ITEM_TURNIP];
+    switch (id) {
+    case ITEM_GRASS: return "Grass";
+    case ITEM_MOON_DROP_FLOWER: return "Moon Drop";
+    case ITEM_PINK_CAT_FLOWER: return "Pink Cat";
+    case ITEM_BLUE_MAGIC_RED_FLOWER: return "Blue Flower";
+    case ITEM_RED_MAGIC_RED_FLOWER: return "Red Flower";
+    case ITEM_TOY_FLOWER: return "Toy Flower";
+    case ITEM_ORANGE_CUP_FRUIT: return "Orange Cup";
+    case ITEM_APPLE: return "Apple";
+    case ITEM_BAMBOO_SHOOT: return "Bamboo Shoot";
+    case ITEM_WILD_GRAPE: return "Wild Grape";
+    case ITEM_MUSHROOM: return "Mushroom";
+    case ITEM_POISONOUS_MUSHROOM: return "Poison Mushroom";
+    case ITEM_TRUFFLE: return "Truffle";
+    case ITEM_BLUE_GRASS: return "Blue Grass";
+    case ITEM_RED_GRASS: return "Red Grass";
+    case ITEM_GREEN_GRASS: return "Green Grass";
+    case ITEM_GOLDEN_EGG: return "Golden Egg";
+    case ITEM_NORMAL_EGG: return "Egg";
+    case ITEM_GOOD_EGG: return "Good Egg";
+    case ITEM_EXCELLENT_EGG: return "Excellent Egg";
+    case ITEM_MILK_S: return "Small Milk";
+    case ITEM_MILK_M: return "Medium Milk";
+    case ITEM_MILK_L: return "Large Milk";
+    case ITEM_MILK_G: return "Gold Milk";
+    case ITEM_WOOL_S: return "Small Wool";
+    case ITEM_WOOL_M: return "Medium Wool";
+    case ITEM_WOOL_L: return "Large Wool";
+    case ITEM_WOOL_G: return "Gold Wool";
+    case ITEM_MAYONNAISE_S: return "Small Mayo";
+    case ITEM_MAYONNAISE_M: return "Medium Mayo";
+    case ITEM_MAYONNAISE_L: return "Large Mayo";
+    case ITEM_MAYONNAISE_G: return "Gold Mayo";
+    case ITEM_CHEESE_S: return "Small Cheese";
+    case ITEM_CHEESE_M: return "Medium Cheese";
+    case ITEM_CHEESE_L: return "Large Cheese";
+    case ITEM_CHEESE_G: return "Gold Cheese";
+    case ITEM_YARN_BALL_S: return "Small Yarn";
+    case ITEM_YARN_BALL_M: return "Medium Yarn";
+    case ITEM_YARN_BALL_L: return "Large Yarn";
+    case ITEM_YARN_G: return "Gold Yarn";
+    case ITEM_LARGE_FISH: return "Large Fish";
+    case ITEM_MEDIUM_FISH: return "Medium Fish";
+    case ITEM_SMALL_FISH: return "Small Fish";
+    default: return "Item";
+    }
+}
+
+static int hm_host_shipping_build_rows(hm_pause_view *view) {
+    int count = 0;
+    for (int id = 1; id < ITEM_COUNT && count < ITEM_COUNT; ++id) {
+        int amount = hm_gameplay_shipping_count(id);
+        if (amount <= 0 || estate_item_slot_index(id) < 0)
+            continue;
+        hm_pause_shipping_ids[count] = (u16)id;
+        SDL_snprintf(hm_pause_shipping_text[count], sizeof(hm_pause_shipping_text[count]),
+                     "%s x%d", hm_pause_item_name(id), amount);
+        view->shipping_items[count] = hm_pause_shipping_text[count];
+        ++count;
+    }
+    view->shipping_count = count;
+    for (int i = 0; i < HM_PAUSE_RUCKSACK_ITEMS; ++i) {
+        FarmStoredItem *item = i < game_state.player.itemSlots ? &game_state.player.items[i] : NULL;
+        if (!item || item->id == ITEM_NOTHING) {
+            SDL_snprintf(hm_pause_rucksack_text[i], sizeof(hm_pause_rucksack_text[i]), "Empty");
+        } else {
+            SDL_snprintf(hm_pause_rucksack_text[i], sizeof(hm_pause_rucksack_text[i]), "%s x%d",
+                         hm_pause_item_name(item->id), item->count);
+        }
+        view->rucksack_items[i] = hm_pause_rucksack_text[i];
+    }
+    return count;
+}
+
+static int hm_host_shipping_withdraw(int selected) {
+    if (selected < 0 || selected >= ITEM_COUNT)
+        return 0;
+    u16 id = hm_pause_shipping_ids[selected];
+    if (hm_gameplay_shipping_count(id) <= 0)
+        return 0;
+    int bin = estate_item_slot_index(id);
+    int price = item_sell_price(id);
+    if (bin < 0 || bin >= 25 || game_state.progress.estate.shipment.counts[bin] == 0 || price < 0)
+        return 0;
+    int slots = game_state.player.itemSlots;
+    if (slots < 0 || slots > HM_PAUSE_RUCKSACK_ITEMS)
+        return 0;
+
+    FarmStoredItem *destination = NULL;
+    if (hm_gameplay_item_stacking()) {
+        for (int i = 0; i < slots; ++i) {
+            FarmStoredItem *item = &game_state.player.items[i];
+            if (item->id == id && item->count > 0 && item->count < HM_STACK_MAX) {
+                destination = item;
+                ++destination->count;
+                break;
+            }
+        }
+    }
+    if (!destination) {
+        for (int i = 0; i < slots; ++i) {
+            if (game_state.player.items[i].id == ITEM_NOTHING) {
+                destination = &game_state.player.items[i];
+                picture_load_to_vram(id);
+                stored_item_set(destination, (s16)id, 0, 1);
+                break;
+            }
+        }
+    }
+    if (!destination)
+        return 0;
+
+    game_state.progress.estate.shipment.counts[bin]--;
+    if (game_state.progress.estate.shipment.shippedValue >= price)
+        game_state.progress.estate.shipment.shippedValue -= price;
+    else
+        game_state.progress.estate.shipment.shippedValue = 0;
+    if (id == ITEM_LARGE_FISH || id == ITEM_MEDIUM_FISH || id == ITEM_SMALL_FISH) {
+        if (game_state.progress.estate.shipmentTotal > 0)
+            game_state.progress.estate.shipmentTotal--;
+        if (game_state.progress.estate.shipmentTotal < 200)
+            event_flag_set(EVENT_FLAG_FISH_SHIPPED_200, 0);
+    }
+    hm_gameplay_shipping_forget(id);
+    return 1;
+}
+#endif
+
+static void hm_host_pause(int shipping) {
     hm_host_in_pause = 1;
     hm_pause_menu menu;
     hm_pause_open(&menu);
     menu.graphics_modern = hm_options.profile == HM_GRAPHICS_PROFILE_MODERN;
+#ifdef HMBTN_ENH_SHIPPING_BIN
+    if (shipping) {
+        menu.page = HM_PAUSE_SHIPPING;
+        menu.content_count = hm_host_shipping_build_rows(&(hm_pause_view){0});
+        if (menu.content_count == 0)
+            menu.content_count = 1;
+    }
+#else
+    (void)shipping;
+#endif
     Uint64 before = SDL_GetTicksNS();
     hm_audio_output_pause(1);
     hm_host_reset_presentation();
@@ -812,12 +976,17 @@ static void hm_host_pause(void) {
     if (!hm_host_image_size(pause_width, 240))
         hm_host_fail();
     int running = 1;
+    int keyboard_capture_item = -1;
     const char *notice = "";
     char value[128] = "";
     char rows[HM_PAUSE_MAX_VIEW_ITEMS][32] = {{0}};
     hm_pause_view view = {.detail = value};
     for (int i = 0; i < HM_PAUSE_MAX_VIEW_ITEMS; ++i)
         view.values[i] = rows[i];
+#ifdef HMBTN_ENH_SHIPPING_BIN
+        if (shipping)
+            hm_host_shipping_build_rows(&view);
+#endif
     int value_dirty = 1;
     hm_mouse_reset();
     while (running) {
@@ -829,6 +998,22 @@ static void hm_host_pause(void) {
                 exit(0);
             }
             hm_host_display_event(event.type);
+            if (keyboard_capture_item >= 0) {
+                if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat) {
+                    if (event.key.key == SDLK_ESCAPE || event.key.key == SDLK_AC_BACK) {
+                        notice = "Key binding cancelled";
+                    } else if (hm_controls_bind(&hm_controls, keyboard_capture_item,
+                                                event.key.scancode)) {
+                        notice = hm_controls_save(&hm_controls) ? "Key binding saved" :
+                                                                  "Cannot save settings";
+                    } else {
+                        notice = "Key is already assigned or unavailable";
+                    }
+                    keyboard_capture_item = -1;
+                    value_dirty = 1;
+                }
+                continue;
+            }
             hm_pause_input input;
             if (event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN) {
                 switch (event.gbutton.button) {
@@ -858,8 +1043,18 @@ static void hm_host_pause(void) {
 #endif
                     int vx, vy;
                     if (hm_mouse_calc_virtual_pos(event.motion.x, event.motion.y, win_w, win_h, &vx, &vy)) {
-                        if (menu.page == HM_PAUSE_GRAPHICS || menu.page == HM_PAUSE_GAMEPLAY ||
-                            menu.page == HM_PAUSE_CONTROLS || menu.page == HM_PAUSE_AUDIO) {
+                        if (menu.page == HM_PAUSE_SHIPPING) {
+                            if (vx >= 20 && vx < 300 && vy >= 121 && vy < 188) {
+                                int row = (vy - 121) / 17;
+                                int idx = menu.first_visible + row;
+                                if (idx < view.shipping_count && menu.selected != idx) {
+                                    menu.selected = idx;
+                                    value_dirty = 1;
+                                }
+                            }
+                        } else if (menu.page == HM_PAUSE_GRAPHICS || menu.page == HM_PAUSE_GAMEPLAY ||
+                            menu.page == HM_PAUSE_CONTROLS || menu.page == HM_PAUSE_AUDIO ||
+                            menu.page == HM_PAUSE_BLESSINGS) {
                             if (vx >= 20 && vx < 300 && vy >= 45 && vy < 45 + HM_PAUSE_VISIBLE_ROWS * 20) {
                                 int row = (vy - 45) / 20;
                                 int idx = menu.first_visible + row;
@@ -872,11 +1067,12 @@ static void hm_host_pause(void) {
                             int root = menu.page == HM_PAUSE_ROOT;
                             int top = root ? 54 : 38;
                             int row_start = top + (root ? 44 : 42);
+                            int row_step = root ? 20 : 24;
                             int count = hm_pause_count(&menu);
                             if (vx >= 80 && vx < 240) {
                                 for (int i = 0; i < count; ++i) {
-                                    int ry = row_start + i * 24 - 4;
-                                    if (vy >= ry && vy < ry + 22) {
+                                    int ry = row_start + i * row_step - (root ? 3 : 4);
+                                    if (vy >= ry && vy < ry + (root ? 19 : 22)) {
                                         if (menu.selected != i) {
                                             menu.selected = i;
                                             value_dirty = 1;
@@ -902,8 +1098,22 @@ static void hm_host_pause(void) {
 #endif
                         int vx, vy;
                         if (hm_mouse_calc_virtual_pos(event.button.x, event.button.y, win_w, win_h, &vx, &vy)) {
-                            if (menu.page == HM_PAUSE_GRAPHICS || menu.page == HM_PAUSE_GAMEPLAY ||
-                                menu.page == HM_PAUSE_CONTROLS || menu.page == HM_PAUSE_AUDIO) {
+                            if (menu.page == HM_PAUSE_SHIPPING) {
+                                if (vx >= 20 && vx < 300 && vy >= 121 && vy < 188) {
+                                    int row = (vy - 121) / 17;
+                                    int idx = menu.first_visible + row;
+                                    if (idx < view.shipping_count) {
+                                        menu.selected = idx;
+                                        input = HM_PAUSE_CONFIRM;
+                                    } else {
+                                        continue;
+                                    }
+                                } else {
+                                    continue;
+                                }
+                            } else if (menu.page == HM_PAUSE_GRAPHICS || menu.page == HM_PAUSE_GAMEPLAY ||
+                                menu.page == HM_PAUSE_CONTROLS || menu.page == HM_PAUSE_AUDIO ||
+                                menu.page == HM_PAUSE_BLESSINGS) {
                                 if (vx >= 20 && vx < 300 && vy >= 45 && vy < 45 + HM_PAUSE_VISIBLE_ROWS * 20) {
                                     int row = (vy - 45) / 20;
                                     int idx = menu.first_visible + row;
@@ -924,12 +1134,13 @@ static void hm_host_pause(void) {
                                 int root = menu.page == HM_PAUSE_ROOT;
                                 int top = root ? 54 : 38;
                                 int row_start = top + (root ? 44 : 42);
+                                int row_step = root ? 20 : 24;
                                 int count = hm_pause_count(&menu);
                                 int found = 0;
                                 if (vx >= 80 && vx < 240) {
                                     for (int i = 0; i < count; ++i) {
-                                        int ry = row_start + i * 24 - 4;
-                                        if (vy >= ry && vy < ry + 22) {
+                                        int ry = row_start + i * row_step - (root ? 3 : 4);
+                                        if (vy >= ry && vy < ry + (root ? 19 : 22)) {
                                             menu.selected = i;
                                             input = HM_PAUSE_CONFIRM;
                                             found = 1;
@@ -1059,6 +1270,63 @@ static void hm_host_pause(void) {
                     notice = hm_audio_save(&hm_audio) ? "" : "Cannot save settings";
                 }
             }
+            if (action == HM_PAUSE_USE_BLESSING) {
+                if (menu.selected == 0) {
+                    estate_gold_change(10000, 0);
+                    notice = "The Goddess added 10000G";
+                } else if (menu.selected == 1) {
+                    game_state.player.stamina = game_state.player.maxStamina;
+                    game_state.player.fatigue = 0;
+                    game_state.player.latches &= (u16)~(PLAYER_LATCH_STAMINA_EMPTY |
+                        PLAYER_LATCH_STAMINA_UNDER_10 | PLAYER_LATCH_STAMINA_UNDER_30 |
+                        PLAYER_LATCH_STAMINA_UNDER_50 | PLAYER_LATCH_FATIGUE_MAX |
+                        PLAYER_LATCH_FATIGUE_80 | PLAYER_LATCH_FATIGUE_50);
+                    notice = "Your stamina and fatigue are restored";
+                } else if (menu.selected == 2) {
+                    estate_fodder_add(FODDER_ADD_BOUGHT, 10);
+                    notice = "The Goddess added 10 fodder";
+                } else if (menu.selected == 3) {
+                    estate_chicken_feed_add(2, 10);
+                    notice = "The Goddess added 10 chicken feed";
+                } else {
+                    estate_fish_food_add(FISH_FOOD_ADD_AMOUNT, 10);
+                    notice = "The Goddess added 10 fish food";
+                }
+                value_dirty = 1;
+            }
+            if (action == HM_PAUSE_REMAP_CONTROLS) {
+                keyboard_capture_item = menu.selected;
+                notice = "Press a key to bind; ESC cancels";
+                value_dirty = 1;
+            }
+            if (action == HM_PAUSE_EDIT_TOUCH_LAYOUT) {
+                if (!hm_controls.virtual_gamepad_enabled) {
+                    notice = "Enable Virtual Gamepad first";
+                } else {
+                    notice = hm_user_data_set_nested_setting("controls", "virtual_gamepad_edit", "true")
+                                 ? "Drag buttons; tap Done to finish"
+                                 : "Cannot save settings";
+                }
+                value_dirty = 1;
+            }
+#ifdef HMBTN_ENH_SHIPPING_BIN
+            if (action == HM_PAUSE_CHANGE_SHIPPING) {
+                if (menu.selected < view.shipping_count && hm_host_shipping_withdraw(menu.selected)) {
+                    notice = "Item returned to rucksack";
+                } else if (view.shipping_count == 0) {
+                    notice = "No shipped items to take";
+                } else {
+                    notice = "Rucksack is full";
+                }
+                int count = hm_host_shipping_build_rows(&view);
+                menu.content_count = count > 0 ? count : 1;
+                if (menu.selected >= count)
+                    menu.selected = count > 0 ? count - 1 : 0;
+                if (menu.first_visible > menu.selected)
+                    menu.first_visible = menu.selected;
+                value_dirty = 1;
+            }
+#endif
         }
         if (!running)
             break;
@@ -1093,6 +1361,20 @@ static void hm_host_pause(void) {
                 if (menu.page == HM_PAUSE_AUDIO)
                     for (int i = 0; i < HM_PAUSE_AUDIO_ITEMS; ++i)
                         hm_audio_row_value(&hm_audio, i, rows[i], sizeof(rows[i]));
+                if (menu.page == HM_PAUSE_BLESSINGS) {
+                    for (int i = 0; i < HM_PAUSE_BLESSINGS_ITEMS; ++i)
+                        snprintf(rows[i], sizeof(rows[i]), "Use");
+                    value[0] = 0;
+                }
+#ifdef HMBTN_ENH_SHIPPING_BIN
+                if (menu.page == HM_PAUSE_SHIPPING) {
+                    int count = hm_host_shipping_build_rows(&view);
+                    menu.content_count = count > 0 ? count : 1;
+                    view.shipping_first = menu.first_visible;
+                    if (count == 0)
+                        view.shipping_items[0] = "No shipped items";
+                }
+#endif
                 value_dirty = 0;
             }
             view.notice = notice;
@@ -1698,9 +1980,13 @@ static void hm_host_poll_events(void) {
 #ifdef HMBTN_ENH_PAUSE_MENU
         if (hm_pause_enabled && event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat &&
             (event.key.key == SDLK_ESCAPE || event.key.key == SDLK_AC_BACK))
-            hm_host_pause();
+            hm_host_pause(0);
 #endif
     }
+#ifdef HMBTN_ENH_SHIPPING_BIN
+    if (hm_pause_enabled && hm_gameplay_shipping_take_request())
+        hm_host_pause(1);
+#endif
 }
 
 static void hm_host_events(void) {
@@ -1843,6 +2129,13 @@ static void hm_host_tick(void *context, u64 tick) {
         for (u32 i = 0; i < 16; ++i)
             if (mapping_wasd[i] != SDL_SCANCODE_UNKNOWN && keys[mapping_wasd[i]])
                 held |= (u16)(1u << i);
+    } else if (hm_controls.keyboard_layout == HM_KEYBOARD_LAYOUT_CUSTOM) {
+        const bool *keys = SDL_GetKeyboardState(NULL);
+        for (u32 i = 0; i < 16; ++i) {
+            int scancode = hm_controls.keyboard_mapping[i];
+            if (scancode > SDL_SCANCODE_UNKNOWN && scancode < SDL_SCANCODE_COUNT && keys[scancode])
+                held |= (u16)(1u << i);
+        }
     }
     if (hm_controls.controller_enabled && hm_active_gamepad) {
         if (SDL_GetGamepadButton(hm_active_gamepad, SDL_GAMEPAD_BUTTON_DPAD_UP))
@@ -1922,20 +2215,16 @@ static void hm_host_tick(void *context, u64 tick) {
     }
 #ifdef __ANDROID__
     const bool *android_keys = SDL_GetKeyboardState(NULL);
-    if (android_keys[SDL_SCANCODE_RETURN]) held |= HM_PAD_START;
-    if (android_keys[SDL_SCANCODE_BACKSPACE]) held |= HM_PAD_SELECT;
-    if (android_keys[SDL_SCANCODE_X]) held |= HM_PAD_CROSS;
-    if (android_keys[SDL_SCANCODE_D]) held |= HM_PAD_CIRCLE;
-    if (android_keys[SDL_SCANCODE_Z]) held |= HM_PAD_SQUARE;
-    if (android_keys[SDL_SCANCODE_W]) held |= HM_PAD_TRIANGLE;
-    if (android_keys[SDL_SCANCODE_A]) held |= HM_PAD_L1;
-    if (android_keys[SDL_SCANCODE_S]) held |= HM_PAD_R1;
-    if (android_keys[SDL_SCANCODE_Q]) held |= HM_PAD_L2;
-    if (android_keys[SDL_SCANCODE_E]) held |= HM_PAD_R2;
-    if (android_keys[SDL_SCANCODE_UP]) held |= HM_PAD_UP;
-    if (android_keys[SDL_SCANCODE_DOWN]) held |= HM_PAD_DOWN;
-    if (android_keys[SDL_SCANCODE_LEFT]) held |= HM_PAD_LEFT;
-    if (android_keys[SDL_SCANCODE_RIGHT]) held |= HM_PAD_RIGHT;
+    static const SDL_Scancode virtual_pad_keys[HM_VIRTUAL_PAD_ACTIONS] = {
+        SDL_SCANCODE_F1, SDL_SCANCODE_F2, SDL_SCANCODE_F3, SDL_SCANCODE_F4,
+        SDL_SCANCODE_F5, SDL_SCANCODE_F6, SDL_SCANCODE_F7, SDL_SCANCODE_F8,
+        SDL_SCANCODE_F9, SDL_SCANCODE_F10, SDL_SCANCODE_F11, SDL_SCANCODE_F12,
+        SDL_SCANCODE_PRINTSCREEN, SDL_SCANCODE_SCROLLLOCK};
+    for (int i = 0; i < HM_VIRTUAL_PAD_ACTIONS; ++i) {
+        int action = hm_controls.virtual_pad_mapping[i];
+        if (android_keys[virtual_pad_keys[i]] && action >= 0 && action < 16)
+            held |= (u16)(1u << action);
+    }
 #endif
     if (hm_replay_enabled)
         held = hm_input_replay_sample(&hm_replay, tick);
@@ -2069,6 +2358,10 @@ int hm_game_host_start(hm_disc *disc) {
     hm_graphics_load(&hm_options);
 #ifdef HMBTN_ENH_GAMEPLAY
     hm_gameplay_load(&hm_gameplay);
+    if (!hm_pause_enabled && hm_gameplay.shipping_bin) {
+        hm_gameplay.shipping_bin = 0;
+        hm_gameplay_set_active(&hm_gameplay);
+    }
 #endif
     if (!hm_graphics_apply(hm_window, &hm_options)) {
 #if defined(__ANDROID__)

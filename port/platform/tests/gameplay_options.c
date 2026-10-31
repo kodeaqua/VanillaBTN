@@ -197,6 +197,9 @@ int main(int argc, char **argv) {
     CHECK(opt.tool_charge_gauge == 0);
     CHECK(opt.tile_targeting == 0);
     CHECK(opt.npc_bonds == 0);
+    CHECK(opt.grass_spread == 0);
+    CHECK(opt.slow_farm_time == 0);
+    CHECK(opt.shipping_bin == 0);
 
     CHECK(hm_gameplay_walk_through_crops() == 0);
     CHECK(hm_gameplay_item_stacking() == 0);
@@ -218,6 +221,13 @@ int main(int argc, char **argv) {
     CHECK(hm_gameplay_tool_charge_gauge() == 0);
     CHECK(hm_gameplay_tile_targeting() == 0);
     CHECK(hm_gameplay_npc_bonds() == 0);
+    CHECK(hm_gameplay_grass_spread() == 0);
+    CHECK(hm_gameplay_slow_farm_time() == 0);
+    CHECK(hm_gameplay_shipping_bin() == 0);
+    CHECK(hm_gameplay_grass_spread_due(1, 2, 3, 4, 5) ==
+          hm_gameplay_grass_spread_due(1, 2, 3, 4, 5));
+    CHECK(hm_gameplay_grass_spread_direction(1, 2, 3, 4, 5) >= 0 &&
+          hm_gameplay_grass_spread_direction(1, 2, 3, 4, 5) < 4);
 
     char val[64];
     hm_gameplay_row_value(&opt, 0, val, sizeof(val));
@@ -263,6 +273,49 @@ int main(int argc, char **argv) {
     hm_gameplay_row_value(&opt, 11, val, sizeof(val));
     CHECK(!strcmp(val, "On"));
 
+    int extra = 12;
+#ifdef HMBTN_ENH_GRASS_SPREAD
+    CHECK(hm_gameplay_change(&opt, extra, 1) == 1);
+    CHECK(opt.grass_spread == 1 && hm_gameplay_grass_spread() == 1);
+    hm_gameplay_row_value(&opt, extra, val, sizeof(val));
+    CHECK(!strcmp(val, "On"));
+    int spread_due_count = 0;
+    int spread_direction_mask = 0;
+    for (int day = 0; day < 28; ++day) {
+        for (int row = 0; row < 25; ++row) {
+            for (int column = 0; column < 45; ++column) {
+                int due = hm_gameplay_grass_spread_due(1, 0, day, row, column);
+                int direction = hm_gameplay_grass_spread_direction(1, 0, day, row, column);
+                CHECK(due == hm_gameplay_grass_spread_due(1, 0, day, row, column));
+                CHECK(direction >= 0 && direction < 4);
+                spread_due_count += due;
+                if (due)
+                    spread_direction_mask |= 1 << direction;
+            }
+        }
+    }
+    CHECK(spread_due_count > 0 && spread_due_count < 28 * 25 * 45);
+    CHECK(spread_direction_mask == 0x0F);
+    ++extra;
+#endif
+#ifdef HMBTN_ENH_SLOW_FARM_TIME
+    CHECK(hm_gameplay_change(&opt, extra, 1) == 1);
+    CHECK(opt.slow_farm_time == 1 && hm_gameplay_slow_farm_time() == 1);
+    ++extra;
+#endif
+#ifdef HMBTN_ENH_SHIPPING_BIN
+    CHECK(hm_gameplay_change(&opt, extra, 1) == 1);
+    CHECK(opt.shipping_bin == 1 && hm_gameplay_shipping_bin() == 1);
+    hm_gameplay_shipping_clear();
+    hm_gameplay_shipping_record(ITEM_TURNIP);
+    CHECK(hm_gameplay_shipping_count(ITEM_TURNIP) == 1);
+    hm_gameplay_shipping_forget(ITEM_TURNIP);
+    CHECK(hm_gameplay_shipping_count(ITEM_TURNIP) == 0);
+    hm_gameplay_shipping_request();
+    CHECK(hm_gameplay_shipping_take_request() == 1);
+    CHECK(hm_gameplay_shipping_take_request() == 0);
+#endif
+
     /* Test save & load persistence */
     CHECK(hm_gameplay_save(&opt) == 1);
 
@@ -277,6 +330,15 @@ int main(int argc, char **argv) {
     CHECK(loaded.tool_charge_gauge == 1);
     CHECK(loaded.tile_targeting == 1);
     CHECK(loaded.npc_bonds == 1);
+#ifdef HMBTN_ENH_GRASS_SPREAD
+    CHECK(loaded.grass_spread == 1);
+#endif
+#ifdef HMBTN_ENH_SLOW_FARM_TIME
+    CHECK(loaded.slow_farm_time == 1);
+#endif
+#ifdef HMBTN_ENH_SHIPPING_BIN
+    CHECK(loaded.shipping_bin == 1);
+#endif
 
     hm_gameplay_defaults(&opt);
     hm_gameplay_set_active(&opt);
@@ -290,6 +352,9 @@ int main(int argc, char **argv) {
     CHECK(hm_gameplay_tool_charge_gauge() == 0);
     CHECK(hm_gameplay_tile_targeting() == 0);
     CHECK(hm_gameplay_npc_bonds() == 0);
+    CHECK(hm_gameplay_grass_spread() == 0);
+    CHECK(hm_gameplay_slow_farm_time() == 0);
+    CHECK(hm_gameplay_shipping_bin() == 0);
 
     SDL_free(root);
     SDL_Quit();

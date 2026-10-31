@@ -802,6 +802,9 @@ s32 estate_shipment_add(s32 itemId) {
     if (index == -1) {
         return 0;
     }
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_SHIPPING_BIN)
+    hm_gameplay_shipping_record(id);
+#endif
     shipment->counts[index]++;
     if (shipment->counts[index] >= 1000U) {
         shipment->counts[index] = ESTATE_STOCK_MAX;
@@ -882,6 +885,9 @@ s32 estate_shipment_settle(void) {
 
     if (event_flag_get(EVENT_FLAG_SHIPMENT_SETTLED) == 1) return 1;
     event_flag_set(EVENT_FLAG_SHIPMENT_SETTLED, 1);
+#if defined(HMBTN_PORT) && defined(HMBTN_ENH_SHIPPING_BIN)
+    hm_gameplay_shipping_clear();
+#endif
     if (clock_date_index(game_state.progress.clock.date.season, game_state.progress.clock.date.day) != 0) return 1;
     shipment = &game_state.progress.estate.shipment;
     estate_gold_change(shipment->shippedValue, 0);

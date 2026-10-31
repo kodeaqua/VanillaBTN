@@ -17,6 +17,9 @@ typedef struct {
     int tool_charge_gauge;  /* 0 = Off, 1 = On */
     int tile_targeting;     /* 0 = Off, 1 = On */
     int npc_bonds;          /* 0 = Off, 1 = On */
+    int grass_spread;       /* 0 = Off, 1 = On */
+    int slow_farm_time;     /* 0 = Off, 1 = On */
+    int shipping_bin;       /* 0 = Off, 1 = On */
 } hm_gameplay_options;
 
 void hm_gameplay_defaults(hm_gameplay_options *options);

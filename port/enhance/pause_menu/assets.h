@@ -4,13 +4,18 @@
 #include "psx/disc.h"
 
 enum { HM_PAUSE_FONT_W = 128, HM_PAUSE_FONT_H = 120 };
-enum { HM_PAUSE_MAX_VIEW_ITEMS = 16 };
+enum { HM_PAUSE_MAX_VIEW_ITEMS = 40 };
+enum { HM_PAUSE_SHIPPING_ITEMS = 380, HM_PAUSE_RUCKSACK_ITEMS = 8 };
 typedef struct {
     u16 font[HM_PAUSE_FONT_W * HM_PAUSE_FONT_H];
     u16 font_light[HM_PAUSE_FONT_W * HM_PAUSE_FONT_H];
 } hm_pause_assets;
 typedef struct {
     const char *values[HM_PAUSE_MAX_VIEW_ITEMS];
+    const char *shipping_items[HM_PAUSE_SHIPPING_ITEMS];
+    const char *rucksack_items[HM_PAUSE_RUCKSACK_ITEMS];
+    int shipping_count;
+    int shipping_first;
     const char *detail;
     const char *notice;
 } hm_pause_view;
