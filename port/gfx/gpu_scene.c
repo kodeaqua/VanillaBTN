@@ -868,6 +868,7 @@ static void hm_scene_command(void *context, const u32 *w, u32 available, int aft
             height = (w[3] >> 16) & 511u;
             width = width ? width : HM_VRAM_WIDTH;
             height = height ? height : HM_VRAM_HEIGHT;
+            hm_scene_texture_tiles(s, source_x, source_y, width, height, 1);
             int source_written = hm_scene_source_has_writes(s, source_x, source_y, width, height);
             if (source_written) {
                 if (!s->materialize_vram)
@@ -945,6 +946,27 @@ void hm_gpu_scene_materialize_vram(hm_gpu_scene *s, int enabled) {
 }
 int hm_gpu_scene_needs_materialization(const hm_gpu_scene *s) {
     return s && s->needs_materialization;
+}
+u32 hm_gpu_scene_materialization_mask(const hm_gpu_scene *s,
+                                     u64 tiles[HM_VRAM_DIRTY_ROWS]) {
+    if (!tiles)
+        return 0;
+    if (!s) {
+        memset(tiles, 0, sizeof(u64) * HM_VRAM_DIRTY_ROWS);
+        return 0;
+    }
+    /* Only scene writes that can feed a scene read need CPU materialization. */
+    for (u32 y = 0; y < HM_VRAM_DIRTY_ROWS; ++y)
+        tiles[y] = s->texture_reads[y] & s->written_tiles[y];
+    u32 count = 0;
+    for (u32 y = 0; y < HM_VRAM_DIRTY_ROWS; ++y) {
+        u64 row = tiles[y];
+        while (row) {
+            row &= row - 1;
+            ++count;
+        }
+    }
+    return count;
 }
 static u32 hm_scene_consume(void *context, const u32 *w, u32 available) {
     hm_gpu_scene *s = context;

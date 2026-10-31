@@ -432,18 +432,32 @@ static int hm_probe_dynamic_scene(SDL_GPUDevice *device, hm_gpu_renderer *render
 }
 static int hm_probe_texture_feedback(SDL_GPUDevice *device, hm_gpu_renderer *renderer,
                                      hm_gpu_scene *builder) {
-    const u32 commands[] = {0x600000ff, 0x00020002, 0x00010001, 0xe1000100,
+    const u32 commands[] = {0x600000ff, 0x00020002, 0x00010001,
+                            0x6000ff00, 0x00140014, 0x00040004, 0xe1000100,
                             0x65000001, 0x00040004, 0x00020002, 0x00010001};
     setup();
-    hm_gpu_scene_materialize_vram(builder, 1);
     RECT area = {0, 0, 32, 32};
     hm_replay_sink previous = hm_gpu_scene_begin(builder, 32, 32);
     hm_replay_begin(&area);
     hm_gpu_execute_words(commands, sizeof commands / sizeof *commands);
     hm_gpu_scene_data scene;
     CHECK(hm_gpu_scene_end(builder, previous, &scene));
+    CHECK(hm_gpu_scene_needs_materialization(builder));
+    u64 materialization_tiles[HM_VRAM_DIRTY_ROWS];
+    CHECK(hm_gpu_scene_materialization_mask(builder, materialization_tiles) > 0);
+    hm_vram_snapshot(&work_vram);
+    hm_vram_context *native = hm_vram_bind(&work_vram);
+    hm_vram_write_filter_begin(materialization_tiles);
+    hm_gpu_scene_materialize_vram(builder, 1);
+    previous = hm_gpu_scene_begin(builder, 32, 32);
+    hm_replay_begin(&area);
+    hm_gpu_execute_words(commands, sizeof commands / sizeof *commands);
+    hm_vram_write_filter_end();
+    hm_vram_bind(native);
+    hm_gpu_scene_materialize_vram(builder, 0);
+    CHECK(hm_gpu_scene_end(builder, previous, &scene));
     CHECK(scene.vram_version_count == 1);
-    CHECK(scene.words[scene.words[8] + HM_SCENE_STRIDE + 40] == 1);
+    CHECK(scene.words[scene.words[8] + HM_SCENE_STRIDE * 2 + 40] == 1);
     CHECK(!readback(device, renderer, &scene, actual));
 
     setup();
@@ -462,7 +476,6 @@ static int hm_probe_texture_feedback(SDL_GPUDevice *device, hm_gpu_renderer *ren
                 }
             }
         }
-    hm_gpu_scene_materialize_vram(builder, 0);
     puts("Ordered VRAM texture feedback matches the CPU raster reference.");
     return 0;
 }

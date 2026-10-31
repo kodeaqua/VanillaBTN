@@ -88,17 +88,24 @@ windows presented at 12-14 FPS, with 6.3-40.2 ms average GPU submit. This
 identifies the second CPU reference replay and its full-image snapshot lookup
 as the dominant measured cost. Thermal status remained normal.
 
-The current source replaces repeated full-image snapshot scans in the private
-materialization replay with 16x16 dirty-tile fingerprints. It hashes only the
-materializing replay and still verifies matching fingerprints with an exact
-full-image comparison. Windows Release rebuilt with all 124 tests passing; the
-updated Android APK is built but has not yet been run on the G100. Package
-manager reports that the APK currently open on the tablet was installed at
-08:17, before the current source build. Its 08:31 log still shows 133-148 ms
-materialization and 86-93 ms average presents, so those values do not measure
-the snapshot change. The ROM rejects `simpleperf` events (`cpu-cycles`,
-`cpu-clock`, and `task-clock`), preventing a function-level profile. No
-post-change gameplay performance claim is established.
+The private materialization replay now tracks 16x16 dirty-tile fingerprints,
+and filters CPU VRAM writes to tiles read by the captured scene. It skips
+unneeded horizontal tile spans in polygon and rectangle raster loops. Snapshot
+matches still use an exact full-image comparison after their hashes match. On
+the G100, the first APK with write filtering reduced measured average
+materialization from the earlier 97.5-142.9 ms range to 23.7-37.7 ms across
+sampled farm windows. Those windows reported 17.4-25.0 ms average presents and
+127-182 materialized tiles. The following tile-span build measured 21.2-26.6 ms
+materialization, 18.5-27.8 ms scene preparation, and 14.0-19.2 ms average
+presents at 384x240. The owner still reports lag and audio crackle. The current
+source further narrows the materialization mask to tiles that are both read and
+written by the scene. The 08:54 APK also reports the game's audio-ring underrun,
+dropped-frame, and queue counters alongside GPU timing. It is installed on the
+tablet; post-change gameplay and audio measurements are still pending. Android's
+audio service reported zero hardware mixer underruns during the prior run, but
+those counters do not include the game's private SDL audio ring. The ROM rejects
+`simpleperf` events (`cpu-cycles`, `cpu-clock`, and `task-clock`), preventing a
+function-level profile.
 
 The probe's `--farm-benchmark` option renders 8,192 fixed 8x8 rectangles at
 320x240 and 960x720, with a fresh builder and an explicit GPU fence per frame.

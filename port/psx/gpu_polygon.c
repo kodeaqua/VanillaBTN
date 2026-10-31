@@ -80,6 +80,7 @@ static void hm_triangle(hm_vertex a, hm_vertex b, hm_vertex c, u32 opcode, u16 c
     u32 page = draw->tpage, depth = (page >> 7) & 3u;
     hm_vram_context *vram = hm_vram_mutable_state();
     u16 (*vram_pixels)[HM_VRAM_WIDTH] = vram->pixels;
+    int filter_writes = hm_vram_write_filter_active();
     u16 set_mask = vram->set_mask, check_mask = vram->check_mask;
     u32 blend_mode = (page >> 5) & 3u;
     int check_disp = !draw->dfe && state->display_enabled;
@@ -105,11 +106,27 @@ static void hm_triangle(hm_vertex a, hm_vertex b, hm_vertex c, u32 opcode, u16 c
     s64 dx1 = -(s64)(a.y - c.y) * 2, dy1 = (s64)(a.x - c.x) * 2;
     s64 dx2 = -(s64)(b.y - a.y) * 2, dy2 = (s64)(b.x - a.x) * 2;
     for (s32 y = miny; y < maxy; ++y, row0 += dy0, row1 += dy1, row2 += dy2) {
+        u64 allowed_tiles = hm_vram_write_filter_row((u32)y);
+        if (filter_writes && !allowed_tiles)
+            continue;
         s64 weight[3] = {row0, row1, row2};
         u16 *vram_row = vram_pixels[y];
         u64 dirty_mask = 0;
         int row_disp = check_disp && y >= disp_y0 && y < disp_y1;
         for (s32 x = minx; x < maxx; ++x, weight[0] += dx0, weight[1] += dx1, weight[2] += dx2) {
+            if (filter_writes && !(allowed_tiles & (UINT64_C(1) << ((u32)x >> 4)))) {
+                s32 tile_end = (s32)((((u32)x >> 4) + 1u) << 4);
+                if (tile_end > maxx)
+                    tile_end = maxx;
+                s32 skip = tile_end - x - 1;
+                if (skip > 0) {
+                    x += skip;
+                    weight[0] += dx0 * skip;
+                    weight[1] += dx1 * skip;
+                    weight[2] += dx2 * skip;
+                }
+                continue;
+            }
             if (weight[0] < 0 || (!weight[0] && !edge0) || weight[1] < 0 ||
                 (!weight[1] && !edge1) || weight[2] < 0 || (!weight[2] && !edge2))
                 continue;

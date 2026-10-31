@@ -42,8 +42,9 @@ void hm_audio_output_stop(void) {
         SDL_CloseAudioDevice(hm_audio_device);
         hm_audio_device = 0;
         fprintf(stderr, "Audio output frames=%llu underflows=%llu dropped=%llu\n",
-                (unsigned long long)hm_audio.rendered, (unsigned long long)hm_audio.underflows,
-                (unsigned long long)hm_audio.dropped);
+                (unsigned long long)atomic_load_explicit(&hm_audio.rendered, memory_order_relaxed),
+                (unsigned long long)atomic_load_explicit(&hm_audio.underflows, memory_order_relaxed),
+                (unsigned long long)atomic_load_explicit(&hm_audio.dropped, memory_order_relaxed));
     }
 }
 void hm_audio_output_pause(int paused) {
@@ -53,4 +54,16 @@ void hm_audio_output_pause(int paused) {
         else
             SDL_ResumeAudioDevice(hm_audio_device);
     }
+}
+void hm_audio_output_get_stats(hm_audio_output_stats *stats) {
+    if (!stats)
+        return;
+    u32 read = atomic_load_explicit(&hm_audio.read, memory_order_relaxed);
+    u32 write = atomic_load_explicit(&hm_audio.write, memory_order_acquire);
+    stats->queued_frames = write - read;
+    stats->rendered_frames =
+        atomic_load_explicit(&hm_audio.rendered, memory_order_relaxed);
+    stats->underflow_frames =
+        atomic_load_explicit(&hm_audio.underflows, memory_order_relaxed);
+    stats->dropped_frames = atomic_load_explicit(&hm_audio.dropped, memory_order_relaxed);
 }

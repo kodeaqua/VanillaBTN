@@ -7,6 +7,8 @@
 static hm_vram_context hm_default_vram;
 static hm_vram_context *hm_context = &hm_default_vram;
 static u64 hm_vram_gen = 1;
+static u64 hm_write_filter[HM_VRAM_DIRTY_ROWS];
+static int hm_write_filter_enabled;
 /* MoveImage is synchronous in the native backend. Preserve overlapping source
  * pixels before writes, matching the source-preserving transfer contract. */
 static u16 hm_move_image_scratch[HM_VRAM_WIDTH * HM_VRAM_HEIGHT];
@@ -60,9 +62,35 @@ void hm_vram_acknowledge(u32 tile_y, u64 tiles) {
     hm_dirty[tile_y] &= ~tiles;
 }
 
+void hm_vram_write_filter_begin(const u64 tiles[HM_VRAM_DIRTY_ROWS]) {
+    if (!tiles)
+        hm_runtime_error("hm_vram_write_filter_begin", "null tile mask");
+    memcpy(hm_write_filter, tiles, sizeof(hm_write_filter));
+    hm_write_filter_enabled = 1;
+}
+
+void hm_vram_write_filter_end(void) { hm_write_filter_enabled = 0; }
+
+int hm_vram_write_filter_active(void) { return hm_write_filter_enabled; }
+
+u64 hm_vram_write_filter_row(u32 y) {
+    if (!hm_write_filter_enabled)
+        return UINT64_MAX;
+    return hm_write_filter[(y & 511u) >> 4];
+}
+
+int hm_vram_write_allowed(u32 x, u32 y) {
+    if (!hm_write_filter_enabled)
+        return 1;
+    u32 tile_x = (x & 1023u) >> 4, tile_y = (y & 511u) >> 4;
+    return (hm_write_filter[tile_y] & (UINT64_C(1) << tile_x)) != 0;
+}
+
 static void hm_vram_put(u32 x, u32 y, u16 value, int masked) {
     x &= 1023;
     y &= 511;
+    if (hm_write_filter_enabled && !hm_vram_write_allowed(x, y))
+        return;
     if (masked) {
         if (hm_vram[y][x] & hm_check_mask)
             return;

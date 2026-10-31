@@ -5,6 +5,9 @@ void hm_audio_ring_init(hm_audio_ring *ring, u32 prebuffer) {
     memset(ring, 0, sizeof(*ring));
     atomic_init(&ring->read, 0);
     atomic_init(&ring->write, 0);
+    atomic_init(&ring->dropped, 0);
+    atomic_init(&ring->underflows, 0);
+    atomic_init(&ring->rendered, 0);
     ring->prebuffer = prebuffer < 2                      ? 2
                       : prebuffer > HM_AUDIO_RING_FRAMES ? HM_AUDIO_RING_FRAMES
                                                          : prebuffer;
@@ -20,7 +23,7 @@ u32 hm_audio_ring_push(hm_audio_ring *ring, const s16 *stereo, u32 frames) {
         ring->samples[index][1] = stereo[i * 2 + 1];
     }
     atomic_store_explicit(&ring->write, write + count, memory_order_release);
-    ring->dropped += frames - count;
+    atomic_fetch_add_explicit(&ring->dropped, frames - count, memory_order_relaxed);
     return count;
 }
 void hm_audio_ring_read(hm_audio_ring *ring, float *output, u32 frames, u32 channels, u32 rate) {
@@ -30,8 +33,10 @@ void hm_audio_ring_read(hm_audio_ring *ring, float *output, u32 frames, u32 chan
     u32 read = atomic_load_explicit(&ring->read, memory_order_relaxed);
     u32 write = atomic_load_explicit(&ring->write, memory_order_acquire);
     if (!ring->primed) {
-        if (write - read < ring->prebuffer)
+        if (write - read < ring->prebuffer) {
+            atomic_fetch_add_explicit(&ring->rendered, frames, memory_order_relaxed);
             return;
+        }
         ring->current[0] = ring->samples[read & (HM_AUDIO_RING_FRAMES - 1)][0];
         ring->current[1] = ring->samples[read & (HM_AUDIO_RING_FRAMES - 1)][1];
         ++read;
@@ -43,6 +48,7 @@ void hm_audio_ring_read(hm_audio_ring *ring, float *output, u32 frames, u32 chan
     if (ring->rate && ring->rate != rate)
         ring->phase = (u32)((u64)ring->phase * rate / ring->rate);
     ring->rate = rate;
+    u32 underflows = 0;
     for (u32 i = 0; i < frames; ++i) {
         float fraction = (float)ring->phase / (float)rate;
         float left =
@@ -61,7 +67,7 @@ void hm_audio_ring_read(hm_audio_ring *ring, float *output, u32 frames, u32 chan
             ring->current[1] = ring->next[1];
             if (read == write) {
                 ring->next[0] = ring->next[1] = 0;
-                ++ring->underflows;
+                ++underflows;
             } else {
                 ring->next[0] = ring->samples[read & (HM_AUDIO_RING_FRAMES - 1)][0];
                 ring->next[1] = ring->samples[read & (HM_AUDIO_RING_FRAMES - 1)][1];
@@ -70,5 +76,6 @@ void hm_audio_ring_read(hm_audio_ring *ring, float *output, u32 frames, u32 chan
         }
     }
     atomic_store_explicit(&ring->read, read, memory_order_release);
-    ring->rendered += frames;
+    atomic_fetch_add_explicit(&ring->underflows, underflows, memory_order_relaxed);
+    atomic_fetch_add_explicit(&ring->rendered, frames, memory_order_relaxed);
 }

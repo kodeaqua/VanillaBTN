@@ -1,6 +1,7 @@
 #ifndef HMBTN_GPU_SCENE_H
 #define HMBTN_GPU_SCENE_H
 #include "gfx/replay_sink.h"
+#include "psx/vram.h"
 #include <stddef.h>
 enum {
     HM_SCENE_HEADER = 16,
@@ -28,6 +29,8 @@ void hm_gpu_scene_texture_filter(hm_gpu_scene *scene, int filter_mode);
 void hm_gpu_scene_multisamples(hm_gpu_scene *scene, unsigned samples);
 void hm_gpu_scene_materialize_vram(hm_gpu_scene *scene, int enabled);
 int hm_gpu_scene_needs_materialization(const hm_gpu_scene *scene);
+u32 hm_gpu_scene_materialization_mask(const hm_gpu_scene *scene,
+                                      u64 tiles[HM_VRAM_DIRTY_ROWS]);
 hm_replay_sink hm_gpu_scene_begin(hm_gpu_scene *scene, u32 width, u32 height);
 int hm_gpu_scene_end(hm_gpu_scene *scene, hm_replay_sink previous, hm_gpu_scene_data *data);
 const char *hm_gpu_scene_fallback(const hm_gpu_scene *scene);

@@ -238,5 +238,52 @@ int main(void) {
         hm_gpu_execute_words(upload_alias, 4);
         CHECK(hm_vram_pixel(20, 30) == 0x4d2b);
     }
+
+    /* Private materialization writes only tiles that later texture reads use. */
+    ResetGraph(0);
+    DRAWENV filter_draw;
+    SetDefDrawEnv(&filter_draw, 0, 0, 32, 32);
+    filter_draw.dfe = 1;
+    PutDrawEnv(&filter_draw);
+    hm_vram_reset();
+    u64 materialization_tiles[HM_VRAM_DIRTY_ROWS] = {0};
+    materialization_tiles[0] = 1;
+    hm_vram_write_filter_begin(materialization_tiles);
+    const u32 filtered_rectangle[] = {0x600000ff, 2u | (2u << 16), 20u | (1u << 16)};
+    hm_gpu_execute_words(filtered_rectangle, 3);
+    hm_vram_write_filter_end();
+    CHECK(hm_vram_pixel(2, 2) == 31 && hm_vram_pixel(15, 2) == 31);
+    CHECK(hm_vram_pixel(16, 2) == 0 && hm_vram_pixel(21, 2) == 0);
+
+    hm_vram_write_filter_end();
+    hm_vram_reset();
+    const u32 filtered_triangle[] = {0x200000ff, 0x00020002, 0x001d0004, 0x0004001d};
+    hm_gpu_execute_words(filtered_triangle, 4);
+    u16 expected_triangle[32 * 32];
+    u32 allowed_triangle_pixels = 0;
+    for (u32 y = 0; y < 32; ++y)
+        for (u32 x = 0; x < 32; ++x) {
+            expected_triangle[y * 32 + x] = hm_vram_pixel(x, y);
+            if (x < 16 && y < 16 && expected_triangle[y * 32 + x])
+                ++allowed_triangle_pixels;
+        }
+    CHECK(allowed_triangle_pixels > 0);
+    hm_vram_reset();
+    hm_vram_write_filter_begin(materialization_tiles);
+    hm_gpu_execute_words(filtered_triangle, 4);
+    hm_vram_write_filter_end();
+    for (u32 y = 0; y < 32; ++y)
+        for (u32 x = 0; x < 32; ++x)
+            CHECK(hm_vram_pixel(x, y) == (x < 16 && y < 16 ? expected_triangle[y * 32 + x] : 0));
+
+    hm_vram_reset();
+    materialization_tiles[0] = 1;
+    hm_vram_write_filter_begin(materialization_tiles);
+    RECT partial_upload = {14, 4, 4, 1};
+    const u32 partial_upload_pixels[] = {0x22221111, 0x44443333};
+    LoadImage(&partial_upload, partial_upload_pixels);
+    hm_vram_write_filter_end();
+    CHECK(hm_vram_pixel(14, 4) == 0x1111 && hm_vram_pixel(15, 4) == 0x2222);
+    CHECK(hm_vram_pixel(16, 4) == 0 && hm_vram_pixel(17, 4) == 0);
     return 0;
 }

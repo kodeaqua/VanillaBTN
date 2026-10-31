@@ -9,7 +9,7 @@ typedef struct {
     u32 prebuffer, phase, rate;
     s16 current[2], next[2];
     int primed;
-    u64 dropped, underflows, rendered;
+    atomic_uint dropped, underflows, rendered;
 } hm_audio_ring;
 void hm_audio_ring_init(hm_audio_ring *ring, u32 prebuffer);
 u32 hm_audio_ring_push(hm_audio_ring *ring, const s16 *stereo, u32 frames);

@@ -258,30 +258,45 @@ int main(void) {
      * point in command order. First pass requests one CPU materialization. */
     setup(32, 32);
     const u32 feedback_sequence[] = {0x600000ff, 0x00020002, 0x00010001,
-                                     0xe1000100,  0x65000001, 0x00040004,
-                                     0x00020002,  0x00010001};
+                                     0x6000ff00, 0x00140014, 0x00040004,
+                                     0xe1000100, 0x65000001, 0x00040004,
+                                     0x00020002, 0x00010001,
+                                     0x65000001, 0x001e0004, 0x00020040,
+                                     0x00010001};
     previous = hm_gpu_scene_begin(s, 32, 32);
     hm_replay_begin(&area);
     hm_gpu_execute_words(feedback_sequence,
                          sizeof(feedback_sequence) / sizeof(feedback_sequence[0]));
     CHECK(hm_gpu_scene_needs_materialization(s));
     CHECK(hm_gpu_scene_end(s, previous, &data));
+    u64 feedback_tiles[HM_VRAM_DIRTY_ROWS];
+    u32 feedback_tile_count = hm_gpu_scene_materialization_mask(s, feedback_tiles);
+    CHECK(feedback_tile_count > 0 && (feedback_tiles[0] & 1u));
+    CHECK(!(feedback_tiles[1] & (UINT64_C(1) << 1)));
+    CHECK(!(feedback_tiles[0] & (UINT64_C(1) << 4)));
     hm_gpu_scene_materialize_vram(s, 1);
     setup(32, 32);
+    hm_vram_snapshot(&private_vram);
+    hm_vram_context *native_vram = hm_vram_bind(&private_vram);
+    hm_vram_write_filter_begin(feedback_tiles);
     previous = hm_gpu_scene_begin(s, 32, 32);
     hm_replay_begin(&area);
     hm_gpu_execute_words(feedback_sequence,
                          sizeof(feedback_sequence) / sizeof(feedback_sequence[0]));
+    hm_vram_write_filter_end();
+    hm_vram_bind(native_vram);
     CHECK(hm_gpu_scene_end(s, previous, &data));
     CHECK(data.vram_version_count == 1);
-    CHECK(data.words[data.words[8] + HM_SCENE_STRIDE + 40] == 1);
+    CHECK(data.words[data.words[8] + HM_SCENE_STRIDE * 2 + 40] == 1);
+    CHECK(data.vram_versions[2 * HM_VRAM_WIDTH + 2] == 31);
+    CHECK(data.vram_versions[20 * HM_VRAM_WIDTH + 20] == 0);
     hm_gpu_scene_materialize_vram(s, 0);
 
     /* Private replays track changed VRAM tiles so equivalent feedback reads
      * reuse a version instead of comparing every full 1 MiB snapshot. */
     setup(64, 64);
     hm_vram_snapshot(&private_vram);
-    hm_vram_context *native_vram = hm_vram_bind(&private_vram);
+    native_vram = hm_vram_bind(&private_vram);
     hm_vram_reset();
     const RECT private_area = {0, 0, 64, 64};
     const u32 duplicate_feedback[] = {

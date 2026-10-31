@@ -22,6 +22,8 @@ void hm_gpu_pixel(s32 x, s32 y, u16 color, int blend) {
     if (x < 0 || x >= 1024 || y < 0 || y >= 512 || x < clip->x || y < clip->y ||
         x >= clip->x + clip->w || y >= clip->y + clip->h)
         return;
+    if (hm_vram_write_filter_active() && !hm_vram_write_allowed((u32)x, (u32)y))
+        return;
     const RECT *display = &state->display.disp;
     if (!state->draw.dfe && state->display_enabled && x >= display->x && y >= display->y &&
         x < display->x + display->w && y < display->y + display->h)
@@ -94,6 +96,7 @@ static void hm_gpu_rectangle(const u32 *words, u32 opcode, u32 width, u32 height
     u32 page = draw->tpage, depth = (page >> 7) & 3u;
     hm_vram_context *vram = hm_vram_mutable_state();
     u16 (*vram_pixels)[HM_VRAM_WIDTH] = vram->pixels;
+    int filter_writes = hm_vram_write_filter_active();
     u16 set_mask = vram->set_mask, check_mask = vram->check_mask;
     u32 blend_mode = (page >> 5) & 3u;
     int check_disp = !draw->dfe && state->display_enabled;
@@ -113,6 +116,9 @@ static void hm_gpu_rectangle(const u32 *words, u32 opcode, u32 width, u32 height
     int semi = (opcode & 2) != 0, raw = (opcode & 1) != 0;
     for (s32 y = y_start; y < y_end; ++y) {
         s32 py = y0 + y;
+        u64 allowed_tiles = hm_vram_write_filter_row((u32)py);
+        if (filter_writes && !allowed_tiles)
+            continue;
         u16 *vram_row = vram_pixels[py];
         u64 dirty_mask = 0;
         int row_disp = check_disp && py >= disp_y0 && py < disp_y1;
@@ -120,6 +126,13 @@ static void hm_gpu_rectangle(const u32 *words, u32 opcode, u32 width, u32 height
             s32 px = x0 + x;
             if (row_disp && px >= disp_x0 && px < disp_x1)
                 continue;
+            if (filter_writes && !(allowed_tiles & (UINT64_C(1) << ((u32)px >> 4)))) {
+                s32 tile_end = (s32)((((u32)px >> 4) + 1u) << 4);
+                if (tile_end > x0 + x_end)
+                    tile_end = x0 + x_end;
+                x += tile_end - px - 1;
+                continue;
+            }
             u16 pixel = color;
             int blend = semi;
             if (textured) {

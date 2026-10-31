@@ -230,7 +230,7 @@ typedef struct {
     Uint64 submit_ns, submit_max_ns;
     u32 scenes, replays, materialized_replays, packs, encodes, acquires, blits, submits;
     u32 width, height, primitive_count, tile_count, max_bin_count;
-    u32 vram_version_count;
+    u32 vram_version_count, materialization_tile_count;
     u64 total_bin_references;
     size_t scene_bytes;
 } hm_gpu_perf_stats;
@@ -480,9 +480,19 @@ static int hm_host_gpu_present(const RECT *native_area) {
 #ifdef __ANDROID__
             Uint64 materialize_begin = SDL_GetTicksNS();
 #endif
+            u64 materialization_tiles[HM_VRAM_DIRTY_ROWS];
+            u32 materialization_tile_count =
+                hm_gpu_scene_materialization_mask(hm_gpu_commands, materialization_tiles);
+#ifdef __ANDROID__
+            hm_gpu_perf.materialization_tile_count = materialization_tile_count;
+#else
+            (void)materialization_tile_count;
+#endif
             hm_gpu_scene_materialize_vram(hm_gpu_commands, 1);
+            hm_vram_write_filter_begin(materialization_tiles);
             (void)hm_gpu_scene_begin(hm_gpu_commands, width, height);
             replayed = hm_frame_replay_draw(hm_gpu_replay, &live);
+            hm_vram_write_filter_end();
             hm_gpu_scene_materialize_vram(hm_gpu_commands, 0);
 #ifdef __ANDROID__
             Uint64 materialize_spent = SDL_GetTicksNS() - materialize_begin;
@@ -1405,15 +1415,19 @@ static void hm_perf_tick_enter(Uint64 now) {
     double bin_avg = hm_gpu_perf.tile_count
                          ? (double)hm_gpu_perf.total_bin_references / hm_gpu_perf.tile_count
                          : 0;
+    hm_audio_output_stats audio_stats;
+    hm_audio_output_get_stats(&audio_stats);
     char gpu_detail[384];
     snprintf(gpu_detail, sizeof(gpu_detail),
-             " | scene=%ux%u p=%u bins=%u refs=%.1f/%u vram=%u %.1fKiB"
+             " | scene=%ux%u p=%u bins=%u refs=%.1f/%u vram=%u %.1fKiB matTiles=%u"
              " | ms scene=%.1f/%.1f replay=%.1f/%.1f mat=%.1f/%.1f pack=%.1f/%.1f"
-             " enc=%.1f/%.1f acq=%.1f/%.1f blit=%.1f/%.1f sub=%.1f/%.1f matCount=%u/%u",
+             " enc=%.1f/%.1f acq=%.1f/%.1f blit=%.1f/%.1f sub=%.1f/%.1f matCount=%u/%u"
+             " audio=%llu/%llu q=%u",
              hm_gpu_perf.width, hm_gpu_perf.height, hm_gpu_perf.primitive_count,
              hm_gpu_perf.tile_count, bin_avg, hm_gpu_perf.max_bin_count,
              hm_gpu_perf.vram_version_count,
              (double)hm_gpu_perf.scene_bytes / 1024.0,
+             hm_gpu_perf.materialization_tile_count,
              scene_avg, hm_gpu_perf.scenes ? hm_gpu_perf.scene_max_ns / 1e6 : 0,
              replay_avg, hm_gpu_perf.replays ? hm_gpu_perf.replay_max_ns / 1e6 : 0,
              materialize_avg,
@@ -1423,7 +1437,9 @@ static void hm_perf_tick_enter(Uint64 now) {
              acquire_avg, hm_gpu_perf.acquires ? hm_gpu_perf.acquire_max_ns / 1e6 : 0,
              blit_avg, hm_gpu_perf.blits ? hm_gpu_perf.blit_max_ns / 1e6 : 0,
              submit_avg, hm_gpu_perf.submits ? hm_gpu_perf.submit_max_ns / 1e6 : 0,
-             hm_gpu_perf.materialized_replays, hm_gpu_perf.scenes);
+             hm_gpu_perf.materialized_replays, hm_gpu_perf.scenes,
+             (unsigned long long)audio_stats.underflow_frames,
+             (unsigned long long)audio_stats.dropped_frames, audio_stats.queued_frames);
     snprintf(hm_perf_notice, sizeof(hm_perf_notice), "FPS %u  Game %.1fms  Present %.1fms",
              hm_perf.presents, game_avg, present_avg);
     __android_log_print(ANDROID_LOG_INFO, "VanillaBTN",
