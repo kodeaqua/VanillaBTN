@@ -646,8 +646,9 @@ The PS1 alternates its draw and display pages, so a capture can be coherent but
 refer to the other half of VRAM. When no capture matches the visible page, GPU
 Auto now builds a zero-primitive scene that reads that page directly from the
 VRAM snapshot. A display area with zero width or height is counted as skipped
-because it has no pixels to present; renderer/resource failures retain the CPU
-safety path. The G100 farm sample at 384x240 recorded 589/589 visible frames on
+because it has no pixels to present; missing captures and replay/packing
+failures now try GPU scanout before the CPU safety path. The G100 farm sample at
+384x240 recorded 589/589 visible frames on
 the GPU (100%), five VRAM scanouts, zero fallbacks, and 11 empty-area startup
 skips. The next two 600-frame windows reported 600/600 GPU frames with zero
 fallbacks and two then zero scanouts. Steady farm timing was 60-61 presents/s,
@@ -655,3 +656,12 @@ fallbacks and two then zero scanouts. Steady farm timing was 60-61 presents/s,
 Synthetic 2x scanout readback matched VRAM exactly on Windows Vulkan and
 Direct3D 12. These results cover the farm scene and native internal size only;
 Windows interactive gameplay, 720p, and other areas remain unverified.
+
+### Weather animation during dialogue pauses (2026-10-31)
+
+The native port now advances weather particle movement, age, and respawn while
+the game pause flag is set, so rain does not drain off-screen during NPC
+dialogue. Paused weather uses a private random sequence and restores the shared
+gameplay RNG each frame. The focused Windows regression test passes; actual
+rainy-dialogue behavior still needs owner gameplay confirmation on Windows and
+Android.

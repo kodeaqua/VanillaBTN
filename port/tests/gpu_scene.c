@@ -162,6 +162,10 @@ int main(void) {
     hm_gpu_scene_data unknown_data;
     CHECK(!hm_gpu_scene_end(s, previous, &unknown_data));
     CHECK(strstr(hm_gpu_scene_fallback(s), "unsupported GP0 opcode") != NULL);
+    hm_gpu_scene_data recovered_scanout;
+    CHECK(hm_gpu_scene_scanout(s, &unknown_area, 32, 32, &recovered_scanout));
+    CHECK(recovered_scanout.words[10] == 0 && recovered_scanout.words[4] == 32 &&
+          recovered_scanout.words[5] == 32);
     u32 rectangle[] = {0x600000ff, 0x00020002, 0x00040004};
     hm_frame_replay *a = hm_frame_replay_acquire(), *b = hm_frame_replay_acquire();
     CHECK(a && b);

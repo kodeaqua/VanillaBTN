@@ -39,6 +39,9 @@ static void drift_step(void);
 static void drift_set_target(s32 steps, s32 *target);
 static void particles_step(void);
 static void particle_respawn(FarmParticle *particle);
+#if defined(HMBTN_PORT)
+static void weather_particles_step_port(void);
+#endif
 
 /* Call field_gate_open on every cell of the 45 by 25 field grid. */
 void field_reset_cells(void) {
@@ -198,6 +201,12 @@ static void weather_set(s16 weather) {
 
 static FarmParticle weather_particles[40];
 static AnimState weather_anim;
+#if defined(HMBTN_PORT)
+/* Ambient weather keeps animating during dialogue pauses without consuming
+ * random values from gameplay's shared sequence. */
+static u32 weather_pause_random_state;
+static int weather_pause_random_active;
+#endif
 /* The drift table in use, rows of three words: weather_fx_init points it at
  * drift_by_hour, the weather at drift_by_weather; drift_select_hour hands row `index` to
  * drift_set_target, drift_reset reads row 0. */
@@ -220,7 +229,11 @@ void weather_fx_frame(void)
   if (record->place.location == PLACE_GREENHOUSE)
     return;
   if ((flags & 0x1000) == 0)
+#if defined(HMBTN_PORT)
+    weather_particles_step_port();
+#else
     particles_step();
+#endif
   if (game_state.globalFlags & GLOBAL_FLAG_HOUR_PASSED)
   {
     if (game_state.drift.index != (index = clock_time_period(game_state.progress.clock.time.hm.hour)))
@@ -250,6 +263,9 @@ void drift_select_hour(void) {
 void weather_fx_init(void) {
     FarmParticle *p = weather_particles;
     s32 i;
+#if defined(HMBTN_PORT)
+    weather_pause_random_active = 0;
+#endif
     for (i = 39; i >= 0; i--) {
         particle_clear(p);
         p++;
@@ -319,10 +335,61 @@ static void drift_set_target(s32 steps, s32 *target) {
  * particle (flag 0x4000) falls by 1, or 5 when fast (0x1000), doubled for
  * 0x2000. It drifts left by 7 when fast and wobbles one pixel by age, then ages
  * until 0x37/0x6E and is respawned by particle_respawn. A still particle only
- * animates (frame = age / 2, respawned at frame 3). While the game is paused
- * nothing ages. The particle then scrolls with farm_area.mode.scroll and is drawn if
- * it is on screen. */
+ * animates (frame = age / 2, respawned at frame 3). The matching build freezes
+ * particle age while paused; the native port advances visual weather with an
+ * isolated random sequence. The particle then scrolls with farm_area.mode.scroll
+ * and is drawn if it is on screen. */
 static void particle_step(FarmParticle *entry) {
+#if defined(HMBTN_PORT)
+    s32 dy;
+    s32 dx;
+    s32 x;
+    s32 step;
+    s32 age;
+    s32 frame;
+    s16 y;
+    FarmScroll *scroll;
+
+    if (entry->delay >= 0) {
+        entry->delay--;
+        return;
+    }
+    if (entry->flags & 0x4000) {
+        if (entry->flags & 0x1000) {
+            dy = 5;
+            dx = 7;
+        } else {
+            dy = 1;
+            dx = 0;
+        }
+        y = entry->y;
+        entry->y = y + ((entry->flags & 0x2000) ? dy * 2 : dy);
+        x = (u16)entry->x - dx;
+        step = (entry->age & 7) != 7;
+        entry->x = (entry->age & 0x8) ? x + step : x - step;
+        age = entry->age;
+        if ((entry->flags & 0x2000) ? age >= 55 : age >= 110) {
+            particle_respawn(entry);
+            return;
+        }
+        entry->age++;
+    } else {
+        frame = entry->age >> 1;
+        entry->frame = frame;
+        if (frame >= 3) {
+            particle_respawn(entry);
+            return;
+        }
+        entry->age++;
+    }
+    scroll = &farm_area.mode.scroll;
+    entry->x += scroll->dx;
+    entry->y += scroll->dy;
+    if (estate_point_on_screen(entry->x, entry->y) != 0) {
+        anim_draw_sprt_cursor(current_frame->ot, &ui_icon_anim, entry->sprite, entry->frame,
+                              entry->x, entry->y);
+    }
+#else
     s32 dy;
     s32 dx;
     s32 x;
@@ -395,7 +462,27 @@ draw:
         anim_draw_sprt_cursor(current_frame->ot, &ui_icon_anim, entry->sprite, entry->frame,
                       entry->x, entry->y);
     }
+#endif
 }
+
+#if defined(HMBTN_PORT)
+static void weather_particles_step_port(void) {
+    if (game_state.globalFlags & GLOBAL_FLAG_PAUSED) {
+        u32 gameplay_random_state = rand_seed;
+        if (!weather_pause_random_active) {
+            weather_pause_random_state = gameplay_random_state;
+            weather_pause_random_active = 1;
+        }
+        rand_seed = weather_pause_random_state;
+        particles_step();
+        weather_pause_random_state = rand_seed;
+        rand_seed = gameplay_random_state;
+    } else {
+        weather_pause_random_active = 0;
+        particles_step();
+    }
+}
+#endif
 
 /* Step every particle slot that has a sprite. The first slot with no delay is left alone; each later
  * moving slot with no delay gets PARTICLE_DELAY_STAGGER added to its delay. */

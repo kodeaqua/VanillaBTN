@@ -1,5 +1,7 @@
 #define field_world_to_cell hm_test_field_cell
 #define greenhouse_world_to_cell hm_test_greenhouse_cell
+#include "../enhance/gameplay/gameplay.h"
+#include "../platform/gameplay_options.h"
 #include "../../src/overlay/11_GF_FARM/farm_probe.c"
 #undef field_world_to_cell
 #undef greenhouse_world_to_cell
@@ -11,8 +13,10 @@
             return 1;                                                                              \
         }                                                                                          \
     } while (0)
-static ItemInfo info[ITEM_WEEDS + 1];
+static ItemInfo info[ITEM_DEAD_WEED + 1];
+static FarmCrop crops[CROP_COUNT];
 static FarmTileRule rule;
+
 s32 hm_test_field_cell(VECTOR *point, s16 *column, s16 *row) {
     (void)point;
     *column = 0;
@@ -24,9 +28,16 @@ s32 hm_test_greenhouse_cell(VECTOR *point, s16 *column, s16 *row) {
 }
 int main(void) {
     game_state.itemInfo = info;
+    game_state.cropTable = crops;
     game_state.tileRules = &rule;
     info[ITEM_WEEDS].tileRule[0] = 0;
     info[ITEM_WEEDS].itemFlags = ITEM_FLAG_PICKUP;
+    info[ITEM_DEAD_WEED].tileRule[0] = 0;
+    info[ITEM_DEAD_WEED].itemFlags = ITEM_FLAG_PICKUP;
+    info[ITEM_GRASS_SEEDS].tileRule[0] = 0;
+    info[ITEM_GRASS_SEEDS].itemFlags = ITEM_FLAG_TOOL | ITEM_FLAG_SEED;
+    info[ITEM_GRASS_SEEDS].crop = CROP_GRASS;
+    crops[CROP_GRASS].grownStage = 1;
     VECTOR pos = {0};
     for (int greenhouse = 0; greenhouse <= 1; ++greenhouse) {
         LimitPair place = {0};
@@ -61,6 +72,38 @@ int main(void) {
         place.location = 2;
         CHECK(farm_probe_tile(pos, place, FACING_DOWN, 1) == 0);
     }
+
+    /* Walk Crops keeps interaction flags intact for both wild weeds and harvestable grass. */
+    {
+        hm_gameplay_options gameplay_options = {0};
+        const ItemId pickup_tiles[] = {ITEM_WEEDS, ITEM_DEAD_WEED, ITEM_GRASS_SEEDS};
+        LimitPair place = {0};
+        FarmFieldTile *tile = &game_state.fieldTiles[0].rows[0];
+        gameplay_options.walk_through_crops = 1;
+        gameplay_options.roaming_horse = 1;
+        hm_gameplay_set_active(&gameplay_options);
+        place.location = 1;
+        rule.status = TILE_RULE_BLOCKED;
+        for (size_t i = 0; i < sizeof(pickup_tiles) / sizeof(pickup_tiles[0]); ++i) {
+            s32 flags = 0;
+            void *found = NULL;
+            tile->value = pickup_tiles[i];
+            tile->kind = pickup_tiles[i] == ITEM_GRASS_SEEDS ? 1 : 0;
+            FarmTileQuery query = {.pos = &pos,
+                                   .place = &place,
+                                   .tile = &found,
+                                   .flags = &flags,
+                                   .hitFlags = FARM_HIT_TILE};
+            CHECK(farm_tile_classify(&query, 0) == TILE_CLASS_PASSABLE);
+            CHECK(found == tile && flags == (FARM_HIT_TILE | 0x4000 | 0x2000));
+            CHECK(farm_probe_tile(pos, place, FACING_DOWN, 1) == TILE_CLASS_PASSABLE);
+            flags = 0;
+            found = NULL;
+            CHECK(farm_tile_occupant(&pos, place, &found, &flags, NULL, OCCUPANT_TILE) == 1);
+            CHECK(found == tile && flags == (FARM_HIT_TILE | 0x4000 | 0x2000));
+        }
+    }
+
     /* The real estate/basket caller intentionally omits both query outputs. */
     FarmEstateRecord stamps[2] = {0};
     stamps[0].location = 1;

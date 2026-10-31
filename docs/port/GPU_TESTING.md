@@ -117,8 +117,10 @@ also reported zero hardware mixer underruns in a prior run. The ROM rejects
 function-level profile. A diagnostic update now reports why replay selection
 failed (no complete capture, no matching loading/bypass capture, mismatched
 draw/display areas, or a capture newer than the live tick). Windows unit tests
-cover the no-capture and area-mismatch cases. A no-capture frame now builds a
-zero-primitive GPU scene over the currently visible VRAM page. The connected
+cover no-capture and area-mismatch cases. A no-capture or unrenderable-capture
+frame now tries a zero-primitive GPU scene over the currently visible VRAM page
+before CPU safety fallback. A GPU scene test verifies recovery after an
+unsupported GP0 opcode. The connected
 G100's 09:52 farm sample reported 589/589 renderable frames through the GPU
 (100%), five direct VRAM scanouts, zero fallbacks, and 11 skipped attempts with
 an empty display area during startup. The next two windows each reported

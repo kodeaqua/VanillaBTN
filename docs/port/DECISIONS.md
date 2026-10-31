@@ -2244,6 +2244,8 @@ Pause Menu -> Settings -> Gameplay:
 Decision: Add enhance/gameplay and platform/gameplay_options, gated by
 HMBTN_ENH_GAMEPLAY (enabled in Windows build.ps1 -Game; runtime defaults OFF except
 wild_dog=1 for vanilla parity). Keep options saved in settings.json under "gameplay".
+When Walk through crops is enabled, field crops and wild/dead weeds stay passable
+without clearing their pickup/harvest flags, so they remain interactable while walking.
 When splitting or moving stacked items in the rucksack menu, show the native-style
 quantity selector dialog with D-pad input (+-1, +-10) and item preview. Draw connected
 fences as two-tiered shaded wooden rails with highlight/shadow behind the posts.
@@ -2254,8 +2256,9 @@ menus, dialogs, or the toolbox are open.
 Calendar birthday/event previews in the top-right are removed in favor of opening authentic event
 dialogue boxes upon pressing the Cross (X) button.
 
-Consequences: Vanilla parity maintained when options are OFF. All 115 unit tests
-pass. Interactive gameplay testing performed by the owner.
+Consequences: Vanilla parity maintained when options are OFF. Farm tile tests cover
+pass-through and preserved pickup/harvest flags for weeds, dead weeds, and mature grass.
+Interactive gameplay testing performed by the owner.
 
 <a id="adr-081"></a>
 
@@ -4191,3 +4194,44 @@ Release build and 124/124 tests pass, and the Android Release APK builds with
 NDK 30.0.16248370. G100 post-change gameplay timing is pending; no frame-rate
 improvement is claimed until the owner measures the updated APK. Windows
 gameplay performance has also not been remeasured.
+
+## ADR-155: Continue Ambient Weather During Dialogue Pauses
+
+Date: 2026-10-31. Status: accepted.
+
+Context: During a paused NPC dialogue, weather particles continued changing
+position but their age and respawn stopped. Rain drops therefore drifted out of
+view without replacement, making the rain appear to stop and slide across the
+screen. Advancing the existing particle lifecycle during a pause would consume
+the shared gameplay RNG and could change later game behavior.
+
+Decision: In the native port only, continue particle delay, movement, animation,
+and respawn while the game pause flag is set. During paused weather updates,
+swap in a private weather RNG state and restore the gameplay RNG state before
+returning. Keep the original matching-build implementation byte-for-byte in the
+`#else` branch.
+
+Consequences: Rain and other ambient weather effects continue behind paused
+dialogue without perturbing gameplay randomness. A focused regression test
+advances and respawns a rain particle while paused and verifies the shared RNG
+is unchanged. Owner confirmation in an actual NPC dialogue remains pending.
+
+## ADR-156: GPU Scanout After Invalid or Unsupported Scene Replay
+
+Date: 2026-10-31. Status: accepted.
+
+Context: GPU Auto already scanned the visible native VRAM page when a frame had
+no coherent command capture. If a capture existed but could not be replayed or
+packed, the host still fell back to the CPU despite the same authoritative VRAM
+being available.
+
+Decision: After any captured-scene replay or packing failure, try a zero-primitive
+GPU scene that scans the current visible VRAM area. Keep CPU rendering as the
+safety path when GPU scanout construction or presentation fails, and leave
+explicit Software mode unchanged.
+
+Consequences: Unsupported, invalidated, and incomplete captures can still reach
+the display through GPU Auto without pretending their command streams were
+successfully replayed. A regression verifies that scanout can rebuild after an
+unsupported GP0 scene. Other scene/device coverage and interactive gameplay
+remain unverified.

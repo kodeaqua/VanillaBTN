@@ -594,10 +594,10 @@ static int hm_host_gpu_present(const RECT *native_area) {
             const char *reason = serial
                                      ? hm_gpu_scene_fallback(hm_gpu_commands)
                                      : hm_frame_replay_failure(hm_gpu_replay);
-            if (!serial && hm_host_gpu_scanout_scene(native_area, width, height)) {
-                /* The PS1 can display the opposite half of its double buffer
-                 * from the one currently being drawn. With no coherent scene
-                 * capture, scan that exact visible VRAM page on the GPU. */
+            if (hm_host_gpu_scanout_scene(native_area, width, height)) {
+                /* The PS1 VRAM is authoritative even when a captured scene
+                 * cannot be replayed or packed. Scan the exact visible page on
+                 * the GPU and keep CPU fallback for scanout/device failures. */
                 scanout_only = 1;
             } else {
                 hm_host_gpu_coverage_record(
