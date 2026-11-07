@@ -36,6 +36,33 @@ before changing unfamiliar systems.
 - Keep unrelated user changes intact. Do not normalize the entire working tree's
   line endings as a workaround for a local build issue.
 
+## Privacy and sensitive data
+
+- Never include anyone's sensitive or identifying local data in documentation,
+  examples, code comments, tests, generated artifacts, commit messages, PRs, or
+  shared reports. Sanitize copied commands, logs, screenshots, and error output
+  before sharing them.
+- Use repository-relative paths whenever possible. For home directories, use
+  `~/` or `$HOME` in POSIX shells, `$env:USERPROFILE` in PowerShell, and
+  `%USERPROFILE%` in Windows cmd. Never publish an expanded home path containing
+  a real username. Keep examples valid for their stated shell.
+- Do not expose credentials, API keys, access/refresh tokens, passwords, private
+  keys, cookies, authorization headers, connection strings, or sensitive values
+  from environment variables and `.env` files. Reference variable names or use
+  explicit placeholders such as `<REDACTED>` instead of actual values.
+- Avoid dumping complete environment variables or credential files. Inspect only
+  the minimum needed, and report presence or absence instead of secret values.
+  Keep local configuration out of version control; example configuration must
+  contain placeholders only.
+- Redact personal contact details, private service URLs, and other non-public
+  identifiers when they are unnecessary to understand the change. Apply this to
+  developers, users, and third parties equally.
+- Before committing or publishing, inspect the relevant diff and artifacts for
+  personal paths and sensitive data. If an existing exposure is found, do not
+  repeat its value in the report; remove or redact it within scope. Report any
+  committed credential exposure so its owner can revoke or rotate it; removing
+  it from the latest file does not remove it from history.
+
 ## Branches, pull requests, and review
 
 - Work organized around a specific topic or phase, including its tasks and
