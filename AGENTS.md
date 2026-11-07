@@ -129,9 +129,26 @@ before changing unfamiliar systems.
   breaking-change declaration.
 - Example: `docs: add agent guidelines and project onboarding guides`.
 
+## Native port Debug and Release policy
+
+- Debug and Release refer to the future VanillaBTN native port only. Follow
+  [docs/native-build-profiles.md](docs/native-build-profiles.md) when implementing
+  its build configuration, diagnostics, verification, and packaging.
+- Keep the current PS1 decompilation source and build outputs outside native
+  Debug/Release targets. Preserve its existing toolchain and matching checks.
+- Native Debug must prioritize useful debugger information, development logging,
+  assertions, and supported runtime checks. Native Release must use verified
+  production optimization and compile out development diagnostics, including
+  argument side effects and debug tool initialization.
+- Required production validation and error handling must work in both profiles.
+  Use separate outputs and compatible dependency/runtime configurations.
+- The native policy is currently documentation only. Do not claim native targets,
+  a working application, or validated runtime features until implemented and
+  tested. Scope checklists and evidence to the actual phase.
+
 ## Validation and reporting
 
-- For C, linker, SDK-processing, or build-tool changes, run the documented Docker
+- For PS1 C, linker, SDK-processing, or build-tool changes, run the documented Docker
   build and `cmake --build <build-dir> --target check`.
 - The default check must report `all 14 files match the original`. With
   `ORIGINAL_DISC`, it also checks archive/disc outputs against their reference hashes.

@@ -10,6 +10,10 @@ See [the build guide](docs/building.md) for code-only verification and the Windo
 PowerShell procedure. [The architecture guide](docs/architecture.md) maps the
 runtime and gameplay modules; [AGENTS.md](AGENTS.md) describes contributor rules.
 
+For the future native port, [Debug and Release policy](docs/native-build-profiles.md)
+defines the planned profile behavior. It does not change the current PS1 build or
+provide native targets yet.
+
 ```sh
 docker build -t hmbtn-build .
 docker run --rm --user "$(id -u):$(id -g)" -v "$PWD":/src:ro -v /tmp/hmbtn-build:/build \
