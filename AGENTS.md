@@ -36,6 +36,22 @@ before changing unfamiliar systems.
 - Keep unrelated user changes intact. Do not normalize the entire working tree's
   line endings as a workaround for a local build issue.
 
+## Commit messages
+
+- Use Conventional Commits: `<type>(<optional scope>): <description>`.
+- Choose the type from the change: `docs` for documentation, `fix` for bugs,
+  `feat` for features, `refactor` for restructuring, `build` for build/toolchain
+  changes, `ci` for workflows, `test` for tests, and `chore` for maintenance.
+- Write the description in English, using an imperative verb, without a trailing
+  period. Keep the subject at most 72 characters. Use a scope only when useful,
+  such as `farm`, `save`, or `toolchain`.
+- Keep each commit focused on one logical change. For substantial changes, add a
+  blank line and a body explaining why; wrap body lines at 72 characters.
+- Use `!` and a `BREAKING CHANGE:` footer for an actual breaking interface or
+  workflow change. A matching-hash failure alone is not a Conventional Commits
+  breaking-change declaration.
+- Example: `docs: add agent guidelines and project onboarding guides`.
+
 ## Validation and reporting
 
 - For C, linker, SDK-processing, or build-tool changes, run the documented Docker
