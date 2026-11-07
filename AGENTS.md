@@ -36,6 +36,33 @@ before changing unfamiliar systems.
 - Keep unrelated user changes intact. Do not normalize the entire working tree's
   line endings as a workaround for a local build issue.
 
+## Branches, pull requests, and review
+
+- Work organized around a specific topic or phase, including its tasks and
+  subtasks, must use a dedicated branch instead of `main`. Create the branch from
+  the latest `main` before starting changes. Use a descriptive name such as
+  `feat/farm-events` or `docs/phase-1-onboarding`.
+- Keep changes for that topic or phase on its branch. Use separate branches and
+  PRs for independent topics or phases; dependent subtasks may share the parent
+  topic or phase branch.
+- When the topic or phase is complete, run the relevant checks, push the branch,
+  and open a PR targeting `main`. Describe the resulting behavior, scope, and
+  validation so a developer can review it.
+- Leave the PR open for developer review. Address requested changes on the same
+  branch, rerun relevant checks, and wait for approval of the updated changes.
+  Do not treat silence or automated checks as developer approval.
+- Once the developer approves the current changes, merge the PR into `main`
+  without asking for redundant confirmation, provided required checks pass and
+  there are no unresolved review requests or merge conflicts. Do not bypass
+  branch protection or required checks.
+- After merging, update local `main` and delete the completed work branch both
+  remotely and locally. Preserve any unrelated uncommitted work. Report the PR,
+  merge result, and branch cleanup; if blocked, report what remains.
+- Small standalone work that is not part of a topic or phase and fits in one
+  focused commit may go directly to `main`, subject to the same validation and
+  commit-message rules. A topic or phase still requires a branch and PR even if
+  its implementation happens to fit in one commit.
+
 ## Commit messages
 
 - Use Conventional Commits: `<type>(<optional scope>): <description>`.
