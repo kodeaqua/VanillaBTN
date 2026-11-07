@@ -6,6 +6,10 @@ your own copy of the disc, the whole disc image.
 
 ## Building
 
+See [the build guide](docs/building.md) for code-only verification and the Windows
+PowerShell procedure. [The architecture guide](docs/architecture.md) maps the
+runtime and gameplay modules; [AGENTS.md](AGENTS.md) describes contributor rules.
+
 ```sh
 docker build -t hmbtn-build .
 docker run --rm --user "$(id -u):$(id -g)" -v "$PWD":/src:ro -v /tmp/hmbtn-build:/build \
