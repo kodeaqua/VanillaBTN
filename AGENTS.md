@@ -36,6 +36,29 @@ before changing unfamiliar systems.
 - Keep unrelated user changes intact. Do not normalize the entire working tree's
   line endings as a workaround for a local build issue.
 
+## Code formatting and documentation
+
+- Format every piece of new or modified code before considering the work
+  complete. Follow the file's existing indentation, spacing, brace style, and
+  line wrapping; use the repository's formatter configuration when one exists.
+  If no formatter is configured, format the changed code consistently with its
+  surroundings. Keep formatting changes scoped to the work.
+- Review the formatted diff for accidental semantic changes. Preserve the
+  compiler-sensitive constructs, data order, and layout required for matching;
+  run the relevant matching checks after code changes.
+- Document new or changed code clearly. Use descriptive names and explain
+  non-obvious intent, constraints, state transitions, units, ownership, and
+  hardware or binary-matching requirements where relevant. Avoid comments that
+  merely repeat the code.
+- For new or changed interfaces, document their purpose, inputs, outputs, side
+  effects, and important preconditions or error behavior as applicable. Keep
+  declarations and implementation comments consistent with actual behavior.
+- Update affected architecture, build, or usage documentation in the same change
+  when behavior, setup, workflows, or module responsibilities change. Follow the
+  privacy rules below in all comments, examples, and documentation.
+- Before completion, verify formatting and documentation accuracy and run
+  `git diff --check`. Report any formatter or validation that could not be run.
+
 ## Privacy and sensitive data
 
 - Never include anyone's sensitive or identifying local data in documentation,
