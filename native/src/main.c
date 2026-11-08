@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "ps1_audio.h"
+#include "ps1_card.h"
 #include "ps1_clock.h"
 #include "ps1_input.h"
 #include "ps1_video.h"
@@ -14,6 +15,7 @@ static Ps1Video video;
 static Ps1InputRecord pad1;
 static Ps1Clock clock;
 static Ps1Audio audio;
+static Ps1CardManager card_mgr;
 
 static uint32_t map_key_to_ps1_button(SDL_Keycode key) {
     switch (key) {
@@ -131,6 +133,7 @@ int main(int argc, char **argv) {
     ps1_input_init(&pad1);
     ps1_clock_init(&clock, PS1_TICK_DURATION_NS, PS1_MAX_TICKS_PER_STEP);
     ps1_audio_init(&audio);
+    ps1_card_manager_init(&card_mgr, NULL);
     uint64_t last_time = SDL_GetTicksNS();
 
     while (running) {
@@ -174,6 +177,7 @@ int main(int argc, char **argv) {
     result = 0;
 
 done:
+    ps1_card_manager_shutdown(&card_mgr);
     ps1_audio_shutdown(&audio);
     if (texture != NULL) SDL_DestroyTexture(texture);
     if (renderer != NULL) SDL_DestroyRenderer(renderer);

@@ -1,0 +1,455 @@
+/* ps1_card.c — host-side virtual PS1 memory card system. */
+
+#include "ps1_card.h"
+#include <SDL3/SDL.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+static const char *s_farm_filenames[PS1_CARD_SAVE_SLOTS] = {
+    "BASLUS-01115-FARM0",
+    "BASLUS-01115-FARM1",
+    "BASLUS-01115-FARM2"
+};
+
+const char *ps1_card_get_farm_filename(int slot_idx) {
+    if (slot_idx < 0 || slot_idx >= PS1_CARD_SAVE_SLOTS) return NULL;
+    return s_farm_filenames[slot_idx];
+}
+
+uint8_t ps1_card_checksum(const uint8_t *frame128) {
+    uint8_t c = 0;
+    for (size_t i = 0; i < 127; i++) {
+        c ^= frame128[i];
+    }
+    return c;
+}
+
+void ps1_card_init(Ps1Card *card) {
+    if (!card) return;
+    memset(card, 0, sizeof(*card));
+    card->present = false;
+    card->dirty = false;
+}
+
+void ps1_card_format(Ps1Card *card) {
+    if (!card) return;
+    memset(card->data, 0, PS1_CARD_SIZE);
+
+    /* Frame 0: Header frame */
+    card->data[0] = 'M';
+    card->data[1] = 'C';
+    card->data[127] = ps1_card_checksum(card->data);
+
+    /* Frames 1..15: Directory entries for blocks 1..15 */
+    for (uint32_t b = 1; b <= PS1_CARD_DATA_BLOCKS; b++) {
+        uint8_t *dir = card->data + b * PS1_CARD_FRAME_SIZE;
+        dir[0] = PS1_CARD_BLOCK_FREE; /* 0xA0 */
+        dir[8] = 0xFF; /* Next block = 0xFFFF (end) */
+        dir[9] = 0xFF;
+        dir[127] = ps1_card_checksum(dir);
+    }
+
+    card->present = true;
+    card->dirty = true;
+}
+
+Ps1CardStatus ps1_card_validate(const Ps1Card *card) {
+    if (!card) return PS1_CARD_ERR_NO_CARD;
+
+    /* Frame 0 magic check */
+    if (card->data[0] != 'M' || card->data[1] != 'C') {
+        return PS1_CARD_ERR_UNFORMATTED;
+    }
+
+    /* Frame 0 checksum */
+    if (card->data[127] != ps1_card_checksum(card->data)) {
+        return PS1_CARD_ERR_DAMAGED;
+    }
+
+    /* Validate directory frames 1..15 */
+    for (uint32_t b = 1; b <= PS1_CARD_DATA_BLOCKS; b++) {
+        const uint8_t *dir = card->data + b * PS1_CARD_FRAME_SIZE;
+        if (dir[127] != ps1_card_checksum(dir)) {
+            return PS1_CARD_ERR_DAMAGED;
+        }
+    }
+
+    return PS1_CARD_OK;
+}
+
+int ps1_card_get_free_blocks(const Ps1Card *card) {
+    if (!card || ps1_card_validate(card) != PS1_CARD_OK) return 0;
+
+    int free_blocks = 0;
+    for (uint32_t b = 1; b <= PS1_CARD_DATA_BLOCKS; b++) {
+        const uint8_t *dir = card->data + b * PS1_CARD_FRAME_SIZE;
+        if (dir[0] == PS1_CARD_BLOCK_FREE) {
+            free_blocks++;
+        }
+    }
+    return free_blocks;
+}
+
+int ps1_card_find_file(const Ps1Card *card, const char *filename, uint32_t *out_size) {
+    if (!card || !filename || ps1_card_validate(card) != PS1_CARD_OK) return 0;
+
+    for (uint32_t b = 1; b <= PS1_CARD_DATA_BLOCKS; b++) {
+        const uint8_t *dir = card->data + b * PS1_CARD_FRAME_SIZE;
+        if (dir[0] == PS1_CARD_BLOCK_FIRST) {
+            char name_buf[21];
+            memcpy(name_buf, dir + 10, 20);
+            name_buf[20] = '\0';
+            if (strcmp(name_buf, filename) == 0) {
+                if (out_size) {
+                    uint32_t sz;
+                    memcpy(&sz, dir + 4, 4);
+                    *out_size = sz;
+                }
+                return (int)b;
+            }
+        }
+    }
+    return 0;
+}
+
+Ps1CardStatus ps1_card_read_file(const Ps1Card *card, const char *filename,
+                                 void *out_buf, size_t max_size, size_t *out_size) {
+    if (!card || !filename || !out_buf) return PS1_CARD_ERR_IO;
+
+    uint32_t file_size = 0;
+    int start_block = ps1_card_find_file(card, filename, &file_size);
+    if (start_block == 0) return PS1_CARD_ERR_NO_FILE;
+
+    if (file_size > max_size) file_size = (uint32_t)max_size;
+    if (out_size) *out_size = file_size;
+
+    size_t bytes_left = file_size;
+    uint8_t *dst = (uint8_t *)out_buf;
+    int curr_block = start_block;
+
+    while (bytes_left > 0 && curr_block >= 1 && curr_block <= (int)PS1_CARD_DATA_BLOCKS) {
+        size_t chunk = (bytes_left > PS1_CARD_BLOCK_SIZE) ? PS1_CARD_BLOCK_SIZE : bytes_left;
+        const uint8_t *src = card->data + (size_t)curr_block * PS1_CARD_BLOCK_SIZE;
+        memcpy(dst, src, chunk);
+
+        dst += chunk;
+        bytes_left -= chunk;
+
+        const uint8_t *dir = card->data + curr_block * PS1_CARD_FRAME_SIZE;
+        uint16_t next;
+        memcpy(&next, dir + 8, 2);
+        if (next == 0xFFFF) break;
+        curr_block = (int)next;
+    }
+
+    return PS1_CARD_OK;
+}
+
+Ps1CardStatus ps1_card_delete_file(Ps1Card *card, const char *filename) {
+    if (!card || !filename) return PS1_CARD_ERR_IO;
+
+    uint32_t sz = 0;
+    int curr_block = ps1_card_find_file(card, filename, &sz);
+    if (curr_block == 0) return PS1_CARD_ERR_NO_FILE;
+
+    while (curr_block >= 1 && curr_block <= (int)PS1_CARD_DATA_BLOCKS) {
+        uint8_t *dir = card->data + curr_block * PS1_CARD_FRAME_SIZE;
+        uint16_t next;
+        memcpy(&next, dir + 8, 2);
+
+        memset(dir, 0, PS1_CARD_FRAME_SIZE);
+        dir[0] = PS1_CARD_BLOCK_FREE;
+        dir[8] = 0xFF;
+        dir[9] = 0xFF;
+        dir[127] = ps1_card_checksum(dir);
+
+        if (next == 0xFFFF) break;
+        curr_block = (int)next;
+    }
+
+    card->dirty = true;
+    return PS1_CARD_OK;
+}
+
+Ps1CardStatus ps1_card_write_file(Ps1Card *card, const char *filename,
+                                  const void *data, size_t size) {
+    if (!card || !filename || !data || size == 0) return PS1_CARD_ERR_IO;
+    if (ps1_card_validate(card) != PS1_CARD_OK) return PS1_CARD_ERR_UNFORMATTED;
+
+    uint32_t needed_blocks = (uint32_t)((size + PS1_CARD_BLOCK_SIZE - 1) / PS1_CARD_BLOCK_SIZE);
+    if (needed_blocks == 0 || needed_blocks > PS1_CARD_DATA_BLOCKS) return PS1_CARD_ERR_FULL;
+
+    /* If file exists, delete it first to free its blocks */
+    uint32_t existing_sz = 0;
+    if (ps1_card_find_file(card, filename, &existing_sz) > 0) {
+        ps1_card_delete_file(card, filename);
+    }
+
+    if ((uint32_t)ps1_card_get_free_blocks(card) < needed_blocks) {
+        return PS1_CARD_ERR_FULL;
+    }
+
+    /* Find free blocks */
+    int allocated_blocks[PS1_CARD_DATA_BLOCKS];
+    uint32_t found = 0;
+    for (uint32_t b = 1; b <= PS1_CARD_DATA_BLOCKS && found < needed_blocks; b++) {
+        const uint8_t *dir = card->data + b * PS1_CARD_FRAME_SIZE;
+        if (dir[0] == PS1_CARD_BLOCK_FREE) {
+            allocated_blocks[found++] = (int)b;
+        }
+    }
+    if (found < needed_blocks) return PS1_CARD_ERR_FULL;
+
+    /* Write data into blocks and configure directory chain */
+    const uint8_t *src = (const uint8_t *)data;
+    size_t bytes_left = size;
+
+    for (uint32_t i = 0; i < needed_blocks; i++) {
+        int b = allocated_blocks[i];
+        size_t chunk = (bytes_left > PS1_CARD_BLOCK_SIZE) ? PS1_CARD_BLOCK_SIZE : bytes_left;
+
+        uint8_t *dst = card->data + (size_t)b * PS1_CARD_BLOCK_SIZE;
+        memset(dst, 0, PS1_CARD_BLOCK_SIZE);
+        memcpy(dst, src, chunk);
+
+        src += chunk;
+        bytes_left -= chunk;
+
+        /* Update directory frame */
+        uint8_t *dir = card->data + b * PS1_CARD_FRAME_SIZE;
+        memset(dir, 0, PS1_CARD_FRAME_SIZE);
+
+        if (i == 0) {
+            dir[0] = PS1_CARD_BLOCK_FIRST;
+            uint32_t sz32 = (uint32_t)size;
+            memcpy(dir + 4, &sz32, 4);
+            size_t fn_len = strlen(filename);
+            if (fn_len > 20) fn_len = 20;
+            memcpy(dir + 10, filename, fn_len);
+        } else if (i + 1 == needed_blocks) {
+            dir[0] = PS1_CARD_BLOCK_LAST;
+        } else {
+            dir[0] = PS1_CARD_BLOCK_MIDDLE;
+        }
+
+        uint16_t next = (i + 1 < needed_blocks) ? (uint16_t)allocated_blocks[i + 1] : 0xFFFF;
+        memcpy(dir + 8, &next, 2);
+        dir[127] = ps1_card_checksum(dir);
+    }
+
+    card->dirty = true;
+    return PS1_CARD_OK;
+}
+
+/* -------------------------------------------------------------------------
+ * Farm Slot Helpers
+ * ---------------------------------------------------------------------- */
+Ps1CardStatus ps1_card_read_farm_slot(const Ps1Card *card, int slot_idx,
+                                      void *out_buf, size_t max_size, size_t *out_size) {
+    const char *fn = ps1_card_get_farm_filename(slot_idx);
+    if (!fn) return PS1_CARD_ERR_IO;
+    return ps1_card_read_file(card, fn, out_buf, max_size, out_size);
+}
+
+Ps1CardStatus ps1_card_write_farm_slot(Ps1Card *card, int slot_idx,
+                                       const void *data, size_t size) {
+    const char *fn = ps1_card_get_farm_filename(slot_idx);
+    if (!fn) return PS1_CARD_ERR_IO;
+    return ps1_card_write_file(card, fn, data, size);
+}
+
+Ps1CardStatus ps1_card_read_slot_header(const Ps1Card *card, int slot_idx,
+                                        void *out_header, size_t header_size) {
+    if (!out_header || header_size == 0) return PS1_CARD_ERR_IO;
+
+    uint8_t full_file[PS1_CARD_SAVE_SIZE];
+    size_t actual_size = 0;
+    Ps1CardStatus status = ps1_card_read_farm_slot(card, slot_idx, full_file, sizeof(full_file), &actual_size);
+    if (status != PS1_CARD_OK) return status;
+
+    if (actual_size < PS1_CARD_HEADER_OFFSET + PS1_CARD_HEADER_SIZE) {
+        return PS1_CARD_ERR_DAMAGED;
+    }
+
+    const uint8_t *hdr = full_file + PS1_CARD_HEADER_OFFSET;
+
+    /* Verify 1-byte XOR checksum across bytes 0..126 against byte 127 */
+    uint8_t c = 0;
+    for (size_t i = 0; i < 127; i++) {
+        c ^= hdr[i];
+    }
+    if (c != hdr[127]) {
+        return PS1_CARD_ERR_BAD_CHECKSUM;
+    }
+
+    size_t copy_len = (header_size > 127) ? 127 : header_size;
+    memcpy(out_header, hdr, copy_len);
+    return PS1_CARD_OK;
+}
+
+/* -------------------------------------------------------------------------
+ * Persistence, Atomic Save, and Crash Recovery
+ * ---------------------------------------------------------------------- */
+static bool is_valid_mcr_file(const char *filepath) {
+    FILE *f = fopen(filepath, "rb");
+    if (!f) return false;
+
+    fseek(f, 0, SEEK_END);
+    long len = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    if (len != (long)PS1_CARD_SIZE) {
+        fclose(f);
+        return false;
+    }
+
+    uint8_t hdr[128];
+    if (fread(hdr, 1, 128, f) != 128) {
+        fclose(f);
+        return false;
+    }
+    fclose(f);
+
+    if (hdr[0] != 'M' || hdr[1] != 'C') return false;
+    return ps1_card_checksum(hdr) == hdr[127];
+}
+
+bool ps1_card_recover_file(const char *filepath) {
+    if (!filepath) return false;
+
+    char tmp_path[540];
+    char bak_path[540];
+    snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", filepath);
+    snprintf(bak_path, sizeof(bak_path), "%s.bak", filepath);
+
+    /* If primary file is already valid, nothing to recover */
+    if (is_valid_mcr_file(filepath)) {
+        remove(tmp_path);
+        return true;
+    }
+
+    /* Try recovering from .tmp */
+    if (is_valid_mcr_file(tmp_path)) {
+        remove(filepath);
+        if (rename(tmp_path, filepath) == 0) return true;
+    }
+
+    /* Try recovering from .bak */
+    if (is_valid_mcr_file(bak_path)) {
+        remove(filepath);
+        if (rename(bak_path, filepath) == 0) return true;
+    }
+
+    return false;
+}
+
+bool ps1_card_load_from_file(Ps1Card *card, const char *filepath) {
+    if (!card || !filepath) return false;
+
+    ps1_card_init(card);
+    snprintf(card->filepath, sizeof(card->filepath), "%s", filepath);
+
+    /* Check for crash recovery */
+    ps1_card_recover_file(filepath);
+
+    FILE *f = fopen(filepath, "rb");
+    if (!f) {
+        /* File doesn't exist yet: format a fresh card */
+        ps1_card_format(card);
+        card->dirty = true;
+        ps1_card_save_to_file(card, filepath);
+        return true;
+    }
+
+    size_t n = fread(card->data, 1, PS1_CARD_SIZE, f);
+    fclose(f);
+
+    if (n != PS1_CARD_SIZE || ps1_card_validate(card) != PS1_CARD_OK) {
+        /* Corrupt: format fresh */
+        ps1_card_format(card);
+        card->dirty = true;
+        return false;
+    }
+
+    card->present = true;
+    card->dirty = false;
+    return true;
+}
+
+bool ps1_card_save_to_file(const Ps1Card *card, const char *filepath) {
+    if (!card || !filepath || !card->present) return false;
+
+    char tmp_path[540];
+    char bak_path[540];
+    snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", filepath);
+    snprintf(bak_path, sizeof(bak_path), "%s.bak", filepath);
+
+    /* 1. Write to temp file */
+    FILE *f = fopen(tmp_path, "wb");
+    if (!f) return false;
+
+    size_t written = fwrite(card->data, 1, PS1_CARD_SIZE, f);
+    fflush(f);
+    fclose(f);
+
+    if (written != PS1_CARD_SIZE || !is_valid_mcr_file(tmp_path)) {
+        remove(tmp_path);
+        return false;
+    }
+
+    /* 2. Backup existing file to .bak */
+    remove(bak_path);
+    rename(filepath, bak_path);
+
+    /* 3. Atomically replace target with temp file */
+    if (rename(tmp_path, filepath) != 0) {
+        /* Restore backup if rename failed */
+        rename(bak_path, filepath);
+        return false;
+    }
+
+    /* Keep .bak as a safety net */
+    return true;
+}
+
+/* -------------------------------------------------------------------------
+ * Card Manager
+ * ---------------------------------------------------------------------- */
+bool ps1_card_manager_init(Ps1CardManager *mgr, const char *custom_dir) {
+    if (!mgr) return false;
+    memset(mgr, 0, sizeof(*mgr));
+
+    if (custom_dir && custom_dir[0] != '\0') {
+        snprintf(mgr->base_dir, sizeof(mgr->base_dir), "%s", custom_dir);
+    } else {
+        char *pref = SDL_GetPrefPath("VanillaBTN", "VanillaBTN");
+        if (pref) {
+            snprintf(mgr->base_dir, sizeof(mgr->base_dir), "%s", pref);
+            SDL_free(pref);
+        } else {
+            snprintf(mgr->base_dir, sizeof(mgr->base_dir), ".");
+        }
+    }
+
+    char card1_path[540];
+    char card2_path[540];
+    snprintf(card1_path, sizeof(card1_path), "%s/card1.mcr", mgr->base_dir);
+    snprintf(card2_path, sizeof(card2_path), "%s/card2.mcr", mgr->base_dir);
+
+    ps1_card_load_from_file(&mgr->cards[0], card1_path);
+    ps1_card_load_from_file(&mgr->cards[1], card2_path);
+
+    return true;
+}
+
+void ps1_card_manager_shutdown(Ps1CardManager *mgr) {
+    if (!mgr) return;
+
+    for (int i = 0; i < 2; i++) {
+        if (mgr->cards[i].present && mgr->cards[i].dirty) {
+            ps1_card_save_to_file(&mgr->cards[i], mgr->cards[i].filepath);
+            mgr->cards[i].dirty = false;
+        }
+    }
+}

@@ -7,14 +7,20 @@ Update the relevant item after completing a task or discovering a blocker.
 
 - [ ] Developer: check controller feel and simulation pacing in native window.
 - [ ] Developer: compare music, effects, speech/streams, and timing by ear.
-- [ ] Milestone 5: keep two virtual card slots and original save-file format/UI semantics.
+- [ ] Developer: save, reload, and compare farms in game.
+- [ ] Milestone 6: bring up farm, events, minigames, ending, title, and card flows.
 
 ## Next
 
-- [ ] Milestone 6: bring up farm, events, minigames, ending, and card flows.
+- [ ] Optimization and release packaging.
 
 ## Completed
 
+- [x] Milestone 5: keep two virtual card slots and original save-file format/UI semantics.
+  - [x] Emulate dual 128 KB PS1 memory card images, Frame 0 header, and directory allocation chains (ps1_card); Debug and Release tests pass.
+  - [x] Implement 32 KB HM:BTN farm save slots (BASLUS-01115-FARM0..2) with 0x200 header checksum validation; Debug and Release tests pass.
+  - [x] Add safe atomic file writing with .tmp staging, .bak backup, and crash recovery; Debug and Release recovery tests pass.
+  - [x] Wire Ps1CardManager with SDL pref path into main.c; Debug and Release storage tests pass.
 - [x] Milestone 4: native PS1 sound decode and mixing to PCM, SDL3 audio stream for playback.
   - [x] Emulate PS1 24-voice SPU mixer and VAB/ADPCM decoding (ps1_spu); Debug and Release decode tests pass.
   - [x] Implement CD-ROM XA sector stream filtering, ADPCM decoding, and track fading (ps1_xa); Debug and Release XA tests pass.

@@ -55,9 +55,15 @@ target_include_directories(ps1_audio PUBLIC src)
 target_link_libraries(ps1_audio PUBLIC ps1_spu ps1_xa SDL3::SDL3)
 target_compile_options(ps1_audio PRIVATE /W4)
 
+add_library(ps1_card STATIC src/ps1_card.c)
+set_target_properties(ps1_card PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_include_directories(ps1_card PUBLIC src)
+target_link_libraries(ps1_card PUBLIC SDL3::SDL3)
+target_compile_options(ps1_card PRIVATE /W4)
+
 add_executable(vanillabtn WIN32 src/main.c)
 set_target_properties(vanillabtn PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
-target_link_libraries(vanillabtn PRIVATE SDL3::SDL3 ps1_video ps1_input ps1_clock ps1_audio)
+target_link_libraries(vanillabtn PRIVATE SDL3::SDL3 ps1_video ps1_input ps1_clock ps1_audio ps1_card)
 target_compile_options(vanillabtn PRIVATE /W4)
 
 enable_testing()
@@ -129,3 +135,9 @@ set_target_properties(ps1_audio_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRE
 target_link_libraries(ps1_audio_test PRIVATE ps1_audio SDL3::SDL3)
 target_compile_options(ps1_audio_test PRIVATE /W4)
 add_test(NAME ps1_audio_playback COMMAND ps1_audio_test)
+
+add_executable(ps1_card_test tests/ps1_card_test.c)
+set_target_properties(ps1_card_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_link_libraries(ps1_card_test PRIVATE ps1_card SDL3::SDL3)
+target_compile_options(ps1_card_test PRIVATE /W4)
+add_test(NAME ps1_card_storage COMMAND ps1_card_test)

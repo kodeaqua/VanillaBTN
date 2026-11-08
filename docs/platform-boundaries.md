@@ -90,3 +90,18 @@ to PS1 controller bits. Scene wiring remains next.
 `SDL_AudioStream` at 44 100 Hz stereo 16-bit signed PCM, with headless fallback
 when no audio output hardware is present. `native/src/main.c` advances audio
 each 60 Hz simulation tick.
+
+## Save and memory-card slice
+
+`native/src/ps1_card.c` implements two virtual PS1 memory card slots:
+- Models standard 128 KB (131 072 bytes) raw PS1 memory card images (.mcr / .mcd):
+  Frame 0 header with `MC` magic and XOR checksum, and 15 directory frames with
+  block allocation chains (0x51 initial, 0x52 middle, 0x53 last, 0xA0 free).
+- Emulates the Harvest Moon: Back to Nature 4-block save files (`BASLUS-01115-FARM0`
+  through `FARM2`, 32 768 bytes each) and the 128-byte slot header record at
+  offset 0x200 with 1-byte XOR checksum validation.
+- Employs atomic write protection: writes to `<file>.tmp`, validates the image,
+  backs up the previous card to `<file>.bak`, and replaces the target.
+- Automatically recovers from interrupted writes or sudden power loss if a valid
+  `.tmp` or `.bak` file remains.
+- Stores card files under SDL3's per-user preferences directory (`SDL_GetPrefPath`).
