@@ -1053,9 +1053,27 @@ static s32 farm_tile_is_special(FarmTileQuery *query) {
         record = &game_state.fieldTiles[row].rows[column];
     }
     switch (record->value) {
+#ifdef VANILLABTN_NATIVE
+    case ITEM_BIG_STONE:
+    case ITEM_BIG_STONE + 1:
+    case ITEM_BIG_STONE + 2:
+#else
     case ITEM_BIG_STONE ... ITEM_STUMP:
+#endif
     case ITEM_LUMBER:
+#ifdef VANILLABTN_NATIVE
+    case FIELD_TILE_BIG_STONE_1:
+    case FIELD_TILE_BIG_STONE_1 + 1:
+    case FIELD_TILE_BIG_STONE_1 + 2:
+    case FIELD_TILE_BIG_STONE_1 + 3:
+    case FIELD_TILE_BIG_STONE_1 + 4:
+    case FIELD_TILE_BIG_STONE_1 + 5:
+    case FIELD_TILE_BIG_STONE_1 + 6:
+    case FIELD_TILE_BIG_STONE_1 + 7:
+    case FIELD_TILE_BIG_STONE_1 + 8:
+#else
     case FIELD_TILE_BIG_STONE_1 ... FIELD_TILE_STUMP_3:
+#endif
         return 1;
     }
     return 0;

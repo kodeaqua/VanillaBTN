@@ -16,4 +16,17 @@ typedef struct GsOT {
 extern short HWD0, VWD0;
 extern MATRIX GsIDMATRIX;
 
+/* Original scene descriptors are runtime data. Declaring the remaining GS
+ * lighting boundary does not provide a pretend implementation: linking a
+ * caller still requires its platform implementation. */
+typedef struct GsF_LIGHT {
+    int vx, vy, vz;
+    unsigned char r, g, b;
+} GsF_LIGHT;
+
+int GsSetFlatLight(int id, GsF_LIGHT *light);
+void GsSetAmbient(long r, long g, long b);
+void GsSetLightMode(int mode);
+void GsSetProjection(long distance);
+
 #endif

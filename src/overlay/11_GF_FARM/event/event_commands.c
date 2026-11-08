@@ -6450,7 +6450,7 @@ void *event_var_address(s32 index, s32 value, s32 *output)
     if (output == 0)
         output = &kind;
     if (farm_variables[index].stride != 0)
-        result = farm_variables[index].address + farm_variables[index].stride * value;
+        result = (u8 *)farm_variables[index].address + farm_variables[index].stride * value;
     else
         result = farm_variables[index].address;
     *output = farm_variables[index].kind;

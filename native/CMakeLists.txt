@@ -294,6 +294,61 @@ target_link_libraries(original_window_test PRIVATE game_window_frame)
 target_compile_options(original_window_test PRIVATE /W4 /UNDEBUG)
 add_test(NAME original_window_packets COMMAND original_window_test)
 
+add_library(game_farm STATIC
+    ../src/overlay/11_GF_FARM/animals/animals.c
+    ../src/overlay/11_GF_FARM/animals/animal_actions.c
+    ../src/overlay/11_GF_FARM/animals/chicken.c
+    ../src/overlay/11_GF_FARM/animals/dog.c
+    ../src/overlay/11_GF_FARM/animals/horse.c
+    ../src/overlay/11_GF_FARM/animals/livestock.c
+    ../src/overlay/11_GF_FARM/demo.c
+    ../src/overlay/11_GF_FARM/estate.c
+    ../src/overlay/11_GF_FARM/event/cue.c
+    ../src/overlay/11_GF_FARM/event/cue_history.c
+    ../src/overlay/11_GF_FARM/event/event_commands.c
+    ../src/overlay/11_GF_FARM/event/event_request.c
+    ../src/overlay/11_GF_FARM/event/event_rules.c
+    ../src/overlay/11_GF_FARM/event/event_script.c
+    ../src/overlay/11_GF_FARM/event/messages.c
+    ../src/overlay/11_GF_FARM/event/milestones.c
+    ../src/overlay/11_GF_FARM/farm_frame.c
+    ../src/overlay/11_GF_FARM/farm_init.c
+    ../src/overlay/11_GF_FARM/farm_load.c
+    ../src/overlay/11_GF_FARM/farm_main.c
+    ../src/overlay/11_GF_FARM/farm_probe.c
+    ../src/overlay/11_GF_FARM/field/field.c
+    ../src/overlay/11_GF_FARM/field/field_item_requests.c
+    ../src/overlay/11_GF_FARM/field/fishing.c
+    ../src/overlay/11_GF_FARM/field/greenhouse.c
+    ../src/overlay/11_GF_FARM/field/mine.c
+    ../src/overlay/11_GF_FARM/field/pond.c
+    ../src/overlay/11_GF_FARM/menu/calendar.c
+    ../src/overlay/11_GF_FARM/menu/house.c
+    ../src/overlay/11_GF_FARM/menu/menus.c
+    ../src/overlay/11_GF_FARM/menu/options_menu.c
+    ../src/overlay/11_GF_FARM/menu/photo_album.c
+    ../src/overlay/11_GF_FARM/menu/shop_dialogues.c
+    ../src/overlay/11_GF_FARM/menu/shop_page.c
+    ../src/overlay/11_GF_FARM/menu/status_pages.c
+    ../src/overlay/11_GF_FARM/menu/storage_swap.c
+    ../src/overlay/11_GF_FARM/people/family.c
+    ../src/overlay/11_GF_FARM/people/harvest_sprites.c
+    ../src/overlay/11_GF_FARM/people/player.c
+    ../src/overlay/11_GF_FARM/people/villager.c
+    ../src/overlay/11_GF_FARM/world/clock.c
+    ../src/overlay/11_GF_FARM/world/clock_events.c
+    ../src/overlay/11_GF_FARM/world/doors.c
+    ../src/overlay/11_GF_FARM/world/scene.c
+    ../src/overlay/11_GF_FARM/world/scene_view.c
+    ../src/overlay/11_GF_FARM/world/weather.c
+    ../src/overlay/30_GF_swind/swind.c
+)
+set_target_properties(game_farm PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_include_directories(game_farm PUBLIC ${game_include_dirs})
+target_link_libraries(game_farm PUBLIC game_window_frame)
+target_compile_options(game_farm PRIVATE /W4 /Gy)
+target_compile_options(game_farm PRIVATE /we4013)
+
 add_library(sdk_pad STATIC src/sdk_pad.c)
 set_target_properties(sdk_pad PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_include_directories(sdk_pad PUBLIC compat src)

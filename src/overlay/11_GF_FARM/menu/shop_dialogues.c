@@ -5145,6 +5145,20 @@ static void shop_menu_clear(FarmMenu *menu) {
     }
 }
 
+#ifdef VANILLABTN_NATIVE
+/* Whether any row's value is a medal price (flag 2). */
+static s32 has_medal_price(u8 *flags) {
+    s32 j;
+
+    for (j = 0; j < 10; j++, flags++) {
+        if (*flags == 2) {
+            return 1;
+        }
+    }
+    return 0;
+}
+#endif
+
 /* Draw `menu` at (x, y): up to ten rows of label, value and cursor, then the
  * frame around them. A value is drawn by its row's flag: 0 a price in gold, 2 a
  * price in medals, 3 a row of dashes as wide as the value column, anything else
@@ -5162,6 +5176,7 @@ static void shop_menu_draw(FarmMenu *menu, s16 x, s16 y) {
     u8 *flags;
     s32 i;
 
+#ifndef VANILLABTN_NATIVE
     /* Whether any row's value is a medal price (flag 2). */
     s32 has_medal_price(u8 *flags) {
         s32 j;
@@ -5173,6 +5188,7 @@ static void shop_menu_draw(FarmMenu *menu, s16 x, s16 y) {
         }
         return 0;
     }
+#endif
 
     display = &current_frame->otTags[0][15];
     valueX = menu->columns[0] * 8 + 28;

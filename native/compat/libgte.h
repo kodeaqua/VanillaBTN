@@ -27,6 +27,8 @@ void PushMatrix(void);
 void PopMatrix(void);
 
 MATRIX *RotMatrix(SVECTOR *r, MATRIX *m);
+MATRIX *RotMatrixZXY(SVECTOR *r, MATRIX *m);
+MATRIX *TransMatrix(MATRIX *m, VECTOR *v);
 MATRIX *RotMatrixX(long r, MATRIX *m);
 MATRIX *RotMatrixY(long r, MATRIX *m);
 MATRIX *RotMatrixZ(long r, MATRIX *m);

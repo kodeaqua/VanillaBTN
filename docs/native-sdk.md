@@ -439,3 +439,21 @@ Opening now uses the bounded parser and publishes only a successful result.
 Fixtures cover invalid PPQN, a short header, an unregistered buffer and a
 valid `FF 2F` delta followed by the actual end event. The invalid-header check
 fails on the previous implementation and again on temporary reversion.
+
+## Farm source compilation
+
+`game_farm` includes the remaining original farm translation units and the
+`30_GF_swind` utility. MSVC compatibility changes expand GNU case ranges into
+the same integer labels, hoist capture-free nested helpers under native guards,
+and use byte-pointer arithmetic where GNU C accepted `void*` arithmetic.
+The PS1 branches retain their nested helpers/ranges and still match all 14
+reference code hashes. Existing interrupted shop/helper/utility edits are kept.
+
+The farm target rejects implicit function declarations (`/we4013`). Remaining
+GS light descriptors and matrix-entry declarations match the installed SDK,
+but declarations alone do not implement that linkage. The archive compiles in
+Debug/Release and the existing 27 synthetic checks pass. It is not linked into
+the host executable and is not a playable farm: unresolved host/runtime entry
+points and serialized/host pointer boundaries still need work. In particular,
+the source build still reports pointer truncations in animal actions, event
+scripts/cue history and player code; those must be resolved before execution.

@@ -1272,6 +1272,20 @@ static s32 harvest_obj_move_action_tick(FarmHelper *helper) {
     return result;
 }
 
+#ifdef VANILLABTN_NATIVE
+static void harvest_helper_arrive_or_wait(FarmHelper *o, s16 kind, u32 mask) {
+    if (o->actor.place.location == kind) {
+        o->targetAnimal = SLOT_NONE;
+        o->actor.taskId = 0;
+        o->actor.flags &= ~mask;
+        o->flags |= HELPER_BIT9;
+    } else {
+        o->actor.flags |= mask;
+        harvest_obj_wait_walk(o, HARVEST_NEAR_PROXIMITY);
+    }
+}
+#endif
+
 /* One tick of a helper's carry script. Tasks -1 to -4 wait for the walk to their
  * target. Otherwise the place decides: on the farm it picks an animal to carry feed
  * to, in PLACE_5 it hands over and fetches, in PLACE_4 it fetches and claims. While
@@ -1283,6 +1297,7 @@ static s32 harvest_obj_carry_tick(FarmHelper *object) {
     s32 result;
     VECTOR pos;
 
+#ifndef VANILLABTN_NATIVE
     void harvest_helper_arrive_or_wait(FarmHelper *o, s16 kind, u32 mask) {
         if (o->actor.place.location == kind) {
             o->targetAnimal = SLOT_NONE;
@@ -1294,6 +1309,7 @@ static s32 harvest_obj_carry_tick(FarmHelper *object) {
             harvest_obj_wait_walk(object, HARVEST_NEAR_PROXIMITY);
         }
     }
+#endif
 
     self = object;
     running = 1;
@@ -2191,8 +2207,21 @@ s32 harvest_find_free_tile(s16 *column_out, s16 *row_out, s32 field, s32 directi
 static s32 harvest_tile_match_category(FarmFieldTile *tile) {
     if (harvest_tile_usable(tile) == 0) return 0;
     switch (tile->value) {
+#ifdef VANILLABTN_NATIVE
+    case ITEM_MOONDROP_SEEDS:
+    case ITEM_MOONDROP_SEEDS + 1:
+    case ITEM_MOONDROP_SEEDS + 2:
+    case ITEM_MOONDROP_SEEDS + 3:
+    case ITEM_MOONDROP_SEEDS + 4:
+#else
     case ITEM_MOONDROP_SEEDS ... ITEM_ORANGE_CUP_SEEDS:
+#endif
+#ifdef VANILLABTN_NATIVE
+    case ITEM_BLUE_MAGIC_RED_PLANT:
+    case ITEM_BLUE_MAGIC_RED_PLANT + 1:
+#else
     case ITEM_BLUE_MAGIC_RED_PLANT ... ITEM_RED_MAGIC_RED_PLANT:
+#endif
         break;
     default:
         if (tile->kind == game_state.cropTable[game_state.itemInfo[tile->value].crop].grownStage) return 1;
@@ -2701,7 +2730,13 @@ static s32 harvest_item_category_2(s16 event) {
 
 static s32 harvest_item_category_3(s16 item_id) {
     switch (item_id) {
+#ifdef VANILLABTN_NATIVE
+    case ITEM_NORMAL_EGG:
+    case ITEM_NORMAL_EGG + 1:
+    case ITEM_NORMAL_EGG + 2:
+#else
     case ITEM_NORMAL_EGG ... ITEM_EXCELLENT_EGG:
+#endif
         return 12;
     case ITEM_GOLDEN_EGG:
         return 13;

@@ -99,6 +99,20 @@ static void farm_roll_stray_dogs(void);
 static void farm_draw_unless_hidden(u32 flags, u_long *ot, u32 x, u32 y);
 static u16 farm_walker_pick_heading(FarmActor *walker, s32 blocked, s32 flags);
 static u16 farm_walker_pick_turn(u16 heading, u16 turn, u16 bias);
+#ifdef VANILLABTN_NATIVE
+/* MSVC has no nested functions; this helper captures no outer locals. */
+static s32 farm_heading_compare(s32 a, s32 b)
+{
+    if (a == b) {
+        return 0;
+    }
+    if (a < b) {
+        return 1;
+    }
+    return 2;
+}
+#endif
+
 static u16 farm_heading_classify(FarmActor *state);
 static void farm_update_zone_flag(FarmActor *object);
 static void farm_objects_update(void);
@@ -139,37 +153,103 @@ void *farm_action_create(s32 kind, s32 slot)
     void *action = 0;
 
     switch (kind) {
+#ifdef VANILLABTN_NATIVE
+    case ITEM_CALF:
+    case ITEM_CALF + 1:
+    case ITEM_CALF + 2:
+#else
     case ITEM_CALF ... ITEM_COW:
+#endif
         action = livestock_spawn(kind, slot, 1);
         break;
     case ITEM_VISITING_COW:
         action = farm_action_claim(ITEM_COW);
         break;
+#ifdef VANILLABTN_NATIVE
+    case ITEM_LAMB:
+    case ITEM_LAMB + 1:
+#else
     case ITEM_LAMB ... ITEM_SHEEP:
+#endif
         action = livestock_spawn_b(kind, slot, 1);
         break;
     case ITEM_VISITING_SHEEP:
         action = farm_action_claim(ITEM_SHEEP);
         break;
+#ifdef VANILLABTN_NATIVE
+    case ITEM_CHICKEN:
+    case ITEM_CHICKEN + 1:
+#else
     case ITEM_CHICKEN ... ITEM_CHICK:
+#endif
         action = chicken_spawn(kind, slot, 1);
         break;
     case ITEM_CAT:
+#ifdef VANILLABTN_NATIVE
+    case ITEM_WHITE_RABBIT:
+    case ITEM_WHITE_RABBIT + 1:
+    case ITEM_WHITE_RABBIT + 2:
+    case ITEM_WHITE_RABBIT + 3:
+    case ITEM_WHITE_RABBIT + 4:
+    case ITEM_WHITE_RABBIT + 5:
+#else
     case ITEM_WHITE_RABBIT ... ITEM_SNAKE:
+#endif
+#ifdef VANILLABTN_NATIVE
+    case ITEM_BUTTERFLY:
+    case ITEM_BUTTERFLY + 1:
+    case ITEM_BUTTERFLY + 2:
+    case ITEM_BUTTERFLY + 3:
+    case ITEM_BUTTERFLY + 4:
+    case ITEM_BUTTERFLY + 5:
+    case ITEM_BUTTERFLY + 6:
+    case ITEM_BUTTERFLY + 7:
+    case ITEM_BUTTERFLY + 8:
+#else
     case ITEM_BUTTERFLY ... ITEM_GRASSHOPPER:
+#endif
+#ifdef VANILLABTN_NATIVE
+    case ITEM_153:
+    case ITEM_153 + 1:
+    case ITEM_153 + 2:
+    case ITEM_153 + 3:
+    case ITEM_153 + 4:
+#else
     case ITEM_153 ... ITEM_157:
+#endif
     case ITEM_159:
     case ITEM_STRAY_DOG:
+#ifdef VANILLABTN_NATIVE
+    case ITEM_17A:
+    case ITEM_17A + 1:
+#else
     case ITEM_17A ... ITEM_17B:
+#endif
         action = farm_action_claim(kind);
         break;
+#ifdef VANILLABTN_NATIVE
+    case ITEM_ADULT_DOG:
+    case ITEM_ADULT_DOG + 1:
+#else
     case ITEM_ADULT_DOG ... ITEM_YOUNG_DOG:
+#endif
         action = dog_start(kind, 1);
         break;
+#ifdef VANILLABTN_NATIVE
+    case ITEM_PONY:
+    case ITEM_PONY + 1:
+#else
     case ITEM_PONY ... ITEM_HORSE:
+#endif
         action = horse_spawn(kind);
         break;
+#ifdef VANILLABTN_NATIVE
+    case ITEM_LARGE_FISH:
+    case ITEM_LARGE_FISH + 1:
+    case ITEM_LARGE_FISH + 2:
+#else
     case ITEM_LARGE_FISH ... ITEM_SMALL_FISH:
+#endif
         pond_add_fish(kind);
         break;
     }
@@ -974,8 +1054,30 @@ static void farm_roll_stray_dogs(void) {
 /* Is a dead farm item of a kind `kind` selects? `kind` bit 1 matches items that died of age, bit 2
  * the others. `mode` picks the tables: bit 4 the chickens, and bits 1 and 2 the livestock (bit 2
  * for records with ACTOR_FLAG_BIT16, bit 1 for the rest). */
+#ifdef VANILLABTN_NATIVE
+/* MSVC has no nested functions; this helper captures no outer locals. */
+static s32 farm_kind_matches_flags(FarmActor *object, u32 kind)
+{
+    u32 flags;
+    u32 diedOfAge;
+
+    flags = object->flags;
+    diedOfAge = flags & ACTOR_FLAG_DIED_OF_AGE;
+    if (flags & ACTOR_FLAG_DIED) {
+        if ((kind & 1) && diedOfAge == 1) {
+            return 1;
+        }
+        if ((kind & 2) && diedOfAge == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+#endif
+
 s32 farm_kind_selected(s32 mode, u32 kind)
 {
+#ifndef VANILLABTN_NATIVE
     s32 farm_kind_matches_flags(FarmActor *object, u32 kind)
     {
         u32 flags;
@@ -993,6 +1095,7 @@ s32 farm_kind_selected(s32 mode, u32 kind)
         }
         return 0;
     }
+#endif
 
     s32 i;
 
@@ -1307,8 +1410,23 @@ static u16 farm_move_compare_table[10] = {
 };
 
 /* Compare both coordinate pairs three ways and look the pair up in the table. */
+#ifdef VANILLABTN_NATIVE
+/* MSVC has no nested functions; this helper captures no outer locals. */
+static s32 farm_move_compare(s32 a, s32 b)
+{
+    if (a == b) {
+        return 0;
+    }
+    if (a < b) {
+        return 1;
+    }
+    return 2;
+}
+#endif
+
 static u16 farm_move_table_lookup(FarmActor *state)
 {
+#ifndef VANILLABTN_NATIVE
     s32 farm_move_compare(s32 a, s32 b)
     {
         if (a == b) {
@@ -1319,6 +1437,7 @@ static u16 farm_move_table_lookup(FarmActor *state)
         }
         return 2;
     }
+#endif
 
     s32 first;
     s32 second;
@@ -1968,6 +2087,7 @@ static u16 farm_heading_table[10] = {
  * both axes, clear ACTOR_FLAG_APPROACHING_PLAYER (0x2000) and report 0 instead. */
 static u16 farm_heading_classify(FarmActor *state)
 {
+#ifndef VANILLABTN_NATIVE
     s32 farm_heading_compare(s32 a, s32 b)
     {
         if (a == b) {
@@ -1978,6 +2098,7 @@ static u16 farm_heading_classify(FarmActor *state)
         }
         return 2;
     }
+#endif
 
     s32 x1;
     s32 y1;
@@ -2548,13 +2669,45 @@ static void farm_action_set_kind_flag(FarmAction *action)
     u32 *flags = &action->actor.flags;
 
     switch (action->actor.kind) {
+#ifdef VANILLABTN_NATIVE
+    case ITEM_LARGE_FISH:
+    case ITEM_LARGE_FISH + 1:
+    case ITEM_LARGE_FISH + 2:
+#else
     case ITEM_LARGE_FISH ... ITEM_SMALL_FISH:
+#endif
+#ifdef VANILLABTN_NATIVE
+    case ITEM_ADULT_DOG:
+    case ITEM_ADULT_DOG + 1:
+    case ITEM_ADULT_DOG + 2:
+    case ITEM_ADULT_DOG + 3:
+    case ITEM_ADULT_DOG + 4:
+    case ITEM_ADULT_DOG + 5:
+    case ITEM_ADULT_DOG + 6:
+    case ITEM_ADULT_DOG + 7:
+    case ITEM_ADULT_DOG + 8:
+    case ITEM_ADULT_DOG + 9:
+    case ITEM_ADULT_DOG + 10:
+#else
     case ITEM_ADULT_DOG ... ITEM_SNAKE:
+#endif
     case ITEM_BUTTERFLY:
     case ITEM_159:
     case ITEM_STRAY_DOG:
+#ifdef VANILLABTN_NATIVE
+    case ITEM_PONY:
+    case ITEM_PONY + 1:
+    case ITEM_PONY + 2:
+    case ITEM_PONY + 3:
+#else
     case ITEM_PONY ... ITEM_YOUNG_COW:
+#endif
+#ifdef VANILLABTN_NATIVE
+    case ITEM_LAMB:
+    case ITEM_LAMB + 1:
+#else
     case ITEM_LAMB ... ITEM_SHEEP:
+#endif
         break;
     case ITEM_COW:
     case ITEM_VISITING_COW:

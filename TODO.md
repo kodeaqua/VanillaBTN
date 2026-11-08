@@ -7,6 +7,8 @@ Update the relevant item after completing a task or discovering a blocker.
 
 - [ ] Continuation audit: complete farm linkage/address translation and remove unsupported SDK success paths before claiming runtime integration.
   - [x] Replace unbounded SEQ scanning with exact archive spans and reject invalid sequence headers without consuming handles.
+  - [x] Finish the interrupted MSVC farm-source build: case ranges, nested helpers, byte-pointer arithmetic and required type declarations.
+  - [ ] Resolve farm-to-host linkage, remaining pointer truncations and GS lighting/matrix entry points; an archive build does not prove a runnable farm.
   - [ ] PocketStation operations must report an absent/unsupported device rather than fabricated successful reads or writes.
 - [ ] Connect original game code through platform/SDK interfaces. Do not rebuild scene, menu, dialog or game logic in the native host.
   - [x] Compile the original texture-pack loader against native GPU transfers.
