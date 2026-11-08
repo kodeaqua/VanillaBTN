@@ -34,9 +34,14 @@ target_include_directories(ps1_gpu PUBLIC src)
 target_link_libraries(ps1_gpu PUBLIC ps1_video ps1_ot)
 target_compile_options(ps1_gpu PRIVATE /W4)
 
+add_library(ps1_clock STATIC src/ps1_clock.c)
+set_target_properties(ps1_clock PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_include_directories(ps1_clock PUBLIC src)
+target_compile_options(ps1_clock PRIVATE /W4)
+
 add_executable(vanillabtn WIN32 src/main.c)
 set_target_properties(vanillabtn PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
-target_link_libraries(vanillabtn PRIVATE SDL3::SDL3 ps1_video)
+target_link_libraries(vanillabtn PRIVATE SDL3::SDL3 ps1_video ps1_input ps1_clock)
 target_compile_options(vanillabtn PRIVATE /W4)
 
 enable_testing()
@@ -84,3 +89,9 @@ set_target_properties(ps1_input_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRE
 target_link_libraries(ps1_input_test PRIVATE ps1_input)
 target_compile_options(ps1_input_test PRIVATE /W4)
 add_test(NAME ps1_input_repeat COMMAND ps1_input_test)
+
+add_executable(ps1_clock_test tests/ps1_clock_test.c)
+set_target_properties(ps1_clock_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_link_libraries(ps1_clock_test PRIVATE ps1_clock)
+target_compile_options(ps1_clock_test PRIVATE /W4)
+add_test(NAME ps1_clock_cadence COMMAND ps1_clock_test)

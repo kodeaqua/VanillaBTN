@@ -58,4 +58,13 @@ OT1, OT0, active OT).
 
 `native/src/ps1_gte.c` provides the host-side GTE compatibility layer: fixed-point
 vector rotation and translation, perspective divide (RTPS/RTPT), normal clipping
-(NCLIP), and depth averaging (AVSZ3/AVSZ4). Scene wiring remains next.
+(NCLIP), and depth averaging (AVSZ3/AVSZ4).
+
+## Input and clock
+
+`native/src/ps1_input.c` emulates the `InputRecord` semantics from `pad.c`:
+`held`, `pressed`, and dual auto-repeat channels (`triggered` and `triggered2`).
+`native/src/ps1_clock.c` accumulates host nanoseconds and emits exact 60 Hz
+simulation ticks with an anti-cascade clamp. `native/src/main.c` maps SDL3
+keyboard (WASD/arrows, ZXCV, Enter/Space/Esc) and SDL3 Gamepad events directly
+to PS1 controller bits. Scene wiring remains next.

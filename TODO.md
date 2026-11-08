@@ -5,17 +5,18 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Active
 
-- [ ] Milestone 3: map input and fixed simulation timing to the PS1 behavior.
-  - [x] Emulate PS1 InputRecord button states and auto-repeat channels (ps1_input); Debug and Release repeat tests pass.
-  - [ ] Add fixed simulation clock and wire input loop into native window.
+- [ ] Developer: check controller feel and simulation pacing in native window.
+- [ ] Milestone 4: native PS1 sound decode and mixing to PCM, SDL3 audio stream for playback.
 
 ## Next
 
-- [ ] Audio: native PS1 sound decode and mixing to PCM, SDL3 audio stream for playback.
+- [ ] Milestone 5: keep two virtual card slots and original save-file format/UI semantics.
 
 ## Completed
 
+- [x] Add fixed 60 Hz simulation clock (ps1_clock) and wire keyboard/gamepad polling into native window; Debug and Release clock tests pass.
 - [x] Emulate PS1 InputRecord button states and auto-repeat channels (ps1_input); Debug and Release repeat tests pass.
+- [x] Milestone 3: map input and fixed simulation timing to the PS1 behavior.
 - [x] Developer: open and close the native Debug/Release window on Windows.
 - [x] Developer: verify the importer recognizes a personally supplied USA disc.
 - [x] Milestone 2: implement required GPU primitives, CLUT, ordering, and GTE behavior with synthetic pixel checks.
