@@ -28,6 +28,12 @@ set_target_properties(ps1_video PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES
 target_include_directories(ps1_video PUBLIC src)
 target_compile_options(ps1_video PRIVATE /W4)
 
+add_library(game_graphics STATIC src/game_graphics.c)
+set_target_properties(game_graphics PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_include_directories(game_graphics PUBLIC src)
+target_link_libraries(game_graphics PUBLIC game_archive ps1_video)
+target_compile_options(game_graphics PRIVATE /W4)
+
 add_library(ps1_ot STATIC src/ps1_ot.c)
 set_target_properties(ps1_ot PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_include_directories(ps1_ot PUBLIC src)
@@ -78,6 +84,11 @@ target_link_libraries(vanillabtn PRIVATE SDL3::SDL3 ps1_video ps1_input ps1_cloc
 target_compile_options(vanillabtn PRIVATE /W4)
 
 enable_testing()
+add_executable(game_graphics_test tests/game_graphics_test.c)
+set_target_properties(game_graphics_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_link_libraries(game_graphics_test PRIVATE game_graphics)
+target_compile_options(game_graphics_test PRIVATE /W4 /UNDEBUG)
+add_test(NAME game_graphics_assets COMMAND game_graphics_test)
 add_executable(ps1_seq_test tests/ps1_seq_test.c)
 set_target_properties(ps1_seq_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_link_libraries(ps1_seq_test PRIVATE ps1_seq)

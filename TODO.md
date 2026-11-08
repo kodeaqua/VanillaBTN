@@ -25,6 +25,7 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Completed
 
+- [x] Decode native texture-bank RLE/raw blocks and offset-based ANI sprites/quads with UV orientation; synthetic pixel/bounds checks pass in both profiles.
 - [x] Add sample-timed SEQ note/program/volume/pan events, running status, tempo, and loop scheduling; synthetic timing and malformed-loop checks pass in Debug/Release.
 - [x] Map signed host sticks through the original pad dead zone and four cardinal sectors; synthetic axis checks pass in both profiles.
 - [x] Exclude polygon bottom/right edges and give shared edges one owner; translucent quad regression passes in Debug and Release.
