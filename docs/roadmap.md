@@ -2,6 +2,10 @@
 
 ## Target
 
+Bringup means running the original game code through native platform services,
+not reconstructing its scenes, code, or gameplay. Each milestone must connect
+the original implementation rather than substitute a hand-written game flow.
+
 Bring up an **x64 native Windows executable** of the USA PS1 game before adding
 enhancements. Keep the original gameplay, timing, internal display modes,
 aspect ratio, texture behavior, audio, and save data. No high-resolution

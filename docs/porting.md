@@ -7,6 +7,10 @@ decompilation is the behavioral and data-layout reference for that work.
 
 ## Fidelity rules
 
+- Bring up the existing game code through native platform and SDK interfaces.
+  This is not a reconstruction of scenes, code, or gameplay. Do not implement
+  replacement scene flows, dialogs, menus, or game rules to imitate the game.
+  Limit original-code changes to compatibility needs and preserve behavior.
 - Preserve the original gameplay rules, pacing, content, and audiovisual
   presentation in the default experience. Avoid balance changes, replacement
   assets, or quality-of-life features in the baseline port.

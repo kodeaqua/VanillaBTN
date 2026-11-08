@@ -5,14 +5,10 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Active
 
-- [ ] Title bringup: native asset loading, original scene rendering, input/timing, and SEQ/SPU music.
-  - [x] Add bounds-checked native A_FILE reader for the importer's BIN/HDT output.
-  - [ ] Decode title texture/animation assets and connect original title flow.
-  - [ ] Connect title input and fixed frame cadence.
-  - [ ] Schedule title SEQ events into SPU and SDL playback.
-- [ ] Audit follow-up: integrate game scenes with the native executable before requesting gameplay acceptance; see `docs/native-audit.md`.
+- [ ] Connect original game code through platform/SDK interfaces. Do not rebuild scene, menu, dialog or game logic in the native host.
+- [ ] Native executable remains a backend smoke harness; original game execution is not connected.
 - [ ] Graphics/GTE: verify hardware rounding, saturation, flags, and primitive edge coverage against independent fixtures.
-- [ ] Audio: implement SEQ scheduling, ADSR/reverb, XA stereo histories and coding-info sample rates.
+- [ ] Audio: implement ADSR/reverb, XA stereo histories and coding-info sample rates.
 - [ ] Save/load: verify external card chain encoding, corruption handling, and original save layout before game integration.
 - [ ] Developer: check controller feel and simulation pacing in native window.
 - [ ] Developer: compare music, effects, speech/streams, and timing by ear.
@@ -24,6 +20,8 @@ Update the relevant item after completing a task or discovering a blocker.
 - [ ] Optimization and release packaging.
 
 ## Completed
+
+- [x] Mix SEQ through the shared SPU/SDL audio backend and open/close gamepads with separate keyboard/controller state. Synthetic tests cover backend behavior; no native game scene is implemented.
 
 - [x] Decode native texture-bank RLE/raw blocks and offset-based ANI sprites/quads with UV orientation; synthetic pixel/bounds checks pass in both profiles.
 - [x] Add sample-timed SEQ note/program/volume/pan events, running status, tempo, and loop scheduling; synthetic timing and malformed-loop checks pass in Debug/Release.

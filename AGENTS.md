@@ -52,6 +52,13 @@ for this repository's agent workflow:
 
 ## Working rules
 
+- VanillaBTN is a native bringup of the original game, not a reconstruction of
+  its scenes, code, or gameplay. Adapt platform services and SDK interfaces so
+  the existing game code can run natively. Do not replace scenes, menus,
+  dialogs, initialization, or game rules with hand-written native equivalents.
+  Keep the original game code authoritative; change it only as needed for
+  native compatibility while preserving its behavior.
+
 - Keep changes scoped to the requested behavior or documentation. Do not
   reformat unrelated C files: source order, declarations, compiler behavior,
   object layout, and link order can affect the output bytes.

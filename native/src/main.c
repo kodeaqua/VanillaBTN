@@ -104,12 +104,15 @@ int main(int argc, char **argv) {
     SDL_Event event;
     bool running = true;
     int result = 1;
+    SDL_Gamepad *gamepad = NULL;
+    uint32_t keyboard_buttons = 0, controller_buttons = 0;
+    int16_t stick_x = 0, stick_y = 0;
 
     /* CTest can verify executable startup without opening a window. */
     if (argc == 2 && strcmp(argv[1], "--check-build") == 0) {
         return 0;
     }
-    if (argc != 1 || !SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
+    if (argc != 1 || !SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD)) {
         return 1;
     }
     window = SDL_CreateWindow("VanillaBTN - native bringup", 640, 480,
@@ -140,23 +143,48 @@ int main(int argc, char **argv) {
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_EVENT_QUIT) {
                 running = false;
+            } else if (event.type == SDL_EVENT_GAMEPAD_ADDED && gamepad == NULL) {
+                gamepad = SDL_OpenGamepad(event.gdevice.which);
+            } else if (event.type == SDL_EVENT_GAMEPAD_REMOVED && gamepad != NULL
+                       && SDL_GetGamepadID(gamepad) == event.gdevice.which) {
+                SDL_CloseGamepad(gamepad);
+                gamepad = NULL;
+                controller_buttons = 0;
+                stick_x = stick_y = 0;
+            } else if (event.type == SDL_EVENT_WINDOW_FOCUS_LOST) {
+                keyboard_buttons = controller_buttons = 0;
+                stick_x = stick_y = 0;
+                ps1_input_clear(&pad1);
             } else if (event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP) {
                 uint32_t btn = map_key_to_ps1_button(event.key.key);
                 if (btn != 0) {
-                    ps1_input_set_button(&pad1, btn, event.type == SDL_EVENT_KEY_DOWN);
+                    if (event.type == SDL_EVENT_KEY_DOWN) keyboard_buttons |= btn;
+                    else keyboard_buttons &= ~btn;
                 }
             } else if (event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN
                        || event.type == SDL_EVENT_GAMEPAD_BUTTON_UP) {
-                uint32_t btn = map_gamepad_to_ps1_button(event.gbutton.button);
+                uint32_t btn = gamepad != NULL && SDL_GetGamepadID(gamepad) == event.gbutton.which
+                    ? map_gamepad_to_ps1_button(event.gbutton.button) : 0;
                 if (btn != 0) {
-                    ps1_input_set_button(&pad1, btn, event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN);
+                    if (event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN) controller_buttons |= btn;
+                    else controller_buttons &= ~btn;
                 }
+            } else if (event.type == SDL_EVENT_GAMEPAD_AXIS_MOTION && gamepad != NULL
+                       && SDL_GetGamepadID(gamepad) == event.gaxis.which) {
+                if (event.gaxis.axis == SDL_GAMEPAD_AXIS_LEFTX) stick_x = event.gaxis.value;
+                if (event.gaxis.axis == SDL_GAMEPAD_AXIS_LEFTY) stick_y = event.gaxis.value;
             } else if (event.type == SDL_EVENT_WINDOW_EXPOSED
                        || event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) {
                 if (!present_frame(renderer, texture)) {
                     goto done;
                 }
             }
+        }
+
+        if (!running) break;
+        pad1.held = keyboard_buttons | controller_buttons;
+        if ((controller_buttons & PS1_PAD_ARROWS_MASK) == 0) {
+            pad1.held |= ps1_input_stick_buttons(stick_x, stick_y);
         }
 
         uint64_t now = SDL_GetTicksNS();
@@ -177,6 +205,7 @@ int main(int argc, char **argv) {
     result = 0;
 
 done:
+    if (gamepad != NULL) SDL_CloseGamepad(gamepad);
     ps1_card_manager_shutdown(&card_mgr);
     ps1_audio_shutdown(&audio);
     if (texture != NULL) SDL_DestroyTexture(texture);

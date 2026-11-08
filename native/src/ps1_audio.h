@@ -12,6 +12,7 @@
 
 #include "ps1_spu.h"
 #include "ps1_xa.h"
+#include "ps1_seq.h"
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -20,6 +21,7 @@ struct SDL_AudioStream;
 typedef struct {
     Ps1Spu                  spu;
     Ps1XaPlayer             xa;
+    Ps1Seq                  sequence;
     struct SDL_AudioStream *stream;
     bool                    has_output;
 } Ps1Audio;

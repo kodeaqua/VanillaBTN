@@ -44,7 +44,8 @@ void ps1_audio_mix(Ps1Audio *audio, int16_t *out, int frames) {
     if (!audio || !out || frames <= 0) return;
 
     /* Mix SPU 24 voices */
-    ps1_spu_mix(&audio->spu, out, frames, 0);
+    if (audio->sequence.data != NULL) ps1_seq_mix(&audio->sequence, &audio->spu, out, frames);
+    else ps1_spu_mix(&audio->spu, out, frames, 0);
 
     /* Mix CD-XA stream, accumulating on top of SPU */
     ps1_xa_mix(&audio->xa, out, frames,
@@ -57,14 +58,13 @@ void ps1_audio_tick(Ps1Audio *audio, int speed_mode) {
     /* Advance CD-XA fade */
     ps1_xa_fade_tick(&audio->xa, speed_mode);
 
+    int16_t buffer[FRAMES_PER_60HZ_TICK * 2];
+    ps1_audio_mix(audio, buffer, FRAMES_PER_60HZ_TICK);
     if (!audio->has_output || !audio->stream) return;
 
     /* Check if audio queue is getting too full to avoid latency build-up */
     int queued = SDL_GetAudioStreamQueued(audio->stream);
     if (queued >= MAX_QUEUED_BYTES) return;
-
-    int16_t buffer[FRAMES_PER_60HZ_TICK * 2];
-    ps1_audio_mix(audio, buffer, FRAMES_PER_60HZ_TICK);
 
     SDL_PutAudioStreamData(audio->stream, buffer, (int)sizeof(buffer));
 }

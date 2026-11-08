@@ -69,7 +69,7 @@ target_compile_options(ps1_seq PRIVATE /W4)
 add_library(ps1_audio STATIC src/ps1_audio.c)
 set_target_properties(ps1_audio PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_include_directories(ps1_audio PUBLIC src)
-target_link_libraries(ps1_audio PUBLIC ps1_spu ps1_xa SDL3::SDL3)
+target_link_libraries(ps1_audio PUBLIC ps1_spu ps1_xa ps1_seq SDL3::SDL3)
 target_compile_options(ps1_audio PRIVATE /W4)
 
 add_library(ps1_card STATIC src/ps1_card.c)
