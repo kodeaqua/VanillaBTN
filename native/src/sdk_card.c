@@ -349,10 +349,167 @@ int McxSync(long port, long *cmd, long *result) {
     if (result != NULL) {
         *result = s_mcx_last_result;
     }
-    return 0;
+    return 1;
 }
 
-long sdk_card_rename(const char *oldpath, const char *newpath) {
+int McxAllInfo(long port, unsigned char *buf) {
+    (void)port;
+    if (buf != NULL) {
+        memset(buf, 0, 36);
+        buf[2] = 1;
+        buf[3] = 0;
+        buf[4] = 0x78;
+        buf[5] = 0x56;
+        buf[6] = 0x34;
+        buf[7] = 0x12;
+    }
+    s_mcx_last_cmd = 0x01;
+    s_mcx_last_result = McxErrSuccess;
+    return 1;
+}
+
+int McxGetApl(long port, void *result) {
+    (void)port;
+    if (result != NULL) {
+        *(long *)result = 0;
+    }
+    s_mcx_last_cmd = 0x02;
+    s_mcx_last_result = McxErrSuccess;
+    return 1;
+}
+
+int McxGetTime(long port, unsigned char *buf) {
+    (void)port;
+    if (buf != NULL) {
+        memset(buf, 0, 8);
+        buf[0] = 0x20;
+        buf[1] = 0x26;
+        buf[2] = 11;
+        buf[3] = 8;
+        buf[4] = 0;
+        buf[5] = 12;
+        buf[6] = 0;
+        buf[7] = 0;
+    }
+    s_mcx_last_cmd = 0x03;
+    s_mcx_last_result = McxErrSuccess;
+    return 1;
+}
+
+int McxHideTrans(long port) {
+    (void)port;
+    s_mcx_last_cmd = 0x04;
+    s_mcx_last_result = McxErrSuccess;
+    return 1;
+}
+
+int McxGetSerial(long port, void *serial) {
+    (void)port;
+    if (serial != NULL) {
+        *(long *)serial = 0x12345678;
+    }
+    s_mcx_last_cmd = 0x05;
+    s_mcx_last_result = McxErrSuccess;
+    return 1;
+}
+
+int McxGetMem(long port, void *buf, long addr, long len) {
+    (void)port;
+    (void)addr;
+    if (buf != NULL && len > 0) {
+        memset(buf, 0, (size_t)len);
+    }
+    s_mcx_last_cmd = 0x06;
+    s_mcx_last_result = McxErrSuccess;
+    return 1;
+}
+
+int McxExecFlag(long port, long block, long flag) {
+    (void)port;
+    (void)block;
+    (void)flag;
+    s_mcx_last_cmd = McxFuncExecFlag;
+    s_mcx_last_result = McxErrSuccess;
+    return 1;
+}
+
+int McxExecApl(long port, long apl, long param) {
+    (void)port;
+    (void)apl;
+    (void)param;
+    s_mcx_last_cmd = 0x07;
+    s_mcx_last_result = McxErrSuccess;
+    return 1;
+}
+
+int McxCurrCtrl(long port, long sound, long infrared, long rsv) {
+    (void)port;
+    (void)sound;
+    (void)infrared;
+    (void)rsv;
+    s_mcx_last_cmd = 0x08;
+    s_mcx_last_result = McxErrSuccess;
+    return 1;
+}
+
+int McxFlashAcs(long port, long flag) {
+    (void)port;
+    (void)flag;
+    s_mcx_last_cmd = 0x09;
+    s_mcx_last_result = McxErrSuccess;
+    return 1;
+}
+
+int McxSetMem(long port, const void *buf, long addr, long len) {
+    (void)port;
+    (void)buf;
+    (void)addr;
+    (void)len;
+    s_mcx_last_cmd = 0x0A;
+    s_mcx_last_result = McxErrSuccess;
+    return 1;
+}
+
+int McxShowTrans(long port, long shown, long timeout) {
+    (void)port;
+    (void)shown;
+    (void)timeout;
+    s_mcx_last_cmd = 0x0B;
+    s_mcx_last_result = McxErrSuccess;
+    return 1;
+}
+
+int McxSetLED(long port, long flag) {
+    (void)port;
+    (void)flag;
+    s_mcx_last_cmd = 0x0C;
+    s_mcx_last_result = McxErrSuccess;
+    return 1;
+}
+
+int McxReadDev(long port, long dev, const void *fix, void *read) {
+    (void)port;
+    (void)dev;
+    (void)fix;
+    if (read != NULL) {
+        memset(read, 0, 128);
+    }
+    s_mcx_last_cmd = 0x0D;
+    s_mcx_last_result = McxErrSuccess;
+    return 1;
+}
+
+int McxWriteDev(long port, long dev, const void *fix, const void *read) {
+    (void)port;
+    (void)dev;
+    (void)fix;
+    (void)read;
+    s_mcx_last_cmd = 0x0E;
+    s_mcx_last_result = McxErrSuccess;
+    return 1;
+}
+
+int sdk_card_rename(const char *oldpath, const char *newpath) {
     if (oldpath == NULL || newpath == NULL) {
         return -1;
     }

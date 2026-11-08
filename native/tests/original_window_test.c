@@ -11,10 +11,13 @@
 #include "mg4.h"
 #include "name_entry.h"
 #include "pad.h"
+#include "pdasamp.h"
 #include "picture_cells.h"
 #include "screen_fade.h"
 #include "sdk_card.h"
 #include "sdk_gpu.h"
+#include "sdk_pad.h"
+#include "sdk_sync.h"
 #include "sdk_work.h"
 #include "sound_request.h"
 #include "staff.h"
@@ -29,6 +32,10 @@
     fprintf(stderr, "Check failed at line %d: %s\n", __LINE__, #condition); \
     exit(1); \
 } } while (0)
+
+static uint64_t sync_clock_time;
+static uint64_t sync_now(void *context) { (void)context; return sync_clock_time; }
+static void sync_wait_until(uint64_t deadline, void *context) { (void)context; sync_clock_time = deadline; }
 
 static u8 demo_and_region_storage[sizeof(InputDemo) + 0x40000];
 u8 *region_base = demo_and_region_storage + sizeof(InputDemo);
@@ -96,6 +103,7 @@ static void init_icon_fixture(void) {
 }
 
 int main(void) {
+    CHECK(sdk_sync_bind(sync_now, sync_wait_until, NULL));
     sdk_gpu_bind(&video);
     CHECK(sdk_gpu_map(work, sizeof(work)));
     CHECK(sdk_work_bind(work, sizeof(work)));
@@ -154,6 +162,7 @@ int main(void) {
     fake_pad.pressed = 0;
     DrawOTag(ot + 31);
     CHECK(sdk_gpu_ok());
+    input_pad1 = input_records;
 
     /* Exercise menu_box_animate, heart_icon_draw, name_entry_start, and name_entry_step. */
     CHECK(sdk_work_bind(work, sizeof(work)));
@@ -348,6 +357,18 @@ int main(void) {
     requested_scene = -1;
     input_pad1->pressed = PAD_START;
     mcard_screen_tick();
+    CHECK(requested_scene == SCENE_DEBUG);
+
+    /* Exercise 10_PdaSamp/pdasamp.c PDA sample utility screen. */
+    input_pad1 = input_records;
+    input_pad2 = input_records + 1;
+    game_state.globalFlags = 0;
+    sdk_pad_sample(0, true, false, PAD_SELECT, 128, 128);
+    sdk_pad_sample(1, true, false, 0, 128, 128);
+    pad_init();
+    pad_reset_records();
+    requested_scene = -1;
+    CHECK(pda_sample_run() == 0);
     CHECK(requested_scene == SCENE_DEBUG);
 
     sdk_gpu_bind(NULL);

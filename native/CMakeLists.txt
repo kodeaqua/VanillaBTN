@@ -272,6 +272,7 @@ add_library(game_window_frame STATIC
     ../src/main/ui/name_entry.c
     ../src/main/ui/window_frame.c
     ../src/overlay/08_DEBUG/debug.c
+    ../src/overlay/10_PdaSamp/pdasamp.c
     ../src/overlay/11_GF_FARM/menu/item_storage.c
     ../src/overlay/11_GF_FARM/picture_cells.c
     ../src/overlay/17_GF_MG1/mg1.c

@@ -219,6 +219,9 @@ s32 pda_sample_run(void)
     DisplayBuffer db[2];
     DisplayBuffer *cdb;
 
+#ifdef VANILLABTN_NATIVE
+    pda_sample_done = 0;
+#endif
     cdb = 0;
     pda_device_block.field.device = 1;
     pda_device_block.field.fix[0] = 4;

@@ -408,3 +408,18 @@ Synthetic fixtures in `original_window_test` exercise the full lifecycle of
 rename from development name `BISLPS-00000-FARM0` to release name `BISLPS-02489-FARM0`,
 directory listing and block counting, unformatting ('MC' magic invalidation),
 reformatting, and reboot request to `SCENE_DEBUG`.
+
+## PocketStation Mcx SDK bridge and PDA sample overlay
+
+`game_window_frame` compiles `src/overlay/10_PdaSamp/pdasamp.c`, with
+`pda_sample_done = 0` initialized under `VANILLABTN_NATIVE` so the interactive
+utility loop can be entered repeatedly.
+
+`native/compat/libmcx.h` and `sdk_card` implement the PocketStation / Mcx API:
+`McxAllInfo`, `McxGetApl`, `McxGetTime`, `McxHideTrans`, `McxGetSerial`, `McxGetMem`,
+`McxExecFlag`, `McxExecApl`, `McxCurrCtrl`, `McxFlashAcs`, `McxSetMem`, `McxShowTrans`,
+`McxSetLED`, `McxReadDev`, `McxWriteDev`, and `McxSync`.
+
+Synthetic fixtures in `original_window_test` execute `pda_sample_run()`, feeding
+a simulated `PAD_SELECT` press through the native SDK pad buffers to verify loop
+execution, menu input handling, and exit transition back to `SCENE_DEBUG`.

@@ -13,6 +13,6 @@ void sdk_card_bind_manager(Ps1CardManager *mgr);
 Ps1Card *sdk_card_get(int port);
 
 /* Rename helper called by libapi rename() macro. */
-long sdk_card_rename(const char *oldpath, const char *newpath);
+int sdk_card_rename(const char *oldpath, const char *newpath);
 
 #endif /* VANILLABTN_SDK_CARD_H */
