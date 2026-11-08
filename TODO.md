@@ -8,6 +8,10 @@ Update the relevant item after completing a task or discovering a blocker.
 - [ ] Developer: open and close the native Debug/Release window on Windows.
 - [ ] Developer: verify the importer recognizes a personally supplied USA disc.
 - [ ] Milestone 2: implement required GPU primitives, CLUT, ordering, and GTE behavior with synthetic pixel checks.
+  - [x] Add GP0 command dispatcher (ps1_gpu_exec) covering fill, untextured tiles, textured sprites, and draw-environment commands; Debug and Release dispatch tests pass.
+  - [ ] Implement flat-shaded textured polygons (POLY_FT4/POLY_F4) for scene rendering.
+  - [ ] Wire OT walk to GPU dispatcher for a complete frame submission path.
+  - [ ] GTE compatibility layer (coordinate transform, perspective divide, clip codes).
 
 ## Next
 
@@ -15,6 +19,7 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Completed
 
+- [x] Add GP0 command dispatcher (ps1_gpu_exec) covering fill, untextured tiles, textured sprites, and draw-environment commands; Debug and Release dispatch tests pass.
 - [x] Add host-safe PS1 ordering-table links and reverse bucket traversal; Debug and Release ordering tests pass.
 - [x] Draw raw and modulated PS1 sprites with CLUT transparency, clipping, and mask tests in Debug and Release.
 - [x] Decode raw PS1 4-bit, 8-bit, and 15-bit TPage/CLUT texels; Debug and Release synthetic checks pass.
