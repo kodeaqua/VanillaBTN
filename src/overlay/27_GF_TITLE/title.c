@@ -1,6 +1,9 @@
 /* Title screen: the logo intro, the title menu, and the name entry before a new game. */
 
 #include <sys/types.h>
+#ifdef VANILLABTN_NATIVE
+#include <string.h>
+#endif
 #include <libgte.h>
 #include <libgpu.h>
 #include <libgs.h>
@@ -404,6 +407,8 @@ static u16 title_layout2_cells[1126] = {
     0x0040, 0x0040, 0x0167, 0x0167, 0x0167, 0x0040, 0x0040, 0x0040, 0x0040, 0x0000,
 };
 
+/* The demo grid continues into D_800BC998 and D_800BCAEC below. The native
+ * copy in title_fill_field_layout preserves that PS1 data adjacency explicitly. */
 static u16 title_layout3_cells[362] = {
     0x003F, 0x003F, 0x003F, 0x003F, 0x0167, 0x0167, 0x003F, 0x003F, 0x003F, 0x003F, 0x003F, 0x003E,
     0x003A, 0x0167, 0x0040, 0x003E, 0x0167, 0x0167, 0x0167, 0x0167, 0x0040, 0x003A, 0x0167, 0x0040,
@@ -3610,7 +3615,30 @@ static void title_fill_field_layout(s32 layout) {
         source = title_layout2_cells;
         break;
     case TITLE_LAYOUT_DEMO:
+#ifdef VANILLABTN_NATIVE
+        {
+            /* The PS1 linker places these declarations consecutively. The
+             * original grid read crosses both boundaries; native linkers may
+             * reorder or discard the unreferenced fragments. Preserve the
+             * original bytes in one bounded host array, without new layout data. */
+            enum {
+                first = sizeof(title_layout3_cells) / sizeof(u16),
+                second = sizeof(D_800BC998) / sizeof(u16),
+                cells = FIELD_ROWS * FIELD_COLS
+            };
+            static u16 demo_cells[cells];
+            _Static_assert(first + second < cells, "Demo grid has a third fragment");
+            _Static_assert(cells - first - second <= sizeof(D_800BCAEC) / sizeof(u16),
+                "Demo grid must fit the original fragments");
+            memcpy(demo_cells, title_layout3_cells, sizeof(title_layout3_cells));
+            memcpy(demo_cells + first, D_800BC998, sizeof(D_800BC998));
+            memcpy(demo_cells + first + second, D_800BCAEC,
+                sizeof(demo_cells) - sizeof(title_layout3_cells) - sizeof(D_800BC998));
+            source = demo_cells;
+        }
+#else
         source = title_layout3_cells;
+#endif
         break;
     case TITLE_LAYOUT_NEW_0:
     default:

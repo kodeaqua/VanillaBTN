@@ -232,6 +232,23 @@ int main(void) {
     CHECK(requested_scene == SCENE_LOAD);
     CHECK((game_state.globalFlags & GLOBAL_FLAG_CONTINUE) != 0);
 
+    /* The retail demo grid spans three adjacent PS1 data declarations.
+     * Hash is from the code-matching reference overlay's 1125 cell words. */
+    game_state.globalFlags = GLOBAL_FLAG_DEMO_START;
+    game_state.progress.entryStep = 6;
+    title_step_dispatch();
+    CHECK(requested_scene == SCENE_FARM);
+    uint32_t layout_hash = 2166136261u;
+    for (int row = 0; row < FIELD_ROWS; ++row) {
+        for (int col = 0; col < FIELD_COLS; ++col) {
+            uint16_t value = game_state.fieldTiles[row].rows[col].value;
+            layout_hash = (layout_hash ^ (value & 255u)) * 16777619u;
+            layout_hash = (layout_hash ^ (value >> 8)) * 16777619u;
+        }
+    }
+    CHECK(layout_hash == 0xf618c92bu);
+    game_state.globalFlags = GLOBAL_FLAG_CONTINUE;
+
     game_state.progress.entryStep = 0;
     staff_tick();
     CHECK(game_state.progress.entryStep == 1);
