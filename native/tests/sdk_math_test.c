@@ -41,5 +41,31 @@ int main(int argc, char **argv) {
         RotMatrixZXY(&angles, &matrix);
         if (memcmp(matrix.m, reference[i], sizeof(reference[i]))) return 9;
     }
+    MATRIX camera = {{{4096, 0, 0}, {0, 4096, 0}, {0, 0, 4096}}, {40000, -40000, 100}};
+    gte_SetRotMatrix(&camera);
+    gte_SetTransMatrix(&camera);
+    MATRIX readback = {0};
+    gte_ReadRotMatrix(&readback);
+    if (memcmp(readback.m, camera.m, sizeof(camera.m)) ||
+        memcmp(readback.t, camera.t, sizeof(camera.t))) return 10;
+    SVECTOR zero = {0};
+    gte_ldv0(&zero);
+    gte_rtv0();
+    long limited[3], wide[3];
+    gte_stlvl(limited);
+    gte_stlvnl(wide);
+    if (limited[0] != 32767 || limited[1] != -32768 || limited[2] != 100 ||
+        wide[0] != 40000 || wide[1] != -40000 || wide[2] != 100) return 11;
+    camera.t[0] = camera.t[1] = camera.t[2] = 0;
+    gte_SetTransMatrix(&camera);
+    VECTOR raw = {65537, -65534, 32768, 0};
+    gte_ldlv0(&raw);
+    gte_rtv0();
+    gte_stlvnl(wide);
+    if (wide[0] != 1 || wide[1] != 2 || wide[2] != -32768) return 12;
+    gte_ldlvl(&raw);
+    gte_rtir();
+    gte_stlvnl(wide);
+    if (wide[0] != 1 || wide[1] != 2 || wide[2] != -32768) return 13;
     return 0;
 }

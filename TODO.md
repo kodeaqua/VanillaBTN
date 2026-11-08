@@ -13,7 +13,7 @@ Update the relevant item after completing a task or discovering a blocker.
   - [x] Clear estate queue kind fields through native member addresses; the original PS1 offsets overwrite x64 entryStep. Synthetic guards reproduce the corruption and protect message/timer fields.
   - [x] Translate original physical-zero scene/ground data accesses into backend RAM, retaining original null sentinels and PS1 member offsets. Fixtures cover reads and absent marked-entry writes.
   - [x] Pass helper/player receivers explicitly at native callback sites that relied on live MIPS argument registers. Off-screen helper cue fixtures fail before the fix and advance correctly afterward.
-  - [ ] Audit remaining farm serialized addresses/layouts and callback calling conventions before claiming a runnable full farm; demo reaches farm execution but currently stops on GPU packet validation.
+  - [ ] Audit remaining farm serialized addresses/layouts and callback calling conventions before claiming a runnable full farm; the 5,000-vblank demo now passes GPU validation, but object placement and movement remain under audit.
   - [x] PocketStation operations report missing/non-PDA devices without fabricated successful reads or writes; restore canonical SDK result/command values.
   - [x] Make SDK card completions consumable, preserve request-versus-result semantics and cap directory output to its supplied capacity.
   - [x] Reject invalid/truncated memory-card transfers and validate file chains before touching caller buffers or saves; 29 synthetic checks pass in both profiles. SDK request/completion semantics are verified separately; open/data APIs explicitly reject unsupported requests.
@@ -44,6 +44,7 @@ Update the relevant item after completing a task or discovering a blocker.
   - [x] Match staged fixed-point products in RotMatrixZXY against local reference SDK numerical outputs.
   - [x] Saturate SZ to 16 bits, preserve triple-projection FIFO order and use SDK ZSF3/ZSF4 scales for average depth; long demo reaches 5,000 vblanks without invalid GPU links.
   - [x] Correct NCLIP winding and MAC0 overflow flags. Independent signed-area and original TMD front/back tests reproduce the inverted culling; a captured native farm frame now contains terrain. Colored-frame counts alone are not a geometry acceptance test.
+  - [x] Preserve translation in SDK matrix snapshots and distinguish saturated IR stores from wide MAC stores; register loads truncate like hardware. Two regressions fail before the fix; Debug/Release pass 30 checks and all 14 PS1 code hashes match.
   - [ ] Replace csin/ccos aliases with the distinct SDK function quantization.
   - [ ] Verify textured-polygon subpixel interpolation with nonuniform original FT4 fixtures; packet-generation tests do not establish texel fidelity.
 - [ ] Audio: implement ADSR/reverb, XA stereo histories and coding-info sample rates.

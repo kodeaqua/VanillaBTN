@@ -322,6 +322,8 @@ void gte_SetRotMatrix(const MATRIX *m) {
 void gte_ReadRotMatrix(MATRIX *m) {
     if (!m) return;
     memcpy(m->m, g_sdk_gte.rot, sizeof(g_sdk_gte.rot));
+    /* The SDK macro snapshots control registers 0..7, including translation. */
+    for (int i = 0; i < 3; ++i) m->t[i] = g_sdk_gte.trans[i];
 }
 
 void gte_SetTransMatrix(const MATRIX *m) {
@@ -365,15 +367,17 @@ void gte_ldv3(const void *v0, const void *v1, const void *v2) {
 void gte_ldlvl(const void *v) {
     const VECTOR *vec = (const VECTOR *)v;
     if (!vec) return;
-    g_gte_ir[1] = clamp_ir(vec->vx);
-    g_gte_ir[2] = clamp_ir(vec->vy);
-    g_gte_ir[3] = clamp_ir(vec->vz);
+    /* CPU writes truncate to signed 16-bit register lanes; saturation belongs
+     * to GTE instructions, not register loading. */
+    g_gte_ir[1] = (int16_t)vec->vx;
+    g_gte_ir[2] = (int16_t)vec->vy;
+    g_gte_ir[3] = (int16_t)vec->vz;
 }
 
 void gte_ldlv0(const void *v) {
     const long *words = (const long *)v;
     if (!words) return;
-    g_gte_v0 = (Ps1Vector3){ clamp_ir(words[0]), clamp_ir(words[1]), clamp_ir(words[2]), 0 };
+    g_gte_v0 = (Ps1Vector3){ (int16_t)words[0], (int16_t)words[1], (int16_t)words[2], 0 };
 }
 
 void gte_ldclmv(const void *p) {
@@ -529,7 +533,12 @@ void gte_stlvnl(void *out) {
 }
 
 void gte_stlvl(void *out) {
-    gte_stlvnl(out);
+    long *words = (long *)out;
+    if (!words) return;
+    /* Store the saturated IR lanes; stlvnl separately exposes wide MAC results. */
+    words[0] = g_gte_ir[1];
+    words[1] = g_gte_ir[2];
+    words[2] = g_gte_ir[3];
 }
 
 void gte_stclmv(void *out) {

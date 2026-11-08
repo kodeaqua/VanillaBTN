@@ -260,6 +260,23 @@ int main(void) {
     DrawOTag(current_frame->ot + FRAME_OT_DEPTH - 1);
     assert(sdk_gpu_ok());
 
+    /* Compose an object with a translated parent through original model.c.
+     * A rotation-only SDK snapshot loses the camera and drifts subsequent models. */
+    PushMatrix();
+    MATRIX parent = GsIDMATRIX;
+    parent.t[0] = 1000; parent.t[1] = -2000; parent.t[2] = 3000;
+    gte_SetRotMatrix(&parent);
+    gte_SetTransMatrix(&parent);
+    model_save_gte_rot();
+    MATRIX local = GsIDMATRIX;
+    local.t[0] = 100; local.t[1] = 200; local.t[2] = 300;
+    model_compose_gte_matrix(&local);
+    SVECTOR origin = {0};
+    VECTOR translated = {0};
+    RotTrans(&origin, &translated, NULL);
+    assert(translated.vx == 1100 && translated.vy == -1800 && translated.vz == 3300);
+    PopMatrix();
+
     /* Original model.c and ground.c: bind a synthetic TMD with two objects,
      * test ground_enable_objects / ground_find_object / ground_height_at, and
      * project + draw a flat triangle through model_draw into the OT. */
