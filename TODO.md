@@ -38,6 +38,8 @@ Update the relevant item after completing a task or discovering a blocker.
   - [x] Invoke original pad polling from original startup/frame execution.
   - [ ] Assign a second physical host controller.
 - [ ] Graphics/GTE: verify hardware rounding, saturation, flags, and primitive edge coverage against independent fixtures.
+  - [x] Match staged fixed-point products in RotMatrixZXY against local reference SDK numerical outputs.
+  - [ ] Replace csin/ccos aliases with the distinct SDK function quantization.
   - [ ] Verify textured-polygon subpixel interpolation with nonuniform original FT4 fixtures; packet-generation tests do not establish texel fidelity.
 - [ ] Audio: implement ADSR/reverb, XA stereo histories and coding-info sample rates.
 - [ ] Save/load: verify external card chain encoding, corruption handling, and original save layout before game integration.

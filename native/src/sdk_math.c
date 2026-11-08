@@ -562,11 +562,22 @@ MATRIX *TransMatrix(MATRIX *m, VECTOR *v) {
 
 MATRIX *RotMatrixZXY(SVECTOR *r, MATRIX *m) {
     if (!r || !m) return m;
-    /* Axis functions premultiply, hence apply Y, X, Z for Z*X*Y. */
-    memcpy(m->m, GsIDMATRIX.m, sizeof(m->m));
-    RotMatrixY(r->vy, m);
-    RotMatrixX(r->vx, m);
-    RotMatrixZ(r->vz, m);
+    int sx = rsin(r->vx), cx = rcos(r->vx);
+    int sy = rsin(r->vy), cy = rcos(r->vy);
+    int sz = rsin(r->vz), cz = rcos(r->vz);
+    int xy = (sx * sy) >> 12;
+    int xc = (sx * cy) >> 12;
+    /* Z*X*Y uses staged 1.12 products. Rounding each term before adding
+     * differs by one unit from composing generic matrix multiplications. */
+    m->m[0][0] = (short)(((cz * cy) >> 12) - ((xy * sz) >> 12));
+    m->m[0][1] = (short)((-sz * cx) >> 12);
+    m->m[0][2] = (short)(((cz * sy) >> 12) + ((xc * sz) >> 12));
+    m->m[1][0] = (short)(((sz * cy) >> 12) + ((xy * cz) >> 12));
+    m->m[1][1] = (short)((cz * cx) >> 12);
+    m->m[1][2] = (short)(((sz * sy) >> 12) - ((xc * cz) >> 12));
+    m->m[2][0] = (short)((-cx * sy) >> 12);
+    m->m[2][1] = (short)sx;
+    m->m[2][2] = (short)((cx * cy) >> 12);
     return m;
 }
 

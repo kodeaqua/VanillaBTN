@@ -29,5 +29,17 @@ int main(int argc, char **argv) {
     const short expected[3][3] = {{0, 0, 4096}, {4096, 0, 0}, {0, 4096, 0}};
     if (memcmp(matrix.m, expected, sizeof(expected)) ||
         matrix.t[0] != 123 || matrix.t[1] != -456 || matrix.t[2] != 789) return 8;
+    /* Numerical outputs from local reference SDK microcalls, not a second
+     * implementation of the rotation formula. */
+    const SVECTOR rotations[2] = {{123, 456, 789, 0}, {-200, 300, -400, 0}};
+    const short reference[2][3][3] = {
+        {{643, -3765, 1479}, {3106, 1419, 2260}, {-2591, 768, 3078}},
+        {{2684, 2248, 2125}, {-2564, 3192, -141}, {-1735, -1237, 3498}}
+    };
+    for (int i = 0; i < 2; ++i) {
+        angles = rotations[i];
+        RotMatrixZXY(&angles, &matrix);
+        if (memcmp(matrix.m, reference[i], sizeof(reference[i]))) return 9;
+    }
     return 0;
 }

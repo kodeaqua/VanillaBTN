@@ -535,3 +535,12 @@ Directory results never exceed the supplied record capacity. Unsupported
 Open/ReadData/WriteData calls reject work instead of claiming successful I/O.
 The card tests cover command IDs, registration conflicts, completion consumption,
 failed transfers preserving buffers/saves, and directory-buffer sentinels.
+
+### ZXY rotation quantization
+
+RotMatrixZXY rounds each 1.12 product before combining terms; generic matrix
+composition differs by one unit for some rotations. Three local reference SDK
+microcalls, including mixed positive/negative angles, supply independent
+numerical fixtures. Translation fields remain unchanged. This does not establish
+all GTE precision or fix the separate csin/ccos alias discrepancy found during
+the audit.
