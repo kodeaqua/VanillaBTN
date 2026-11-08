@@ -258,6 +258,13 @@ target_link_libraries(original_screen_test PRIVATE game_screen)
 target_compile_options(original_screen_test PRIVATE /W4 /UNDEBUG)
 add_test(NAME original_screen_fades COMMAND original_screen_test)
 
+add_library(sdk_card STATIC src/sdk_card.c)
+set_target_properties(sdk_card PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_include_directories(sdk_card PUBLIC compat src ${game_include_dirs})
+target_link_libraries(sdk_card PUBLIC ps1_card)
+target_compile_definitions(sdk_card PRIVATE _CRT_SECURE_NO_WARNINGS)
+target_compile_options(sdk_card PRIVATE /W4)
+
 add_library(game_window_frame STATIC
     ../src/main/text/text.c
     ../src/main/ui/heart.c
@@ -274,10 +281,11 @@ add_library(game_window_frame STATIC
     ../src/overlay/25_GF_MG5/mg5.c
     ../src/overlay/27_GF_TITLE/title.c
     ../src/overlay/28_GF_STAFF/staff.c
+    ../src/overlay/31_gf_mcard/mcard.c
 )
 set_target_properties(game_window_frame PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_include_directories(game_window_frame PUBLIC ${game_include_dirs})
-target_link_libraries(game_window_frame PUBLIC game_afile game_pad)
+target_link_libraries(game_window_frame PUBLIC game_afile game_pad sdk_card)
 target_compile_options(game_window_frame PRIVATE /W4 /Gy)
 add_executable(original_window_test tests/original_window_test.c)
 set_target_properties(original_window_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)

@@ -4,6 +4,7 @@
 #include "heart.h"
 #include "item_storage.h"
 #include "main.h"
+#include "mcard.h"
 #include "menu_window.h"
 #include "mg1.h"
 #include "mg2.h"
@@ -12,6 +13,7 @@
 #include "pad.h"
 #include "picture_cells.h"
 #include "screen_fade.h"
+#include "sdk_card.h"
 #include "sdk_gpu.h"
 #include "sdk_work.h"
 #include "sound_request.h"
@@ -277,6 +279,76 @@ int main(void) {
     CHECK(game_state.progress.entrySubStep == 0xFF);
     CHECK(requested_scene == SCENE_FARM_MINIGAME_EXIT);
     CHECK((game_state.globalFlags & GLOBAL_FLAG_MINIGAME_EXIT) != 0);
+
+    /* Exercise 31_gf_mcard/mcard.c memory-card utility test screen. */
+    Ps1Card *test_card = sdk_card_get(0);
+    CHECK(test_card != NULL);
+    ps1_card_format(test_card);
+    {
+        uint8_t dummy_save[8192] = {0};
+        CHECK(ps1_card_write_file(test_card, "BISLPS-00000-FARM0", dummy_save, sizeof(dummy_save)) == PS1_CARD_OK);
+    }
+
+    /* Initial menu draw */
+    input_pad1->pressed = 0;
+    mcard_screen_tick();
+
+    /* Probe card type: PAD_CIRCLE */
+    input_pad1->pressed = PAD_CIRCLE;
+    mcard_screen_tick();
+    /* Status should display "Card" */
+    input_pad1->pressed = 0;
+    mcard_screen_tick();
+    /* Clear status line by pressing a button */
+    input_pad1->pressed = PAD_TRIANGLE;
+    mcard_screen_tick();
+
+    /* Rename save files: PAD_SELECT */
+    input_pad1->pressed = PAD_SELECT;
+    mcard_screen_tick();
+    {
+        uint32_t renamed_size = 0;
+        CHECK(ps1_card_find_file(test_card, "BISLPS-02489-FARM0", &renamed_size) > 0);
+        CHECK(ps1_card_find_file(test_card, "BISLPS-00000-FARM0", &renamed_size) == 0);
+    }
+
+    /* Clear status */
+    input_pad1->pressed = PAD_TRIANGLE;
+    mcard_screen_tick();
+
+    /* List directory: PAD_CROSS */
+    input_pad1->pressed = PAD_CROSS;
+    mcard_screen_tick();
+    input_pad1->pressed = 0;
+    mcard_screen_tick();
+
+    /* Clear status */
+    input_pad1->pressed = PAD_TRIANGLE;
+    mcard_screen_tick();
+
+    /* Unformat card: PAD_TRIANGLE */
+    input_pad1->pressed = PAD_TRIANGLE;
+    mcard_screen_tick();
+    CHECK(test_card->data[0] != 'M' || test_card->data[1] != 'C');
+
+    /* Clear status */
+    input_pad1->pressed = PAD_CROSS;
+    mcard_screen_tick();
+
+    /* Format card: PAD_SQUARE */
+    input_pad1->pressed = PAD_SQUARE;
+    mcard_screen_tick();
+    CHECK(test_card->data[0] == 'M' && test_card->data[1] == 'C');
+
+    /* Clear status */
+    input_pad1->pressed = PAD_CROSS;
+    mcard_screen_tick();
+
+    /* Reboot / scene debug request: PAD_START */
+    requested_scene = -1;
+    input_pad1->pressed = PAD_START;
+    mcard_screen_tick();
+    CHECK(requested_scene == SCENE_DEBUG);
 
     sdk_gpu_bind(NULL);
     CHECK(sdk_work_bind(NULL, 0));

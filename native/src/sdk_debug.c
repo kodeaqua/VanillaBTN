@@ -10,6 +10,30 @@ void FntPrint(const char *format, ...) {
     va_end(args);
 }
 
+void FntFlush(int id) {
+    (void)id;
+    fflush(stderr);
+}
+
+void FntLoad(int tx, int ty) {
+    (void)tx;
+    (void)ty;
+}
+
+int FntOpen(int x, int y, int w, int h, int isbg, int n) {
+    (void)x;
+    (void)y;
+    (void)w;
+    (void)h;
+    (void)isbg;
+    (void)n;
+    return 0;
+}
+
+void SetDumpFnt(int id) {
+    (void)id;
+}
+
 int KanjiFntOpen(int x, int y, int w, int h, int dx, int dy, int cx, int cy, int isbg, int n) {
     (void)x;
     (void)y;

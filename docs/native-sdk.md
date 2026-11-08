@@ -377,3 +377,34 @@ helpers (`RotMatrix`, `SetRotMatrix`, `SetTransMatrix`, `RotTrans`, `csin`,
 in `sdk_math` and `libspu.h`. A nested helper in `mg2.c` (`mg2_draw_board_marker`)
 is hoisted to file-scope `static` under `VANILLABTN_NATIVE`, leaving the PS1
 nested function syntax intact when compiling the matching reference build.
+
+## Memory-card SDK bridge and test screen
+
+`game_window_frame` compiles `src/overlay/31_gf_mcard/mcard.c` directly without
+modifying its source.
+
+`native/compat/libmcrd.h`, `native/compat/libmcx.h` and `native/compat/kernel.h`
+provide standard PS1 memory card definitions (`MemCardInit`, `MemCardAccept`,
+`MemCardSync`, `MemCardFormat`, `MemCardUnformat`, `MemCardGetDirentry`,
+`MemCardReadFile`, `MemCardWriteFile`, `MemCardCreateFile`, `MemCardDeleteFile`,
+`McxCardType`, `McxSync`, and `struct DIRENTRY`).
+
+`sdk_card` connects these calls directly to the host-side virtual memory card
+system (`ps1_card`). Channels 0 and 0x10 map to virtual slots 0 and 1. Card probe
+requests distinguish between unformatted cards, damaged/invalid headers, standard
+PS1 cards, and missing cards, reporting `McxErrInvalid` for standard PS1 memory
+cards (indicating non-PDA cards).
+
+Card save file renames (`CARD_RENAME` in `mcard.c`) route through `sdk_card_rename`
+via `native/compat/libapi.h`. This updates the card's directory frame filename and
+recomputes the Frame XOR checksum.
+
+GPU font helpers `FntLoad`, `FntOpen`, `FntFlush`, and `SetDumpFnt` are provided
+by `libgpu.h` and `sdk_debug.c`, routing formatted output to `stderr` in `Debug`
+and compiling out under `NDEBUG` in `Release`.
+
+Synthetic fixtures in `original_window_test` exercise the full lifecycle of
+`mcard.c`: initial menu rendering, card probe resulting in `MCARD_CARD`, save file
+rename from development name `BISLPS-00000-FARM0` to release name `BISLPS-02489-FARM0`,
+directory listing and block counting, unformatting ('MC' magic invalidation),
+reformatting, and reboot request to `SCENE_DEBUG`.
