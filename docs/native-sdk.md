@@ -507,3 +507,14 @@ clock against locally imported assets. Both profiles reach the original title
 with 848 colored frames and 658 nonzero PCM intervals over 901 vblank pumps.
 Only this test executable includes probe diagnostics. It uses in-memory cards
 and performs no save-file access. The ordinary suite remains asset-free.
+
+### Farm runtime pointer storage
+
+Native event-block and VRAM-stash tail addresses are host pointers; on-disc
+entry offsets remain 32-bit. Animal/toy buffers use byte-pointer addition and
+cue histories subtract addresses before narrowing the relative offset. All PS1
+expressions remain in the reference build. A synthetic original-function test
+reads chunks split between VRAM and a host tail, including a wholly borrowed
+tail. The previous 32-bit tail storage causes that test to fault. Test-only GS
+allocation is a separate library so event integration can link original main
+without pulling a duplicate allocator.

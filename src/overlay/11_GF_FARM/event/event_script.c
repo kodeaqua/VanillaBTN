@@ -6,6 +6,9 @@
 #include <libgpu.h>
 #include <libapi.h>
 #include "types.h"
+#ifdef VANILLABTN_NATIVE
+#include <stdint.h>
+#endif
 #include "actor.h"
 #include "afile.h"
 #include "anim.h"
@@ -125,7 +128,11 @@ static s32 vram_stash_block(u8 *data, s16 x, s16 y)
     u8 *p;
     s32 i;
     s32 size;
+#ifdef VANILLABTN_NATIVE
+    uintptr_t dest;
+#else
     u32 dest;
+#endif
 
     p = data;
     for (i = 0; i < EVENT_CHUNK_COUNT; i++)
@@ -146,12 +153,20 @@ static s32 vram_stash_block(u8 *data, s16 x, s16 y)
         if (main_region_free_bytes() >= size)
         {
             vram_stash_tail = main_get_region_base() - size;
+#ifdef VANILLABTN_NATIVE
+            dest = (uintptr_t)vram_stash_tail;
+#else
             dest = vram_stash_tail;
+#endif
             if (dest & 3)
             {
                 dest -= dest & 3;
             }
+#ifdef VANILLABTN_NATIVE
+            vram_stash_tail = (u8 *)dest;
+#else
             vram_stash_tail = dest;
+#endif
             memcpy((void *)dest, p, size);
             DrawSync(0);
             return 0;
@@ -166,7 +181,12 @@ static s32 vram_stash_block(u8 *data, s16 x, s16 y)
  * script starts. */
 static u8 *event_script_base;
 static u8 *event_script_cursor;
+#ifdef VANILLABTN_NATIVE
+/* These are runtime buffer addresses, never serialized event-file words. */
+u8 *event_block_base;
+#else
 u32 event_block_base;
+#endif
 s32 event_block_offsets[25];
 u32 event_step_index;
 u32 event_script_unused_80129228[2];
@@ -178,7 +198,11 @@ s16 event_sprite_offset_y;
 u32 event_block_size;
 s16 event_request_status[4];
 s32 chunk_checksums[EVENT_CHUNK_COUNT];
+#ifdef VANILLABTN_NATIVE
+u8 *vram_stash_tail;
+#else
 u32 vram_stash_tail;
+#endif
 
 /* Read chunk `chunk` of the block that vram_stash_block uploaded back into `buffer`.
  * The part of the chunk that is still in VRAM comes back with StoreImage; the
@@ -1460,7 +1484,11 @@ static void event_object_draw(FarmPositionObject *object, AnimState *item)
 static void event_block_unpack(u16 *buffer)
 {
     u32 size;
+#ifdef VANILLABTN_NATIVE
+    u8 *top;
+#else
     s32 top;
+#endif
     u32 length;
     s32 entry;
     u8 *results;
@@ -1535,7 +1563,11 @@ static s32 event_block_first_size(FarmEventBlock *block)
 /* Offset of entry index in the block. */
 static s32 event_block_entry(FarmEventBlock *block, s32 index)
 {
+#ifdef VANILLABTN_NATIVE
+    return block->entryOffsets[index];
+#else
     return *(s32 *)((index << 2) + (s32)block->entryOffsets);
+#endif
 }
 
 /* Data of entry index in the block. */

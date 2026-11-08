@@ -108,7 +108,7 @@ target_link_libraries(sdk_gpu_test PRIVATE game_texture_pack)
 target_compile_options(sdk_gpu_test PRIVATE /W4 /UNDEBUG)
 add_test(NAME original_texture_pack COMMAND sdk_gpu_test)
 
-add_library(game_prim STATIC ../src/main/graphics/prim.c src/sdk_work.c src/sdk_error.c)
+add_library(game_prim STATIC ../src/main/graphics/prim.c src/sdk_error.c)
 set_target_properties(game_prim PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_include_directories(game_prim PUBLIC ../src/main ../src/main/input ../src/main/sound)
 target_link_libraries(game_prim PUBLIC game_texture_pack)
@@ -503,3 +503,18 @@ target_compile_definitions(original_boot_test PRIVATE VANILLABTN_BOOT_TEST)
 target_compile_options(original_boot_test PRIVATE /W4)
 target_link_libraries(original_boot_test PRIVATE game_main host_display SDL3::SDL3
     ps1_input ps1_audio ps1_card)
+
+add_executable(original_farm_memory_test tests/original_farm_memory_test.c)
+set_target_properties(original_farm_memory_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_compile_options(original_farm_memory_test PRIVATE /W4)
+target_link_libraries(original_farm_memory_test PRIVATE game_main)
+add_test(NAME original_farm_event_memory COMMAND original_farm_memory_test)
+
+# The real runtime uses main.c's allocator. Isolated graphics fixtures provide
+# their own bounded arena without exporting a second allocator into game_main.
+add_library(sdk_test_work STATIC src/sdk_work.c)
+target_link_libraries(sdk_test_work PUBLIC game_prim)
+target_compile_options(sdk_test_work PRIVATE /W4)
+foreach(fixture original_prim_test original_anim_test original_frame_test original_window_test)
+    target_link_libraries(${fixture} PRIVATE sdk_test_work)
+endforeach()

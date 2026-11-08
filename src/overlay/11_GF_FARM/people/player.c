@@ -6285,7 +6285,11 @@ s32 player_init_toys(FarmPlayer *player)
     file_offset = ANIM_PACK_START(entry, 0);
     do
     {
+#ifdef VANILLABTN_NATIVE
+        anim_bind_file(&player->toys[i].sprite, file_base + file_offset);
+#else
         anim_bind_file(&player->toys[i].sprite, (void *)(file_offset + (s32)file_base));
+#endif
         i++;
     } while (i < PLAYER_TOYS);
 
