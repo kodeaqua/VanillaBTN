@@ -15,6 +15,7 @@ Update the relevant item after completing a task or discovering a blocker.
   - [ ] Connect original disc requests, startup and native overlay dispatch.
     - [x] Provide SDK VSync timing with deterministic synthetic clock checks.
     - [x] Compile original afile.c against imported-disc SDK sector reads.
+    - [x] Map original overlay data regions into bounded host main RAM.
     - [ ] Connect original CD audio, startup and module dispatch to the host loop.
 - [ ] Native executable remains a backend smoke harness; original game execution is not connected.
 - [ ] Graphics/GTE: verify hardware rounding, saturation, flags, and primitive edge coverage against independent fixtures.
@@ -32,6 +33,7 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Completed
 
+- [x] Map 2 MB main RAM and its cached/uncached aliases without pointer truncation, and compile the original overlay-region table with host-backed data offsets. Boundary/overflow/alias/reset tests pass in both profiles (22 checks). Original startup and native scene dispatch remain pending; imported MIPS bytes are never executed.
 - [x] Read synthetic disc trees through original A_FILE initialization, blocking/range and start/poll reads, using native CD SDK entry points. Validate HDT size/offsets before scratch reads, preserve sector padding, cancel pending reads and reject unsupported raw/XA modes. Debug/Release pass 21 checks; XA control is not connected yet.
 - [x] Add SDK VSync(0/1/n/-n) timing on an SDL monotonic clock, with nominal 60 Hz vblank/15,750 Hz horizontal units and no extra wait when work is late. Debug/Release pass 20 checks. Interrupt callback registration and hardware timing remain open.
 - [x] Compile original frame_buffers.c with host-safe OT insertion. Synthetic checks exercise both original buffer layouts, clearing, cursor advancement, depth clamping and final VRAM output in Debug/Release (19 checks).

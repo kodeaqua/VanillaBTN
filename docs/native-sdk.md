@@ -134,3 +134,19 @@ audio boundary hook. It exercises real original archive functions and native
 sector reads, not an audio implementation. It also tests BCD conversion, missing
 files, traversal rejection, read cancellation, padding, extent bounds and an
 oversized HDT rejected before it can overflow native scratch.
+
+## Original data regions
+
+`sdk_memory` owns one aligned 2 MB main-RAM allocation. Serialized addresses
+in the low, cached (`0x80000000`) and uncached (`0xA0000000`) segments resolve
+to the same bounded storage. Out-of-range spans, unsupported segments and
+scratchpad addresses return NULL. Additional physical RAM mirrors, BIOS,
+scratchpad and device-register mappings are not implemented.
+
+The original `overlay_regions.c` now has a native-only table using the same
+LOW/HIGH data offsets as the reference linker configuration, within that one
+allocation. Their pointer subtraction is valid on the host. PS1 builds retain
+their linker-defined symbols. These are data destinations; native scene
+functions still need separate linkage and dispatch. Imported MIPS code is
+never executed or cast to a host function pointer. This does not yet connect
+original global-state initialization, startup or the game loop.
