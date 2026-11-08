@@ -23,6 +23,22 @@ the window manually. This build does not yet load game data or run gameplay.
 To inspect the Debug window, run `& .\build\native\Debug\vanillabtn.exe` and
 close it with the window's close button.
 
+## Importing game data on Windows
+
+For development, provide your own USA `SLUS_011.15` disc image in raw
+MODE2/2352 `.bin` format. Python 3 is needed for this import step only:
+
+```powershell
+$disc = Join-Path $env:USERPROFILE 'Downloads\your-disc.bin'
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/import-game.ps1 `
+  -Disc $disc
+```
+
+The importer writes extracted disc files to `build/game-data/disc/` and 32
+archive members to `build/game-data/members/`. Those files are local,
+proprietary game data in the ignored `build/` tree. The current native
+executable does not load them yet. Its runtime build needs no Python.
+
 ## PS1 reference build
 
 These commands build PS1 binaries, even when Docker runs on Windows. A native
