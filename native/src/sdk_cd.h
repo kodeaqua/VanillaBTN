@@ -9,4 +9,14 @@
 bool sdk_cd_mount(const char *directory);
 void sdk_cd_unmount(void);
 
+typedef struct SdkCdXaStatus {
+    bool streaming;
+    unsigned char mode;
+    unsigned char file;
+    unsigned char channel;
+    unsigned long sector;
+} SdkCdXaStatus;
+
+SdkCdXaStatus sdk_cd_xa_status(void);
+
 #endif

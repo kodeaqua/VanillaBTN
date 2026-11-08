@@ -14,12 +14,12 @@ Update the relevant item after completing a task or discovering a blocker.
       - [x] Connect original frame-buffer layout, system display-mask helpers, loading screen, CLUT fades/scrolls, math_util.c and cursor insertion to host storage.
   - [ ] Connect original disc requests, startup and native overlay dispatch.
     - [x] Provide SDK VSync timing with deterministic synthetic clock checks.
-    - [x] Compile original afile.c against imported-disc SDK sector reads.
+    - [x] Compile original afile.c, cd_audio.c and event_flags.c against imported-disc SDK sector reads and XA control commands.
     - [x] Map original overlay data regions into bounded host main RAM.
     - [x] Honor SDK-selected draw/display rectangles and display mask in SDL presentation.
     - [x] Compile and exercise original screen fades through SDK GPU submission.
     - [x] Compile original window-frame drawing and support its line/Gouraud packets.
-    - [ ] Connect original CD audio, startup and module dispatch to the host loop.
+    - [ ] Connect original startup and module dispatch to the host loop.
 - [ ] Native executable remains a backend smoke harness; original game execution is not connected.
 - [ ] Connect original controller polling through native SDK receive buffers and rumble.
   - [x] Match SDK atan/CORDIC math across all 16,641 analog magnitude pairs in both profiles.
@@ -40,6 +40,7 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Completed
 
+- [x] Compile original `cd_audio.c` and `event_flags.c` in `game_afile` with `sdk_cd` XA control commands (`CdlStandby`, `CdlSetfilter`, `CdlSetmode` `0xC8`, `CdlGetlocP`, `CdlReadS`, `CdControlB`, `CdControlF`, `CdLastCom`) and `sdk_sound` (`SsSetSerialVol`). Synthetic checks exercise `xa_search_files`, `cd_audio_play_track` (valid, out-of-range and event-flag muted), `cd_audio_fade_tick` (fade-out, end-of-track stop and loop seek), `cd_audio_stop`, `event_flag_set`/`event_flag_get`, and `afile_read_bytes` stopping active XA playback in Debug/Release (27 checks).
 - [x] Support inline `DR_LOAD` (`GP0 0xA0`) CPU-to-VRAM packets, add `rsin`/`rcos` to `sdk_math`, and compile original `clut.c` and `math_util.c` in `game_frame_buffers`. Synthetic checks verify odd-width/out-of-bounds `GP0 0xA0` transfers, `StoreImage` palette capture, `clut_fade_step` midpoint blending with STP bit rules, `clut_scroll_step` bounce/wrap modes, and polar vector math in Debug/Release (27 checks).
 - [x] Compile original system.c (`host_poll`, `display_on`, `display_off`) and loading_screen.c in game_anim/game_frame_buffers without changing their source. Synthetic checks exercise loading-picture texture upload, display-mask toggling, double-buffered frame/environment flips, SPRT/DR_MODE submission at (160, 120) and stop transitions in Debug/Release (27 checks).
 - [x] Compile original pad_vibration.c alongside pad.c in game_pad. Synthetic checks exercise vibration pattern startup gating before pad_init, script step durations, same-script deduplication, actuator0/actuator1 updates through sdk_pad rumble callbacks, explicit stop and replay suppression in Debug/Release (27 checks).

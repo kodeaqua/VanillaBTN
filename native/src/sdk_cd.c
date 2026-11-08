@@ -16,12 +16,18 @@ static char root[1024];
 static DiscFile files[CD_FILES];
 static unsigned file_count;
 static u_long next_sector, seek_sector;
+static u_char last_command, drive_mode, filter_file, filter_channel;
+static bool filter_set, xa_streaming;
 static struct {
     DiscFile *file;
     unsigned char *destination;
     u_long offset, sectors;
     int status;
 } read_job;
+
+SdkCdXaStatus sdk_cd_xa_status(void) {
+    return (SdkCdXaStatus){xa_streaming, drive_mode, filter_file, filter_channel, seek_sector};
+}
 
 void sdk_cd_unmount(void) {
     for (unsigned i = 0; i < file_count; ++i) fclose(files[i].handle);
@@ -30,6 +36,8 @@ void sdk_cd_unmount(void) {
     root[0] = 0;
     file_count = 0;
     next_sector = seek_sector = 0;
+    last_command = drive_mode = filter_file = filter_channel = 0;
+    filter_set = xa_streaming = false;
 }
 
 bool sdk_cd_mount(const char *directory) {
@@ -112,29 +120,91 @@ CdlFILE *CdSearchFile(CdlFILE *result, char *name) {
     return result;
 }
 
+static DiscFile *find_sector_file(u_long sector) {
+    for (unsigned i = 0; i < file_count; ++i) {
+        DiscFile *file = files + i;
+        if (sector >= file->first && sector - file->first < file->sectors) return file;
+    }
+    return NULL;
+}
+
 int CdControl(u_char command, u_char *parameter, u_char *result) {
     if (!root[0]) return 0;
     if (command == CdlSetloc) {
         int sector = CdPosToInt((CdlLOC *)parameter);
         if (sector < 0) return 0;
         seek_sector = (u_long)sector;
+    } else if (command == CdlStandby) {
+        xa_streaming = false;
+    } else if (command == CdlSetfilter) {
+        if (!parameter || parameter[0] == 0 || parameter[1] > 31) return 0;
+        filter_file = parameter[0];
+        filter_channel = parameter[1];
+        filter_set = true;
     } else if (command == CdlSetmode) {
-        /* Only ordinary 2048-byte data sectors are supported by this bridge.
-         * XA/raw-sector commands must not pretend to succeed. */
-        if (!parameter || (*parameter & ~0x80)) return 0;
+        /* Support 2048-byte data modes (0x00/0x80) and the 0xC8 real-time
+         * filtered XA-ADPCM mode configured by cd_audio.c. */
+        if (!parameter || (*parameter != 0 && *parameter != 0x80 && *parameter != 0xC8)) return 0;
+        drive_mode = *parameter;
+        if (drive_mode != 0xC8) xa_streaming = false;
+    } else if (command == CdlReadS) {
+        if (drive_mode != 0xC8 || !filter_set) return 0;
+        if (parameter) {
+            int sector = CdPosToInt((CdlLOC *)parameter);
+            if (sector < 0) return 0;
+            seek_sector = (u_long)sector;
+        }
+        if (!find_sector_file(seek_sector)) return 0;
+        xa_streaming = true;
+    } else if (command == CdlGetlocP) {
+        if (result) {
+            CdlLOC pos;
+            memset(result, 0, 8);
+            if (CdIntToPos((int)seek_sector, &pos)) {
+                result[5] = pos.minute;
+                result[6] = pos.second;
+                result[7] = pos.sector;
+            }
+        }
     } else return 0;
-    if (result) result[0] = 2;
+    last_command = command;
+    if (result && command != CdlGetlocP) result[0] = 2;
     return 1;
+}
+
+int CdControlB(u_char command, u_char *parameter, u_char *result) {
+    return CdControl(command, parameter, result);
+}
+
+int CdControlF(u_char command, u_char *parameter) {
+    return CdControl(command, parameter, NULL);
+}
+
+u_char CdLastCom(void) {
+    return last_command;
 }
 
 int CdSync(int mode, u_char *result) {
     if (!root[0] || (mode != 0 && mode != 1)) return -1;
-    if (result) result[0] = 2;
+    if (result) {
+        memset(result, 0, 8);
+        result[0] = 2;
+        if (last_command == CdlGetlocP) {
+            CdlLOC pos;
+            if (CdIntToPos((int)seek_sector, &pos)) {
+                result[5] = pos.minute;
+                result[6] = pos.second;
+                result[7] = pos.sector;
+            }
+        }
+    }
     return CdlComplete; /* Supported control commands complete immediately. */
 }
 
 int CdRead(int sectors, u_long *buffer, int mode) {
     if (!buffer || sectors <= 0 || read_job.status > 0 || (mode & ~0x80)) return 0;
+    drive_mode = (u_char)mode;
+    xa_streaming = false;
     for (unsigned i = 0; i < file_count; ++i) {
         DiscFile *file = files + i;
         if (seek_sector >= file->first && seek_sector - file->first < file->sectors

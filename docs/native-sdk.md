@@ -120,9 +120,10 @@ their phase and late work does not incur another full wait. Repeated
 source once without rewinding it. No interrupt callback registration API is
 provided yet; this is not full BIOS callback emulation.
 
-## Original archive reads
+## Original archive reads and CD audio control
 
-`game_afile` compiles `src/main/cd/afile.c` against `sdk_cd` and `sdk_sync`.
+`game_afile` compiles `src/main/cd/afile.c`, `src/main/sound/cd_audio.c` and
+`src/main/game/event_flags.c` against `sdk_cd`, `sdk_sound` and `sdk_sync`.
 The native-only initialization scratch is one sector instead of borrowing the
 host farm-state object. It checks the 33-word HDT length, aligned monotonic
 offsets and terminal BIN size before the original member table is used. PS1
@@ -137,16 +138,29 @@ cancels it. Host reads are synchronous at completion: there are no artificial
 busy frames or emulated seek delays. Sector padding after EOF is zero-filled;
 requests cannot cross the selected file's allocated sector extent.
 
-Only ordinary 2048-byte data mode is supported. Raw/XA modes and other control
-commands return failure; original CD audio remains a separate pending boundary.
+For `cd_audio.c`, `sdk_cd` additionally handles `CdlSetloc`, `CdlStandby`,
+`CdlPause`, `CdlSetfilter`, `CdlSetmode` (`0xC8` for filtered real-time XA
+ADPCM streaming in addition to `0x00`/`0x80` 2048-byte data modes), `CdlReadS`,
+`CdlGetlocP`, `CdControlB`, `CdControlF` and `CdLastCom`. During active XA
+streaming, `CdlGetlocP` advances the subheader Q position by 8 sectors per
+query (one channel-interleaved cycle) across the selected track's sector extent
+so `cd_audio_fade_tick` observes track progress, end-of-track stop and loop
+seek behavior. `sdk_sound` provides `SsSetSerialVol` to record the CD serial
+input left/right volume (`0..127`) adjusted by `cd_audio_play_track`,
+`cd_audio_fade_tick` and `cd_audio_stop`. Starting an archive sector read via
+`afile_read_bytes` invokes the real `cd_audio_stop` and switches the drive back
+to data mode (`0x80`). Feeding `cd_audio.c` filter/location/volume state into
+the live `ps1_xa` audio mixer stream remains a separate integration step.
 File lookup failure is real failure: the host must validate the data tree before
 entering original retry loops. Mount/unmount invalidates all pending requests.
 
-The archive fixture records the original request to stop XA with a test-only
-audio boundary hook. It exercises real original archive functions and native
-sector reads, not an audio implementation. It also tests BCD conversion, missing
-files, traversal rejection, read cancellation, padding, extent bounds and an
-oversized HDT rejected before it can overflow native scratch.
+The archive and CD audio fixture exercises `xa_search_files`,
+`cd_audio_play_track` (valid, out-of-range and event-flag muted tracks),
+`cd_audio_fade_tick` (fade-out to stop, end-of-track stop and looped track
+rewinds), `cd_audio_stop`, `event_flag_set`/`event_flag_get` bitfields, and
+`afile_read_bytes` stopping active XA playback. It also tests BCD conversion,
+missing files, traversal rejection, read cancellation, padding, extent bounds
+and an oversized HDT rejected before it can overflow native scratch.
 
 ## Original data regions
 

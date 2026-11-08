@@ -167,22 +167,31 @@ target_link_libraries(sdk_sync_test PRIVATE sdk_sync)
 target_compile_options(sdk_sync_test PRIVATE /W4 /UNDEBUG)
 add_test(NAME sdk_vsync_timing COMMAND sdk_sync_test)
 
+add_library(sdk_sound STATIC src/sdk_sound.c)
+set_target_properties(sdk_sound PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_include_directories(sdk_sound PUBLIC compat src)
+target_compile_options(sdk_sound PRIVATE /W4)
+
 add_library(sdk_cd STATIC src/sdk_cd.c)
 set_target_properties(sdk_cd PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_include_directories(sdk_cd PUBLIC compat src)
 target_compile_definitions(sdk_cd PRIVATE _CRT_SECURE_NO_WARNINGS)
 target_compile_options(sdk_cd PRIVATE /W4)
-add_library(game_afile STATIC ../src/main/cd/afile.c)
+add_library(game_afile STATIC
+    ../src/main/cd/afile.c
+    ../src/main/game/event_flags.c
+    ../src/main/sound/cd_audio.c
+)
 set_target_properties(game_afile PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
-target_include_directories(game_afile PUBLIC ../src/main/cd ../src/main/sound)
-target_link_libraries(game_afile PUBLIC sdk_cd sdk_sync game_texture_pack)
+target_include_directories(game_afile PUBLIC ${game_include_dirs})
+target_link_libraries(game_afile PUBLIC sdk_cd sdk_sound sdk_sync game_prim)
 target_compile_options(game_afile PRIVATE /W4)
 add_executable(original_afile_test tests/original_afile_test.c)
 set_target_properties(original_afile_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_link_libraries(original_afile_test PRIVATE game_afile)
 target_compile_definitions(original_afile_test PRIVATE _CRT_SECURE_NO_WARNINGS)
 target_compile_options(original_afile_test PRIVATE /W4 /UNDEBUG)
-file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/sdk-disc-test")
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/sdk-disc-test/STR")
 add_test(NAME original_archive_reads COMMAND original_afile_test)
 set_tests_properties(original_archive_reads PROPERTIES
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/sdk-disc-test" TIMEOUT 10)
