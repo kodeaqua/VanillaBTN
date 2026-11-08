@@ -142,8 +142,7 @@ int main(void) {
         if (video.vram[40][13] != 0xFFFFu) return 5;
     }
 
-    /* --- GP0(E3/E4/E5/E6): draw environment commands ---
-     * Verify that draw state is correctly updated by environment packets. */
+    /* --- GP0(E6): mask bit setting --- */
     {
         ps1_draw_state_reset(&draw);
 
@@ -168,6 +167,73 @@ int main(void) {
         const uint32_t e6[1] = { (0xE6u << 24) | 3u };
         if (!ps1_gpu_exec(&video, &draw, e6, 1)) return 6;
         if (!draw.force_mask || !draw.check_mask) return 6;
+    }
+
+    /* --- GP0(20): untextured flat triangle (POLY_F3) ---
+     * Right-angle triangle: (80, 80), (85, 80), (80, 85) in blue. */
+    {
+        ps1_draw_state_reset(&draw);
+        const uint32_t pkt[4] = {
+            cmd_rgb(0x20, 0, 0, 0xF8),
+            xy_word(80, 80),
+            xy_word(85, 80),
+            xy_word(80, 85),
+        };
+        if (!ps1_gpu_exec(&video, &draw, pkt, 4)) return 14;
+        if (video.vram[80][80] != 0x7C00u) return 14;
+        if (video.vram[81][81] != 0x7C00u) return 14;
+        if (video.vram[85][85] != 0)       return 14;
+    }
+
+    /* --- GP0(28): untextured flat quad (POLY_F4) ---
+     * Quad: (50, 50) to (54, 54) in green (0x00F800 = 0x03E0u). */
+    {
+        ps1_draw_state_reset(&draw);
+        const uint32_t pkt[5] = {
+            cmd_rgb(0x28, 0, 0xF8, 0),
+            xy_word(50, 50),
+            xy_word(54, 50),
+            xy_word(50, 54),
+            xy_word(54, 54),
+        };
+        if (!ps1_gpu_exec(&video, &draw, pkt, 5)) return 15;
+        if (video.vram[50][50] != 0x03E0u) return 15;
+        if (video.vram[50][54] != 0x03E0u) return 15;
+        if (video.vram[54][50] != 0x03E0u) return 15;
+        if (video.vram[54][54] != 0x03E0u) return 15;
+        if (video.vram[49][50] != 0)       return 15;
+        if (video.vram[55][54] != 0)       return 15;
+    }
+
+    /* --- GP0(2C): textured quad (POLY_FT4) ---
+     * 4-bit CLUT texture from VRAM (page 1, CLUT at row 2 col 0).
+     * Texels at row 0 col 64: 0x0210 (nibbles 0=trans, 1=red, 2=green, 0=trans). */
+    {
+        ps1_draw_state_reset(&draw);
+        video.vram[70][70] = 0xFFFFu;
+        video.vram[70][71] = 0xFFFFu;
+        video.vram[70][72] = 0xFFFFu;
+        video.vram[70][73] = 0xFFFFu;
+
+        unsigned clut_field = (2u << 6) | 0u;
+        const uint32_t pkt[9] = {
+            cmd_rgb(0x2C, 0x80, 0x80, 0x80),                  /* neutral modulation */
+            xy_word(70, 70),                                  /* v0 */
+            (uint32_t)(0 | (0 << 8) | (clut_field << 16)),    /* u0=0, v0=0, clut */
+            xy_word(74, 70),                                  /* v1 */
+            (uint32_t)(4 | (0 << 8) | (1u << 16)),            /* u1=4, v1=0, tpage=1 */
+            xy_word(70, 71),                                  /* v2 */
+            (uint32_t)(0 | (1 << 8)),                         /* u2=0, v2=1 */
+            xy_word(74, 71),                                  /* v3 */
+            (uint32_t)(4 | (1 << 8)),                         /* u3=4, v3=1 */
+        };
+        if (!ps1_gpu_exec(&video, &draw, pkt, 9)) return 16;
+        /* Index 0: transparent -> 0xFFFF preserved */
+        if (video.vram[70][70] != 0xFFFFu) return 16;
+        /* Index 1: red 0x001F */
+        if (video.vram[70][71] != 0x001Fu) return 16;
+        /* Index 2: green 0x03E0 */
+        if (video.vram[70][72] != 0x03E0u) return 16;
     }
 
     /* --- NULL / zero-count guard ---

@@ -171,6 +171,112 @@ bool ps1_video_draw_sprite(Ps1Video *video, const Ps1DrawState *state,
     return true;
 }
 
+static int min3(int a, int b, int c) {
+    int m = a < b ? a : b;
+    return m < c ? m : c;
+}
+
+static int max3(int a, int b, int c) {
+    int m = a > b ? a : b;
+    return m > c ? m : c;
+}
+
+bool ps1_video_draw_triangle(Ps1Video *video, const Ps1DrawState *state,
+                             const Ps1Vertex *v0, const Ps1Vertex *v1, const Ps1Vertex *v2,
+                             uint32_t rgb24, unsigned tpage, unsigned clut,
+                             bool textured, bool raw_texture, bool semi_transparent) {
+    if (video == NULL || !valid_draw_state(state) || v0 == NULL || v1 == NULL || v2 == NULL) {
+        return false;
+    }
+    if (textured && ((tpage >> 7) & 3u) == 3u) {
+        return false;
+    }
+    int x0 = signed11(v0->x) + signed11(state->offset_x);
+    int y0 = signed11(v0->y) + signed11(state->offset_y);
+    int x1 = signed11(v1->x) + signed11(state->offset_x);
+    int y1 = signed11(v1->y) + signed11(state->offset_y);
+    int x2 = signed11(v2->x) + signed11(state->offset_x);
+    int y2 = signed11(v2->y) + signed11(state->offset_y);
+
+    int64_t u0 = v0->u, v_0 = v0->v;
+    int64_t u1 = v1->u, v_1 = v1->v;
+    int64_t u2 = v2->u, v_2 = v2->v;
+
+    /* 2D cross product: (x1 - x0)*(y2 - y0) - (y1 - y0)*(x2 - x0) */
+    int64_t det = (int64_t)(x1 - x0) * (y2 - y0) - (int64_t)(y1 - y0) * (x2 - x0);
+    if (det == 0) {
+        return true; /* Degenerate triangle, nothing to draw. */
+    }
+    if (det < 0) {
+        /* Swap v1 and v2 so vertices are consistently oriented. */
+        int tx = x1; x1 = x2; x2 = tx;
+        int ty = y1; y1 = y2; y2 = ty;
+        int64_t tu = u1; u1 = u2; u2 = tu;
+        int64_t tv = v_1; v_1 = v_2; v_2 = tv;
+        det = -det;
+    }
+
+    int left = min3(x0, x1, x2);
+    int top = min3(y0, y1, y2);
+    int right = max3(x0, x1, x2) + 1;
+    int bottom = max3(y0, y1, y2) + 1;
+
+    if (left < state->left) left = state->left;
+    if (top < state->top) top = state->top;
+    if (right > state->right + 1) right = state->right + 1;
+    if (bottom > state->bottom + 1) bottom = state->bottom + 1;
+
+    uint16_t flat_color = rgb15(rgb24);
+
+    for (int row = top; row < bottom; ++row) {
+        for (int col = left; col < right; ++col) {
+            int64_t w0 = (int64_t)(x2 - x1) * (row - y1) - (int64_t)(y2 - y1) * (col - x1);
+            int64_t w1 = (int64_t)(x0 - x2) * (row - y2) - (int64_t)(y0 - y2) * (col - x2);
+            int64_t w2 = (int64_t)(x1 - x0) * (row - y0) - (int64_t)(y1 - y0) * (col - x0);
+
+            if (w0 >= 0 && w1 >= 0 && w2 >= 0) {
+                uint16_t *pixel = &video->vram[row][col];
+                if (state->check_mask && (*pixel & 0x8000u)) continue;
+
+                uint16_t front;
+                if (!textured) {
+                    front = semi_transparent
+                        ? blend_pixel(*pixel, flat_color, state->blend_mode)
+                        : flat_color;
+                } else {
+                    unsigned u = (unsigned)((w0 * u0 + w1 * u1 + w2 * u2) / det);
+                    unsigned v = (unsigned)((w0 * v_0 + w1 * v_1 + w2 * v_2) / det);
+                    uint16_t texel;
+                    if (!ps1_video_sample_texel(video, tpage, clut, u, v, &texel)) {
+                        continue;
+                    }
+                    if (texel == 0) continue;
+
+                    front = raw_texture ? texel : modulate_texel(texel, rgb24);
+                    if (semi_transparent && (texel & 0x8000u)) {
+                        front = blend_pixel(*pixel, front, state->blend_mode) | 0x8000u;
+                    }
+                }
+                *pixel = front | (state->force_mask ? 0x8000u : 0);
+            }
+        }
+    }
+    return true;
+}
+
+bool ps1_video_draw_quad(Ps1Video *video, const Ps1DrawState *state,
+                         const Ps1Vertex *v0, const Ps1Vertex *v1,
+                         const Ps1Vertex *v2, const Ps1Vertex *v3,
+                         uint32_t rgb24, unsigned tpage, unsigned clut,
+                         bool textured, bool raw_texture, bool semi_transparent) {
+    if (!ps1_video_draw_triangle(video, state, v0, v1, v2, rgb24, tpage, clut,
+                                 textured, raw_texture, semi_transparent)) {
+        return false;
+    }
+    return ps1_video_draw_triangle(video, state, v1, v2, v3, rgb24, tpage, clut,
+                                   textured, raw_texture, semi_transparent);
+}
+
 bool ps1_video_upload(Ps1Video *video, int x, int y, int width, int height,
                       const uint16_t *source, size_t source_stride) {
     if (video == NULL || source == NULL || !valid_rect(x, y, width, height)

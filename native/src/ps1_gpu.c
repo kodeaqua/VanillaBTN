@@ -37,6 +37,20 @@
 #define GP0_SPRITE_8_ST     0x76u
 #define GP0_SPRITE_8_RST    0x77u
 
+/* Polygons (3-point and 4-point, flat and textured). */
+#define GP0_POLY_F3         0x20u
+#define GP0_POLY_F3_ST      0x22u
+#define GP0_POLY_FT3        0x24u
+#define GP0_POLY_FT3_RAW    0x25u
+#define GP0_POLY_FT3_ST     0x26u
+#define GP0_POLY_FT3_RST    0x27u
+#define GP0_POLY_F4         0x28u
+#define GP0_POLY_F4_ST      0x2Au
+#define GP0_POLY_FT4        0x2Cu
+#define GP0_POLY_FT4_RAW    0x2Du
+#define GP0_POLY_FT4_ST     0x2Eu
+#define GP0_POLY_FT4_RST    0x2Fu
+
 /* Draw environment. */
 #define GP0_DRAW_MODE       0xE1u  /* Texture page, semi-transparency mode */
 #define GP0_DRAW_AREA_TL    0xE3u  /* Top-left corner of draw area */
@@ -136,6 +150,80 @@ static void exec_sprite(Ps1Video *video, const Ps1DrawState *state,
         sprite.height = (unsigned)gp0_y(words[3]);
     }
     ps1_video_draw_sprite(video, state, &sprite);
+}
+
+/* Dispatch an untextured 3-point polygon.
+ * Layout: [0] cmd+rgb, [1] x0/y0, [2] x1/y1, [3] x2/y2. */
+static void exec_poly_f3(Ps1Video *video, const Ps1DrawState *state,
+                         const uint32_t *words, size_t count,
+                         bool semi_transparent) {
+    if (count < 4) return;
+    uint32_t rgb24 = gp0_rgb24(words[0]);
+    Ps1Vertex v0 = { gp0_x(words[1]), gp0_y(words[1]), 0, 0 };
+    Ps1Vertex v1 = { gp0_x(words[2]), gp0_y(words[2]), 0, 0 };
+    Ps1Vertex v2 = { gp0_x(words[3]), gp0_y(words[3]), 0, 0 };
+    ps1_video_draw_triangle(video, state, &v0, &v1, &v2,
+                            rgb24, 0, 0, false, false, semi_transparent);
+}
+
+/* Dispatch a textured 3-point polygon.
+ * Layout: [0] cmd+rgb, [1] x0/y0, [2] u0/v0+clut, [3] x1/y1,
+ *         [4] u1/v1+tpage, [5] x2/y2, [6] u2/v2. */
+static void exec_poly_ft3(Ps1Video *video, Ps1DrawState *state,
+                          const uint32_t *words, size_t count,
+                          bool raw_texture, bool semi_transparent) {
+    if (count < 7) return;
+    uint32_t rgb24 = gp0_rgb24(words[0]);
+    Ps1Vertex v0 = { gp0_x(words[1]), gp0_y(words[1]), words[2] & 0xFFu, (words[2] >> 8) & 0xFFu };
+    unsigned clut = (words[2] >> 16) & 0xFFFFu;
+    Ps1Vertex v1 = { gp0_x(words[3]), gp0_y(words[3]), words[4] & 0xFFu, (words[4] >> 8) & 0xFFu };
+    unsigned tpage_word = (words[4] >> 16) & 0xFFFFu;
+    Ps1Vertex v2 = { gp0_x(words[5]), gp0_y(words[5]), words[6] & 0xFFu, (words[6] >> 8) & 0xFFu };
+
+    state->tpage = tpage_word & 0x1FFu;
+    state->blend_mode = (tpage_word >> 5) & 3u;
+
+    ps1_video_draw_triangle(video, state, &v0, &v1, &v2,
+                            rgb24, state->tpage, clut,
+                            true, raw_texture, semi_transparent);
+}
+
+/* Dispatch an untextured 4-point polygon.
+ * Layout: [0] cmd+rgb, [1] x0/y0, [2] x1/y1, [3] x2/y2, [4] x3/y3. */
+static void exec_poly_f4(Ps1Video *video, const Ps1DrawState *state,
+                         const uint32_t *words, size_t count,
+                         bool semi_transparent) {
+    if (count < 5) return;
+    uint32_t rgb24 = gp0_rgb24(words[0]);
+    Ps1Vertex v0 = { gp0_x(words[1]), gp0_y(words[1]), 0, 0 };
+    Ps1Vertex v1 = { gp0_x(words[2]), gp0_y(words[2]), 0, 0 };
+    Ps1Vertex v2 = { gp0_x(words[3]), gp0_y(words[3]), 0, 0 };
+    Ps1Vertex v3 = { gp0_x(words[4]), gp0_y(words[4]), 0, 0 };
+    ps1_video_draw_quad(video, state, &v0, &v1, &v2, &v3,
+                        rgb24, 0, 0, false, false, semi_transparent);
+}
+
+/* Dispatch a textured 4-point polygon (POLY_FT4).
+ * Layout: [0] cmd+rgb, [1] x0/y0, [2] u0/v0+clut, [3] x1/y1,
+ *         [4] u1/v1+tpage, [5] x2/y2, [6] u2/v2, [7] x3/y3, [8] u3/v3. */
+static void exec_poly_ft4(Ps1Video *video, Ps1DrawState *state,
+                          const uint32_t *words, size_t count,
+                          bool raw_texture, bool semi_transparent) {
+    if (count < 9) return;
+    uint32_t rgb24 = gp0_rgb24(words[0]);
+    Ps1Vertex v0 = { gp0_x(words[1]), gp0_y(words[1]), words[2] & 0xFFu, (words[2] >> 8) & 0xFFu };
+    unsigned clut = (words[2] >> 16) & 0xFFFFu;
+    Ps1Vertex v1 = { gp0_x(words[3]), gp0_y(words[3]), words[4] & 0xFFu, (words[4] >> 8) & 0xFFu };
+    unsigned tpage_word = (words[4] >> 16) & 0xFFFFu;
+    Ps1Vertex v2 = { gp0_x(words[5]), gp0_y(words[5]), words[6] & 0xFFu, (words[6] >> 8) & 0xFFu };
+    Ps1Vertex v3 = { gp0_x(words[7]), gp0_y(words[7]), words[8] & 0xFFu, (words[8] >> 8) & 0xFFu };
+
+    state->tpage = tpage_word & 0x1FFu;
+    state->blend_mode = (tpage_word >> 5) & 3u;
+
+    ps1_video_draw_quad(video, state, &v0, &v1, &v2, &v3,
+                        rgb24, state->tpage, clut,
+                        true, raw_texture, semi_transparent);
 }
 
 /* Update draw state from GP0(E1): draw mode / texture page.
@@ -266,6 +354,46 @@ bool ps1_gpu_exec(Ps1Video *video, Ps1DrawState *state,
         break;
     case GP0_SPRITE_16_RST:
         exec_sprite(video, state, words, count, 16, 16, true, true);
+        break;
+
+    /* 3-point polygons (triangles). */
+    case GP0_POLY_F3:
+        exec_poly_f3(video, state, words, count, false);
+        break;
+    case GP0_POLY_F3_ST:
+        exec_poly_f3(video, state, words, count, true);
+        break;
+    case GP0_POLY_FT3:
+        exec_poly_ft3(video, state, words, count, false, false);
+        break;
+    case GP0_POLY_FT3_RAW:
+        exec_poly_ft3(video, state, words, count, true, false);
+        break;
+    case GP0_POLY_FT3_ST:
+        exec_poly_ft3(video, state, words, count, false, true);
+        break;
+    case GP0_POLY_FT3_RST:
+        exec_poly_ft3(video, state, words, count, true, true);
+        break;
+
+    /* 4-point polygons (quads). */
+    case GP0_POLY_F4:
+        exec_poly_f4(video, state, words, count, false);
+        break;
+    case GP0_POLY_F4_ST:
+        exec_poly_f4(video, state, words, count, true);
+        break;
+    case GP0_POLY_FT4:
+        exec_poly_ft4(video, state, words, count, false, false);
+        break;
+    case GP0_POLY_FT4_RAW:
+        exec_poly_ft4(video, state, words, count, true, false);
+        break;
+    case GP0_POLY_FT4_ST:
+        exec_poly_ft4(video, state, words, count, false, true);
+        break;
+    case GP0_POLY_FT4_RST:
+        exec_poly_ft4(video, state, words, count, true, true);
         break;
 
     /* Draw environment commands. */

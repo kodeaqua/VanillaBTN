@@ -27,6 +27,11 @@ typedef struct Ps1Sprite {
     bool raw_texture, semi_transparent;
 } Ps1Sprite;
 
+typedef struct Ps1Vertex {
+    int x, y;
+    unsigned u, v;
+} Ps1Vertex;
+
 /* Preserve raw PS1 BGR555 words, including the high mask/semitransparency bit. */
 bool ps1_video_upload(Ps1Video *video, int x, int y, int width, int height,
                       const uint16_t *source, size_t source_stride);
@@ -52,5 +57,18 @@ bool ps1_video_sample_texel(const Ps1Video *video, unsigned tpage, unsigned clut
 /* Draw a textured PS1 rectangle with raw or modulated color. */
 bool ps1_video_draw_sprite(Ps1Video *video, const Ps1DrawState *state,
                            const Ps1Sprite *sprite);
+
+/* Draw a flat or textured PS1 triangle. */
+bool ps1_video_draw_triangle(Ps1Video *video, const Ps1DrawState *state,
+                             const Ps1Vertex *v0, const Ps1Vertex *v1, const Ps1Vertex *v2,
+                             uint32_t rgb24, unsigned tpage, unsigned clut,
+                             bool textured, bool raw_texture, bool semi_transparent);
+
+/* Draw a flat or textured PS1 quad (split into triangles v0-v1-v2 and v1-v2-v3). */
+bool ps1_video_draw_quad(Ps1Video *video, const Ps1DrawState *state,
+                         const Ps1Vertex *v0, const Ps1Vertex *v1,
+                         const Ps1Vertex *v2, const Ps1Vertex *v3,
+                         uint32_t rgb24, unsigned tpage, unsigned clut,
+                         bool textured, bool raw_texture, bool semi_transparent);
 
 #endif
