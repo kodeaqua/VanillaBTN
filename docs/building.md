@@ -17,13 +17,10 @@ on first configure and checks its SHA-256. The output is
 `build/native/<profile>/vanillabtn.exe`; the build tree is ignored by Git.
 No WSL, MSYS, Docker, or Python is needed for this native target.
 
-The executable currently presents a blank 320x240 PS1 framebuffer, scaled
-without filtering. The `native_startup` CTest check launches it headlessly
-with `--check-build`; `ps1_video_pixels` checks VRAM conversion, quick fill,
-tiles, mask bits, blending, CLUT sampling, and sprite pixels with synthetic
-fixtures. `ps1_ot_order` checks ordering-table traversal. The developer checks
-the window manually. This build does not yet
-load game data or run gameplay.
+The executable runs original startup and scene handlers using locally imported
+assets. The `native_startup` CTest checks executable linkage with `--check-build`;
+other tests check SDK and rendering behavior with synthetic fixtures. Actual
+visual, audio and gameplay acceptance remains with the developer.
 To inspect the Debug window, run `& .\build\native\Debug\vanillabtn.exe` and
 close it with the window's close button.
 
@@ -61,6 +58,13 @@ and a finite 900-vblank budget. It checks GPU status and counts colored frames
 and nonzero PCM intervals without displaying or judging gameplay. It is not
 part of CTest because the normal suite requires no proprietary data. Diagnostics
 belong to this test executable, not the Release game executable.
+
+Add `--demo` to run 5,000 vblanks, reaching the original title attract demo.
+At the budget boundary it writes the selected framebuffer to the ignored
+`build/native-demo.bmp`. This is a diagnostic capture, not an image comparison
+or proof of gameplay fidelity. On a crash, the probe reports original state
+counters and symbol names without dumping asset data or source paths. The
+probe uses in-memory cards and never writes your card files.
 
 To build a separate local candidate while a game window is open:
 

@@ -61,6 +61,8 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Completed
 
+- [x] Extend the optional original-code boot probe to 5,000 vblanks with a framebuffer capture and test-only crash symbols; keep cards in memory and diagnostics outside the game executable.
+
 - [x] Allow a simple named Windows runtime candidate through the build wrapper while another executable is in use; default and candidate Debug builds and the Release build pass 30 tests.
 
 - [x] Remove fabricated PocketStation serial/time/memory and successful execution/write responses. Standard cards report Invalid (2), missing cards NoCard (1), with canonical command IDs and untouched buffers/card contents. Regression fails on the old bridge and on temporary reversion; both profiles pass 28 tests. No PocketStation device is emulated.

@@ -4,6 +4,7 @@
 #include <string.h>
 #ifdef VANILLABTN_BOOT_TEST
 #include <stdio.h>
+#include "farm_state.h"
 #endif
 
 #include "ps1_audio.h"
@@ -112,15 +113,38 @@ typedef struct HostGame {
     uint32_t keyboard_buttons, controller_buttons;
     int16_t stick_x, stick_y;
 #ifdef VANILLABTN_BOOT_TEST
-    unsigned vblanks, colored_frames, audible_frames;
+    unsigned vblanks, vblank_limit, colored_frames, audible_frames;
 #endif
 } HostGame;
+
+#ifdef VANILLABTN_BOOT_TEST
+static bool boot_save_frame(void) {
+    SdkDisplay output = sdk_gpu_display();
+    if (!output.enabled || output.width <= 0 || output.height <= 0 ||
+        output.width > PS1_VRAM_WIDTH || output.height > PS1_VRAM_HEIGHT) return false;
+    size_t count = (size_t)output.width * output.height;
+    uint32_t *pixels = SDL_malloc(count * sizeof(*pixels));
+    if (!pixels) return false;
+    SDL_Surface *surface = NULL;
+    if (ps1_video_copy_argb(&video, output.x, output.y, output.width,
+        output.height, pixels, output.width)) {
+        surface = SDL_CreateSurfaceFrom(output.width, output.height,
+            SDL_PIXELFORMAT_ARGB8888, pixels, output.width * sizeof(*pixels));
+    }
+    bool saved = surface && SDL_SaveBMP(surface, "build/native-demo.bmp");
+    if (surface) SDL_DestroySurface(surface);
+    SDL_free(pixels);
+    return saved;
+}
+#endif
 
 static void host_game_pump(void *context) {
     HostGame *host = context;
     SDL_Event event;
 #ifdef VANILLABTN_BOOT_TEST
-    if (++host->vblanks >= 900 || !sdk_gpu_ok()) {
+    if (++host->vblanks >= host->vblank_limit || !sdk_gpu_ok()) {
+        if (host->vblank_limit > 900 && host->vblanks == host->vblank_limit)
+            fprintf(stderr, "frame snapshot: %d\n", boot_save_frame());
         sdk_sync_stop();
         host->running = false;
         return;
@@ -209,6 +233,12 @@ static void host_game_pump(void *context) {
 }
 
 #ifdef VANILLABTN_BOOT_TEST
+void boot_fault_install(void (*hook)(void));
+static void boot_fault_state(void) {
+    fprintf(stderr, "state: entry=%u frame=%u\n",
+        game_state.progress.entryStep, game_state.frameCount);
+}
+
 static uint64_t boot_time;
 static uint64_t boot_now(void *context) { (void)context; return boot_time; }
 static void boot_wait(uint64_t deadline, void *context) {
@@ -223,9 +253,18 @@ int main(int argc, char **argv) {
     HostGame host = {0};
     int result = 1;
     const char *disc = "build/game-data/disc";
+#ifdef VANILLABTN_BOOT_TEST
+    boot_fault_install(boot_fault_state);
+    host.vblank_limit = 900;
+#endif
     if (argc == 2 && strcmp(argv[1], "--check-build") == 0) return 0;
-    if (argc == 3 && strcmp(argv[1], "--data") == 0) disc = argv[2];
-    else if (argc != 1) return 1;
+    for (int i = 1; i < argc; ++i) {
+        if (strcmp(argv[i], "--data") == 0 && i + 1 < argc) disc = argv[++i];
+#ifdef VANILLABTN_BOOT_TEST
+        else if (strcmp(argv[i], "--demo") == 0) host.vblank_limit = 5000;
+#endif
+        else return 1;
+    }
 #ifdef VANILLABTN_BOOT_TEST
     SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "dummy");
     SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "dummy");
@@ -275,7 +314,7 @@ int main(int argc, char **argv) {
     extern int main_scene;
     fprintf(stderr, "boot: vblanks=%u scene=%d gpu=%d colored=%u audible=%u\n",
         host.vblanks, main_scene, sdk_gpu_ok(), host.colored_frames, host.audible_frames);
-    if (host.vblanks < 900 || !sdk_gpu_ok() || !host.colored_frames) result = 2;
+    if (host.vblanks < host.vblank_limit || !sdk_gpu_ok() || !host.colored_frames) result = 2;
 #endif
 
 done:

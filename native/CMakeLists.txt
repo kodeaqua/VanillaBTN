@@ -503,9 +503,10 @@ target_link_libraries(sdk_gpu PUBLIC sdk_math)
 
 # Optional integration probe uses locally imported assets and dummy SDL devices.
 # It is deliberately outside CTest: normal builds must not require game data.
-add_executable(original_boot_test src/main.c)
+add_executable(original_boot_test src/main.c tests/boot_fault.c)
 set_target_properties(original_boot_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_compile_definitions(original_boot_test PRIVATE VANILLABTN_BOOT_TEST)
+target_link_libraries(original_boot_test PRIVATE Dbghelp)
 target_compile_options(original_boot_test PRIVATE /W4)
 target_link_libraries(original_boot_test PRIVATE game_main host_display SDL3::SDL3
     ps1_input ps1_audio ps1_card)
