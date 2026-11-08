@@ -5,6 +5,10 @@
 
 int main(void) {
     Ps1Clock clock;
+    /* main_run_frame waits two NTSC vblanks: game updates are nominally 30 Hz. */
+    ps1_clock_init(&clock, 0, 0);
+    for (unsigned i = 0; i < 1000; ++i) ps1_clock_advance(&clock, 1000000ull);
+    if (clock.total_ticks != 30) return 15;
     ps1_clock_init(&clock, 16666666ull, 4);
 
     if (clock.tick_duration_ns != 16666666ull) return 1;

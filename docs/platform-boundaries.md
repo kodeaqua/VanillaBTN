@@ -64,8 +64,9 @@ vector rotation and translation, perspective divide (RTPS/RTPT), normal clipping
 
 `native/src/ps1_input.c` emulates the `InputRecord` semantics from `pad.c`:
 `held`, `pressed`, and dual auto-repeat channels (`triggered` and `triggered2`).
-`native/src/ps1_clock.c` accumulates host nanoseconds and emits exact 60 Hz
-simulation ticks with an anti-cascade clamp. `native/src/main.c` maps SDL3
+`native/src/ps1_clock.c` accumulates host nanoseconds and emits nominal 30 Hz
+game ticks with an anti-cascade clamp, matching the original `VSync(2)` cadence.
+Exact NTSC hardware drift remains unmodeled. `native/src/main.c` maps SDL3
 keyboard (WASD/arrows, ZXCV, Enter/Space/Esc) and SDL3 Gamepad events directly
 to PS1 controller bits. Scene wiring remains next.
 
@@ -89,7 +90,7 @@ to PS1 controller bits. Scene wiring remains next.
 `native/src/ps1_audio.c` bridges SPU mixing and CD-XA playback into SDL3's
 `SDL_AudioStream` at 44 100 Hz stereo 16-bit signed PCM, with headless fallback
 when no audio output hardware is present. `native/src/main.c` advances audio
-each 60 Hz simulation tick.
+each nominal 30 Hz game tick, retaining 44 100 PCM frames per second.
 
 ## Save and memory-card slice
 

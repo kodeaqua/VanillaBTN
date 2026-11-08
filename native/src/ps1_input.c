@@ -55,16 +55,22 @@ void ps1_input_set_button(Ps1InputRecord *record, uint32_t button, bool pressed)
 }
 
 void ps1_input_tick(Ps1InputRecord *record) {
+    ps1_input_tick_speed(record, 1);
+}
+
+void ps1_input_tick_speed(Ps1InputRecord *record, unsigned speed_mode) {
     if (record == NULL) return;
+    int divisor = speed_mode == 2 || speed_mode == 3 ? (int)speed_mode : 1;
 
     record->pressed = (record->previous ^ record->held) & record->held;
 
     if (record->held == record->previous) {
-        int32_t rate = record->rate <= 0 ? 1 : record->rate;
+        int32_t rate = record->rate / divisor;
+        if (rate <= 0) rate = 1;
         if (record->repeating == 0) {
             record->triggered = 0;
             record->repeat_frames++;
-            if ((int32_t)record->repeat_frames > record->delay) {
+            if ((int32_t)record->repeat_frames > record->delay / divisor) {
                 record->repeat_frames = 0;
                 record->repeating = 1;
             }
@@ -77,11 +83,12 @@ void ps1_input_tick(Ps1InputRecord *record) {
             }
         }
 
-        int32_t rate2 = record->rate2 <= 0 ? 1 : record->rate2;
+        int32_t rate2 = record->rate2 / divisor;
+        if (rate2 <= 0) rate2 = 1;
         if (record->repeating2 == 0) {
             record->triggered2 = 0;
             record->repeat_frames2++;
-            if ((int32_t)record->repeat_frames2 > record->delay2) {
+            if ((int32_t)record->repeat_frames2 > record->delay2 / divisor) {
                 record->repeat_frames2 = 0;
                 record->repeating2 = 1;
             }

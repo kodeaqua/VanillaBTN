@@ -13,6 +13,7 @@
 #include "ps1_spu.h"
 #include "ps1_xa.h"
 #include "ps1_seq.h"
+#include "ps1_clock.h"
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -34,7 +35,7 @@ bool ps1_audio_init(Ps1Audio *audio);
 /* Shut down audio system and release resources */
 void ps1_audio_shutdown(Ps1Audio *audio);
 
-/* Advance audio by 1 tick (at 60 Hz = 735 frames of 44.1 kHz audio).
+/* Advance audio by one game frame (nominal 30 Hz = 1470 PCM frames at 44.1 kHz).
  * Mixes SPU and CD-XA streams, pushing PCM to SDL3 audio stream. */
 void ps1_audio_tick(Ps1Audio *audio, int speed_mode);
 

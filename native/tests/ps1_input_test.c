@@ -89,5 +89,18 @@ int main(void) {
     if (record.held != (PS1_PAD_L1 | PS1_PAD_TRIANGLE)) return 22;
     if (record.pressed != (PS1_PAD_L1 | PS1_PAD_TRIANGLE)) return 23;
 
+    /* FAST_2 scales both channels independently, as main_run_frame requires. */
+    ps1_input_init(&record);
+    ps1_input_set_repeat(&record, 6, 4);
+    ps1_input_set_repeat2(&record, 2, 2);
+    record.held = PS1_PAD_UP;
+    ps1_input_tick_speed(&record, 2);
+    for (unsigned i = 0; i < 4; ++i) ps1_input_tick_speed(&record, 2);
+    assert(record.repeating == 1 && record.triggered == 0);
+    assert(record.triggered2 == PS1_PAD_UP);
+    ps1_input_tick_speed(&record, 2);
+    assert(record.triggered == 0);
+    ps1_input_tick_speed(&record, 2);
+    assert(record.triggered == PS1_PAD_UP);
     return 0;
 }

@@ -4,8 +4,8 @@
 #include <SDL3/SDL.h>
 #include <string.h>
 
-#define FRAMES_PER_60HZ_TICK (PS1_SPU_SAMPLE_RATE / 60) /* 735 frames */
-#define MAX_QUEUED_BYTES (4 * FRAMES_PER_60HZ_TICK * 2 * (int)sizeof(int16_t)) /* ~11760 bytes = ~66 ms */
+#define FRAMES_PER_GAME_TICK (PS1_SPU_SAMPLE_RATE / PS1_TICK_RATE_HZ) /* 1470 frames */
+#define MAX_QUEUED_BYTES (2 * FRAMES_PER_GAME_TICK * 2 * (int)sizeof(int16_t)) /* ~66 ms */
 
 bool ps1_audio_init(Ps1Audio *audio) {
     if (!audio) return false;
@@ -58,8 +58,8 @@ void ps1_audio_tick(Ps1Audio *audio, int speed_mode) {
     /* Advance CD-XA fade */
     ps1_xa_fade_tick(&audio->xa, speed_mode);
 
-    int16_t buffer[FRAMES_PER_60HZ_TICK * 2];
-    ps1_audio_mix(audio, buffer, FRAMES_PER_60HZ_TICK);
+    int16_t buffer[FRAMES_PER_GAME_TICK * 2];
+    ps1_audio_mix(audio, buffer, FRAMES_PER_GAME_TICK);
     if (!audio->has_output || !audio->stream) return;
 
     /* Check if audio queue is getting too full to avoid latency build-up */

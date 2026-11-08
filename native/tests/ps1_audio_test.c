@@ -62,6 +62,16 @@ static void test_audio_mix_combined(void) {
 }
 
 int main(void) {
+    /* A game frame spans two vblanks, but PCM must retain its real-time rate. */
+    Ps1Audio actual = {0}, expected = {0};
+    uint8_t loop[16] = {0x04, 7, 0x22};
+    int16_t pcm[1470 * 2];
+    ps1_spu_init(&actual.spu);
+    ps1_spu_key_on_raw(&actual.spu, 0, loop, sizeof(loop), 0x10000, 0x4000, 0x4000);
+    expected = actual;
+    ps1_audio_mix(&expected, pcm, 1470);
+    ps1_audio_tick(&actual, 2);
+    assert(actual.spu.voices[0].block_sample_idx == expected.spu.voices[0].block_sample_idx);
     test_audio_init_shutdown();
     test_audio_mix_combined();
     printf("ps1_audio tests passed.\n");

@@ -21,6 +21,8 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Completed
 
+- [x] Use nominal 30 Hz two-vblank game cadence, 44.1 kHz audio and FAST_2 input-repeat scaling in the backend harness.
+
 - [x] Mix SEQ through the shared SPU/SDL audio backend and open/close gamepads with separate keyboard/controller state. Synthetic tests cover backend behavior; no native game scene is implemented.
 
 - [x] Decode native texture-bank RLE/raw blocks and offset-based ANI sprites/quads with UV orientation; synthetic pixel/bounds checks pass in both profiles.

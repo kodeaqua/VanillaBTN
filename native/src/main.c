@@ -192,8 +192,8 @@ int main(int argc, char **argv) {
         last_time = now;
 
         while (ticks-- > 0) {
-            ps1_input_tick(&pad1);
-            ps1_audio_tick(&audio, 1);
+            ps1_input_tick_speed(&pad1, 2);
+            ps1_audio_tick(&audio, 2);
         }
 
         if (!present_frame(renderer, texture)) {

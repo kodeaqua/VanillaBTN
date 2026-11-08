@@ -63,6 +63,8 @@ void ps1_input_set_button(Ps1InputRecord *record, uint32_t button, bool pressed)
 
 /* Advance one simulation tick: computes pressed and updates auto-repeat channels. */
 void ps1_input_tick(Ps1InputRecord *record);
+/* pad.c divides repeat delay/rate by FAST_2/FAST_3 (2/3) at lower frame rates. */
+void ps1_input_tick_speed(Ps1InputRecord *record, unsigned speed_mode);
 
 /* Clear all held, pressed, and repeat states. */
 void ps1_input_clear(Ps1InputRecord *record);
