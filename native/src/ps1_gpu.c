@@ -318,16 +318,17 @@ bool ps1_gpu_exec(Ps1Video *video, Ps1DrawState *state,
         unsigned tpage_word = (words[5] >> 16) & 0xFFFFu;
         state->tpage = tpage_word & 0x1FFu;
         state->blend_mode = (tpage_word >> 5) & 3u;
-        uint32_t rgb24 = gp0_rgb24(words[0]);
+        uint32_t colors[4];
+        for (unsigned i = 0; i < vertices; ++i) colors[i] = gp0_rgb24(words[i * 3]);
         bool raw_tex = (code & 1) != 0;
         bool semi_trans = (code & 2) != 0;
-        if (!ps1_video_draw_triangle(video, state, &points[0], &points[1], &points[2],
-                                     rgb24, state->tpage, clut,
-                                     true, raw_tex, semi_trans)) return false;
+        if (!ps1_video_draw_textured_gouraud_triangle(video, state,
+            &points[0], &points[1], &points[2], colors, state->tpage, clut,
+            raw_tex, semi_trans)) return false;
         if (vertices == 4) {
-            return ps1_video_draw_triangle(video, state, &points[1], &points[2], &points[3],
-                                           rgb24, state->tpage, clut,
-                                           true, raw_tex, semi_trans);
+            return ps1_video_draw_textured_gouraud_triangle(video, state,
+                &points[1], &points[2], &points[3], colors + 1, state->tpage,
+                clut, raw_tex, semi_trans);
         }
         break;
     }

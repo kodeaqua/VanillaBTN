@@ -64,7 +64,13 @@ bool ps1_video_draw_triangle(Ps1Video *video, const Ps1DrawState *state,
                              uint32_t rgb24, unsigned tpage, unsigned clut,
                              bool textured, bool raw_texture, bool semi_transparent);
 
-/* Flat lines include both endpoints; Gouraud colors belong to the vertices. */
+/* Gouraud colors are interpolated before texture modulation. */
+bool ps1_video_draw_textured_gouraud_triangle(Ps1Video *video,
+    const Ps1DrawState *state, const Ps1Vertex *v0, const Ps1Vertex *v1,
+    const Ps1Vertex *v2, const uint32_t colors[3], unsigned tpage, unsigned clut,
+    bool raw_texture, bool semi_transparent);
+
+/* Flat lines include both endpoints. */
 bool ps1_video_draw_line(Ps1Video *video, const Ps1DrawState *state,
                          int x0, int y0, int x1, int y1, uint32_t rgb24, bool semi_transparent);
 bool ps1_video_draw_gouraud_triangle(Ps1Video *video, const Ps1DrawState *state,

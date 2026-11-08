@@ -46,6 +46,7 @@ Update the relevant item after completing a task or discovering a blocker.
   - [x] Correct NCLIP winding and MAC0 overflow flags. Independent signed-area and original TMD front/back tests reproduce the inverted culling; a captured native farm frame now contains terrain. Colored-frame counts alone are not a geometry acceptance test.
   - [x] Preserve translation in SDK matrix snapshots and distinguish saturated IR stores from wide MAC stores; register loads truncate like hardware. Two regressions fail before the fix; Debug/Release pass 30 checks and all 14 PS1 code hashes match.
   - [ ] Replace csin/ccos aliases with the distinct SDK function quantization.
+  - [x] Interpolate all vertex colors for textured Gouraud GT3/GT4 packets before texel modulation. Independent nonuniform white-texture fixtures fail on the old backend; Debug/Release pass 30 checks and the 5,000-vblank Release demo passes GPU validation. Full object visibility and placement remain under audit.
   - [ ] Verify textured-polygon subpixel interpolation with nonuniform original FT4 fixtures; packet-generation tests do not establish texel fidelity.
 - [ ] Audio: implement ADSR/reverb, XA stereo histories and coding-info sample rates.
 - [ ] Save/load: verify external card chain encoding, corruption handling, and original save layout before game integration.

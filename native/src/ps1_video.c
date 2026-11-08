@@ -251,18 +251,19 @@ static bool draw_triangle(Ps1Video *video, const Ps1DrawState *state,
                 uint16_t *pixel = &video->vram[row][col];
                 if (state->check_mask && (*pixel & 0x8000u)) continue;
 
+                /* Interpolate RGB before either direct output or texture modulation. */
+                uint32_t shade = rgb24;
+                if (colors) {
+                    shade = 0;
+                    for (unsigned shift = 0; shift < 24; shift += 8) {
+                        uint32_t channel = (uint32_t)((w0 * ((c0 >> shift) & 255)
+                            + w1 * ((c1 >> shift) & 255) + w2 * ((c2 >> shift) & 255)) / det);
+                        shade |= channel << shift;
+                    }
+                }
                 uint16_t front;
                 if (!textured) {
-                    uint16_t color = flat_color;
-                    if (colors) {
-                        uint32_t rgb = 0;
-                        for (unsigned shift = 0; shift < 24; shift += 8) {
-                            uint32_t channel = (uint32_t)((w0 * ((c0 >> shift) & 255)
-                                + w1 * ((c1 >> shift) & 255) + w2 * ((c2 >> shift) & 255)) / det);
-                            rgb |= channel << shift;
-                        }
-                        color = rgb15(rgb);
-                    }
+                    uint16_t color = colors ? rgb15(shade) : flat_color;
                     front = semi_transparent
                         ? blend_pixel(*pixel, color, state->blend_mode)
                         : color;
@@ -275,7 +276,7 @@ static bool draw_triangle(Ps1Video *video, const Ps1DrawState *state,
                     }
                     if (texel == 0) continue;
 
-                    front = raw_texture ? texel : modulate_texel(texel, rgb24);
+                    front = raw_texture ? texel : modulate_texel(texel, shade);
                     if (semi_transparent && (texel & 0x8000u)) {
                         front = blend_pixel(*pixel, front, state->blend_mode) | 0x8000u;
                     }
@@ -300,6 +301,15 @@ bool ps1_video_draw_gouraud_triangle(Ps1Video *video, const Ps1DrawState *state,
     const uint32_t colors[3], bool semi_transparent) {
     if (!colors) return false;
     return draw_triangle(video, state, v0, v1, v2, 0, 0, 0, false, false, semi_transparent, colors);
+}
+
+bool ps1_video_draw_textured_gouraud_triangle(Ps1Video *video,
+    const Ps1DrawState *state, const Ps1Vertex *v0, const Ps1Vertex *v1,
+    const Ps1Vertex *v2, const uint32_t colors[3], unsigned tpage, unsigned clut,
+    bool raw_texture, bool semi_transparent) {
+    if (!colors) return false;
+    return draw_triangle(video, state, v0, v1, v2, 0, tpage, clut,
+        true, raw_texture, semi_transparent, colors);
 }
 
 bool ps1_video_draw_line(Ps1Video *video, const Ps1DrawState *state,

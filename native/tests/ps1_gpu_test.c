@@ -53,6 +53,22 @@ int main(void) {
     if (!ps1_gpu_exec(&video, &draw, red_pixel, 2) || video.vram[5][5] != 0x001Fu) return 100;
     memset(&video, 0, sizeof(video));
 
+    /* White direct-color texel makes the per-vertex modulation measurable.
+     * At (61,61), barycentric RGB is (64,32,32), giving (15,7,7). */
+    video.vram[256][0] = 0x7FFF;
+    const uint32_t gt3[] = {0x34000080, 60u | (60u << 16), 0,
+        0x00008000, 64u | (60u << 16), 0x01100000,
+        0x00800000, 60u | (64u << 16), 0};
+    if (!ps1_gpu_exec(&video, &draw, gt3, 9)
+        || video.vram[61][61] != (15u | (7u << 5) | (7u << 10))) return 107;
+    const uint32_t gt4[] = {0x3C000000, 70u | (70u << 16), 0,
+        0, 74u | (70u << 16), 0x01100000,
+        128, 70u | (74u << 16), 0, 128, 74u | (74u << 16), 0};
+    if (!ps1_gpu_exec(&video, &draw, gt4, 12)
+        || video.vram[71][71] != 7 || video.vram[73][71] != 23) return 108;
+    memset(&video, 0, sizeof(video));
+    ps1_draw_state_reset(&draw);
+
     /* --- GP0(02): quick fill ---
      * Fill a 16-pixel-wide stripe at (32, 10) with pure red (0xF80000 = red
      * in 8-bit, which maps to BGR555 0x001F).  Width 1 rounds up to 16. */
