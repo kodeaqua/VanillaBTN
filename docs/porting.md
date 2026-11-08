@@ -29,9 +29,10 @@ runtime overhead. Neither profile may depend on side effects inside diagnostic
 code. User-facing game messages and required error handling are gameplay or
 product behavior, not developer diagnostics.
 
-Once the native target exists, verify that both profiles build and run, that
-Release produces no developer diagnostic output, and that optimization does
-not change the original game's behavior or timing. The PS1 reference build
+Once the native target exists, agents verify that both profiles compile and
+pass code-level or synthetic checks, including checks that Release excludes
+developer diagnostics. The developer performs actual runtime and gameplay
+testing to judge behavior, timing, visuals, and audio. The PS1 reference build
 keeps its existing compiler settings and SHA-1 checks.
 
 ## Bringup sequence
@@ -39,11 +40,13 @@ keeps its existing compiler settings and SHA-1 checks.
 1. Identify PS1 platform calls and shared game logic in the existing code;
    document boundaries before moving or adapting code.
 2. Establish a minimal native Windows executable and game loop, with platform
-   services isolated from game behavior. Verify that it starts and exits cleanly.
+   services isolated from game behavior. Prepare synthetic startup checks;
+   the developer verifies actual start and exit behavior.
 3. Bring up input, timing, rendering, audio, and disc-data access in small,
    independently verifiable steps against the PS1 reference.
-4. Bring up scenes and save data incrementally. Compare visible behavior and
-   state transitions against the original game before expanding coverage.
+4. Bring up scenes and save data incrementally. Verify state transitions with
+   code-level checks; the developer compares gameplay with the original game
+   before expanding coverage.
 
 This is a sequence for future work, not a claim that these systems already
 exist. The PS1 `check` target verifies byte identity of the reference build;

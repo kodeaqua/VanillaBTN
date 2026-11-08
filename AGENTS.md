@@ -8,6 +8,7 @@ baseline and must continue to match their original SHA-1 hashes.
 ## Read first
 
 - [README.md](README.md) describes the project and its exceptions.
+- [TODO.md](TODO.md) tracks active work and next steps. Check it before edits.
 - [docs/architecture.md](docs/architecture.md) maps the runtime and build layout.
 - [docs/building.md](docs/building.md) gives the build and verification commands.
 - [docs/porting.md](docs/porting.md) states the Windows port direction and fidelity rules.
@@ -30,6 +31,23 @@ for this repository's agent workflow:
   iterate until the relevant checks pass. Use a regression test when it proves
   a bug or protects a meaningful behavior; use the binary `check` target for
   changes that can affect matching output.
+
+## Task execution and testing
+
+- Before editing, inspect `TODO.md`, the current branch and pull request, the
+  working tree, and the relevant code. Decide what success looks like and how
+  to verify it before writing code.
+- Write the smallest correct change, document non-obvious behavior, format it
+  consistently, and review the diff for unintended changes.
+- Test code through compilation, unit or integration tests, fixtures, mocks,
+  static checks, or other synthetic checks appropriate to the change. Use the
+  PS1 SHA-1 `check` target when matching output may change. Do not claim that a
+  build or synthetic test proves gameplay fidelity.
+- Leave actual gameplay, hands-on runtime acceptance, and visual or audio
+  judgment to the developer. Report what they still need to check instead of
+  performing or claiming those tests on their behalf.
+- After the work, update the relevant `TODO.md` item with its status and any
+  remaining work, then commit the completed task atomically.
 
 ## Working rules
 
@@ -70,9 +88,9 @@ for this repository's agent workflow:
 - Optimize `Release` for runtime performance. Compile developer diagnostics
   out of the Release executable; hiding their output at runtime is not enough.
   Do not let diagnostic expressions carry gameplay side effects.
-- Verify both profiles when native code exists: Debug must support diagnosis,
-  and Release must run without developer diagnostics while preserving the same
-  gameplay behavior and timing requirements.
+- Verify that both native profiles compile and pass code-level checks. Confirm
+  through static or synthetic checks that Release excludes developer
+  diagnostics; the developer validates actual runtime and gameplay behavior.
 
 ## Commits
 
