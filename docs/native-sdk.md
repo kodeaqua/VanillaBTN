@@ -478,3 +478,11 @@ leave caller buffers and saves unchanged. This follows the current internal
 1-based block representation; external card-format compatibility remains under
 audit. Open/ReadData/WriteData and completion polling are not yet validated for
 original save/load runtime integration.
+
+### Cooperative VSync callbacks
+
+Waiting VSync calls now service the registered original callback at each
+intervening nominal 60 Hz boundary. A host pump runs afterward for SDL events
+and presentation. Query modes remain side-effect-free; late work delivers one
+current callback instead of replaying stale draws. This is cooperative dispatch,
+not an asynchronous hardware interrupt. It does not alone connect game startup.
