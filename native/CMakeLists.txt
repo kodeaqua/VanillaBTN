@@ -141,13 +141,16 @@ target_compile_options(sdk_math_test PRIVATE /W4)
 add_test(NAME sdk_fixed_math COMMAND sdk_math_test)
 
 add_library(game_frame_buffers STATIC
+    ../src/main/geometry/camera.c
     ../src/main/geometry/math_util.c
     ../src/main/graphics/clut.c
     ../src/main/graphics/frame_buffers.c
+    ../src/main/ui/bg_tile.c
     ../src/main/ui/loading_screen.c
+    ../src/main/ui/ui_icons.c
 )
 set_target_properties(game_frame_buffers PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
-target_include_directories(game_frame_buffers PUBLIC ../src/main/geometry ../src/main/ui)
+target_include_directories(game_frame_buffers PUBLIC ${game_include_dirs})
 target_link_libraries(game_frame_buffers PUBLIC game_anim sdk_math)
 target_compile_options(game_frame_buffers PRIVATE /W4 /Gy)
 add_executable(original_frame_test tests/original_frame_test.c)
@@ -219,8 +222,18 @@ target_link_libraries(host_display_test PRIVATE host_display)
 target_compile_options(host_display_test PRIVATE /W4 /UNDEBUG)
 add_test(NAME native_display_selection COMMAND host_display_test)
 
-add_library(game_screen STATIC ../src/main/graphics/screen_fade.c)
+add_library(game_screen STATIC
+    ../src/main/debug_stubs.c
+    ../src/main/game/cooking_recipes.c
+    ../src/main/game/farm_data_size.c
+    ../src/main/game/horse_names.c
+    ../src/main/game/picture_codes.c
+    ../src/main/game/shop_restock.c
+    ../src/main/graphics/screen_fade.c
+    ../src/main/text/text_bank.c
+)
 set_target_properties(game_screen PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_include_directories(game_screen PUBLIC ${game_include_dirs})
 target_link_libraries(game_screen PUBLIC game_frame_buffers sdk_sync)
 target_compile_options(game_screen PRIVATE /W4 /Gy)
 add_executable(original_screen_test tests/original_screen_test.c)

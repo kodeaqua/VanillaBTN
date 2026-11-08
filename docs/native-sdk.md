@@ -90,18 +90,21 @@ isolate packet generation from the backend's incomplete polygon interpolation;
 independent nonuniform hardware fixtures remain required for texel fidelity.
 
 `game_frame_buffers` compiles the original frame layout, cursor insertion,
-`src/main/geometry/math_util.c`, `src/main/graphics/clut.c` and
-`src/main/ui/loading_screen.c`. Native insertion replaces only the 24-bit
-pointer cast with SDK link mapping. `SetDrawLoad` constructs inline `DR_LOAD`
-(`GP0 0xA0`) CPU-to-VRAM transfer packets while preserving any link already
-stored in the tag's low 24 bits by `ot_insert_prim`, and `ps1_gpu_exec` copies
-those halfwords into VRAM with bounds and word-count validation. The original
-OT dimensions, memory offsets, clearing, cursor advancement, CLUT palette
-blending/bouncing/wrapping, loading-picture texture upload, double-buffered
-loading OT/packet slots and environment flips remain authoritative. Tests
-allocate a sufficiently large host region, map it once, invoke the original
-layout for both frames, submit inserted packets, and exercise loading-screen
-and CLUT-fade/scroll execution. Frame storage is runtime-only; its host
+`src/main/geometry/math_util.c`, `src/main/geometry/camera.c`,
+`src/main/graphics/clut.c`, `src/main/ui/loading_screen.c`,
+`src/main/ui/ui_icons.c` and `src/main/ui/bg_tile.c`. Native insertion replaces
+only the 24-bit pointer cast with SDK link mapping. `SetDrawLoad` constructs
+inline `DR_LOAD` (`GP0 0xA0`) CPU-to-VRAM transfer packets while preserving any
+link already stored in the tag's low 24 bits by `ot_insert_prim`, and
+`ps1_gpu_exec` copies those halfwords into VRAM with bounds and word-count
+validation. The original OT dimensions, memory offsets, clearing, cursor
+advancement, camera polar setup, CLUT palette blending/bouncing/wrapping,
+loading-picture texture upload, double-buffered loading OT/packet slots,
+environment flips, UI icon blink cycles/sprites and diagonal 24-pixel
+background tiling remain authoritative. Tests allocate a sufficiently large
+host region, map it once, invoke the original layout for both frames, submit
+inserted packets, and exercise loading-screen, CLUT-fade/scroll, camera, UI
+icon and background-tile execution. Frame storage is runtime-only; its host
 pointer layout is never serialized as a PS1 frame record or saved game.
 
 ## SDK timing
@@ -198,11 +201,15 @@ boundary. Dithering, scanline/interlace timing, screen overscan placement and
 drawing-to-displayed-area restrictions remain incomplete; accepting an
 environment does not establish those hardware behaviors.
 
-`game_screen` compiles the original `screen_fade.c` unchanged. The fixture
-provides main-loop frame globals and records/isolates main control boundaries;
-fade counters, private packets, blend mode and shader levels come from the
-original code. Synthetic in/out frames verify resulting VRAM values. This
-does not wire startup or replace its publisher/title sequence.
+`game_screen` compiles the original `screen_fade.c`, `shop_restock.c`,
+`cooking_recipes.c`, `text_bank.c`, `picture_codes.c`, `horse_names.c`,
+`farm_data_size.c` and `debug_stubs.c` unchanged. The fixture provides
+main-loop frame globals and records/isolates main control boundaries; fade
+counters, private packets, blend mode, shader levels, recipe/picture/glyph
+tables and horse-race runner restocking come from the original code. Synthetic
+in/out frames verify resulting VRAM values, and table/restock checks verify
+distinct runner selection and player-horse slot overrides. This does not wire
+startup or replace its publisher/title sequence.
 
 `game_window_frame` compiles the original bevel/gradient drawing routine.
 Its actual packets exposed missing flat-line and Gouraud-polygon dispatch in

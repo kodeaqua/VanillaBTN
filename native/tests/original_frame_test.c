@@ -1,10 +1,15 @@
 #include "sdk_gpu.h"
+#include "sdk_work.h"
 #include "main.h"
 #include "anim.h"
+#include "bg_tile.h"
+#include "camera.h"
 #include "clut.h"
+#include "farm_state.h"
 #include "frame_buffers.h"
 #include "loading_screen.h"
 #include "math_util.h"
+#include "ui_icons.h"
 #include <assert.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -23,6 +28,26 @@ FrameState frame_records[2];
 FrameState *current_frame;
 s32 frame_index;
 u8 *region_base = (u8 *)storage;
+FarmLoadArea farm_area;
+
+extern u8 camera_mode;
+extern u8 camera_ready;
+extern s8 camera_dirty;
+extern s32 camera_view_x;
+extern s32 camera_view_y;
+extern s32 camera_view_z;
+extern s32 camera_focus_index;
+extern u8 ui_icon_cycle;
+extern u8 ui_icon_tick;
+
+typedef struct StageAnimFixture {
+    AnimFile file;
+    AnimImage images[2];
+    AnimPartList lists[1];
+    AnimPart parts[1];
+    AnimRange ranges[44];
+    AnimFrame frames[4];
+} StageAnimFixture;
 
 typedef struct LoadingFixture {
     AnimFile file;
@@ -166,6 +191,72 @@ int main(void) {
     s32 polar[3] = {0};
     vec_from_polar(polar, 800, 600, 512);
     assert(polar[0] == ((2896 * 800) >> 12) && polar[1] == -600 && polar[2] == ((2896 * 800) >> 12));
+
+    camera_init();
+    assert(camera_ready == 1 && camera_mode == 2 && camera_dirty == 0);
+    assert(camera_focus_index == -1);
+    assert(camera_view_x == 800 && camera_view_y == 600 && camera_view_z == 0);
+
+    /* Stage an AnimFile in farm_area.stageData to exercise ui_icons.c and bg_tile.c. */
+    StageAnimFixture *stage = (StageAnimFixture *)farm_area.stageData;
+    memset(stage, 0, sizeof(*stage));
+    stage->file.magic = 14;
+    stage->file.section[0] = (s32)offsetof(StageAnimFixture, images);
+    stage->file.section[1] = (s32)offsetof(StageAnimFixture, lists);
+    stage->file.section[2] = (s32)offsetof(StageAnimFixture, parts);
+    stage->file.section[3] = (s32)offsetof(StageAnimFixture, ranges);
+    stage->file.section[4] = (s32)offsetof(StageAnimFixture, frames);
+    stage->images[0] = (AnimImage){64, 0, 1, 1};
+    stage->images[1] = (AnimImage){16, 1, 16, 1};
+    stage->lists[0].count = 1;
+    stage->parts[0].palette = 1;
+    for (unsigned i = 0; i < 44; ++i) {
+        stage->ranges[i].frames = 4;
+    }
+    for (unsigned i = 0; i < 4; ++i) {
+        stage->frames[i].duration = 1;
+    }
+
+    ui_blink_tick(-1);
+    assert(ui_icon_cycle == 0);
+    for (unsigned i = 0; i < 121; ++i) {
+        ui_blink_tick(0);
+    }
+    assert(ui_icon_cycle == 1);
+    ui_blink_tick_60(-1);
+    assert(ui_icon_tick == 0);
+    for (unsigned i = 0; i < 61; ++i) {
+        ui_blink_tick_60(0);
+    }
+    assert(ui_icon_tick == 1);
+
+    assert(PutDrawEnv(&current_frame->drawEnv));
+    assert(sdk_work_bind(current_frame->primStart, (size_t)current_frame->primSize));
+    ClearOTagR(current_frame->ot, FRAME_OT_DEPTH);
+    ui_draw_icon_2a(&current_frame->ot[0], 20, 30);
+    assert(ui_icon_anim.source == &stage->file);
+    assert((u8 *)gs_work_alloc(0) ==
+           current_frame->primStart + sizeof(SPRT) + sizeof(DR_MODE));
+    DrawOTag(current_frame->ot + FRAME_OT_DEPTH - 1);
+    assert(sdk_gpu_ok() && video.vram[30][20] == 0x001F);
+
+    assert(sdk_work_bind(current_frame->primStart, (size_t)current_frame->primSize));
+    ClearOTagR(current_frame->ot, FRAME_OT_DEPTH);
+    bg_tile_mode_sprite(&current_frame->ot[0]);
+    /* 11 rows (y = 0..240 step 24) * 15 cols (x = -12..324 step 24) = 165 tiles. */
+    assert((u8 *)gs_work_alloc(0) ==
+           current_frame->primStart + 165 * (sizeof(SPRT) + sizeof(DR_MODE)));
+    DrawOTag(current_frame->ot + FRAME_OT_DEPTH - 1);
+    assert(sdk_gpu_ok() && video.vram[0][12] == 0x001F);
+    assert(sdk_work_bind(NULL, 0));
+
+    ClearOTagR(current_frame->ot, FRAME_OT_DEPTH);
+    current_frame->primCursor.bytes = current_frame->primStart;
+    bg_tile_mode_cursor(&current_frame->ot[0]);
+    assert(current_frame->primCursor.bytes ==
+           current_frame->primStart + 165 * (sizeof(SPRT) + sizeof(DR_MODE)));
+    DrawOTag(current_frame->ot + FRAME_OT_DEPTH - 1);
+    assert(sdk_gpu_ok());
 
     sdk_gpu_bind(NULL);
     return 0;
