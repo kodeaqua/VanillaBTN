@@ -18,10 +18,20 @@ FetchContent_Declare(SDL3
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
 FetchContent_MakeAvailable(SDL3)
 
+add_library(ps1_video STATIC src/ps1_video.c)
+set_target_properties(ps1_video PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_include_directories(ps1_video PUBLIC src)
+target_compile_options(ps1_video PRIVATE /W4)
+
 add_executable(vanillabtn WIN32 src/main.c)
 set_target_properties(vanillabtn PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
-target_link_libraries(vanillabtn PRIVATE SDL3::SDL3)
+target_link_libraries(vanillabtn PRIVATE SDL3::SDL3 ps1_video)
 target_compile_options(vanillabtn PRIVATE /W4)
 
 enable_testing()
 add_test(NAME native_startup COMMAND vanillabtn --check-build)
+add_executable(ps1_video_test tests/ps1_video_test.c)
+set_target_properties(ps1_video_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_link_libraries(ps1_video_test PRIVATE ps1_video)
+target_compile_options(ps1_video_test PRIVATE /W4)
+add_test(NAME ps1_video_pixels COMMAND ps1_video_test)

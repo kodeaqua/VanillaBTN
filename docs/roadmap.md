@@ -36,7 +36,8 @@ fields with explicit 32-bit types, and check structure sizes at compile time.
 
 Milestone 0 now has a native build and empty window. Milestone 1 maps the PS1
 boundaries and has a development-time Windows disc importer. The developer's
-window and own-disc checks are pending; gameplay systems still need porting.
+window and own-disc checks are pending. Milestone 2 now has a VRAM word and
+display-conversion slice; primitive drawing and gameplay still need porting.
 
 | Order | Work | Agent's code or synthetic exit check | Developer's actual check |
 | --- | --- | --- | --- |

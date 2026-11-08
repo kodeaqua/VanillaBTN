@@ -7,13 +7,15 @@ Update the relevant item after completing a task or discovering a blocker.
 
 - [ ] Developer: open and close the native Debug/Release window on Windows.
 - [ ] Developer: verify the importer recognizes a personally supplied USA disc.
+- [ ] Milestone 2: implement required GPU primitives, CLUT, ordering, and GTE behavior with synthetic pixel checks.
 
 ## Next
 
-- [ ] Continue milestone 2: bring up original PS1 graphics behavior in the native target.
+- [ ] After graphics, map input and fixed simulation timing to the PS1 behavior.
 
 ## Completed
 
+- [x] Add native 16-bit VRAM storage and SDL presentation at original 320×240 pixels; Debug and Release pixel checks pass.
 - [x] Map PS1 platform boundaries and add a Windows disc importer; synthetic checks and all 17 PS1 reference hashes pass.
 - [x] Merge PR #1, sync `main`, and delete its work branch.
 - [x] Add the native Windows MSVC/CMake/SDL3 build foundation; Debug and Release pass headless CTest, and all 14 PS1 code hashes still match.
