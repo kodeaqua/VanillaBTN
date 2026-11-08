@@ -129,13 +129,17 @@ static DiscFile *find_sector_file(u_long sector) {
 }
 
 int CdControl(u_char command, u_char *parameter, u_char *result) {
+    if (command == CdlStandby || command == CdlPause) {
+        xa_streaming = false;
+        last_command = command;
+        if (result) result[0] = 2;
+        return 1;
+    }
     if (!root[0]) return 0;
     if (command == CdlSetloc) {
         int sector = CdPosToInt((CdlLOC *)parameter);
         if (sector < 0) return 0;
         seek_sector = (u_long)sector;
-    } else if (command == CdlStandby) {
-        xa_streaming = false;
     } else if (command == CdlSetfilter) {
         if (!parameter || parameter[0] == 0 || parameter[1] > 31) return 0;
         filter_file = parameter[0];

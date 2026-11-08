@@ -173,6 +173,7 @@ add_test(NAME sdk_vsync_timing COMMAND sdk_sync_test)
 add_library(sdk_sound STATIC src/sdk_sound.c)
 set_target_properties(sdk_sound PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_include_directories(sdk_sound PUBLIC compat src)
+target_link_libraries(sdk_sound PUBLIC ps1_seq)
 target_compile_options(sdk_sound PRIVATE /W4)
 
 add_library(sdk_cd STATIC src/sdk_cd.c)
@@ -184,11 +185,13 @@ add_library(game_afile STATIC
     ../src/main/cd/afile.c
     ../src/main/game/event_flags.c
     ../src/main/sound/cd_audio.c
+    ../src/main/sound/sound.c
+    ../src/main/sound/sound_request.c
 )
 set_target_properties(game_afile PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_include_directories(game_afile PUBLIC ${game_include_dirs})
-target_link_libraries(game_afile PUBLIC sdk_cd sdk_sound sdk_sync game_prim)
-target_compile_options(game_afile PRIVATE /W4)
+target_link_libraries(game_afile PUBLIC sdk_cd sdk_sound sdk_sync game_screen)
+target_compile_options(game_afile PRIVATE /W4 /Gy)
 add_executable(original_afile_test tests/original_afile_test.c)
 set_target_properties(original_afile_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_link_libraries(original_afile_test PRIVATE game_afile)

@@ -123,14 +123,19 @@ their phase and late work does not incur another full wait. Repeated
 source once without rewinding it. No interrupt callback registration API is
 provided yet; this is not full BIOS callback emulation.
 
-## Original archive reads and CD audio control
+## Original archive reads, sound system and CD audio control
 
-`game_afile` compiles `src/main/cd/afile.c`, `src/main/sound/cd_audio.c` and
-`src/main/game/event_flags.c` against `sdk_cd`, `sdk_sound` and `sdk_sync`.
+`game_afile` compiles `src/main/cd/afile.c`, `src/main/sound/cd_audio.c`,
+`src/main/sound/sound.c`, `src/main/sound/sound_request.c` and
+`src/main/game/event_flags.c` against `sdk_cd`, `sdk_sound` (`ps1_spu` and
+`ps1_seq`) and `sdk_sync`.
 The native-only initialization scratch is one sector instead of borrowing the
 host farm-state object. It checks the 33-word HDT length, aligned monotonic
-offsets and terminal BIN size before the original member table is used. PS1
-initialization and its reference build retain their original declarations.
+offsets and terminal BIN size before the original member table is used. In
+`sound.c`, `sound_update` compares the 64-bit `seq_data[i]` pointer directly
+against `SOUND_BUFFER_NONE` (`(u8 *)-1`) under `VANILLABTN_NATIVE` instead of
+truncating it to 32-bit `s32`. PS1 initialization and its reference build retain
+their original declarations and bytes.
 
 `sdk_cd_mount` mounts the imported disc directory. `CdSearchFile` resolves
 PS1-style names and assigns stable virtual LBAs for the mount; MSF positions
@@ -150,20 +155,40 @@ query (one channel-interleaved cycle) across the selected track's sector extent
 so `cd_audio_fade_tick` observes track progress, end-of-track stop and loop
 seek behavior. `sdk_sound` provides `SsSetSerialVol` to record the CD serial
 input left/right volume (`0..127`) adjusted by `cd_audio_play_track`,
-`cd_audio_fade_tick` and `cd_audio_stop`. Starting an archive sector read via
+`cd_audio_fade_tick` and `cd_audio_stop`, plus the `libsnd`/`libspu` entry
+points used by `sound.c` and `sound_request.c`: `SsInit`, `SsSetTableSize`,
+`SsSetTickMode`, `SsSetReservedVoice`, `SsStart`, `SsEnd`, `SsSetMVol`,
+`SsSetRVol`, `SsSetStereo`, `SsSetMono`, `SsSetSerialAttr`, `SsVabOpenHead`,
+`SsVabTransBodyPartly`, `SsVabTransCompleted`, `SsVabClose`, `SsSeqOpen`,
+`SsSeqPlay`, `SsSeqPause`, `SsSeqReplay`, `SsSeqStop`, `SsSeqSetVol`,
+`SsSeqClose`, `SsUtKeyOn`, `SsUtKeyOff`, `SsUtKeyOnV`, `SsUtKeyOffV`,
+`SsUtAllKeyOff`, `SsUtSetVVol`, `SsVoKeyOff`, `SsUtReverbOn`, `SsUtReverbOff`,
+`SsUtSetReverbType`, `SsUtSetReverbDepth`, `SsUtSetReverbFeedback`,
+`SsUtSetReverbDelay`, `SpuSetCommonAttr`, `SpuGetAllKeysStatus` and
+`SpuGetKeyStatus`. VAB headers and chunk-streamed bodies are copied into
+per-slot SPU buffers and loaded into `Ps1Spu`, while opened `pQES` sequences
+and keyed voices drive `Ps1Seq` and `Ps1Spu` directly. SPU hardware ADSR
+envelopes and reverb signal processing remain open; reverb parameters are
+recorded at the SDK boundary. Starting an archive sector read via
 `afile_read_bytes` invokes the real `cd_audio_stop` and switches the drive back
 to data mode (`0x80`). Feeding `cd_audio.c` filter/location/volume state into
 the live `ps1_xa` audio mixer stream remains a separate integration step.
 File lookup failure is real failure: the host must validate the data tree before
 entering original retry loops. Mount/unmount invalidates all pending requests.
 
-The archive and CD audio fixture exercises `xa_search_files`,
+The archive, sound and CD audio fixture exercises `xa_search_files`,
 `cd_audio_play_track` (valid, out-of-range and event-flag muted tracks),
 `cd_audio_fade_tick` (fade-out to stop, end-of-track stop and looped track
-rewinds), `cd_audio_stop`, `event_flag_set`/`event_flag_get` bitfields, and
-`afile_read_bytes` stopping active XA playback. It also tests BCD conversion,
-missing files, traversal rejection, read cancellation, padding, extent bounds
-and an oversized HDT rejected before it can overflow native scratch.
+rewinds), `cd_audio_stop`, `event_flag_set`/`event_flag_get` bitfields,
+`afile_read_bytes` stopping active XA playback, `sound_fader_init`, `sound_init`,
+`sound_init_stereo_xa`, `sound_set_mono`/`sound_set_stereo`, `sound_fade_out`/
+`sound_fade_in`, `sound_request(SOUND_REQUEST_RESET)` VAB chunk streaming via
+`sound_load_tick`, `sound_play` + `sound_voice_set_volume` + `sound_release_voice`
+ADPCM voice mixing, and `sound_queue_seq_pair` + `sound_update` +
+`sound_seq_start_reverb` + `sound_seq_stop_first` + `sound_release_from`. It
+also tests BCD conversion, missing files, traversal rejection, read
+cancellation, padding, extent bounds and an oversized HDT rejected before it
+can overflow native scratch.
 
 ## Original data regions
 

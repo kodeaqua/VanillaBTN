@@ -8,6 +8,7 @@ typedef struct CdlFILE { CdlLOC pos; u_long size; char name[16]; } CdlFILE;
 enum {
     CdlSetloc = 2,
     CdlStandby = 6,
+    CdlPause = 9,
     CdlSetfilter = 13,
     CdlSetmode = 14,
     CdlGetlocP = 17,

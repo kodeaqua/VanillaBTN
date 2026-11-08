@@ -14,7 +14,7 @@ Update the relevant item after completing a task or discovering a blocker.
       - [x] Connect original frame-buffer layout, system display-mask helpers, loading screen, UI icons, background tiling, camera setup, CLUT fades/scrolls, math_util.c and cursor insertion to host storage.
   - [ ] Connect original disc requests, startup and native overlay dispatch.
     - [x] Provide SDK VSync timing with deterministic synthetic clock checks.
-    - [x] Compile original afile.c, cd_audio.c and event_flags.c against imported-disc SDK sector reads and XA control commands.
+    - [x] Compile original afile.c, cd_audio.c, sound.c, sound_request.c and event_flags.c against imported-disc SDK sector reads, XA control commands and libsnd/libspu bridges.
     - [x] Map original overlay data regions into bounded host main RAM.
     - [x] Honor SDK-selected draw/display rectangles and display mask in SDL presentation.
     - [x] Compile and exercise original screen fades through SDK GPU submission.
@@ -40,6 +40,7 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Completed
 
+- [x] Connect `sdk_sound` (`libsnd`/`libspu`) to `ps1_spu` and `ps1_seq` and compile original `sound.c` and `sound_request.c` in `game_afile`. Synthetic checks verify `sound_fader_init`, `sound_init`, `sound_init_stereo_xa`, master-volume fader steps, `sound_request(SOUND_REQUEST_RESET)` VAB chunk streaming via `sound_load_tick`, `sound_play` ADPCM voice playback and `sound_queue_seq_pair`/`sound_seq_start_reverb` sequence playback in Debug/Release (27 checks), and all 14 PS1 code hashes match.
 - [x] Compile original `camera.c`, `ui_icons.c` and `bg_tile.c` in `game_frame_buffers`, and `shop_restock.c`, `cooking_recipes.c`, `text_bank.c`, `picture_codes.c`, `horse_names.c`, `farm_data_size.c` and `debug_stubs.c` in `game_screen`. Synthetic checks verify `camera_init`, UI icon blink cycles/sprite drawing, 165-tile background tiling, recipe/picture/glyph tables, and distinct horse-race runner restocking in Debug/Release (27 checks).
 - [x] Compile original `cd_audio.c` and `event_flags.c` in `game_afile` with `sdk_cd` XA control commands (`CdlStandby`, `CdlSetfilter`, `CdlSetmode` `0xC8`, `CdlGetlocP`, `CdlReadS`, `CdControlB`, `CdControlF`, `CdLastCom`) and `sdk_sound` (`SsSetSerialVol`). Synthetic checks exercise `xa_search_files`, `cd_audio_play_track` (valid, out-of-range and event-flag muted), `cd_audio_fade_tick` (fade-out, end-of-track stop and loop seek), `cd_audio_stop`, `event_flag_set`/`event_flag_get`, and `afile_read_bytes` stopping active XA playback in Debug/Release (27 checks).
 - [x] Support inline `DR_LOAD` (`GP0 0xA0`) CPU-to-VRAM packets, add `rsin`/`rcos` to `sdk_math`, and compile original `clut.c` and `math_util.c` in `game_frame_buffers`. Synthetic checks verify odd-width/out-of-bounds `GP0 0xA0` transfers, `StoreImage` palette capture, `clut_fade_step` midpoint blending with STP bit rules, `clut_scroll_step` bounce/wrap modes, and polar vector math in Debug/Release (27 checks).
