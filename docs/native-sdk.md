@@ -106,3 +106,31 @@ their phase and late work does not incur another full wait. Repeated
 `ResetCallback` calls, as used by original disc reads, initialize the timing
 source once without rewinding it. No interrupt callback registration API is
 provided yet; this is not full BIOS callback emulation.
+
+## Original archive reads
+
+`game_afile` compiles `src/main/cd/afile.c` against `sdk_cd` and `sdk_sync`.
+The native-only initialization scratch is one sector instead of borrowing the
+host farm-state object. It checks the 33-word HDT length, aligned monotonic
+offsets and terminal BIN size before the original member table is used. PS1
+initialization and its reference build retain their original declarations.
+
+`sdk_cd_mount` mounts the imported disc directory. `CdSearchFile` resolves
+PS1-style names and assigns stable virtual LBAs for the mount; MSF positions
+use BCD and the usual 150-sector lead-in. These addresses identify native file
+extents, not the original physical disc layout or executable overlay memory.
+`CdRead` records a pending request, `CdReadSync` completes it, and `CdReadBreak`
+cancels it. Host reads are synchronous at completion: there are no artificial
+busy frames or emulated seek delays. Sector padding after EOF is zero-filled;
+requests cannot cross the selected file's allocated sector extent.
+
+Only ordinary 2048-byte data mode is supported. Raw/XA modes and other control
+commands return failure; original CD audio remains a separate pending boundary.
+File lookup failure is real failure: the host must validate the data tree before
+entering original retry loops. Mount/unmount invalidates all pending requests.
+
+The archive fixture records the original request to stop XA with a test-only
+audio boundary hook. It exercises real original archive functions and native
+sector reads, not an audio implementation. It also tests BCD conversion, missing
+files, traversal rejection, read cancellation, padding, extent bounds and an
+oversized HDT rejected before it can overflow native scratch.
