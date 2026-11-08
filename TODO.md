@@ -25,6 +25,7 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Completed
 
+- [x] Exclude polygon bottom/right edges and give shared edges one owner; translucent quad regression passes in Debug and Release.
 - [x] Correct VAB header fields/sparse programs, ADPCM shifts, interpolation overflow, and final-block playback; synthetic checks pass in Debug and Release.
 - [x] Milestone 5 foundation: standalone virtual card API; original format/UI compatibility remains under audit.
   - [x] Emulate dual 128 KB PS1 memory card images, Frame 0 header, and directory allocation chains (ps1_card); Debug and Release tests pass.

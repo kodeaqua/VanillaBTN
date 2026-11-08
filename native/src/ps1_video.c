@@ -234,7 +234,14 @@ bool ps1_video_draw_triangle(Ps1Video *video, const Ps1DrawState *state,
             int64_t w1 = (int64_t)(x0 - x2) * (row - y2) - (int64_t)(y0 - y2) * (col - x2);
             int64_t w2 = (int64_t)(x1 - x0) * (row - y0) - (int64_t)(y1 - y0) * (col - x0);
 
-            if (w0 >= 0 && w1 >= 0 && w2 >= 0) {
+            /* Include top/left edges only: adjacent triangles share one owner.
+             * In particular, a translucent quad must not blend its diagonal twice. */
+            bool edge0 = y2 < y1 || (y2 == y1 && x2 > x1);
+            bool edge1 = y0 < y2 || (y0 == y2 && x0 > x2);
+            bool edge2 = y1 < y0 || (y1 == y0 && x1 > x0);
+            if ((w0 > 0 || (w0 == 0 && edge0))
+                && (w1 > 0 || (w1 == 0 && edge1))
+                && (w2 > 0 || (w2 == 0 && edge2))) {
                 uint16_t *pixel = &video->vram[row][col];
                 if (state->check_mask && (*pixel & 0x8000u)) continue;
 

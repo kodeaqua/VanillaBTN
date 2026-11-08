@@ -169,6 +169,21 @@ int main(void) {
         if (!draw.force_mask || !draw.check_mask) return 6;
     }
 
+    /* Adjacent triangles must blend each pixel of a quad exactly once. */
+    {
+        const Ps1Vertex vertices[4] = {{100,100,0,0},{104,100,0,0},{100,104,0,0},{104,104,0,0}};
+        ps1_draw_state_reset(&draw);
+        draw.blend_mode = 1;
+        if (!ps1_video_draw_quad(&video, &draw, vertices, vertices + 1, vertices + 2,
+            vertices + 3, 0x080000u, 0, 0, false, false, true)) return 17;
+        for (unsigned y = 100; y < 104; ++y) {
+            for (unsigned x = 100; x < 104; ++x) {
+                if (video.vram[y][x] != 1) return 17;
+            }
+        }
+        if (video.vram[104][103] != 0 || video.vram[103][104] != 0) return 17;
+    }
+
     /* --- GP0(20): untextured flat triangle (POLY_F3) ---
      * Right-angle triangle: (80, 80), (85, 80), (80, 85) in blue. */
     {
@@ -198,9 +213,10 @@ int main(void) {
         };
         if (!ps1_gpu_exec(&video, &draw, pkt, 5)) return 15;
         if (video.vram[50][50] != 0x03E0u) return 15;
-        if (video.vram[50][54] != 0x03E0u) return 15;
-        if (video.vram[54][50] != 0x03E0u) return 15;
-        if (video.vram[54][54] != 0x03E0u) return 15;
+        if (video.vram[53][53] != 0x03E0u) return 15;
+        if (video.vram[50][54] != 0)       return 15;
+        if (video.vram[54][50] != 0)       return 15;
+        if (video.vram[54][54] != 0)       return 15;
         if (video.vram[49][50] != 0)       return 15;
         if (video.vram[55][54] != 0)       return 15;
     }
