@@ -3,6 +3,7 @@
 
 #include <string.h>
 
+#include "ps1_audio.h"
 #include "ps1_clock.h"
 #include "ps1_input.h"
 #include "ps1_video.h"
@@ -12,6 +13,7 @@ _Static_assert(sizeof(void *) == 8, "The Windows port requires x64");
 static Ps1Video video;
 static Ps1InputRecord pad1;
 static Ps1Clock clock;
+static Ps1Audio audio;
 
 static uint32_t map_key_to_ps1_button(SDL_Keycode key) {
     switch (key) {
@@ -105,7 +107,7 @@ int main(int argc, char **argv) {
     if (argc == 2 && strcmp(argv[1], "--check-build") == 0) {
         return 0;
     }
-    if (argc != 1 || !SDL_Init(SDL_INIT_VIDEO)) {
+    if (argc != 1 || !SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
         return 1;
     }
     window = SDL_CreateWindow("VanillaBTN - native bringup", 640, 480,
@@ -128,6 +130,7 @@ int main(int argc, char **argv) {
     }
     ps1_input_init(&pad1);
     ps1_clock_init(&clock, PS1_TICK_DURATION_NS, PS1_MAX_TICKS_PER_STEP);
+    ps1_audio_init(&audio);
     uint64_t last_time = SDL_GetTicksNS();
 
     while (running) {
@@ -159,6 +162,7 @@ int main(int argc, char **argv) {
 
         while (ticks-- > 0) {
             ps1_input_tick(&pad1);
+            ps1_audio_tick(&audio, 1);
         }
 
         if (!present_frame(renderer, texture)) {
@@ -170,6 +174,7 @@ int main(int argc, char **argv) {
     result = 0;
 
 done:
+    ps1_audio_shutdown(&audio);
     if (texture != NULL) SDL_DestroyTexture(texture);
     if (renderer != NULL) SDL_DestroyRenderer(renderer);
     if (window != NULL) SDL_DestroyWindow(window);

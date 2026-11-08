@@ -39,9 +39,25 @@ set_target_properties(ps1_clock PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES
 target_include_directories(ps1_clock PUBLIC src)
 target_compile_options(ps1_clock PRIVATE /W4)
 
+add_library(ps1_spu STATIC src/ps1_spu.c)
+set_target_properties(ps1_spu PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_include_directories(ps1_spu PUBLIC src)
+target_compile_options(ps1_spu PRIVATE /W4)
+
+add_library(ps1_xa STATIC src/ps1_xa.c)
+set_target_properties(ps1_xa PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_include_directories(ps1_xa PUBLIC src)
+target_compile_options(ps1_xa PRIVATE /W4)
+
+add_library(ps1_audio STATIC src/ps1_audio.c)
+set_target_properties(ps1_audio PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_include_directories(ps1_audio PUBLIC src)
+target_link_libraries(ps1_audio PUBLIC ps1_spu ps1_xa SDL3::SDL3)
+target_compile_options(ps1_audio PRIVATE /W4)
+
 add_executable(vanillabtn WIN32 src/main.c)
 set_target_properties(vanillabtn PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
-target_link_libraries(vanillabtn PRIVATE SDL3::SDL3 ps1_video ps1_input ps1_clock)
+target_link_libraries(vanillabtn PRIVATE SDL3::SDL3 ps1_video ps1_input ps1_clock ps1_audio)
 target_compile_options(vanillabtn PRIVATE /W4)
 
 enable_testing()
@@ -95,3 +111,21 @@ set_target_properties(ps1_clock_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRE
 target_link_libraries(ps1_clock_test PRIVATE ps1_clock)
 target_compile_options(ps1_clock_test PRIVATE /W4)
 add_test(NAME ps1_clock_cadence COMMAND ps1_clock_test)
+
+add_executable(ps1_spu_test tests/ps1_spu_test.c)
+set_target_properties(ps1_spu_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_link_libraries(ps1_spu_test PRIVATE ps1_spu)
+target_compile_options(ps1_spu_test PRIVATE /W4)
+add_test(NAME ps1_spu_decode COMMAND ps1_spu_test)
+
+add_executable(ps1_xa_test tests/ps1_xa_test.c)
+set_target_properties(ps1_xa_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_link_libraries(ps1_xa_test PRIVATE ps1_xa)
+target_compile_options(ps1_xa_test PRIVATE /W4)
+add_test(NAME ps1_xa_stream COMMAND ps1_xa_test)
+
+add_executable(ps1_audio_test tests/ps1_audio_test.c)
+set_target_properties(ps1_audio_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_link_libraries(ps1_audio_test PRIVATE ps1_audio SDL3::SDL3)
+target_compile_options(ps1_audio_test PRIVATE /W4)
+add_test(NAME ps1_audio_playback COMMAND ps1_audio_test)

@@ -6,14 +6,19 @@ Update the relevant item after completing a task or discovering a blocker.
 ## Active
 
 - [ ] Developer: check controller feel and simulation pacing in native window.
-- [ ] Milestone 4: native PS1 sound decode and mixing to PCM, SDL3 audio stream for playback.
+- [ ] Developer: compare music, effects, speech/streams, and timing by ear.
+- [ ] Milestone 5: keep two virtual card slots and original save-file format/UI semantics.
 
 ## Next
 
-- [ ] Milestone 5: keep two virtual card slots and original save-file format/UI semantics.
+- [ ] Milestone 6: bring up farm, events, minigames, ending, and card flows.
 
 ## Completed
 
+- [x] Milestone 4: native PS1 sound decode and mixing to PCM, SDL3 audio stream for playback.
+  - [x] Emulate PS1 24-voice SPU mixer and VAB/ADPCM decoding (ps1_spu); Debug and Release decode tests pass.
+  - [x] Implement CD-ROM XA sector stream filtering, ADPCM decoding, and track fading (ps1_xa); Debug and Release XA tests pass.
+  - [x] Bridge SPU and CD-XA PCM output to SDL3 AudioStream with headless fallback (ps1_audio), wired into main loop; Debug and Release playback tests pass.
 - [x] Add fixed 60 Hz simulation clock (ps1_clock) and wire keyboard/gamepad polling into native window; Debug and Release clock tests pass.
 - [x] Emulate PS1 InputRecord button states and auto-repeat channels (ps1_input); Debug and Release repeat tests pass.
 - [x] Milestone 3: map input and fixed simulation timing to the PS1 behavior.

@@ -68,3 +68,25 @@ vector rotation and translation, perspective divide (RTPS/RTPT), normal clipping
 simulation ticks with an anti-cascade clamp. `native/src/main.c` maps SDL3
 keyboard (WASD/arrows, ZXCV, Enter/Space/Esc) and SDL3 Gamepad events directly
 to PS1 controller bits. Scene wiring remains next.
+
+## Audio slice
+
+`native/src/ps1_spu.c` provides the host-side 24-voice SPU mixer:
+- Decodes 16-byte PS1 ADPCM blocks with the 5 hardware IIR prediction filters
+  and loop start/repeat/end semantics.
+- Parses Sony PSY-Q VAB headers (magic `pBAV`), 128-program ProgAtr tables,
+  VagAtr tone entries, and VAG offset tables.
+- Computes pitch step from semitone difference against the tone's center note
+  and fine cents, with linear interpolation on resampling.
+- Supports independent voice volume and master volume scaling.
+
+`native/src/ps1_xa.c` implements the CD-ROM XA streaming audio player:
+- Filters 2336-byte Form 2 disc sectors by file number and channel.
+- Decodes CD-XA ADPCM (18 sound groups per sector, 224 samples per group) with
+  filter history and sample clamping.
+- Implements the 26 CD audio tracks and volume fading curves matching `cd_audio.c`.
+
+`native/src/ps1_audio.c` bridges SPU mixing and CD-XA playback into SDL3's
+`SDL_AudioStream` at 44 100 Hz stereo 16-bit signed PCM, with headless fallback
+when no audio output hardware is present. `native/src/main.c` advances audio
+each 60 Hz simulation tick.
