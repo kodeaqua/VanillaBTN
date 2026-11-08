@@ -1,10 +1,12 @@
 #include "farm_state.h"
 #include "farm_tables.h"
 #include "heart.h"
+#include "item_storage.h"
 #include "main.h"
 #include "menu_window.h"
 #include "name_entry.h"
 #include "pad.h"
+#include "picture_cells.h"
 #include "sdk_gpu.h"
 #include "sdk_work.h"
 #include "text.h"
@@ -18,30 +20,29 @@
     exit(1); \
 } } while (0)
 
-FarmState game_state;
-FarmLoadArea farm_area;
+static u8 demo_and_region_storage[sizeof(InputDemo) + 64];
+u8 *region_base = demo_and_region_storage + sizeof(InputDemo);
 s32 frame_index;
 FrameState frame_records[2];
 FrameState *current_frame = &frame_records[0];
 u_long *active_ot;
-InputRecord *input_pad1;
+InputRecord input_records[2];
+InputRecord *input_pad1 = input_records;
+InputRecord *input_pad2 = input_records + 1;
 VabStream vab_stream_copy;
 
+u8 *main_get_region_base(void) { return region_base; }
 u8 main_get_speed_mode(void) { return MAIN_SPEED_NORMAL; }
 void main_set_put_env(s32 value) { (void)value; }
 void main_set_clear_screen(s32 value) { (void)value; }
-
-void *farm_work_sector_get(void) {
-    if (game_state.system.workSectorBusy == 0) {
-        game_state.system.workSectorBusy = 1;
-        return game_state.work.sector;
-    }
+s32 estate_gold_change(s32 amount, s32 reset) {
+    (void)reset;
+    game_state.player.gold += amount;
     return 0;
 }
-
-void farm_work_sector_release(void) {
-    game_state.system.workSectorBusy = 0;
-}
+int scene_pan_is_held(void) { return 0; }
+int scene_tilt_is_held(void) { return 0; }
+void farm_unpause(void) {}
 
 static Ps1Video video;
 static u_long work[8192], ot[32];
@@ -155,6 +156,37 @@ int main(void) {
     CHECK(name_entry_step() == NAME_STEP_EDITING);
     DrawOTag(ot + 31);
     CHECK(sdk_gpu_ok());
+
+    /* Exercise picture_cells.c and item_storage.c helpers with registered farm tables. */
+    farm_state_init();
+    CHECK(item_buy_price(ITEM_TURNIP_SEEDS) == 120);
+    CHECK(item_sell_price(ITEM_TURNIP) == 60);
+    CHECK(item_is_seed(ITEM_TURNIP_SEEDS) == 1 && item_is_seed(ITEM_TURNIP) == 0);
+    CHECK(crop_grown_stage(ITEM_TURNIP_SEEDS) > 0 && crop_season(ITEM_TURNIP_SEEDS) == 0);
+    CHECK(crop_harvest_item(ITEM_TURNIP_SEEDS) == ITEM_TURNIP);
+    CHECK(item_villager_reaction(ITEM_SICKLE, 0) == -2);
+    CHECK(item_villager_reaction(ITEM_TURNIP, 0) >= 0);
+
+    game_state.player.maxStamina = 100;
+    game_state.player.stamina = 50;
+    game_state.player.fatigue = 10;
+    game_state.player.happiness = 20;
+    CHECK(farm_clamp_status(80, 15, 30, 0) == 1);
+    CHECK(game_state.player.stamina == 100 && game_state.player.fatigue == 25 &&
+          game_state.player.happiness == 50);
+    CHECK(farm_adjust_stamina_fatigue(15, -5) == 1);
+    CHECK(game_state.player.maxStamina == 115 && game_state.player.stamina == 115);
+    CHECK(game_state.player.fatigue == 20 && game_state.progress.estate.powerBerries == 1);
+    s32 coin_out = -1;
+    CHECK(item_use_coin(50, 0, 0, &coin_out) == 1 && coin_out == 0 && game_state.player.gold == 50);
+
+    picture_grid_clear();
+    CHECK(picture_slot_claim(ITEM_TURNIP, PICTURE_ROW_PICKUP) == 0);
+    CHECK(farm_area.mode.pictureIds[PICTURE_ROW_PICKUP][0] == ITEM_TURNIP);
+    picture_release_item(ITEM_TURNIP);
+    CHECK(farm_area.mode.pictureIds[PICTURE_ROW_PICKUP][0] == 0);
+    item_picture_slots_clear();
+    item_picture_slots_unmark();
 
     sdk_gpu_bind(NULL);
     CHECK(sdk_work_bind(NULL, 0));

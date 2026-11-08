@@ -239,22 +239,31 @@ boundary. Dithering, scanline/interlace timing, screen overscan placement and
 drawing-to-displayed-area restrictions remain incomplete; accepting an
 environment does not establish those hardware behaviors.
 
-`game_screen` compiles the original `screen_fade.c`, `shop_restock.c`,
-`cooking_recipes.c`, `text_bank.c`, `picture_codes.c`, `horse_names.c`,
-`farm_data_size.c` and `debug_stubs.c` unchanged. The fixture provides
-main-loop frame globals and records/isolates main control boundaries; fade
-counters, private packets, blend mode, shader levels, recipe/picture/glyph
-tables and horse-race runner restocking come from the original code. Synthetic
-in/out frames verify resulting VRAM values, and table/restock checks verify
-distinct runner selection and player-horse slot overrides. This does not wire
-startup or replace its publisher/title sequence.
+`game_screen` compiles the original `screen_fade.c`, `farm_state.c`,
+`farm_tables.c`, `shop_restock.c`, `cooking_recipes.c`, `text_bank.c`,
+`picture_codes.c`, `horse_names.c`, `farm_data_size.c`, `debug_stubs.c`,
+`11_GF_FARM/farm_data.c` and `11_GF_FARM/farm_vars.c` unchanged (except
+`main_get_region_base` returning a 64-bit `u8 *` under `VANILLABTN_NATIVE` so
+overlay region base addition in `farm_state_init` and `menu_window.c` does not
+truncate). The fixture provides main-loop frame globals and records/isolates
+main control boundaries; fade counters, private packets, blend mode, shader
+levels, recipe/picture/glyph tables, item/crop/price tables, `farm_state_init`,
+`farm_tables_register`, `farm_work_sector_get`/`release` and horse-race runner
+restocking come from the original code. Synthetic in/out frames verify resulting
+VRAM values, and state/table/restock checks verify `farm_state_init` defaults,
+item prices/seeds/crops, work-sector claims, and distinct runner selection. This
+does not wire startup or replace its publisher/title sequence.
 
 `game_window_frame` compiles the original bevel/gradient drawing routine
 (`window_frame.c`), message-window and glyph-layout engine (`text.c`), field
 menu box/dispatcher (`menu_window.c`), villager affection heart icon
-(`heart.c`) and name/birthday entry screen (`name_entry.c`). In `text_bank.h`,
-`VANILLABTN_NATIVE` preserves full 64-bit host pointers in `LOCALIZED` and
-`LOCALIZED_NAME` instead of truncating string addresses to 32-bit `u32`/`s32`.
+(`heart.c`), name/birthday entry screen (`name_entry.c`), and the `11_GF_FARM`
+VRAM picture-cell allocator and storage screens (`picture_cells.c` and
+`menu/item_storage.c`). In `text_bank.h` and `picture_cells.c`,
+`VANILLABTN_NATIVE` preserves full 64-bit host pointers in `LOCALIZED`,
+`LOCALIZED_NAME` and `item_villager_reaction` (`game_state.pictureCodes`)
+instead of truncating pointer arithmetic to 32-bit `u32`/`s32`. `libgpu.h`
+exposes `AddPrim`, `setRGB0`, `setXYWH` and `MoveImage2`.
 `sdk_gpu` supplies `DR_AREA` and `SetDrawArea` (`GP0 0xE3` and `0xE4` draw-area
 packets), `ps1_gpu_exec` dispatches multi-word `0xE1..0xE6` environment packets,
 `libgs.h` exposes `HWD0`/`VWD0` (`320`/`240`), and `sdk_work` supplies
@@ -275,8 +284,11 @@ pixel. Independent GP0 fixtures cover inclusive/coincident line endpoints and
 interior Gouraud rows, and the window/text fixture exercises `text_format_number`,
 `text_write_season`, `text_write_weekday`, `text_list_append`,
 `text_match_either`, `text_window_draw` typing and close states with `DR_AREA`
-clipping, `menu_box_animate`, `heart_icon_draw`, and `name_entry_start`/
-`name_entry_step`. The original window drawing code is unchanged.
+clipping, `menu_box_animate`, `heart_icon_draw`, `name_entry_start`/
+`name_entry_step`, `item_villager_reaction`, `farm_clamp_status`,
+`farm_adjust_stamina_fatigue`, `item_use_coin`, `picture_grid_clear`,
+`picture_slot_claim`, `picture_release_item`, `item_picture_slots_clear` and
+`item_picture_slots_unmark`. The original window drawing code is unchanged.
 
 ## Controller math compatibility
 

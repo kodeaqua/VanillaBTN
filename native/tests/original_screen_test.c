@@ -4,6 +4,7 @@
 #include "farm_state.h"
 #include "farm_tables.h"
 #include "main.h"
+#include "overlay_regions.h"
 #include "screen_fade.h"
 #include "shop_restock.h"
 #include "text_bank.h"
@@ -17,10 +18,12 @@
 } } while (0)
 
 /* Main-loop state and controls are fixture boundaries. Fade state, counters,
- * packet storage and builders all come from the actual screen_fade.c. */
+ * packet storage and builders all come from the actual screen_fade.c, and
+ * game_state / farm_area / farm_tables come from farm_state.c and farm_tables.c. */
 FrameState frame_records[2];
 FrameState *current_frame = frame_records;
-FarmState game_state;
+static u8 demo_and_region_storage[sizeof(InputDemo) + 64];
+u8 *region_base = demo_and_region_storage + sizeof(InputDemo);
 extern Recipe recipes[RECIPE_COUNT];
 extern u32 picture_codes[174][4];
 extern u16 horse_names[253];
@@ -29,9 +32,22 @@ s32 frame_index;
 static u_long ot[2];
 u_long *active_ot = ot;
 InputRecord *input_pad1;
+u8 *main_get_region_base(void) { return region_base; }
 u8 main_get_speed_mode(void) { return MAIN_SPEED_FAST_2; }
 void main_set_clear_screen(s32 value) { (void)value; }
 void main_set_put_env(s32 value) { (void)value; }
+s32 farm_clamp_status(s8 stamina, s8 fatigue, s16 happiness, s32 unused3) {
+    (void)stamina; (void)fatigue; (void)happiness; (void)unused3;
+    return 1;
+}
+s32 item_use_coin(s8 amount, s8 reset, s32 unused, s32 *out) {
+    (void)amount; (void)reset; (void)unused; (void)out;
+    return 1;
+}
+s32 farm_adjust_stamina_fatigue(s8 maxStaminaDelta, s8 fatigueDelta) {
+    (void)maxStaminaDelta; (void)fatigueDelta;
+    return 1;
+}
 static Ps1Video video;
 
 static void draw_frame(void) {
@@ -105,6 +121,21 @@ int main(void) {
           game_state.raceBets.rows[2][2].rivalChance == 0);
     CHECK(game_state.raceBets.rows[2][2].training == 210 &&
           game_state.raceBets.rows[2][2].affection == 180);
+
+    /* Verify original farm_state_init, farm_tables_register, and work sector locks. */
+    farm_state_init();
+    CHECK(game_state.itemInfo != NULL && game_state.pictureGrids != NULL);
+    CHECK(game_state.tileRules != NULL && game_state.cropTable != NULL);
+    CHECK(game_state.pictureCodes == picture_codes);
+    CHECK(game_state.demo == (InputDemo *)(region_base - sizeof(InputDemo)));
+    CHECK(farm_area.loadWindow >= overlay_region_table[OVERLAY_HIGH]);
+    CHECK(farm_area.sectionBuffer == farm_area.loadWindow + FARM_IMAGE_SIZE);
+
+    CHECK(farm_work_sector_get() == game_state.work.sector);
+    game_state.system.workSectorBusy = 1;
+    CHECK(farm_work_sector_get() == NULL);
+    farm_work_sector_release();
+    CHECK(farm_work_sector_get() == game_state.work.sector);
 
     sdk_gpu_bind(NULL);
     return 0;

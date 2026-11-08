@@ -90,7 +90,11 @@ void *gs_work_alloc(s32 size);
 void gs_work_release(void *end);
 s32 main_region_free_bytes(void);
 u8 *main_region_free_start(void);
+#ifdef VANILLABTN_NATIVE
+u8 *main_get_region_base(void);
+#else
 s32 main_get_region_base(void);
+#endif
 void main_frame_clear(void);
 
 /* Double-buffer parity: 0 or 1. */

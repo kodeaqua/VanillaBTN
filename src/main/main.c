@@ -554,9 +554,15 @@ u8 *main_region_free_start(void) {
     return region_base - main_region_free_bytes();
 }
 
+#ifdef VANILLABTN_NATIVE
+u8 *main_get_region_base(void) {
+    return region_base;
+}
+#else
 s32 main_get_region_base(void) {
     return (s32)region_base;
 }
+#endif
 
 /* Start a frame: point the GS work area at its work base, select its ordering-table block (0x3000
  * bytes per frame index), clear the tables and rewind the primitive cursor. */

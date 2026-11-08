@@ -25,16 +25,30 @@
 
 extern s32 sound_offsets[151];
 
-FarmState game_state;
+static u8 demo_and_region_storage[sizeof(InputDemo) + 64];
+u8 *region_base = demo_and_region_storage + sizeof(InputDemo);
 FrameState frame_records[2];
 FrameState *current_frame = frame_records;
 s32 frame_index;
 static u_long ot[2];
 u_long *active_ot = ot;
 VabStream vab_stream_copy;
+u8 *main_get_region_base(void) { return region_base; }
 u8 main_get_speed_mode(void) { return MAIN_SPEED_FAST_2; }
 void main_set_clear_screen(s32 value) { (void)value; }
 void main_set_put_env(s32 value) { (void)value; }
+s32 farm_clamp_status(s8 stamina, s8 fatigue, s16 happiness, s32 unused3) {
+    (void)stamina; (void)fatigue; (void)happiness; (void)unused3;
+    return 1;
+}
+s32 item_use_coin(s8 amount, s8 reset, s32 unused, s32 *out) {
+    (void)amount; (void)reset; (void)unused; (void)out;
+    return 1;
+}
+s32 farm_adjust_stamina_fatigue(s8 maxStaminaDelta, s8 fatigueDelta) {
+    (void)maxStaminaDelta; (void)fatigueDelta;
+    return 1;
+}
 static uint64_t clock_time;
 static uint64_t now(void *context) { (void)context; return clock_time; }
 static void wait_until(uint64_t deadline, void *context) { (void)context; clock_time = deadline; }

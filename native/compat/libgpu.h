@@ -152,14 +152,21 @@ void DrawOTag(u_long *ot);
 
 #define setlen(p, n) (*(u_long *)(p) = (*(u_long *)(p) & 0xFFFFFFul) | ((u_long)(n) << 24))
 #define addPrim(ot, p) sdk_add_prim((ot), (p))
+#define AddPrim(ot, p) sdk_add_prim((ot), (p))
 #define getClut(x, y) ((u_short)(((unsigned)(y) << 6) | (((unsigned)(x) >> 4) & 63)))
 #define getTPage(tp, abr, x, y) ((u_short)(((tp) << 7) | ((abr) << 5) | (((y) & 256) >> 4) | (((x) & 1023) >> 6) | (((y) & 512) << 2)))
 #define setSprt(p) (setlen((p), 4), (p)->code = 0x64)
 #define setPolyFT4(p) (setlen((p), 9), (p)->code = 0x2C)
 #define setSemiTrans(p, enabled) ((p)->code = ((p)->code & ~2) | ((enabled) ? 2 : 0))
 #define setShadeTex(p, enabled) ((p)->code = ((p)->code & ~1) | ((enabled) ? 1 : 0))
+#define setRGB0(p, r, g, b) ((p)->r0 = (u_char)(r), (p)->g0 = (u_char)(g), (p)->b0 = (u_char)(b))
 #define setXY0(p, x, y) ((p)->x0 = (short)(x), (p)->y0 = (short)(y))
 #define setWH(p, width, height) ((p)->w = (short)(width), (p)->h = (short)(height))
+#define setXYWH(p, x, y, w, h) \
+    ((p)->x0 = (short)(x), (p)->y0 = (short)(y), \
+     (p)->x1 = (short)((x) + (w)), (p)->y1 = (short)(y), \
+     (p)->x2 = (short)(x), (p)->y2 = (short)((y) + (h)), \
+     (p)->x3 = (short)((x) + (w)), (p)->y3 = (short)((y) + (h)))
 #define setUV0(p, u, v) ((p)->u0 = (u_char)(u), (p)->v0 = (u_char)(v))
 #define setUVWH(p, u, v, w, h) \
     ((p)->u0 = (u_char)(u), (p)->v0 = (u_char)(v), \
@@ -182,6 +189,7 @@ DISPENV *PutDispEnv(DISPENV *env);
 DISPENV *GetDispEnv(DISPENV *env);
 int ClearImage(RECT *rect, u_char r, u_char g, u_char b);
 int MoveImage(RECT *rect, int x, int y);
+#define MoveImage2(rect, x, y) MoveImage((rect), (x), (y))
 void SetDispMask(int mask);
 
 #ifdef NDEBUG

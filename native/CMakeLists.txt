@@ -238,15 +238,19 @@ add_library(game_screen STATIC
     ../src/main/debug_stubs.c
     ../src/main/game/cooking_recipes.c
     ../src/main/game/farm_data_size.c
+    ../src/main/game/farm_state.c
+    ../src/main/game/farm_tables.c
     ../src/main/game/horse_names.c
     ../src/main/game/picture_codes.c
     ../src/main/game/shop_restock.c
     ../src/main/graphics/screen_fade.c
     ../src/main/text/text_bank.c
+    ../src/overlay/11_GF_FARM/farm_data.c
+    ../src/overlay/11_GF_FARM/farm_vars.c
 )
 set_target_properties(game_screen PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_include_directories(game_screen PUBLIC ${game_include_dirs})
-target_link_libraries(game_screen PUBLIC game_frame_buffers sdk_sync)
+target_link_libraries(game_screen PUBLIC game_frame_buffers sdk_memory sdk_sync)
 target_compile_options(game_screen PRIVATE /W4 /Gy)
 add_executable(original_screen_test tests/original_screen_test.c)
 set_target_properties(original_screen_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
@@ -260,6 +264,8 @@ add_library(game_window_frame STATIC
     ../src/main/ui/menu_window.c
     ../src/main/ui/name_entry.c
     ../src/main/ui/window_frame.c
+    ../src/overlay/11_GF_FARM/menu/item_storage.c
+    ../src/overlay/11_GF_FARM/picture_cells.c
 )
 set_target_properties(game_window_frame PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_include_directories(game_window_frame PUBLIC ${game_include_dirs})
