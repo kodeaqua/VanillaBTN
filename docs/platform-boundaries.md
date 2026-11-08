@@ -43,8 +43,9 @@ The raw texel sampler decodes 4-bit and 8-bit CLUT indexes or a direct 15-bit
 word while preserving zero and bit 15.
 The sprite path now draws raw or modulated texels, skips color zero, blends
 only texels with bit 15 when semitransparency is requested, and applies the
-drawing area's clipping and mask rules. Texture windows, flips, CLUT cache
-timing, and textured polygons are still pending.
+drawing area's clipping and mask rules. Software triangle and quad rasterization
+covers flat and textured polygons (POLY_F3, POLY_FT3, POLY_F4, POLY_FT4).
+Texture windows, flips, and CLUT cache timing remain pending.
 No game scene issues these commands through the native target yet.
 
 `native/src/ps1_ot.c` stores packet IDs behind host-sized links rather than
@@ -53,4 +54,8 @@ visits newer packets first within one bucket, matching `ClearOTagR` and
 `addPrim`. `ps1_gpu_submit_ot` and `ps1_gpu_submit_frame` walk single or multiple
 ordering tables, unpack each packet tag's length, and route GP0 command words
 into the dispatcher, supporting the game's table sequence (OT3, OT2, main OT,
-OT1, OT0, active OT). Textured polygons, GTE, and scene wiring remain pending.
+OT1, OT0, active OT).
+
+`native/src/ps1_gte.c` provides the host-side GTE compatibility layer: fixed-point
+vector rotation and translation, perspective divide (RTPS/RTPT), normal clipping
+(NCLIP), and depth averaging (AVSZ3/AVSZ4). Scene wiring remains next.

@@ -62,3 +62,14 @@ set_target_properties(ps1_gpu_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED 
 target_link_libraries(ps1_gpu_test PRIVATE ps1_gpu)
 target_compile_options(ps1_gpu_test PRIVATE /W4)
 add_test(NAME ps1_gpu_dispatch COMMAND ps1_gpu_test)
+
+add_library(ps1_gte STATIC src/ps1_gte.c)
+set_target_properties(ps1_gte PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_include_directories(ps1_gte PUBLIC src)
+target_compile_options(ps1_gte PRIVATE /W4)
+
+add_executable(ps1_gte_test tests/ps1_gte_test.c)
+set_target_properties(ps1_gte_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_link_libraries(ps1_gte_test PRIVATE ps1_gte)
+target_compile_options(ps1_gte_test PRIVATE /W4)
+add_test(NAME ps1_gte_math COMMAND ps1_gte_test)

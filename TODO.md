@@ -7,11 +7,11 @@ Update the relevant item after completing a task or discovering a blocker.
 
 - [x] Developer: open and close the native Debug/Release window on Windows.
 - [x] Developer: verify the importer recognizes a personally supplied USA disc.
-- [ ] Milestone 2: implement required GPU primitives, CLUT, ordering, and GTE behavior with synthetic pixel checks.
+- [x] Milestone 2: implement required GPU primitives, CLUT, ordering, and GTE behavior with synthetic pixel checks.
   - [x] Add GP0 command dispatcher (ps1_gpu_exec) covering fill, untextured tiles, textured sprites, and draw-environment commands; Debug and Release dispatch tests pass.
   - [x] Wire OT walk to GPU dispatcher (ps1_gpu_submit_ot/frame) for frame submission; Debug and Release multi-table tests pass.
   - [x] Implement flat and textured polygons (POLY_F3/F4/FT3/FT4) for scene rendering; Debug and Release rasterization tests pass.
-  - [ ] GTE compatibility layer (coordinate transform, perspective divide, clip codes).
+  - [x] Add host-side GTE compatibility layer (ps1_gte) for transforms, projection, culling, and depth; Debug and Release math tests pass.
 
 ## Next
 
@@ -19,6 +19,7 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Completed
 
+- [x] Add host-side GTE compatibility layer (ps1_gte) for transforms, projection, culling, and depth; Debug and Release math tests pass.
 - [x] Implement flat and textured polygons (POLY_F3/F4/FT3/FT4) for scene rendering; Debug and Release rasterization tests pass.
 - [x] Wire OT walk to GPU dispatcher (ps1_gpu_submit_ot/frame) for frame submission; Debug and Release multi-table tests pass.
 - [x] Add GP0 command dispatcher (ps1_gpu_exec) covering fill, untextured tiles, textured sprites, and draw-environment commands; Debug and Release dispatch tests pass.
