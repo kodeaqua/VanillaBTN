@@ -5,6 +5,8 @@
 #ifdef VANILLABTN_BOOT_TEST
 #include <stdio.h>
 #include "farm_state.h"
+#include "main.h"
+extern int main_scene;
 #endif
 
 #include "ps1_audio.h"
@@ -114,6 +116,7 @@ typedef struct HostGame {
     int16_t stick_x, stick_y;
 #ifdef VANILLABTN_BOOT_TEST
     unsigned vblanks, vblank_limit, colored_frames, audible_frames;
+    bool cycle_required, visited_farm, returned_title;
 #endif
 } HostGame;
 
@@ -142,6 +145,9 @@ static void host_game_pump(void *context) {
     HostGame *host = context;
     SDL_Event event;
 #ifdef VANILLABTN_BOOT_TEST
+    if (main_scene == SCENE_FARM && (game_state.globalFlags & GLOBAL_FLAG_INPUT_REPLAY))
+        host->visited_farm = true;
+    if (host->visited_farm && main_scene == SCENE_TITLE) host->returned_title = true;
     if (++host->vblanks >= host->vblank_limit || !sdk_gpu_ok()) {
         if (host->vblank_limit > 900 && host->vblanks == host->vblank_limit)
             fprintf(stderr, "frame snapshot: %d\n", boot_save_frame());
@@ -262,6 +268,10 @@ int main(int argc, char **argv) {
         if (strcmp(argv[i], "--data") == 0 && i + 1 < argc) disc = argv[++i];
 #ifdef VANILLABTN_BOOT_TEST
         else if (strcmp(argv[i], "--demo") == 0) host.vblank_limit = 5000;
+        else if (strcmp(argv[i], "--cycle") == 0) {
+            host.vblank_limit = 10000;
+            host.cycle_required = true;
+        }
 #endif
         else return 1;
     }
@@ -311,9 +321,13 @@ int main(int argc, char **argv) {
     sdk_sync_start();
     result = game_main();
 #ifdef VANILLABTN_BOOT_TEST
-    extern int main_scene;
     fprintf(stderr, "boot: vblanks=%u scene=%d gpu=%d colored=%u audible=%u\n",
         host.vblanks, main_scene, sdk_gpu_ok(), host.colored_frames, host.audible_frames);
+    if (host.cycle_required) {
+        fprintf(stderr, "cycle: farm=%d returned_title=%d\n",
+            host.visited_farm, host.returned_title);
+        if (!host.visited_farm || !host.returned_title) result = 2;
+    }
     if (host.vblanks < host.vblank_limit || !sdk_gpu_ok() || !host.colored_frames) result = 2;
 #endif
 

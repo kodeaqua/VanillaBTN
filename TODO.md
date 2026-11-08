@@ -51,6 +51,7 @@ Update the relevant item after completing a task or discovering a blocker.
   - [ ] Verify textured-polygon subpixel interpolation with nonuniform original FT4 fixtures; packet-generation tests do not establish texel fidelity.
 - [ ] Audio: implement ADSR/reverb, XA stereo histories and coding-info sample rates.
 - [ ] Save/load: verify external card chain encoding, corruption handling, and original save layout before game integration.
+- [x] Trace the reported large attract-demo displacement to the original `scene_enter` area transition, rather than a large velocity; temporary write-watch instrumentation was removed. This does not establish console-equivalent demo behavior.
 - [ ] Developer: check controller feel and simulation pacing in native window.
 - [ ] Developer: compare music, effects, speech/streams, and timing by ear.
 - [ ] Developer: save, reload, and compare farms in game.
@@ -61,6 +62,8 @@ Update the relevant item after completing a task or discovering a blocker.
 - [ ] Optimization and release packaging.
 
 ## Completed
+
+- [x] Add an optional `--cycle` original-code probe requiring farm input replay and return to title. Release completes 10,000 vblanks with valid GPU submission; both build profiles pass 30 asset-free checks.
 
 - [x] Extend the optional original-code boot probe to 5,000 vblanks with a framebuffer capture and test-only crash symbols; keep cards in memory and diagnostics outside the game executable.
 

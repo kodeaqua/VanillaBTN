@@ -66,6 +66,11 @@ or proof of gameplay fidelity. On a crash, the probe reports original state
 counters and symbol names without dumping asset data or source paths. The
 probe uses in-memory cards and never writes your card files.
 
+Use `--cycle` instead of `--demo` for a 10,000-vblank run. It additionally
+requires the original input replay to reach the farm and return to title;
+a missed transition fails the probe. This checks scene execution, not whether
+the recording matches the original console's visuals or movement.
+
 To build a separate local candidate while a game window is open:
 
 ```powershell
