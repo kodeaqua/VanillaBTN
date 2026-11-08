@@ -28,6 +28,16 @@ that the generated EXE and 13 overlays still match the reference SHA-1 hashes.
   files to the repository. The project's own work is CC0; `tools/maspsx` has
   its own license.
 
+## Commits
+
+- Use Conventional Commits for every new commit: `type(scope): summary` or
+  `type: summary` when a scope adds no value. Write the summary in the
+  imperative, for example `docs: clarify the Windows build steps`.
+- Use a type that describes the change, such as `feat`, `fix`, `docs`, `refactor`,
+  `test`, `build`, `ci`, or `chore`. Keep each commit focused on one logical change.
+- Explain why in the commit body when the reason is not obvious. Mark breaking
+  changes with `!` after the type or scope and a `BREAKING CHANGE:` footer.
+
 ## Windows and Docker
 
 The old PS1 preprocessor can fail on a Windows bind mount and on CRLF source
