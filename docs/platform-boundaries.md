@@ -34,6 +34,10 @@ before distribution. Imported files remain local and must never be committed.
 
 ## Graphics slice
 
+The first original graphics module now compiles against native SDK transfers;
+see [Native SDK boundary](native-sdk.md). Scene and primitive submission remain
+unconnected to the host loop.
+
 `native/src/ps1_video.c` implements the tested GP0(02) quick fill and
 GP0(60/62/68/6A) untextured tile rules: 8-to-5-bit color conversion, fill
 rounding and VRAM wrapping, draw-area clipping, 11-bit coordinates, mask bits,

@@ -6,6 +6,9 @@ Update the relevant item after completing a task or discovering a blocker.
 ## Active
 
 - [ ] Connect original game code through platform/SDK interfaces. Do not rebuild scene, menu, dialog or game logic in the native host.
+  - [x] Compile the original texture-pack loader against native GPU transfers.
+  - [ ] Connect original primitive/ordering-table submission and animation code.
+  - [ ] Connect original disc requests, startup and native overlay dispatch.
 - [ ] Native executable remains a backend smoke harness; original game execution is not connected.
 - [ ] Graphics/GTE: verify hardware rounding, saturation, flags, and primitive edge coverage against independent fixtures.
 - [ ] Audio: implement ADSR/reverb, XA stereo histories and coding-info sample rates.
@@ -21,6 +24,7 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Completed
 
+- [x] Add native LoadImage/StoreImage/DrawSync entry points and compile original texture_pack.c with preserved file offsets. Synthetic fixtures exercise raw/RLE uploads through the original loader; the host binds its VRAM to the SDK bridge. Full game execution remains pending.
 - [x] Decode GP0 packet color bytes in PS1 order; an independent raw-byte red fixture protects the backend conversion.
 
 - [x] Keep SEQ note/control/termination and allocation from modifying active voices owned by other banks or raw effects. The current mixer supports one sequence; shared-bank ownership and SDK voice reservation remain open.

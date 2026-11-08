@@ -84,6 +84,28 @@ target_link_libraries(vanillabtn PRIVATE SDL3::SDL3 ps1_video ps1_input ps1_cloc
 target_compile_options(vanillabtn PRIVATE /W4)
 
 enable_testing()
+add_library(game_texture_pack STATIC ../src/main/graphics/texture_pack.c)
+set_target_properties(game_texture_pack PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_include_directories(game_texture_pack PUBLIC compat ../src/include ../src/main/graphics)
+target_compile_definitions(game_texture_pack PUBLIC VANILLABTN_NATIVE)
+# Private unused original helpers reference animation functions not ported yet.
+# Separate functions let the linker discard those helpers without fake stubs.
+target_compile_options(game_texture_pack PRIVATE /W4 /Gy)
+
+add_library(sdk_gpu STATIC src/sdk_gpu.c)
+set_target_properties(sdk_gpu PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_include_directories(sdk_gpu PUBLIC compat src)
+target_link_libraries(sdk_gpu PUBLIC ps1_video)
+target_compile_options(sdk_gpu PRIVATE /W4)
+target_link_libraries(game_texture_pack PUBLIC sdk_gpu)
+target_link_options(game_texture_pack INTERFACE /OPT:REF)
+target_link_libraries(vanillabtn PRIVATE game_texture_pack)
+
+add_executable(sdk_gpu_test tests/sdk_gpu_test.c)
+set_target_properties(sdk_gpu_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_link_libraries(sdk_gpu_test PRIVATE game_texture_pack)
+target_compile_options(sdk_gpu_test PRIVATE /W4 /UNDEBUG)
+add_test(NAME original_texture_pack COMMAND sdk_gpu_test)
 add_executable(game_graphics_test tests/game_graphics_test.c)
 set_target_properties(game_graphics_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_link_libraries(game_graphics_test PRIVATE game_graphics)

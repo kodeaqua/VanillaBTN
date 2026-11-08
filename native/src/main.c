@@ -8,6 +8,7 @@
 #include "ps1_clock.h"
 #include "ps1_input.h"
 #include "ps1_video.h"
+#include "sdk_gpu.h"
 
 _Static_assert(sizeof(void *) == 8, "The Windows port requires x64");
 
@@ -134,6 +135,7 @@ int main(int argc, char **argv) {
         goto done;
     }
     ps1_input_init(&pad1);
+    sdk_gpu_bind(&video);
     ps1_clock_init(&clock, PS1_TICK_DURATION_NS, PS1_MAX_TICKS_PER_STEP);
     ps1_audio_init(&audio);
     ps1_card_manager_init(&card_mgr, NULL);
@@ -205,6 +207,7 @@ int main(int argc, char **argv) {
     result = 0;
 
 done:
+    sdk_gpu_bind(NULL);
     if (gamepad != NULL) SDL_CloseGamepad(gamepad);
     ps1_card_manager_shutdown(&card_mgr);
     ps1_audio_shutdown(&audio);
