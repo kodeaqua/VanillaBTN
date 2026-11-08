@@ -16,6 +16,7 @@ typedef struct Ps1DrawState {
     int left, top, right, bottom; /* Inclusive drawing area in VRAM. */
     int offset_x, offset_y;       /* Signed 11-bit GP0 draw offset. */
     unsigned blend_mode;          /* GP0(E1) bits 5-6: average, add, subtract, add quarter. */
+    unsigned tpage;               /* GP0(E1) bits 0-8: texture page (x64/y256 base, depth). */
     bool force_mask, check_mask;  /* GP0(E6) bits 0-1. */
 } Ps1DrawState;
 

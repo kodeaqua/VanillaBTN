@@ -45,8 +45,9 @@ static uint16_t blend_pixel(uint16_t back, uint16_t front, unsigned mode) {
 
 void ps1_draw_state_reset(Ps1DrawState *state) {
     if (state == NULL) return;
+    /* tpage 0 = texture page X base 0, Y base 0, 4-bit depth, opaque mode. */
     *state = (Ps1DrawState){0, 0, PS1_VRAM_WIDTH - 1, PS1_VRAM_HEIGHT - 1,
-                            0, 0, 0, false, false};
+                            0, 0, 0, 0, false, false};
 }
 
 void ps1_video_quick_fill(Ps1Video *video, int x, int y, int width, int height,
