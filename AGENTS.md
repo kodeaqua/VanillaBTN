@@ -10,6 +10,24 @@ that the generated EXE and 13 overlays still match the reference SHA-1 hashes.
 - [docs/architecture.md](docs/architecture.md) maps the runtime and build layout.
 - [docs/building.md](docs/building.md) gives the build and verification commands.
 
+## Engineering approach
+
+Adapted from the [Karpathy-inspired coding guidelines](https://github.com/multica-ai/andrej-karpathy-skills/blob/main/CLAUDE.md)
+for this repository's agent workflow:
+
+- Before coding, identify assumptions, meaningful ambiguity, and tradeoffs.
+  Ask for clarification when the answer changes the intended result; continue
+  independent work while waiting. Recommend a simpler approach when warranted.
+- Implement only what the task needs. Avoid speculative features, one-use
+  abstractions, and configuration or error handling without a real use case.
+- Change only files and lines that serve the task. Follow the existing style,
+  remove code made unused by the change, and report unrelated issues without
+  silently refactoring them.
+- Define a verifiable result for multi-step work, share a brief plan, and
+  iterate until the relevant checks pass. Use a regression test when it proves
+  a bug or protects a meaningful behavior; use the binary `check` target for
+  changes that can affect matching output.
+
 ## Working rules
 
 - Keep changes scoped to the requested behavior or documentation. Do not
