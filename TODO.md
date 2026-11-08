@@ -5,6 +5,11 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Active
 
+- [ ] Title bringup: native asset loading, original scene rendering, input/timing, and SEQ/SPU music.
+  - [x] Add bounds-checked native A_FILE reader for the importer's BIN/HDT output.
+  - [ ] Decode title texture/animation assets and connect original title flow.
+  - [ ] Connect title input and fixed frame cadence.
+  - [ ] Schedule title SEQ events into SPU and SDL playback.
 - [ ] Audit follow-up: integrate game scenes with the native executable before requesting gameplay acceptance; see `docs/native-audit.md`.
 - [ ] Graphics/GTE: verify hardware rounding, saturation, flags, and primitive edge coverage against independent fixtures.
 - [ ] Audio: implement SEQ scheduling, ADSR/reverb, XA stereo histories and coding-info sample rates.
