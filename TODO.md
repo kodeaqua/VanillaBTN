@@ -21,6 +21,8 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Completed
 
+- [x] Keep SEQ note/control/termination and allocation from modifying active voices owned by other banks or raw effects. The current mixer supports one sequence; shared-bank ownership and SDK voice reservation remain open.
+
 - [x] Use nominal 30 Hz two-vblank game cadence, 44.1 kHz audio and FAST_2 input-repeat scaling in the backend harness.
 
 - [x] Mix SEQ through the shared SPU/SDL audio backend and open/close gamepads with separate keyboard/controller state. Synthetic tests cover backend behavior; no native game scene is implemented.

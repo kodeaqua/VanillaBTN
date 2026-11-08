@@ -79,6 +79,42 @@ static void test_malformed_sequences_terminate(void) {
 }
 
 int main(void) {
+    /* A voice previously used by this sequence may now hold an external effect.
+     * Note-off, CC volume/all-notes-off and EOT must not modify that effect. */
+    uint8_t sequence[] = {
+        'p','Q','E','S',0,0,0,1,0,100,0x0F,0x42,0x40,4,2,
+        0,0x80,60,0, 0,0xB0,7,2, 0,0xB0,123,0, 0,0xFF,0x2F,0
+    };
+    Ps1Seq seq;
+    int16_t pcm[2];
+    assert(ps1_seq_open(&seq, sequence, sizeof(sequence), bank(), false));
+    ps1_spu_key_on_raw(&spu, 0, body, sizeof(body), 0x10000, 12345, 23456);
+    ps1_spu_key_on_raw(&spu, 22, body, sizeof(body), 0x10000, 12345, 23456);
+    ps1_spu_key_on_raw(&spu, 23, body, sizeof(body), 0x10000, 12345, 23456);
+    seq.voices[0].note = 60;
+    ps1_seq_mix(&seq, &spu, pcm, 1);
+    assert(!seq.active && !seq.failed);
+    if (!spu.voices[0].active || !spu.voices[22].active || !spu.voices[23].active) return 20;
+    if (spu.voices[0].vol_left != 12345 || spu.voices[0].vol_right != 23456) return 21;
+    uint8_t chord[128];
+    memcpy(chord, sequence, 15);
+    unsigned end = 15;
+    for (unsigned note = 0; note < 23; ++note) {
+        chord[end++] = 0;
+        chord[end++] = 0x90;
+        chord[end++] = (uint8_t)(60 + note % 12);
+        chord[end++] = 127;
+    }
+    chord[end++] = 127;
+    chord[end++] = 0xFF;
+    chord[end++] = 0x2F;
+    chord[end++] = 0;
+    assert(ps1_seq_open(&seq, chord, end, bank(), false));
+    for (unsigned v = 22; v < 24; ++v)
+        ps1_spu_key_on_raw(&spu, (int)v, body, sizeof(body), 0x10000, 12345, 23456);
+    ps1_seq_mix(&seq, &spu, pcm, 1);
+    if (spu.voices[22].vab_id != PS1_VAB_NONE || spu.voices[23].vab_id != PS1_VAB_NONE) return 22;
+    assert(seq.note_events == 23 && !seq.failed);
     test_sample_boundaries_and_running_status();
     test_ps1_tempo_and_loop_commands();
     test_malformed_sequences_terminate();

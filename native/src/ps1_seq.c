@@ -56,10 +56,16 @@ bool ps1_seq_open(Ps1Seq *seq, const uint8_t *data, size_t size, Ps1VabId bank, 
 
 static void note_off(Ps1Seq *seq, Ps1Spu *spu, unsigned channel, unsigned note) {
     for (int v = 0; v < 24; ++v) {
-        if (seq->voices[v].channel == channel && seq->voices[v].note == note) {
+        if (spu->voices[v].vab_id == seq->bank
+            && seq->voices[v].channel == channel && seq->voices[v].note == note) {
             ps1_spu_key_off(spu, v);
         }
     }
+}
+
+static void sequence_key_off_all(Ps1Seq *seq, Ps1Spu *spu) {
+    for (unsigned v = 0; v < 24; ++v)
+        if (spu->voices[v].vab_id == seq->bank) ps1_spu_key_off(spu, (int)v);
 }
 
 static void voice_volume(Ps1Seq *seq, Ps1Spu *spu, unsigned voice) {
@@ -87,12 +93,14 @@ static void note_on(Ps1Seq *seq, Ps1Spu *spu, unsigned channel, unsigned note, u
     ++seq->note_events;
     for (unsigned t = 0; t < bank->program_tone_counts[program]; ++t) {
         const uint8_t *tone = bank->header + bank->program_tone_offsets[program] + t * 32u;
-        unsigned voice = 0;
+        unsigned voice = 24;
         if (note < tone[6] || note > tone[7]) continue;
         for (unsigned v = 0; v < 24; ++v) {
             if (!spu->voices[v].active) { voice = v; break; }
-            if (seq->voices[v].age < seq->voices[voice].age) voice = v;
+            if (spu->voices[v].vab_id == seq->bank
+                && (voice == 24 || seq->voices[v].age < seq->voices[voice].age)) voice = v;
         }
+        if (voice == 24) continue;
         ps1_spu_key_on_vab(spu, (int)voice, seq->bank, (int)program, (int)t, (int)note, 0, 127, 127);
         seq->voices[voice] = (Ps1SeqVoice){channel,note,velocity,program,t,seq->note_events};
         voice_volume(seq, spu, voice);
@@ -116,8 +124,8 @@ static bool event(Ps1Seq *seq, Ps1Spu *spu) {
             return seq->tempo != 0;
         }
         if (a != 0x2F) return false;
-        if (!seq->repeat) { seq->active = false; ps1_spu_key_off_all(spu); return true; }
-        ps1_spu_key_off_all(spu);
+        if (!seq->repeat) { seq->active = false; sequence_key_off_all(seq, spu); return true; }
+        sequence_key_off_all(seq, spu);
         seq->cursor = 15;
         seq->running_status = 0;
         seq->tempo = seq->initial_tempo;
@@ -149,11 +157,13 @@ static bool event(Ps1Seq *seq, Ps1Spu *spu) {
             ++seq->loop_count;
         } else if (a == 120 || a == 123) {
             for (unsigned v = 0; v < 24; ++v) {
-                if (seq->voices[v].channel == channel) ps1_spu_key_off(spu, (int)v);
+                if (spu->voices[v].vab_id == seq->bank
+                    && seq->voices[v].channel == channel) ps1_spu_key_off(spu, (int)v);
             }
         } else if (a != 6 && a != 99) return false;
         for (unsigned v = 0; v < 24; ++v) {
-            if (spu->voices[v].active && seq->voices[v].channel == channel) voice_volume(seq, spu, v);
+            if (spu->voices[v].active && spu->voices[v].vab_id == seq->bank
+                && seq->voices[v].channel == channel) voice_volume(seq, spu, v);
         }
         return true;
     default: return false;
@@ -181,7 +191,7 @@ void ps1_seq_mix(Ps1Seq *seq, Ps1Spu *spu, int16_t *out, int frames) {
                 || (seq->active && !delta(seq))) {
                 seq->failed = true;
                 seq->active = false;
-                ps1_spu_key_off_all(spu);
+                sequence_key_off_all(seq, spu);
             }
         }
         ps1_spu_mix(spu, out + i * 2, 1, 0);
