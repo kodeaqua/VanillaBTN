@@ -34,6 +34,9 @@ fields with explicit 32-bit types, and check structure sizes at compile time.
 
 ## Milestones
 
+Milestone 0 now has a native build and empty window. The developer's window
+check is still pending; game systems begin in milestone 1.
+
 | Order | Work | Agent's code or synthetic exit check | Developer's actual check |
 | --- | --- | --- | --- |
 | **0. Native Windows tools first** | Use the installed Visual Studio C++ tools. Add a separate native CMake project and Debug/Release presets. Provide a small PowerShell build/test entry point that finds VS tools without requiring PATH edits. Pin SDL3 and build a minimal native `.exe`. Keep Python only for development/import tools. If the PS1 reference still needs Docker, offer an optional PowerShell wrapper around its existing check. | From ordinary PowerShell, configure and compile x64 Debug and Release with MSVC, then run headless synthetic tests. The native build and executable require no WSL, MSYS, or Docker. | Confirm the minimal window opens and closes on Windows. |

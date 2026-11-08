@@ -1,7 +1,32 @@
-# Building and checking the PS1 reference
+# Building on Windows and checking the PS1 reference
+
+## Native Windows bringup
+
+Install Visual Studio with Desktop development with C++. From the repository
+root, run in an ordinary PowerShell session:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/build-windows.ps1 -Configuration Debug
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/build-windows.ps1 -Configuration Release
+```
+
+The script locates Visual Studio's x64 compiler, CMake, and Ninja, then
+configures, builds, and runs CTest for each profile. It downloads the pinned
+[SDL3 3.4.18 release](https://github.com/libsdl-org/SDL/releases/tag/release-3.4.18)
+on first configure and checks its SHA-256. The output is
+`build/native/<profile>/vanillabtn.exe`; the build tree is ignored by Git.
+No WSL, MSYS, Docker, or Python is needed for this native target.
+
+The executable currently opens an empty bringup window. The `native_startup`
+CTest check launches it headlessly with `--check-build`; the developer checks
+the window manually. This build does not yet load game data or run gameplay.
+To inspect the Debug window, run `& .\build\native\Debug\vanillabtn.exe` and
+close it with the window's close button.
+
+## PS1 reference build
 
 These commands build PS1 binaries, even when Docker runs on Windows. A native
-Windows game executable is not available yet. The build requires Docker and
+Windows game is not available yet. The PS1 reference build requires Docker and
 produces the EXE and 13 overlays from source.
 With your own USA `SLUS_011.15` disc image in MODE2/2352 `.bin` format, it also
 rebuilds `A_FILE` and a `.bin`/`.cue` disc image. The original game data and

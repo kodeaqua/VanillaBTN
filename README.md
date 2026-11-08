@@ -8,21 +8,33 @@ should be optional and separate from that default experience.
 
 ## Current status
 
-This repository currently contains a matching decompilation of the PlayStation
-USA release (`SLUS_011.15`), **not a native Windows game executable**. The C
-source builds the PS1 EXE and its 13 overlays byte for byte and, given your own
-copy of the disc, the whole disc image. That build is the reference baseline
-for the planned port. Building it with Docker on Windows still produces PS1
-binaries.
+This repository contains a matching decompilation of the PlayStation USA
+release (`SLUS_011.15`) and a minimal native Windows bringup executable. The
+native executable opens an empty window; it does not run the game yet. The PS1
+source builds the EXE and its 13 overlays byte for byte and, given your own
+copy of the disc, the whole disc image. That build remains the reference
+baseline. Building it with Docker on Windows still produces PS1 binaries.
 
 The [Windows roadmap](docs/roadmap.md) orders the bringup work, and the
 [porting rules](docs/porting.md) define its fidelity boundaries. The
-[architecture guide](docs/architecture.md) maps the
-current code. [AGENTS.md](AGENTS.md) records repository rules for coding agents.
+[architecture guide](docs/architecture.md) maps the current code.
+[AGENTS.md](AGENTS.md) records repository rules for coding agents.
 The [versioning policy](docs/versioning.md) explains the project's development
 version, which can be printed with `python tools/version.py`.
 
 ## Building
+
+On Windows, build the native bringup executable from PowerShell with Visual
+Studio's Desktop development with C++ installed:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/build-windows.ps1 -Configuration Debug
+```
+
+See [building instructions](docs/building.md) for Release and the PS1 reference
+build. The native build does not use Docker, WSL, or MSYS.
+
+For the PS1 reference build on Linux or WSL:
 
 ```sh
 docker build -t vanillabtn-build .

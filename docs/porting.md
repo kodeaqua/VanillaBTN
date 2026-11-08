@@ -1,9 +1,9 @@
 # Windows port direction
 
 VanillaBTN's current target is a native Windows port of *Harvest Moon: Back to
-Nature* that preserves the original experience. The repository does not yet
-build or run a native Windows game. Its matching PS1 decompilation is the
-behavioral and data-layout reference for that work.
+Nature* that preserves the original experience. The repository builds a native
+Windows bringup window, but it does not run the game yet. Its matching PS1
+decompilation is the behavioral and data-layout reference for that work.
 
 ## Fidelity rules
 
@@ -19,7 +19,7 @@ behavioral and data-layout reference for that work.
 
 ## Native build profiles
 
-The future Windows target must have distinct `Debug` and `Release` builds.
+The Windows target has distinct `Debug` and `Release` builds.
 `Debug` should prioritize short compile times and useful diagnostic symbols.
 Logs, console prints, traces, assertions, and debug UI belong in that build.
 
@@ -29,13 +29,14 @@ runtime overhead. Neither profile may depend on side effects inside diagnostic
 code. User-facing game messages and required error handling are gameplay or
 product behavior, not developer diagnostics.
 
-Once the native target exists, agents verify that both profiles compile and
-pass code-level or synthetic checks, including checks that Release excludes
-developer diagnostics. The developer performs actual runtime and gameplay
-testing to judge behavior, timing, visuals, and audio. The PS1 reference build
+Agents verify that both profiles compile and pass code-level or synthetic
+checks, including checks that Release excludes developer diagnostics. The
+developer performs actual runtime and gameplay testing to judge behavior,
+timing, visuals, and audio. The PS1 reference build
 keeps its existing compiler settings and SHA-1 checks.
 
 The staged implementation plan and stack decisions are in
-[roadmap.md](roadmap.md). They describe future work, not systems already
-implemented. The PS1 `check` target verifies byte identity of the reference;
-the developer will validate actual Windows gameplay separately.
+[roadmap.md](roadmap.md). Only the native toolchain and empty window from
+milestone 0 are implemented so far. The PS1 `check` target verifies byte
+identity of the reference; the developer will validate actual Windows gameplay
+separately.
