@@ -9,10 +9,11 @@ Update the relevant item after completing a task or discovering a blocker.
   - [x] Compile the original texture-pack loader against native GPU transfers.
   - [ ] Connect original primitive/ordering-table submission and animation code.
     - [x] Compile original prim.c and submit its packets through mapped native OT links.
-    - [ ] Compile original animation drawing and connect frame cursor insertion.
+    - [x] Compile original animation drawing and connect frame cursor insertion.
       - [x] Compile anim.c and exercise original clock, SPRT/FT4 construction and cursor linking.
       - [x] Connect original frame-buffer layout and cursor insertion to host storage.
   - [ ] Connect original disc requests, startup and native overlay dispatch.
+    - [x] Provide SDK VSync timing with deterministic synthetic clock checks.
 - [ ] Native executable remains a backend smoke harness; original game execution is not connected.
 - [ ] Graphics/GTE: verify hardware rounding, saturation, flags, and primitive edge coverage against independent fixtures.
   - [ ] Verify textured-polygon subpixel interpolation with nonuniform original FT4 fixtures; packet-generation tests do not establish texel fidelity.
@@ -29,6 +30,7 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Completed
 
+- [x] Add SDK VSync(0/1/n/-n) timing on an SDL monotonic clock, with nominal 60 Hz vblank/15,750 Hz horizontal units and no extra wait when work is late. Debug/Release pass 20 checks. Interrupt callback registration and hardware timing remain open.
 - [x] Compile original frame_buffers.c with host-safe OT insertion. Synthetic checks exercise both original buffer layouts, clearing, cursor advancement, depth clamping and final VRAM output in Debug/Release (19 checks).
 - [x] Compile original animation routines against native packet/link APIs. Synthetic fixtures cover section binding, duration/hold/pause, SPRT/FT4 upload-to-draw paths and original UV orientation fields; Debug/Release pass 18 tests.
 - [x] Run original primitive builders through native SDK packet submission, reverse OT traversal and bounded GS work storage. Synthetic fixtures verify color bytes, layer order, same-bucket order and rejection of unmapped/cyclic/oversized links in Debug/Release.

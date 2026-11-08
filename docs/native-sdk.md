@@ -90,3 +90,19 @@ remain authoritative. Tests allocate a sufficiently large host region, map it
 once, invoke the original layout for both frames, then submit inserted packets.
 Frame storage is runtime-only; its host pointer layout is never serialized as
 a PS1 frame record or saved game.
+
+## SDK timing
+
+`sdk_sync` supplies `VSync`: mode 0 waits for the next vblank, mode 1 queries
+elapsed horizontal units without waiting, n greater than 1 waits until n
+vblanks since the last completed wait, and negative modes query the absolute
+vblank count. This follows the SDK runtime reference linked above. The initial
+implementation uses nominal 60 Hz and 15,750 horizontal units per second;
+exact NTSC drift, scanline position and interrupt callbacks remain unmodeled.
+
+The default clock and absolute-deadline wait use SDL. Synthetic tests bind a
+deterministic clock to exercise deadlines without sleeping. Deadlines retain
+their phase and late work does not incur another full wait. Repeated
+`ResetCallback` calls, as used by original disc reads, initialize the timing
+source once without rewinding it. No interrupt callback registration API is
+provided yet; this is not full BIOS callback emulation.
