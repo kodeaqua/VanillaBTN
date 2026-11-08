@@ -1,6 +1,8 @@
 param(
     [ValidateSet('Debug', 'Release')]
-    [string]$Configuration = 'Debug'
+    [string]$Configuration = 'Debug',
+    [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9_-]*$')]
+    [string]$ExecutableName = 'vanillabtn'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -37,7 +39,7 @@ $env:PATH = "$(Split-Path $ninja);$env:PATH"
 $nativeDir = Join-Path (Split-Path $PSScriptRoot) 'native'
 Push-Location $nativeDir
 try {
-    & $cmake --preset $Configuration
+    & $cmake --preset $Configuration "-DVANILLABTN_EXECUTABLE_NAME=$ExecutableName"
     if ($LASTEXITCODE -ne 0) { throw 'Native CMake configure failed.' }
     & $cmake --build "../build/native/$Configuration"
     if ($LASTEXITCODE -ne 0) { throw 'Native build failed.' }

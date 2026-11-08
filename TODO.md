@@ -59,6 +59,8 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Completed
 
+- [x] Allow a simple named Windows runtime candidate through the build wrapper while another executable is in use; default and candidate Debug builds and the Release build pass 30 tests.
+
 - [x] Remove fabricated PocketStation serial/time/memory and successful execution/write responses. Standard cards report Invalid (2), missing cards NoCard (1), with canonical command IDs and untouched buffers/card contents. Regression fails on the old bridge and on temporary reversion; both profiles pass 28 tests. No PocketStation device is emulated.
 - [x] Fix SDK sequence opening: carry original archive byte counts into one-shot SDK source views, remove raw EOT byte scanning, and check parser failure before publishing a handle. Invalid PPQN fails before/after temporary reversion; short buffers and an FF/2F delta are covered. Both native profiles pass 27 checks, and the 14-file PS1 code check passes.
 - [x] Compile original PDA sample screen `10_PdaSamp/pdasamp.c` in `game_window_frame`, and add PocketStation `libmcx` SDK bridges (`McxAllInfo`, `McxGetApl`, `McxGetTime`, `McxHideTrans`, `McxGetSerial`, `McxGetMem`, `McxExecFlag`, `McxExecApl`, `McxCurrCtrl`, `McxFlashAcs`, `McxSetMem`, `McxShowTrans`, `McxSetLED`, `McxReadDev`, `McxWriteDev`, `McxSync`). Synthetic checks exercise `pda_sample_run` loop execution, pad polling delivering `PAD_SELECT` through native SDK buffers, and exit scene request to `SCENE_DEBUG` in Debug/Release (27 checks), and all 14 PS1 code hashes match.

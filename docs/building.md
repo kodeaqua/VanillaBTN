@@ -62,6 +62,16 @@ and nonzero PCM intervals without displaying or judging gameplay. It is not
 part of CTest because the normal suite requires no proprietary data. Diagnostics
 belong to this test executable, not the Release game executable.
 
+To build a separate local candidate while a game window is open:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/build-windows.ps1 `
+  -Configuration Debug -ExecutableName vanillabtn-candidate
+```
+
+This produces `build/native/Debug/vanillabtn-candidate.exe`. Omitting the name
+selects the standard `vanillabtn.exe` output again.
+
 ## PS1 reference build
 
 These commands build PS1 binaries, even when Docker runs on Windows. The incomplete native

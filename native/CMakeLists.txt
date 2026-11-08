@@ -79,8 +79,14 @@ target_include_directories(ps1_card PUBLIC src)
 target_link_libraries(ps1_card PUBLIC SDL3::SDL3)
 target_compile_options(ps1_card PRIVATE /W4)
 
+# A named local candidate can be built while another runtime is in use.
+set(VANILLABTN_EXECUTABLE_NAME "vanillabtn" CACHE STRING "Native runtime output name")
+if(NOT VANILLABTN_EXECUTABLE_NAME MATCHES "^[A-Za-z0-9][A-Za-z0-9_-]*$")
+    message(FATAL_ERROR "VANILLABTN_EXECUTABLE_NAME must be a simple executable name")
+endif()
 add_executable(vanillabtn WIN32 src/main.c)
-set_target_properties(vanillabtn PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+set_target_properties(vanillabtn PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES
+    OUTPUT_NAME "${VANILLABTN_EXECUTABLE_NAME}")
 target_link_libraries(vanillabtn PRIVATE SDL3::SDL3 ps1_video ps1_input ps1_clock ps1_audio ps1_card)
 target_compile_options(vanillabtn PRIVATE /W4)
 
