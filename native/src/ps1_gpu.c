@@ -277,6 +277,27 @@ bool ps1_gpu_exec(Ps1Video *video, Ps1DrawState *state,
     unsigned code = gp0_code(words[0]);
 
     switch (code) {
+    case 0x40: case 0x42: /* Flat line: color, XY0, XY1. */
+        if (count >= 3)
+            return ps1_video_draw_line(video, state, gp0_x(words[1]), gp0_y(words[1]),
+                gp0_x(words[2]), gp0_y(words[2]), gp0_rgb24(words[0]), (code & 2) != 0);
+        break;
+    case 0x30: case 0x32: case 0x38: case 0x3A: {
+        unsigned vertices = (code & 8) ? 4 : 3;
+        if (count < vertices * 2) break;
+        Ps1Vertex points[4];
+        uint32_t colors[4];
+        for (unsigned i = 0; i < vertices; ++i) {
+            points[i] = (Ps1Vertex){gp0_x(words[i * 2 + 1]), gp0_y(words[i * 2 + 1]), 0, 0};
+            colors[i] = gp0_rgb24(words[i * 2]);
+        }
+        if (!ps1_video_draw_gouraud_triangle(video, state, points, points + 1, points + 2,
+                                             colors, (code & 2) != 0)) return false;
+        if (vertices == 4)
+            return ps1_video_draw_gouraud_triangle(video, state, points + 1, points + 2, points + 3,
+                                                   colors + 1, (code & 2) != 0);
+        break;
+    }
     case GP0_FILL:
         exec_fill(video, words, count);
         break;

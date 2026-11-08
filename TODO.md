@@ -18,6 +18,7 @@ Update the relevant item after completing a task or discovering a blocker.
     - [x] Map original overlay data regions into bounded host main RAM.
     - [x] Honor SDK-selected draw/display rectangles and display mask in SDL presentation.
     - [x] Compile and exercise original screen fades through SDK GPU submission.
+    - [x] Compile original window-frame drawing and support its line/Gouraud packets.
     - [ ] Connect original CD audio, startup and module dispatch to the host loop.
 - [ ] Native executable remains a backend smoke harness; original game execution is not connected.
 - [ ] Graphics/GTE: verify hardware rounding, saturation, flags, and primitive edge coverage against independent fixtures.
@@ -35,6 +36,7 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Completed
 
+- [x] Correct missing original window borders/gradients by supporting flat-line and untextured Gouraud polygon commands in the backend. The unchanged window_frame.c fixture fails before the fix; separate line/Gouraud removal makes it fail again. Both profiles pass 25 checks; all 14 PS1 code hashes match. Hardware dithering and diagonal precision remain open.
 - [x] Compile original screen_fade.c and lazily map its private packets through the native SDK. Synthetic frames verify original fade counters and VRAM subtraction in/out; Debug/Release pass 24 checks. Main-loop frame globals/control hooks are fixture boundaries, not game startup.
 - [x] Add SDK draw/display environments, clear and VRAM moves; SDL follows selected frame-buffer location and original internal size. Memory-only software-renderer fixtures verify buffer flips, display mask and 320x240/640x480 texture changes without opening a window. Debug/Release pass 23 checks.
 - [x] Map 2 MB main RAM and its cached/uncached aliases without pointer truncation, and compile the original overlay-region table with host-backed data offsets. Boundary/overflow/alias/reset tests pass in both profiles (22 checks). Original startup and native scene dispatch remain pending; imported MIPS bytes are never executed.

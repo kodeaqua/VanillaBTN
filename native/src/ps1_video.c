@@ -1,6 +1,7 @@
 #include "ps1_video.h"
 
 #include <string.h>
+#include <stdlib.h>
 
 _Static_assert(sizeof(uint16_t) == 2, "PS1 VRAM words must be 16 bits");
 _Static_assert(sizeof(uint32_t) == 4, "ARGB pixels must be 32 bits");
@@ -181,10 +182,11 @@ static int max3(int a, int b, int c) {
     return m > c ? m : c;
 }
 
-bool ps1_video_draw_triangle(Ps1Video *video, const Ps1DrawState *state,
+static bool draw_triangle(Ps1Video *video, const Ps1DrawState *state,
                              const Ps1Vertex *v0, const Ps1Vertex *v1, const Ps1Vertex *v2,
                              uint32_t rgb24, unsigned tpage, unsigned clut,
-                             bool textured, bool raw_texture, bool semi_transparent) {
+                             bool textured, bool raw_texture, bool semi_transparent,
+                             const uint32_t *colors) {
     if (video == NULL || !valid_draw_state(state) || v0 == NULL || v1 == NULL || v2 == NULL) {
         return false;
     }
@@ -201,6 +203,9 @@ bool ps1_video_draw_triangle(Ps1Video *video, const Ps1DrawState *state,
     int64_t u0 = v0->u, v_0 = v0->v;
     int64_t u1 = v1->u, v_1 = v1->v;
     int64_t u2 = v2->u, v_2 = v2->v;
+    uint32_t c0 = colors ? colors[0] : rgb24;
+    uint32_t c1 = colors ? colors[1] : rgb24;
+    uint32_t c2 = colors ? colors[2] : rgb24;
 
     /* 2D cross product: (x1 - x0)*(y2 - y0) - (y1 - y0)*(x2 - x0) */
     int64_t det = (int64_t)(x1 - x0) * (y2 - y0) - (int64_t)(y1 - y0) * (x2 - x0);
@@ -213,6 +218,7 @@ bool ps1_video_draw_triangle(Ps1Video *video, const Ps1DrawState *state,
         int ty = y1; y1 = y2; y2 = ty;
         int64_t tu = u1; u1 = u2; u2 = tu;
         int64_t tv = v_1; v_1 = v_2; v_2 = tv;
+        uint32_t tc = c1; c1 = c2; c2 = tc;
         det = -det;
     }
 
@@ -247,9 +253,19 @@ bool ps1_video_draw_triangle(Ps1Video *video, const Ps1DrawState *state,
 
                 uint16_t front;
                 if (!textured) {
+                    uint16_t color = flat_color;
+                    if (colors) {
+                        uint32_t rgb = 0;
+                        for (unsigned shift = 0; shift < 24; shift += 8) {
+                            uint32_t channel = (uint32_t)((w0 * ((c0 >> shift) & 255)
+                                + w1 * ((c1 >> shift) & 255) + w2 * ((c2 >> shift) & 255)) / det);
+                            rgb |= channel << shift;
+                        }
+                        color = rgb15(rgb);
+                    }
                     front = semi_transparent
-                        ? blend_pixel(*pixel, flat_color, state->blend_mode)
-                        : flat_color;
+                        ? blend_pixel(*pixel, color, state->blend_mode)
+                        : color;
                 } else {
                     unsigned u = (unsigned)((w0 * u0 + w1 * u1 + w2 * u2) / det);
                     unsigned v = (unsigned)((w0 * v_0 + w1 * v_1 + w2 * v_2) / det);
@@ -267,6 +283,48 @@ bool ps1_video_draw_triangle(Ps1Video *video, const Ps1DrawState *state,
                 *pixel = front | (state->force_mask ? 0x8000u : 0);
             }
         }
+    }
+    return true;
+}
+
+bool ps1_video_draw_triangle(Ps1Video *video, const Ps1DrawState *state,
+    const Ps1Vertex *v0, const Ps1Vertex *v1, const Ps1Vertex *v2,
+    uint32_t rgb24, unsigned tpage, unsigned clut,
+    bool textured, bool raw_texture, bool semi_transparent) {
+    return draw_triangle(video, state, v0, v1, v2, rgb24, tpage, clut,
+                         textured, raw_texture, semi_transparent, NULL);
+}
+
+bool ps1_video_draw_gouraud_triangle(Ps1Video *video, const Ps1DrawState *state,
+    const Ps1Vertex *v0, const Ps1Vertex *v1, const Ps1Vertex *v2,
+    const uint32_t colors[3], bool semi_transparent) {
+    if (!colors) return false;
+    return draw_triangle(video, state, v0, v1, v2, 0, 0, 0, false, false, semi_transparent, colors);
+}
+
+bool ps1_video_draw_line(Ps1Video *video, const Ps1DrawState *state,
+    int x0, int y0, int x1, int y1, uint32_t rgb24, bool semi_transparent) {
+    if (!video || !valid_draw_state(state)) return false;
+    x0 = signed11(x0) + signed11(state->offset_x);
+    y0 = signed11(y0) + signed11(state->offset_y);
+    x1 = signed11(x1) + signed11(state->offset_x);
+    y1 = signed11(y1) + signed11(state->offset_y);
+    int dx = abs(x1 - x0), dy = -abs(y1 - y0);
+    int sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+    int error = dx + dy;
+    uint16_t color = rgb15(rgb24);
+    for (;;) {
+        if (x0 >= state->left && x0 <= state->right && y0 >= state->top && y0 <= state->bottom) {
+            uint16_t *pixel = &video->vram[y0][x0];
+            if (!state->check_mask || !(*pixel & 0x8000)) {
+                *pixel = (semi_transparent ? blend_pixel(*pixel, color, state->blend_mode) : color)
+                    | (state->force_mask ? 0x8000 : 0);
+            }
+        }
+        if (x0 == x1 && y0 == y1) break;
+        int twice = error * 2;
+        if (twice >= dy) { error += dy; x0 += sx; }
+        if (twice <= dx) { error += dx; y0 += sy; }
     }
     return true;
 }

@@ -31,6 +31,21 @@ static uint32_t wh_word(int16_t w, int16_t h) {
 }
 
 int main(void) {
+    /* Lines include both endpoints and a coincident pair draws one pixel. */
+    ps1_draw_state_reset(&draw);
+    const uint32_t line[] = {0x400000F8, 10u | (20u << 16), 13u | (20u << 16)};
+    if (!ps1_gpu_exec(&video, &draw, line, 3)) return 101;
+    for (unsigned x = 10; x <= 13; ++x) if (video.vram[20][x] != 0x001F) return 102;
+    if (video.vram[20][9] || video.vram[20][14]) return 103;
+    const uint32_t point[] = {0x4000F800, 30u | (30u << 16), 30u | (30u << 16)};
+    if (!ps1_gpu_exec(&video, &draw, point, 3) || video.vram[30][30] != 0x03E0) return 104;
+    /* Independent Gouraud quad: black at y=40, red=248 at y=44.
+     * Interior rows interpolate before truncating to five-bit channels. */
+    const uint32_t gradient[] = {0x38000000, 40u | (40u << 16),
+        0, 44u | (40u << 16), 248, 40u | (44u << 16), 248, 44u | (44u << 16)};
+    if (!ps1_gpu_exec(&video, &draw, gradient, 8)) return 105;
+    if (video.vram[41][41] != 7 || video.vram[42][41] != 15
+        || video.vram[43][41] != 23 || video.vram[44][41] != 0) return 106;
     memset(&video, 0, sizeof(video));
     ps1_draw_state_reset(&draw);
     /* Independent GP0 byte fixture: R occupies bits 0..7, B bits 16..23. */

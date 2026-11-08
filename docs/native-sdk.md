@@ -180,3 +180,19 @@ provides main-loop frame globals and records/isolates main control boundaries;
 fade counters, private packets, blend mode and shader levels come from the
 original code. Synthetic in/out frames verify resulting VRAM values. This
 does not wire startup or replace its publisher/title sequence.
+
+`game_window_frame` compiles the original bevel/gradient drawing routine.
+Its actual packets exposed missing flat-line and Gouraud-polygon dispatch in
+the software GPU. The backend now draws inclusive flat-line endpoints and
+untextured Gouraud triangles/quads, retaining clipping, masks and blending.
+Quads use the documented two-triangle split and existing shared-edge ownership.
+These command and endpoint rules follow the
+[GPU command specification](https://psx-spx.consoledev.net/graphicsprocessingunitgpu/).
+Dithering, diagonal-line tie behavior and exact hardware interpolation remain
+incomplete; the axis-aligned window fixture does not establish all of them.
+
+Regression evidence: the original window fixture fails on its missing upper
+edge before the fix, passes afterward, and fails again when line dispatch is
+removed. Keeping lines but removing Gouraud dispatch instead fails its gradient
+pixel. Independent GP0 fixtures cover inclusive/coincident line endpoints and
+interior Gouraud rows. The original window drawing code is unchanged.
