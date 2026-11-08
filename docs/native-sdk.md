@@ -570,3 +570,14 @@ Synthetic fixtures seed a nonzero byte at physical zero, read it through the
 original ground helper, and exercise missing marked-entry writes. The previous
 code faults on each fixture. The long headless probe now advances beyond scene
 setup into farm frames; callback ABI adaptation remains unfinished.
+
+### Native callback arguments
+
+Two original call sites retain their receiver only implicitly through MIPS
+argument registers: the harvest-helper tick callback and the player's confirm
+action. Windows builds pass that same receiver explicitly. Handler selection,
+cue tables and game rules remain unchanged; PS1 calls keep their original form.
+An off-screen helper fixture checks cue start and timer advancement through the
+actual public update function. The old native call faults; both profiles pass
+with explicit arguments. The extended demo now reaches farm execution and
+stops later on GPU packet validation.

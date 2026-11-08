@@ -3410,7 +3410,11 @@ static s32 player_confirm_action(FarmPlayer *player, s32 buttons)
     {
         return 0;
     }
+#ifdef VANILLABTN_NATIVE
+    if (player_advance_state(player))
+#else
     if (((s32 (*)())player_advance_state)())
+#endif
     {
         return 1;
     }

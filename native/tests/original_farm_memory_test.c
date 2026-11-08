@@ -49,6 +49,19 @@ int main(void) {
     sdk_main_ram[0] = 0x80;
     CHECK(farm_status_upper_bits() == 1);
     sdk_main_ram[0] = 0;
+    /* Off-screen helper ticks still need the explicit x64 receiver argument. */
+    game_state.globalFlags = GLOBAL_FLAG_CLOCK_TICKED;
+    game_state.progress.clock.time.hm.hour = 12;
+    memset(game_state.helpers, 0, sizeof(game_state.helpers));
+    for (int i = 0; i < HELPER_COUNT; ++i) game_state.helpers[i].flags = HELPER_BIT5;
+    FarmHelper *helper = &game_state.helpers[0];
+    helper->flags = 0;
+    helper->actor.place.location = PLACE_FARM;
+    harvest_helpers_update();
+    CHECK(helper->actor.taskId == CUE_STEP_PLAY);
+    CHECK(helper->actor.flags & ACTOR_FLAG_CUE_RUNNING);
+    harvest_helpers_update();
+    CHECK(helper->actor.taskTime == 1);
     u32 first = 11, buffer[3] = {0};
     sdk_gpu_bind(&video);
     CHECK(ps1_video_upload(&video, 0, 0, 2, 1, (u16 *)&first, 2));

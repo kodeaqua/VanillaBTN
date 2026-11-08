@@ -375,7 +375,13 @@ static s32 harvest_helper_timer_tick(FarmHelper *helper) {
     actions = harvest_helper_tick_handlers;
     action = actions[action_id];
     if (action != 0) {
+#ifdef VANILLABTN_NATIVE
+        /* The MIPS call leaves its receiver in a0. The Windows ABI requires
+         * us to pass that same helper explicitly through the callback. */
+        action(helper);
+#else
         action();
+#endif
     }
     if (!(helper->actor.flags & ACTOR_FLAG_CUE_RUNNING) && helper->actor.interruptTime >= HELPER_TASK_INTERVAL) {
         harvest_helper_seasonal_task(helper);
