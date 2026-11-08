@@ -266,6 +266,8 @@ add_library(game_window_frame STATIC
     ../src/main/ui/window_frame.c
     ../src/overlay/11_GF_FARM/menu/item_storage.c
     ../src/overlay/11_GF_FARM/picture_cells.c
+    ../src/overlay/27_GF_TITLE/title.c
+    ../src/overlay/28_GF_STAFF/staff.c
 )
 set_target_properties(game_window_frame PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_include_directories(game_window_frame PUBLIC ${game_include_dirs})

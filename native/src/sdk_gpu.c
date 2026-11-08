@@ -243,6 +243,17 @@ int DrawSync(int mode) {
     return mode == 0 || mode == 1 ? 0 : -1;
 }
 
+void SetDrawMode(DR_MODE *p, int dfe, int dtd, int tpage, RECT *tw) {
+    if (!p || (tw && (tw->x != 0 || tw->y != 0 || tw->w != 0 || tw->h != 0))) {
+        packet_error = true;
+        return;
+    }
+    setlen(p, 2);
+    p->code[0] = 0xE1000000ul | ((dfe) ? 0x400ul : 0ul)
+               | ((dtd) ? 0x200ul : 0ul) | ((u_long)tpage & 0x9FFul);
+    p->code[1] = 0xE2000000ul;
+}
+
 void SetDrawArea(DR_AREA *p, RECT *r) {
     if (!p || !r || !valid_area(r->x, r->y, r->w, r->h)) {
         packet_error = true;

@@ -8,4 +8,9 @@ typedef unsigned short u_short;
 typedef unsigned int u_int;
 typedef unsigned long u_long;
 
+#ifdef _MSC_VER
+#include <string.h>
+#define __builtin_memcpy memcpy
+#endif
+
 #endif

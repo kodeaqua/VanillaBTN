@@ -156,8 +156,11 @@ void DrawOTag(u_long *ot);
 #define getClut(x, y) ((u_short)(((unsigned)(y) << 6) | (((unsigned)(x) >> 4) & 63)))
 #define getTPage(tp, abr, x, y) ((u_short)(((tp) << 7) | ((abr) << 5) | (((y) & 256) >> 4) | (((x) & 1023) >> 6) | (((y) & 512) << 2)))
 #define setSprt(p) (setlen((p), 4), (p)->code = 0x64)
+#define setPolyF4(p) (setlen((p), 5), (p)->code = 0x28)
+#define SetPolyF4(p) setPolyF4(p)
 #define setPolyFT4(p) (setlen((p), 9), (p)->code = 0x2C)
 #define setSemiTrans(p, enabled) ((p)->code = ((p)->code & ~2) | ((enabled) ? 2 : 0))
+#define SetSemiTrans(p, enabled) setSemiTrans(p, enabled)
 #define setShadeTex(p, enabled) ((p)->code = ((p)->code & ~1) | ((enabled) ? 1 : 0))
 #define setRGB0(p, r, g, b) ((p)->r0 = (u_char)(r), (p)->g0 = (u_char)(g), (p)->b0 = (u_char)(b))
 #define setXY0(p, x, y) ((p)->x0 = (short)(x), (p)->y0 = (short)(y))
@@ -180,6 +183,7 @@ void DrawOTag(u_long *ot);
 int LoadImage(RECT *rect, u_long *pixels);
 int StoreImage(RECT *rect, u_long *pixels);
 int DrawSync(int mode);
+void SetDrawMode(DR_MODE *p, int dfe, int dtd, int tpage, RECT *tw);
 void SetDrawArea(DR_AREA *p, RECT *r);
 void SetDrawLoad(DR_LOAD *p, RECT *r);
 DRAWENV *SetDefDrawEnv(DRAWENV *env, int x, int y, int w, int h);

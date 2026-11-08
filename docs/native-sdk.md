@@ -257,17 +257,20 @@ does not wire startup or replace its publisher/title sequence.
 `game_window_frame` compiles the original bevel/gradient drawing routine
 (`window_frame.c`), message-window and glyph-layout engine (`text.c`), field
 menu box/dispatcher (`menu_window.c`), villager affection heart icon
-(`heart.c`), name/birthday entry screen (`name_entry.c`), and the `11_GF_FARM`
+(`heart.c`), name/birthday entry screen (`name_entry.c`), the `11_GF_FARM`
 VRAM picture-cell allocator and storage screens (`picture_cells.c` and
-`menu/item_storage.c`). In `text_bank.h` and `picture_cells.c`,
+`menu/item_storage.c`), the title overlay (`27_GF_TITLE/title.c`) and the
+staff-roll overlay (`28_GF_STAFF/staff.c`). In `text_bank.h` and `picture_cells.c`,
 `VANILLABTN_NATIVE` preserves full 64-bit host pointers in `LOCALIZED`,
 `LOCALIZED_NAME` and `item_villager_reaction` (`game_state.pictureCodes`)
 instead of truncating pointer arithmetic to 32-bit `u32`/`s32`. `libgpu.h`
-exposes `AddPrim`, `setRGB0`, `setXYWH` and `MoveImage2`.
-`sdk_gpu` supplies `DR_AREA` and `SetDrawArea` (`GP0 0xE3` and `0xE4` draw-area
-packets), `ps1_gpu_exec` dispatches multi-word `0xE1..0xE6` environment packets,
-`libgs.h` exposes `HWD0`/`VWD0` (`320`/`240`), and `sdk_work` supplies
-`SystemError` at the fatal platform boundary.
+exposes `AddPrim`, `setPolyF4`/`SetPolyF4`, `SetSemiTrans`, `setRGB0`,
+`setXYWH` and `MoveImage2`, and `sdk_types.h` aliases `__builtin_memcpy` to
+`memcpy` on MSVC.
+`sdk_gpu` supplies `SetDrawMode`, `DR_AREA` and `SetDrawArea` (`GP0 0xE1..0xE4`
+draw-mode and draw-area packets), `ps1_gpu_exec` dispatches multi-word
+`0xE1..0xE6` environment packets, `libgs.h` exposes `HWD0`/`VWD0` (`320`/`240`),
+and `sdk_work` supplies `SystemError` at the fatal platform boundary.
 Its actual packets exposed missing flat-line and Gouraud-polygon dispatch in
 the software GPU. The backend now draws inclusive flat-line endpoints and
 untextured Gouraud triangles/quads, retaining clipping, masks and blending.
@@ -287,8 +290,10 @@ interior Gouraud rows, and the window/text fixture exercises `text_format_number
 clipping, `menu_box_animate`, `heart_icon_draw`, `name_entry_start`/
 `name_entry_step`, `item_villager_reaction`, `farm_clamp_status`,
 `farm_adjust_stamina_fatigue`, `item_use_coin`, `picture_grid_clear`,
-`picture_slot_claim`, `picture_release_item`, `item_picture_slots_clear` and
-`item_picture_slots_unmark`. The original window drawing code is unchanged.
+`picture_slot_claim`, `picture_release_item`, `item_picture_slots_clear`,
+`item_picture_slots_unmark`, `title_step_dispatch` new-game initialization and
+continue-load transitions, and `staff_tick` entry and route-dependent exit
+transitions. The original window drawing code is unchanged.
 
 ## Controller math compatibility
 

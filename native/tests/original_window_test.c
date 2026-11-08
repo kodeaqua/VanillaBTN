@@ -9,7 +9,9 @@
 #include "picture_cells.h"
 #include "sdk_gpu.h"
 #include "sdk_work.h"
+#include "staff.h"
 #include "text.h"
+#include "title.h"
 #include "window_frame.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,7 +22,7 @@
     exit(1); \
 } } while (0)
 
-static u8 demo_and_region_storage[sizeof(InputDemo) + 64];
+static u8 demo_and_region_storage[sizeof(InputDemo) + 0x40000];
 u8 *region_base = demo_and_region_storage + sizeof(InputDemo);
 s32 frame_index;
 FrameState frame_records[2];
@@ -30,11 +32,13 @@ InputRecord input_records[2];
 InputRecord *input_pad1 = input_records;
 InputRecord *input_pad2 = input_records + 1;
 VabStream vab_stream_copy;
+static s32 requested_scene = -1;
 
 u8 *main_get_region_base(void) { return region_base; }
 u8 main_get_speed_mode(void) { return MAIN_SPEED_NORMAL; }
 void main_set_put_env(s32 value) { (void)value; }
 void main_set_clear_screen(s32 value) { (void)value; }
+void main_request_scene(s32 scene) { requested_scene = scene; }
 s32 estate_gold_change(s32 amount, s32 reset) {
     (void)reset;
     game_state.player.gold += amount;
@@ -45,7 +49,7 @@ int scene_tilt_is_held(void) { return 0; }
 void farm_unpause(void) {}
 
 static Ps1Video video;
-static u_long work[8192], ot[32];
+static u_long work[8192], ot[64], main_ot[FRAME_OT_DEPTH], active_ot_storage[4];
 static FrameState frame;
 static InputRecord fake_pad;
 
@@ -187,6 +191,45 @@ int main(void) {
     CHECK(farm_area.mode.pictureIds[PICTURE_ROW_PICKUP][0] == 0);
     item_picture_slots_clear();
     item_picture_slots_unmark();
+
+    /* Exercise 27_GF_TITLE/title.c and 28_GF_STAFF/staff.c entry/exit dispatch. */
+    CHECK(sdk_gpu_map(main_ot, sizeof(main_ot)));
+    CHECK(sdk_gpu_map(active_ot_storage, sizeof(active_ot_storage)));
+    ClearOTagR(active_ot_storage, 2);
+    active_ot = active_ot_storage;
+    frame.ot = main_ot;
+    frame.otDepth = FRAME_OT_DEPTH;
+
+    game_state.globalFlags = 0;
+    game_state.progress.entryStep = 0;
+    title_step_dispatch();
+    CHECK(game_state.progress.entryStep == 1);
+    CHECK(game_state.player.gold == 500 && game_state.player.stamina == 100);
+    CHECK(game_state.world.options.stereo == 1 && game_state.world.options.vibration == 1);
+    CHECK(game_state.progress.estate.toolboxItems[0].id == ITEM_SICKLE);
+
+    requested_scene = -1;
+    game_state.progress.entryStep = 6;
+    title_step_dispatch();
+    CHECK(game_state.progress.entryStep == 0);
+    CHECK(requested_scene == SCENE_LOAD);
+    CHECK((game_state.globalFlags & GLOBAL_FLAG_CONTINUE) != 0);
+
+    game_state.progress.entryStep = 0;
+    staff_tick();
+    CHECK(game_state.progress.entryStep == 1);
+
+    requested_scene = -1;
+    game_state.ending.route = 0;
+    game_state.progress.entryStep = 6;
+    staff_tick();
+    CHECK(requested_scene == SCENE_FARM_STAFF_EXIT);
+
+    requested_scene = -1;
+    game_state.ending.route = 10;
+    game_state.progress.entryStep = 6;
+    staff_tick();
+    CHECK(requested_scene == SCENE_TITLE);
 
     sdk_gpu_bind(NULL);
     CHECK(sdk_work_bind(NULL, 0));
