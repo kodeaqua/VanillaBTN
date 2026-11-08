@@ -35,3 +35,8 @@ set_target_properties(ps1_video_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRE
 target_link_libraries(ps1_video_test PRIVATE ps1_video)
 target_compile_options(ps1_video_test PRIVATE /W4)
 add_test(NAME ps1_video_pixels COMMAND ps1_video_test)
+add_executable(ps1_sprite_test tests/ps1_sprite_test.c)
+set_target_properties(ps1_sprite_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_link_libraries(ps1_sprite_test PRIVATE ps1_video)
+target_compile_options(ps1_sprite_test PRIVATE /W4)
+add_test(NAME ps1_sprite_pixels COMMAND ps1_sprite_test)

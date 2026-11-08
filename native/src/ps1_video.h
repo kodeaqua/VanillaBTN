@@ -19,6 +19,13 @@ typedef struct Ps1DrawState {
     bool force_mask, check_mask;  /* GP0(E6) bits 0-1. */
 } Ps1DrawState;
 
+typedef struct Ps1Sprite {
+    int x, y, width, height;
+    unsigned u, v, tpage, clut;
+    uint32_t rgb24;               /* 0xRRGGBB; 0x808080 is neutral modulation. */
+    bool raw_texture, semi_transparent;
+} Ps1Sprite;
+
 /* Preserve raw PS1 BGR555 words, including the high mask/semitransparency bit. */
 bool ps1_video_upload(Ps1Video *video, int x, int y, int width, int height,
                       const uint16_t *source, size_t source_stride);
@@ -40,5 +47,9 @@ bool ps1_video_draw_tile(Ps1Video *video, const Ps1DrawState *state, int x, int 
 /* Read one raw texel through the GP0 texture page and CLUT fields. Zero is transparent. */
 bool ps1_video_sample_texel(const Ps1Video *video, unsigned tpage, unsigned clut,
                             unsigned u, unsigned v, uint16_t *texel);
+
+/* Draw a textured PS1 rectangle with raw or modulated color. */
+bool ps1_video_draw_sprite(Ps1Video *video, const Ps1DrawState *state,
+                           const Ps1Sprite *sprite);
 
 #endif

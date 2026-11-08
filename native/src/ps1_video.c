@@ -10,6 +10,13 @@ static bool valid_rect(int x, int y, int width, int height) {
         && width <= PS1_VRAM_WIDTH - x && height <= PS1_VRAM_HEIGHT - y;
 }
 
+static bool valid_draw_state(const Ps1DrawState *state) {
+    return state != NULL && state->left >= 0 && state->top >= 0
+        && state->right < PS1_VRAM_WIDTH && state->bottom < PS1_VRAM_HEIGHT
+        && state->left <= state->right && state->top <= state->bottom
+        && state->blend_mode <= 3;
+}
+
 static uint16_t rgb15(uint32_t rgb24) {
     return (uint16_t)(((rgb24 >> 19) & 31u) | ((rgb24 >> 6) & 0x3E0u)
                       | ((rgb24 << 7) & 0x7C00u));
@@ -61,10 +68,7 @@ void ps1_video_quick_fill(Ps1Video *video, int x, int y, int width, int height,
 
 bool ps1_video_draw_tile(Ps1Video *video, const Ps1DrawState *state, int x, int y,
                          int width, int height, uint32_t rgb24, bool semi_transparent) {
-    if (video == NULL || state == NULL || state->left < 0 || state->top < 0
-        || state->right >= PS1_VRAM_WIDTH || state->bottom >= PS1_VRAM_HEIGHT
-        || state->left > state->right || state->top > state->bottom
-        || state->blend_mode > 3) {
+    if (video == NULL || !valid_draw_state(state)) {
         return false;
     }
     int tile_width = width & 0x3FF;
@@ -114,6 +118,55 @@ bool ps1_video_sample_texel(const Ps1Video *video, unsigned tpage, unsigned clut
     unsigned clut_x = (((clut & 63u) * 16u) + index) & (PS1_VRAM_WIDTH - 1);
     unsigned clut_y = (clut >> 6) & (PS1_VRAM_HEIGHT - 1);
     *texel = video->vram[clut_y][clut_x];
+    return true;
+}
+
+static unsigned modulate_channel(unsigned texel, unsigned color) {
+    unsigned result = (texel * color) >> 7;
+    return result > 31 ? 31 : result;
+}
+
+static uint16_t modulate_texel(uint16_t texel, uint32_t rgb24) {
+    unsigned red = modulate_channel(texel & 31u, (rgb24 >> 16) & 255u);
+    unsigned green = modulate_channel((texel >> 5) & 31u, (rgb24 >> 8) & 255u);
+    unsigned blue = modulate_channel((texel >> 10) & 31u, rgb24 & 255u);
+    return (uint16_t)(red | (green << 5) | (blue << 10) | (texel & 0x8000u));
+}
+
+bool ps1_video_draw_sprite(Ps1Video *video, const Ps1DrawState *state,
+                           const Ps1Sprite *sprite) {
+    if (video == NULL || !valid_draw_state(state) || sprite == NULL
+        || ((sprite->tpage >> 7) & 3u) == 3u) {
+        return false;
+    }
+    int origin_x = signed11(sprite->x) + signed11(state->offset_x);
+    int origin_y = signed11(sprite->y) + signed11(state->offset_y);
+    int left = origin_x;
+    int top = origin_y;
+    int right = left + (sprite->width & 0x3FF);
+    int bottom = top + (sprite->height & 0x1FF);
+
+    if (left < state->left) left = state->left;
+    if (top < state->top) top = state->top;
+    if (right > state->right + 1) right = state->right + 1;
+    if (bottom > state->bottom + 1) bottom = state->bottom + 1;
+    for (int row = top; row < bottom; ++row) {
+        for (int col = left; col < right; ++col) {
+            uint16_t texel;
+            ps1_video_sample_texel(video, sprite->tpage, sprite->clut,
+                                   sprite->u + (unsigned)(col - origin_x),
+                                   sprite->v + (unsigned)(row - origin_y), &texel);
+            if (texel == 0) continue; /* Zero texels leave the destination untouched. */
+            uint16_t *pixel = &video->vram[row][col];
+            if (state->check_mask && (*pixel & 0x8000u)) continue;
+            uint16_t front = sprite->raw_texture
+                ? texel : modulate_texel(texel, sprite->rgb24);
+            if (sprite->semi_transparent && (texel & 0x8000u)) {
+                front = blend_pixel(*pixel, front, state->blend_mode) | 0x8000u;
+            }
+            *pixel = front | (state->force_mask ? 0x8000u : 0);
+        }
+    }
     return true;
 }
 
