@@ -119,7 +119,7 @@ target_link_libraries(original_prim_test PRIVATE game_prim)
 target_compile_options(original_prim_test PRIVATE /W4 /UNDEBUG)
 add_test(NAME original_primitive_packets COMMAND original_prim_test)
 
-add_library(game_anim STATIC ../src/main/graphics/anim.c src/sdk_debug.c)
+add_library(game_anim STATIC ../src/main/graphics/anim.c ../src/main/system.c src/sdk_debug.c)
 target_include_directories(game_anim PRIVATE ../src/main/geometry)
 set_target_properties(game_anim PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_link_libraries(game_anim PUBLIC game_prim)
@@ -130,10 +130,14 @@ target_link_libraries(original_anim_test PRIVATE game_anim)
 target_compile_options(original_anim_test PRIVATE /W4 /UNDEBUG)
 add_test(NAME original_animation_packets COMMAND original_anim_test)
 
-add_library(game_frame_buffers STATIC ../src/main/graphics/frame_buffers.c)
+add_library(game_frame_buffers STATIC
+    ../src/main/graphics/frame_buffers.c
+    ../src/main/ui/loading_screen.c
+)
 set_target_properties(game_frame_buffers PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_include_directories(game_frame_buffers PUBLIC ../src/main/ui)
 target_link_libraries(game_frame_buffers PUBLIC game_anim)
-target_compile_options(game_frame_buffers PRIVATE /W4)
+target_compile_options(game_frame_buffers PRIVATE /W4 /Gy)
 add_executable(original_frame_test tests/original_frame_test.c)
 set_target_properties(original_frame_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_link_libraries(original_frame_test PRIVATE game_frame_buffers)

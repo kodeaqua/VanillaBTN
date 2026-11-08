@@ -11,7 +11,7 @@ Update the relevant item after completing a task or discovering a blocker.
     - [x] Compile original prim.c and submit its packets through mapped native OT links.
     - [x] Compile original animation drawing and connect frame cursor insertion.
       - [x] Compile anim.c and exercise original clock, SPRT/FT4 construction and cursor linking.
-      - [x] Connect original frame-buffer layout and cursor insertion to host storage.
+      - [x] Connect original frame-buffer layout, system display-mask helpers, loading screen and cursor insertion to host storage.
   - [ ] Connect original disc requests, startup and native overlay dispatch.
     - [x] Provide SDK VSync timing with deterministic synthetic clock checks.
     - [x] Compile original afile.c against imported-disc SDK sector reads.
@@ -40,6 +40,7 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Completed
 
+- [x] Compile original system.c (`host_poll`, `display_on`, `display_off`) and loading_screen.c in game_anim/game_frame_buffers without changing their source. Synthetic checks exercise loading-picture texture upload, display-mask toggling, double-buffered frame/environment flips, SPRT/DR_MODE submission at (160, 120) and stop transitions in Debug/Release (27 checks).
 - [x] Compile original pad_vibration.c alongside pad.c in game_pad. Synthetic checks exercise vibration pattern startup gating before pad_init, script step durations, same-script deduplication, actuator0/actuator1 updates through sdk_pad rumble callbacks, explicit stop and replay suppression in Debug/Release (27 checks).
 - [x] Connect host raw input/rumble adapters and compile original pad.c without replacing its logic. Synthetic fixtures exercise two SDK ports, original repeat timing, analog dead zone/d-pad priority, exact sector boundary, replay button swap, actuator negotiation and analog/digital hot swaps. Both profiles pass 27 checks and all 14 PS1 code hashes match; gameplay/controller feel remains developer validation.
 - [x] Implement native SDK csqrt/ratan2 with the reference SDK's fixed-point quantization. Optional VM microchecks execute only SDK math functions from the local reference ELF, with an explicit leading-sign-bit hook, and compare all analog magnitudes against Debug/Release. Normal builds require neither the VM package nor SDK files; 26 synthetic checks pass.

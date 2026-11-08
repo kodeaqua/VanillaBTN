@@ -69,14 +69,16 @@ scene is connected by this step.
 
 ## Original animation code
 
-`game_anim` compiles `src/main/graphics/anim.c` directly. Byte-pointer offset
-arithmetic replaces the compiler-specific `void*` addition. Native builds omit
-the farm-state include used only for PS1 return-address diagnostics; those
-MIPS addresses have no native meaning. No playback or drawing rule is replaced.
-`LINK_PRIM` routes through the same mapped SDK links as `addPrim`, preserving
-the original packet length and preventing x64 pointer truncation.
+`game_anim` compiles `src/main/graphics/anim.c` and `src/main/system.c`
+directly. Byte-pointer offset arithmetic replaces the compiler-specific `void*`
+addition. Native builds omit the farm-state include used only for PS1
+return-address diagnostics; those MIPS addresses have no native meaning. No
+playback or drawing rule is replaced. `LINK_PRIM` routes through the same mapped
+SDK links as `addPrim`, preserving the original packet length and preventing
+x64 pointer truncation.
 
-Original fatal debugger waits terminate through the native `host_poll` trap.
+Original fatal debugger waits terminate through `pollhost()` in the compiled
+`host_poll` routine, while `display_on`/`display_off` drive `SetDispMask`.
 Font diagnostic output exists only in Debug; Release discards calls and their
 arguments at compile time. The native compatibility header does not supply
 fake implementations for unported scratchpad or other CPU operations.
@@ -87,13 +89,16 @@ They supply the main module's frame pointer as fixture state. Uniform texels
 isolate packet generation from the backend's incomplete polygon interpolation;
 independent nonuniform hardware fixtures remain required for texel fidelity.
 
-`game_frame_buffers` compiles the original frame layout and cursor insertion.
-Native insertion replaces only the 24-bit pointer cast with SDK link mapping.
-The original OT dimensions, memory offsets, clearing and cursor advancement
-remain authoritative. Tests allocate a sufficiently large host region, map it
-once, invoke the original layout for both frames, then submit inserted packets.
-Frame storage is runtime-only; its host pointer layout is never serialized as
-a PS1 frame record or saved game.
+`game_frame_buffers` compiles the original frame layout, cursor insertion and
+`src/main/ui/loading_screen.c`. Native insertion replaces only the 24-bit
+pointer cast with SDK link mapping. The original OT dimensions, memory offsets,
+clearing, cursor advancement, loading-picture texture upload, double-buffered
+loading OT/packet slots and environment flips remain authoritative. Tests
+allocate a sufficiently large host region, map it once, invoke the original
+layout for both frames, submit inserted packets, and exercise loading-screen
+initialization, double-buffered drawing and stop transitions. Frame storage is
+runtime-only; its host pointer layout is never serialized as a PS1 frame record
+or saved game.
 
 ## SDK timing
 
