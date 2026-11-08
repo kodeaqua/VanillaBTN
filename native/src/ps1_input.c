@@ -1,4 +1,26 @@
 #include "ps1_input.h"
+#include <math.h>
+#include <stdlib.h>
+
+uint32_t ps1_input_stick_buttons(int16_t host_x, int16_t host_y) {
+    int x = ((int)host_x + 32768) / 256;
+    int y = ((int)host_y + 32768) / 256;
+    int angle;
+    if (x >= 92 && x <= 164 && y >= 92 && y <= 164) return 0;
+    int dx = abs(x - 128), dy = abs(y - 128);
+    if (dy == 0) angle = 90;
+    else if (dx == 0) angle = 0;
+    else angle = (int)(atan2((double)dx, (double)dy) * 4096.0 / 6.283185307179586) * 360 / 4096;
+    if (x >= 128) { if (y > 128) angle = 180 - angle; }
+    else if (y > 128) angle += 180;
+    else angle = 360 - angle;
+    if (angle == 360) angle = 0;
+    if (angle < 45 || angle > 315) return PS1_PAD_UP;
+    if (angle > 45 && angle < 135) return PS1_PAD_RIGHT;
+    if (angle > 135 && angle < 225) return PS1_PAD_DOWN;
+    if (angle > 225) return PS1_PAD_LEFT;
+    return 0;
+}
 
 #include <string.h>
 

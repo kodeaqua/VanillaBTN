@@ -2,8 +2,14 @@
  * ps1_input_test: synthetic checks for pad.c controller emulation and repeat semantics.
  */
 #include "ps1_input.h"
+#include <assert.h>
 
 int main(void) {
+    assert(ps1_input_stick_buttons(0, 0) == 0);
+    assert(ps1_input_stick_buttons(0, -32768) == PS1_PAD_UP);
+    assert(ps1_input_stick_buttons(32767, 0) == PS1_PAD_RIGHT);
+    assert(ps1_input_stick_buttons(0, 32767) == PS1_PAD_DOWN);
+    assert(ps1_input_stick_buttons(-32768, 0) == PS1_PAD_LEFT);
     Ps1InputRecord record;
     ps1_input_init(&record);
 

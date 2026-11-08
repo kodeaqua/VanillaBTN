@@ -67,4 +67,7 @@ void ps1_input_tick(Ps1InputRecord *record);
 /* Clear all held, pressed, and repeat states. */
 void ps1_input_clear(Ps1InputRecord *record);
 
+/* Fold an SDL signed left stick into pad.c's four cardinal sectors/dead zone. */
+uint32_t ps1_input_stick_buttons(int16_t x, int16_t y);
+
 #endif /* VANILLABTN_PS1_INPUT_H */
