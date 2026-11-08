@@ -7,8 +7,10 @@
 #include "clut.h"
 #include "farm_state.h"
 #include "frame_buffers.h"
+#include "ground.h"
 #include "loading_screen.h"
 #include "math_util.h"
+#include "model.h"
 #include "ui_icons.h"
 #include <assert.h>
 #include <stddef.h>
@@ -257,6 +259,69 @@ int main(void) {
            current_frame->primStart + 165 * (sizeof(SPRT) + sizeof(DR_MODE)));
     DrawOTag(current_frame->ot + FRAME_OT_DEPTH - 1);
     assert(sdk_gpu_ok());
+
+    /* Original model.c and ground.c: bind a synthetic TMD with two objects,
+     * test ground_enable_objects / ground_find_object / ground_height_at, and
+     * project + draw a flat triangle through model_draw into the OT. */
+    typedef struct SyntheticTmdFile {
+        u32 id;
+        u32 flags;
+        s32 n_obj;
+        TmdObject objects[2];
+        s32 clip;
+        s16 center_coords[8];
+        SVECTOR verts[3];
+        u32 f3_packet[4];
+    } SyntheticTmdFile;
+
+    SyntheticTmdFile tmd_file;
+    memset(&tmd_file, 0, sizeof(tmd_file));
+    tmd_file.id = 0x41;
+    tmd_file.n_obj = 2;
+    tmd_file.objects[0].vert_top = (u32)((u8 *)tmd_file.verts - (u8 *)tmd_file.objects);
+    tmd_file.objects[0].n_vert = 3;
+    tmd_file.objects[0].primitive_top = (u32)((u8 *)tmd_file.f3_packet - (u8 *)tmd_file.objects);
+    tmd_file.objects[0].n_primitive = 1;
+    tmd_file.clip = 400;
+    /* Triangle at y = 50 spanning (-100..100, -100..100) in XZ, oriented so
+     * ground_triangle_under passes; facing a camera at (0, -200, 500) looking
+     * at (0, 50, 0) with roll 0x800, its projected vertices have OPZ > 0. */
+    tmd_file.verts[0] = (SVECTOR){ -100, 50, -100, 0 };
+    tmd_file.verts[1] = (SVECTOR){  100, 50, -100, 0 };
+    tmd_file.verts[2] = (SVECTOR){    0, 50,  100, 0 };
+    tmd_file.f3_packet[0] = (u32)TMD_PRIM_F3_RAW << 16;
+    tmd_file.f3_packet[1] = 0x2000FF00u; /* green flat triangle */
+    tmd_file.f3_packet[2] = 0u | (1u << 16);
+    tmd_file.f3_packet[3] = 2u;
+
+    Model test_model;
+    model_bind_tmd(&test_model, (char *)&tmd_file);
+    assert(test_model.tmd == (TmdHeader *)&tmd_file);
+    assert(test_model.centers == (ModelCenters *)&tmd_file.clip);
+    ground_enable_objects(&test_model);
+    assert(tmd_file.objects[0].scale == 1 && tmd_file.objects[1].scale == 1);
+    ground_set_tolerance(200);
+    VECTOR query_pos = { 0, 60, 0, 0 };
+    assert(ground_find_object(&test_model, &query_pos) == 1);
+    assert(ground_height_at() == 50);
+    assert(ground_hit_primitive() == (void *)tmd_file.f3_packet);
+
+    camera_init_projection();
+    camera_set_eye_roll(0, -200, 500, 0x800);
+    camera_set_target(0, 50, 0);
+    model_load_lighting();
+    FarmScreenXY proj_xy = { 0, 0 };
+    SVECTOR center_v = { 0, 50, 0, 0 };
+    s32 otz = gte_project_vertex(&proj_xy, &center_v);
+    assert(otz > 0 && proj_xy.x == 160 && proj_xy.y == 120);
+
+    ClearOTagR(current_frame->ot, FRAME_OT_DEPTH);
+    current_frame->primCursor.bytes = current_frame->primStart;
+    model_draw(&test_model);
+    assert(current_frame->primCursor.bytes == current_frame->primStart + sizeof(POLY_F3));
+    DrawOTag(current_frame->ot + FRAME_OT_DEPTH - 1);
+    assert(sdk_gpu_ok());
+    assert(video.vram[120][160] == (31u << 5));
 
     sdk_gpu_bind(NULL);
     return 0;

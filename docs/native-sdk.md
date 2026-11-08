@@ -91,20 +91,33 @@ independent nonuniform hardware fixtures remain required for texel fidelity.
 
 `game_frame_buffers` compiles the original frame layout, cursor insertion,
 `src/main/geometry/math_util.c`, `src/main/geometry/camera.c`,
-`src/main/graphics/clut.c`, `src/main/ui/loading_screen.c`,
-`src/main/ui/ui_icons.c` and `src/main/ui/bg_tile.c`. Native insertion replaces
+`src/main/geometry/vec_length.c`, `src/main/geometry/ground.c`,
+`src/main/geometry/model.c`, `src/main/graphics/clut.c`,
+`src/main/ui/loading_screen.c`, `src/main/ui/ui_icons.c` and
+`src/main/ui/bg_tile.c`. Native insertion replaces
 only the 24-bit pointer cast with SDK link mapping. `SetDrawLoad` constructs
 inline `DR_LOAD` (`GP0 0xA0`) CPU-to-VRAM transfer packets while preserving any
 link already stored in the tag's low 24 bits by `ot_insert_prim`, and
 `ps1_gpu_exec` copies those halfwords into VRAM with bounds and word-count
-validation. The original OT dimensions, memory offsets, clearing, cursor
-advancement, camera polar setup, CLUT palette blending/bouncing/wrapping,
+validation. `sdk_math` connects `<libgte.h>`, `<inline_c.h>` and `<gtemac.h>`
+entry points (`SetGeomOffset`, `SetGeomScreen`, `SetFogNear`, `SetFarColor`,
+`PushMatrix`, `PopMatrix`, `RotMatrixX/Y/Z`, `ApplyMatrixLV`, `OuterProduct0`,
+`gte_OuterProduct12`, `gte_MulMatrix0`, `VectorNormal`, `VectorNormalS`,
+`VectorNormalSS`, `SquareRoot0`, `GsIDMATRIX`, and the `gte_ld*`/`gte_rt*`/
+`gte_nclip`/`gte_avsz*`/`gte_sqr0`/`gte_op12`/`gte_st*` coprocessor calls) to
+`ps1_gte`, while `ground.c` moves its two GCC nested helpers (`ground_triangle_under`
+and `ground_quad_under`, which capture no local variables) to file scope under
+`VANILLABTN_NATIVE` so MSVC C17 compiles the original height and triangle-hit
+logic unchanged. The original OT dimensions, memory offsets, clearing, cursor
+advancement, camera polar/frustum/view setup, TMD model projection/culling,
+ground triangle height/collision lookup, CLUT palette blending/bouncing/wrapping,
 loading-picture texture upload, double-buffered loading OT/packet slots,
 environment flips, UI icon blink cycles/sprites and diagonal 24-pixel
 background tiling remain authoritative. Tests allocate a sufficiently large
 host region, map it once, invoke the original layout for both frames, submit
 inserted packets, and exercise loading-screen, CLUT-fade/scroll, camera, UI
-icon and background-tile execution. Frame storage is runtime-only; its host
+icon, background-tile, ground-height/collision and TMD model-projection/draw
+execution. Frame storage is runtime-only; its host
 pointer layout is never serialized as a PS1 frame record or saved game.
 
 ## SDK timing

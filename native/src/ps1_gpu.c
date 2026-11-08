@@ -299,6 +299,38 @@ bool ps1_gpu_exec(Ps1Video *video, Ps1DrawState *state,
                                                    colors + 1, (code & 2) != 0);
         break;
     }
+    case 0x34: case 0x35: case 0x36: case 0x37:
+    case 0x3C: case 0x3D: case 0x3E: case 0x3F: {
+        /* POLY_GT3 / POLY_GT4: textured Gouraud polygon.
+         * Layout: v_i has [3*i] rgb, [3*i+1] xy, [3*i+2] uv(+clut/tpage). */
+        unsigned vertices = (code & 8) ? 4 : 3;
+        if (count < vertices * 3) break;
+        Ps1Vertex points[4];
+        for (unsigned i = 0; i < vertices; ++i) {
+            points[i] = (Ps1Vertex){
+                gp0_x(words[i * 3 + 1]),
+                gp0_y(words[i * 3 + 1]),
+                words[i * 3 + 2] & 0xFFu,
+                (words[i * 3 + 2] >> 8) & 0xFFu
+            };
+        }
+        unsigned clut = (words[2] >> 16) & 0xFFFFu;
+        unsigned tpage_word = (words[5] >> 16) & 0xFFFFu;
+        state->tpage = tpage_word & 0x1FFu;
+        state->blend_mode = (tpage_word >> 5) & 3u;
+        uint32_t rgb24 = gp0_rgb24(words[0]);
+        bool raw_tex = (code & 1) != 0;
+        bool semi_trans = (code & 2) != 0;
+        if (!ps1_video_draw_triangle(video, state, &points[0], &points[1], &points[2],
+                                     rgb24, state->tpage, clut,
+                                     true, raw_tex, semi_trans)) return false;
+        if (vertices == 4) {
+            return ps1_video_draw_triangle(video, state, &points[1], &points[2], &points[3],
+                                           rgb24, state->tpage, clut,
+                                           true, raw_tex, semi_trans);
+        }
+        break;
+    }
     case GP0_FILL:
         exec_fill(video, words, count);
         break;

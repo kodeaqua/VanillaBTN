@@ -3,6 +3,11 @@
 
 #include <stdlib.h>
 
+/* Scratchpad stack switching is a PS1 1 KB d-cache optimization; on Windows
+ * the host call stack is already cached. */
+#define SCRATCHPAD_STACK_ENTER() ((void)0)
+#define SCRATCHPAD_STACK_LEAVE() ((void)0)
+
 /* PS1 return addresses are debugger metadata, not game state. A 32-bit MIPS
  * address has no meaning in the native process; do not truncate host pointers
  * or evaluate the discarded diagnostic destination. */

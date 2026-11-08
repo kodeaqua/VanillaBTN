@@ -130,9 +130,15 @@ target_link_libraries(original_anim_test PRIVATE game_anim)
 target_compile_options(original_anim_test PRIVATE /W4 /UNDEBUG)
 add_test(NAME original_animation_packets COMMAND original_anim_test)
 
+add_library(ps1_gte STATIC src/ps1_gte.c)
+set_target_properties(ps1_gte PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_include_directories(ps1_gte PUBLIC src)
+target_compile_options(ps1_gte PRIVATE /W4)
+
 add_library(sdk_math STATIC src/sdk_math.c)
 set_target_properties(sdk_math PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
-target_include_directories(sdk_math PUBLIC compat)
+target_include_directories(sdk_math PUBLIC compat src)
+target_link_libraries(sdk_math PUBLIC ps1_gte)
 target_compile_options(sdk_math PRIVATE /W4)
 add_executable(sdk_math_test tests/sdk_math_test.c)
 set_target_properties(sdk_math_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
@@ -142,7 +148,10 @@ add_test(NAME sdk_fixed_math COMMAND sdk_math_test)
 
 add_library(game_frame_buffers STATIC
     ../src/main/geometry/camera.c
+    ../src/main/geometry/ground.c
     ../src/main/geometry/math_util.c
+    ../src/main/geometry/model.c
+    ../src/main/geometry/vec_length.c
     ../src/main/graphics/clut.c
     ../src/main/graphics/frame_buffers.c
     ../src/main/ui/bg_tile.c
@@ -322,11 +331,6 @@ set_target_properties(ps1_gpu_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED 
 target_link_libraries(ps1_gpu_test PRIVATE ps1_gpu)
 target_compile_options(ps1_gpu_test PRIVATE /W4)
 add_test(NAME ps1_gpu_dispatch COMMAND ps1_gpu_test)
-
-add_library(ps1_gte STATIC src/ps1_gte.c)
-set_target_properties(ps1_gte PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
-target_include_directories(ps1_gte PUBLIC src)
-target_compile_options(ps1_gte PRIVATE /W4)
 
 add_executable(ps1_gte_test tests/ps1_gte_test.c)
 set_target_properties(ps1_gte_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)

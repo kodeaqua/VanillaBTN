@@ -28,6 +28,26 @@ typedef struct DR_TPAGE { u_long tag, code[1]; } DR_TPAGE;
 typedef struct DR_LOAD { u_long tag, code[3], p[13]; } DR_LOAD;
 typedef struct DR_ENV { u_long tag, code[15]; } DR_ENV;
 
+typedef struct POLY_F3 {
+    u_long tag;
+    u_char r0, g0, b0, code;
+    short x0, y0, x1, y1, x2, y2;
+} POLY_F3;
+
+typedef struct POLY_FT3 {
+    u_long tag;
+    u_char r0, g0, b0, code;
+    short x0, y0;
+    u_char u0, v0;
+    u_short clut;
+    short x1, y1;
+    u_char u1, v1;
+    u_short tpage;
+    short x2, y2;
+    u_char u2, v2;
+    u_short pad1;
+} POLY_FT3;
+
 typedef struct POLY_FT4 {
     u_long tag;
     u_char r0, g0, b0, code;
@@ -50,6 +70,64 @@ typedef struct POLY_F4 {
     u_char r0, g0, b0, code;
     short x0, y0, x1, y1, x2, y2, x3, y3;
 } POLY_F4;
+
+typedef struct POLY_G3 {
+    u_long tag;
+    u_char r0, g0, b0, code;
+    short x0, y0;
+    u_char r1, g1, b1, pad1;
+    short x1, y1;
+    u_char r2, g2, b2, pad2;
+    short x2, y2;
+} POLY_G3;
+
+typedef struct POLY_GT3 {
+    u_long tag;
+    u_char r0, g0, b0, code;
+    short x0, y0;
+    u_char u0, v0;
+    u_short clut;
+    u_char r1, g1, b1, p1;
+    short x1, y1;
+    u_char u1, v1;
+    u_short tpage;
+    u_char r2, g2, b2, p2;
+    short x2, y2;
+    u_char u2, v2;
+    u_short pad2;
+} POLY_GT3;
+
+typedef struct POLY_G4 {
+    u_long tag;
+    u_char r0, g0, b0, code;
+    short x0, y0;
+    u_char r1, g1, b1, pad1;
+    short x1, y1;
+    u_char r2, g2, b2, pad2;
+    short x2, y2;
+    u_char r3, g3, b3, pad3;
+    short x3, y3;
+} POLY_G4;
+
+typedef struct POLY_GT4 {
+    u_long tag;
+    u_char r0, g0, b0, code;
+    short x0, y0;
+    u_char u0, v0;
+    u_short clut;
+    u_char r1, g1, b1, p1;
+    short x1, y1;
+    u_char u1, v1;
+    u_short tpage;
+    u_char r2, g2, b2, p2;
+    short x2, y2;
+    u_char u2, v2;
+    u_short pad2;
+    u_char r3, g3, b3, p3;
+    short x3, y3;
+    u_char u3, v3;
+    u_short pad3;
+} POLY_GT4;
 
 typedef struct DRAWENV {
     RECT clip;
@@ -83,6 +161,13 @@ void DrawOTag(u_long *ot);
 #define setXY0(p, x, y) ((p)->x0 = (short)(x), (p)->y0 = (short)(y))
 #define setWH(p, width, height) ((p)->w = (short)(width), (p)->h = (short)(height))
 #define setUV0(p, u, v) ((p)->u0 = (u_char)(u), (p)->v0 = (u_char)(v))
+#define setUVWH(p, u, v, w, h) \
+    ((p)->u0 = (u_char)(u), (p)->v0 = (u_char)(v), \
+     (p)->u1 = (u_char)((u) + (w)), (p)->v1 = (u_char)(v), \
+     (p)->u2 = (u_char)(u), (p)->v2 = (u_char)((v) + (h)), \
+     (p)->u3 = (u_char)((u) + (w)), (p)->v3 = (u_char)((v) + (h)))
+#define GetTPage(tp, abr, x, y) getTPage(tp, abr, x, y)
+#define GetClut(x, y) getClut(x, y)
 #define setDrawTPage(p, dfe, dtd, page) (setlen((p), 1), (p)->code[0] = 0xE1000000ul | ((dfe) ? 1024 : 0) | ((dtd) ? 512 : 0) | (page))
 
 int LoadImage(RECT *rect, u_long *pixels);
