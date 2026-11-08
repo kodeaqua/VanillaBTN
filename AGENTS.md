@@ -1,14 +1,16 @@
 # Repository guidance
 
-This repository is a matching decompilation of *Harvest Moon: Back to Nature*
-(PlayStation USA, `SLUS_011.15`). The primary requirement for code changes is
-that the generated EXE and 13 overlays still match the reference SHA-1 hashes.
+VanillaBTN aims to bring *Harvest Moon: Back to Nature* to native Windows while
+preserving the original experience. Today this repository is a matching PS1
+decompilation, not a native port. Its EXE and 13 overlays form the reference
+baseline and must continue to match their original SHA-1 hashes.
 
 ## Read first
 
 - [README.md](README.md) describes the project and its exceptions.
 - [docs/architecture.md](docs/architecture.md) maps the runtime and build layout.
 - [docs/building.md](docs/building.md) gives the build and verification commands.
+- [docs/porting.md](docs/porting.md) states the Windows port direction and fidelity rules.
 
 ## Engineering approach
 
@@ -33,6 +35,10 @@ for this repository's agent workflow:
 - Keep changes scoped to the requested behavior or documentation. Do not
   reformat unrelated C files: source order, declarations, compiler behavior,
   object layout, and link order can affect the output bytes.
+- Keep native Windows port work separate from the PS1 matching build. Preserve
+  the reference hashes as a guardrail; do not weaken them to make port code fit.
+  Default port behavior should retain the original game's mechanics, pacing,
+  content, and presentation. Put optional modifications outside that baseline.
 - Document new or changed code so its purpose and non-obvious behavior are
   clear. Put concise comments near tricky logic and constraints; use separate
   documentation for broader workflows or architecture, and update it when the

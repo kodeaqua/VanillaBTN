@@ -1,6 +1,6 @@
 # Build the 14 code binaries, check them against the original's SHA-1, and publish the
 # progress report decomp.dev reads (artifact SLUS_011.15_report). Needs no game data.
-name: build
+name: VanillaBTN PS1 reference build
 
 on:
   push:
@@ -14,11 +14,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build the image
-        run: docker build -t hmbtn-build .
+        run: docker build -t vanillabtn-build .
 
       - name: Build and check
         run: >
-          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD":/src -w /src hmbtn-build
+          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD":/src -w /src vanillabtn-build
           bash -c 'cmake -S . -B build -G Ninja && cmake --build build --target check'
 
       - name: Progress report

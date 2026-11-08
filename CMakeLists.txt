@@ -1,10 +1,10 @@
-# Harvest Moon: Back to Nature (SLUS_011.15), the EXE and its overlays.
+# VanillaBTN PS1 reference build: SLUS_011.15 and its overlays.
 cmake_minimum_required(VERSION 3.20)
 
 if(NOT CMAKE_TOOLCHAIN_FILE)
     set(CMAKE_TOOLCHAIN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/psx-toolchain.cmake)
 endif()
-project(hmbtn NONE)
+project(VanillaBTN NONE)
 find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter)
 include(cmake/psx.cmake)
 

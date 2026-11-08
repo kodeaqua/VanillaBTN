@@ -1,6 +1,8 @@
-# Building and checking
+# Building and checking the PS1 reference
 
-The build requires Docker. It produces the EXE and 13 overlays from source.
+These commands build PS1 binaries, even when Docker runs on Windows. A native
+Windows game executable is not available yet. The build requires Docker and
+produces the EXE and 13 overlays from source.
 With your own USA `SLUS_011.15` disc image in MODE2/2352 `.bin` format, it also
 rebuilds `A_FILE` and a `.bin`/`.cue` disc image. The original game data and
 PSY-Q SDK are not included in this repository.
@@ -10,25 +12,25 @@ PSY-Q SDK are not included in this repository.
 From the repository root:
 
 ```sh
-docker build -t hmbtn-build .
-mkdir -p /tmp/hmbtn-build
+docker build -t vanillabtn-build .
+mkdir -p /tmp/vanillabtn-build
 docker run --rm --user "$(id -u):$(id -g)" \
-  -v "$PWD":/src:ro -v /tmp/hmbtn-build:/build \
-  hmbtn-build bash -c 'cmake -S /src -B /build -G Ninja && cmake --build /build --target check'
+  -v "$PWD":/src:ro -v /tmp/vanillabtn-build:/build \
+  vanillabtn-build bash -c 'cmake -S /src -B /build -G Ninja && cmake --build /build --target check'
 ```
 
 For a full disc build, mount the folder containing your `.bin` and add
 `-DORIGINAL_DISC`:
 
 ```sh
-mkdir -p /tmp/hmbtn-build
+mkdir -p /tmp/vanillabtn-build
 docker run --rm --user "$(id -u):$(id -g)" \
-  -v "$PWD":/src:ro -v /tmp/hmbtn-build:/build \
+  -v "$PWD":/src:ro -v /tmp/vanillabtn-build:/build \
   -v /path/to/disc-folder:/disc:ro \
-  hmbtn-build bash -c 'cmake -S /src -B /build -G Ninja -DORIGINAL_DISC=/disc/disc.bin && cmake --build /build --target check'
+  vanillabtn-build bash -c 'cmake -S /src -B /build -G Ninja -DORIGINAL_DISC=/disc/disc.bin && cmake --build /build --target check'
 ```
 
-The outputs in these examples are under `/tmp/hmbtn-build` on the host.
+The outputs in these examples are under `/tmp/vanillabtn-build` on the host.
 Choose a different build directory if switching between code-only and full
 disc builds.
 
@@ -40,8 +42,8 @@ to the container's Linux filesystem, converts CRLF to LF there, builds, runs
 The source checkout is not rewritten.
 
 ```powershell
-docker build -t hmbtn-build .
-docker run --rm -v "${PWD}:/input" hmbtn-build bash /input/tools/build-in-container.sh
+docker build -t vanillabtn-build .
+docker run --rm -v "${PWD}:/input" vanillabtn-build bash /input/tools/build-in-container.sh
 ```
 
 For the full disc build, set the folder and exact `.bin` filename to yours:
@@ -49,7 +51,7 @@ For the full disc build, set the folder and exact `.bin` filename to yours:
 ```powershell
 $discFolder = 'C:\path\to\disc-folder'
 $discFile = 'disc.bin'
-docker run --rm -v "${PWD}:/input" -v "${discFolder}:/disc:ro" hmbtn-build `
+docker run --rm -v "${PWD}:/input" -v "${discFolder}:/disc:ro" vanillabtn-build `
   bash /input/tools/build-in-container.sh "/disc/$discFile"
 ```
 

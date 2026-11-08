@@ -1,16 +1,31 @@
-# Harvest Moon: Back to Nature
+# VanillaBTN
 
-A matching decompilation of *Harvest Moon: Back to Nature* (PlayStation, USA,
-`SLUS_011.15`). The C source builds the EXE and its 13 overlays byte for byte and, given
-your own copy of the disc, the whole disc image.
+VanillaBTN is working toward a native Windows port of *Harvest Moon: Back to
+Nature*. Its goal is to preserve the original game's play, pacing, audiovisual
+identity, and content. Community mods can be creative, but the default VanillaBTN
+experience should remain faithful to the unmodified game. Any future mod support
+should be optional and separate from that default experience.
+
+## Current status
+
+This repository currently contains a matching decompilation of the PlayStation
+USA release (`SLUS_011.15`), **not a native Windows game executable**. The C
+source builds the PS1 EXE and its 13 overlays byte for byte and, given your own
+copy of the disc, the whole disc image. That build is the reference baseline
+for the planned port. Building it with Docker on Windows still produces PS1
+binaries.
+
+The [Windows port plan](docs/porting.md) describes the intended bringup and
+its fidelity rules. The [architecture guide](docs/architecture.md) maps the
+current code. [AGENTS.md](AGENTS.md) records repository rules for coding agents.
 
 ## Building
 
 ```sh
-docker build -t hmbtn-build .
-mkdir -p /tmp/hmbtn-build
-docker run --rm --user "$(id -u):$(id -g)" -v "$PWD":/src:ro -v /tmp/hmbtn-build:/build \
-    -v /path/to/disc:/disc:ro hmbtn-build bash -c 'cmake -S /src -B /build -G Ninja \
+docker build -t vanillabtn-build .
+mkdir -p /tmp/vanillabtn-build
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD":/src:ro -v /tmp/vanillabtn-build:/build \
+    -v /path/to/disc:/disc:ro vanillabtn-build bash -c 'cmake -S /src -B /build -G Ninja \
     -DORIGINAL_DISC=/disc/disc.bin && cmake --build /build --target check'
 ```
 
@@ -19,9 +34,7 @@ builds and checks only the 14 code binaries, which needs no game data.
 
 For Windows PowerShell, use the container build helper described in
 [docs/building.md](docs/building.md). It avoids problems with the old compiler
-on Windows bind mounts and CRLF checkouts. The [architecture guide](docs/architecture.md)
-maps the code and build layout. [AGENTS.md](AGENTS.md) records repository rules
-for coding agents.
+on Windows bind mounts and CRLF checkouts.
 
 ## Exceptions
 

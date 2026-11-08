@@ -1,6 +1,10 @@
 # Architecture
 
-## Runtime
+VanillaBTN's current codebase is the matching PS1 reference build. There is no
+native Windows runtime yet. See [porting.md](porting.md) for the intended port
+direction; the layout below describes what exists today.
+
+## PS1 runtime
 
 `src/main/main.c` initializes the PlayStation libraries, graphics buffers,
 input, sound, and persistent game state. Its outer loop chooses a scene, reads
@@ -20,7 +24,7 @@ overlays implement the title, save/load, five minigames, staff roll, memory
 card screen, and debug or sample screens. `src/main/main.c` is the authoritative
 map from scene IDs to overlay files and entry handlers.
 
-## Build
+## PS1 build
 
 `CMakeLists.txt` declares the EXE, 13 overlays, two overlay load regions, and
 the `check` target. Each image's `CMakeLists.txt` lists source files in link
@@ -38,6 +42,10 @@ Without it, the build produces the 14 code binaries only.
 `check` compares generated files with `disc/binaries.sha1` and, for a full
 disc build, `disc/disc.sha1`. CI runs the 14-file check on pushes and pull
 requests. See [building.md](building.md) for commands and platform notes.
+
+The port can reuse the understanding and data structures gained here, but its
+Windows platform code should be separate so the PS1 reference continues to
+build and match independently.
 
 ## Where to start
 
