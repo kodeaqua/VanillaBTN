@@ -6,8 +6,9 @@
  *
  * Implements fixed-point 3D vector rotation, translation, perspective
  * projection (RTPS / RTPT), 2D normal clipping (NCLIP), and depth averaging
- * (AVSZ3 / AVSZ4) matching the PlayStation Cop2 hardware behaviors used by
- * model.c, ground.c, and camera.c.
+ * (AVSZ3 / AVSZ4) for the PlayStation Cop2 operations used by
+ * model.c, ground.c, and camera.c. Full MAC/IR flags, division precision and
+ * screen-coordinate clipping remain under audit.
  *
  * Fixed-point formats:
  *   Rotation matrix elements: signed 16-bit 1.3.12 (4096 = 1.0).
@@ -39,6 +40,7 @@ typedef struct Ps1Gte {
     int32_t trans[3];      /* Current translation vector */
     int32_t ofx, ofy;      /* Screen offset */
     int32_t h;             /* Screen distance */
+    int16_t zsf3, zsf4;     /* Signed 1.3.12 average-depth scale registers. */
 
     /* FIFOs and result registers */
     int32_t sz[4];         /* Screen Z FIFO (SZ0, SZ1, SZ2, SZ3) */

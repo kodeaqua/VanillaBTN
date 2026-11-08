@@ -32,6 +32,7 @@ int main(void) {
     if (gte.sxy[0].x != 160 || gte.sxy[0].y != 120) return 5;
     if (gte.sxy[1].x != 360 || gte.sxy[1].y != 120) return 6;
     if (gte.sxy[2].x != 160 || gte.sxy[2].y != 220) return 7;
+    if (gte.sz[0] != 1000) return 21; /* Three pushes retain previous SZ3. */
 
     /* 3. NCLIP on front-facing triangle:
      * (160,120), (360,120), (160,220) -> OPZ = (160-360)*(220-120) - (120-120)*(160-360)
@@ -60,11 +61,11 @@ int main(void) {
     gte.sz[2] = 300;
     gte.sz[3] = 400;
 
-    int32_t av3 = ps1_gte_avsz3(&gte); /* (200 + 300 + 400) / 3 = 300 */
-    if (av3 != 300) return 12;
+    int32_t av3 = ps1_gte_avsz3(&gte); /* InitGeom: ZSF3=341, (900*341)>>12 = 74. */
+    if (av3 != 74) return 12;
 
-    int32_t av4 = ps1_gte_avsz4(&gte); /* (100 + 200 + 300 + 400) / 4 = 250 */
-    if (av4 != 250) return 13;
+    int32_t av4 = ps1_gte_avsz4(&gte); /* InitGeom: ZSF4=256, (1000*256)>>12 = 62. */
+    if (av4 != 62) return 13;
 
     /* 6. Translation matrix offset: */
     int32_t trans[3] = { 50, -30, 500 };
@@ -76,5 +77,18 @@ int main(void) {
     if (!ps1_gte_rtps(&gte, &v_trans)) return 14;
     if (gte.sxy[2].x != 210 || gte.sxy[2].y != 90 || gte.sz[3] != 1000) return 15;
 
+    /* SZ is an unsigned saturated 16-bit hardware FIFO, never raw host Z. */
+    trans[0] = trans[1] = 0;
+    trans[2] = 1000000;
+    ps1_gte_set_trans_matrix(&gte, trans);
+    Ps1Vector3 far = {0, 0, 0, 0};
+    if (ps1_gte_rtps(&gte, &far)) return 16;
+    if (gte.sz[3] != 65535 || !(gte.flag & (1 << 18))) return 17;
+    for (int i = 0; i < 4; ++i) gte.sz[i] = 65535;
+    if (ps1_gte_avsz3(&gte) != 16367 || ps1_gte_avsz4(&gte) != 16383) return 18;
+    gte.zsf3 = 32767;
+    if (ps1_gte_avsz3(&gte) != 65535 || !(gte.flag & (1 << 18))) return 19;
+    gte.zsf4 = -1;
+    if (ps1_gte_avsz4(&gte) != 0 || !(gte.flag & (1 << 18))) return 20;
     return 0;
 }

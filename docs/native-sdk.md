@@ -581,3 +581,17 @@ An off-screen helper fixture checks cue start and timer advancement through the
 actual public update function. The old native call faults; both profiles pass
 with explicit arguments. The extended demo now reaches farm execution and
 stops later on GPU packet validation.
+
+### GTE depth registers
+
+Native SZ results saturate to unsigned 16-bit values, including far-Z flags,
+and RTPT retains the previous SZ3 after its three FIFO pushes. AVSZ3/AVSZ4 use
+signed ZSF scales and saturated OTZ instead of plain arithmetic averages. The
+SDK InitGeom scales are 341 and 256; synthetic tests cover fractional results,
+far Z, negative scales and OTZ saturation. See the
+[GTE register specification](https://psx-spx.consoledev.net/ps1/cpu/gte/geometrytransformationenginegte/).
+Full MAC/IR and perspective-division precision remain open.
+
+The extended Debug probe reaches 5,001 pumps in the original farm without a GPU
+link fault. Colored output includes sprites/UI and does not prove 3D terrain:
+the developer reported black farm geometry, and NCLIP winding needs correction.

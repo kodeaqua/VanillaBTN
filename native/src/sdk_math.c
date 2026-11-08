@@ -13,7 +13,8 @@ MATRIX GsIDMATRIX = {
 
 static Ps1Gte g_sdk_gte = {
     .rot = { { 4096, 0, 0 }, { 0, 4096, 0 }, { 0, 0, 4096 } },
-    .h = 1000
+    .h = 1000,
+    .zsf3 = 341, .zsf4 = 256
 };
 static Ps1Vector3 g_gte_v0;
 static Ps1Vector3 g_gte_v1;
@@ -543,6 +544,8 @@ void InitGeom(void) {
     memset(&g_sdk_gte, 0, sizeof(g_sdk_gte));
     memcpy(g_sdk_gte.rot, GsIDMATRIX.m, sizeof(g_sdk_gte.rot));
     g_sdk_gte.h = 1000;
+    g_sdk_gte.zsf3 = 341;
+    g_sdk_gte.zsf4 = 256;
     memset(g_gte_ir, 0, sizeof(g_gte_ir));
     memset(g_gte_mac, 0, sizeof(g_gte_mac));
     memset(g_gte_color_matrix, 0, sizeof(g_gte_color_matrix));
