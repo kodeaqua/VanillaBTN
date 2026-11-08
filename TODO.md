@@ -13,4 +13,5 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Completed
 
+- [x] Define the native Windows bringup roadmap and first port stack in `docs/roadmap.md`; native implementation remains next.
 - [x] Add agent planning, synthetic testing, and developer gameplay-test rules; the code-level version test passed.

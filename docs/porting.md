@@ -35,19 +35,7 @@ developer diagnostics. The developer performs actual runtime and gameplay
 testing to judge behavior, timing, visuals, and audio. The PS1 reference build
 keeps its existing compiler settings and SHA-1 checks.
 
-## Bringup sequence
-
-1. Identify PS1 platform calls and shared game logic in the existing code;
-   document boundaries before moving or adapting code.
-2. Establish a minimal native Windows executable and game loop, with platform
-   services isolated from game behavior. Prepare synthetic startup checks;
-   the developer verifies actual start and exit behavior.
-3. Bring up input, timing, rendering, audio, and disc-data access in small,
-   independently verifiable steps against the PS1 reference.
-4. Bring up scenes and save data incrementally. Verify state transitions with
-   code-level checks; the developer compares gameplay with the original game
-   before expanding coverage.
-
-This is a sequence for future work, not a claim that these systems already
-exist. The PS1 `check` target verifies byte identity of the reference build;
-native-port checks will need to verify behavior and Windows execution separately.
+The staged implementation plan and stack decisions are in
+[roadmap.md](roadmap.md). They describe future work, not systems already
+implemented. The PS1 `check` target verifies byte identity of the reference;
+the developer will validate actual Windows gameplay separately.

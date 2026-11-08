@@ -15,8 +15,9 @@ copy of the disc, the whole disc image. That build is the reference baseline
 for the planned port. Building it with Docker on Windows still produces PS1
 binaries.
 
-The [Windows port plan](docs/porting.md) describes the intended bringup and
-its fidelity rules. The [architecture guide](docs/architecture.md) maps the
+The [Windows roadmap](docs/roadmap.md) orders the bringup work, and the
+[porting rules](docs/porting.md) define its fidelity boundaries. The
+[architecture guide](docs/architecture.md) maps the
 current code. [AGENTS.md](AGENTS.md) records repository rules for coding agents.
 The [versioning policy](docs/versioning.md) explains the project's development
 version, which can be printed with `python tools/version.py`.
