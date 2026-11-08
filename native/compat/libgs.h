@@ -1,7 +1,15 @@
 #ifndef VANILLABTN_COMPAT_LIBGS_H
 #define VANILLABTN_COMPAT_LIBGS_H
 
-/* Original shared headers include libgs even without using its operations.
- * No libgs operations are implemented by this compatibility header. */
+#include "sdk_types.h"
+
+/* Pointers belong to the host; this runtime descriptor is never read from a
+ * serialized PS1 structure. Packet tags themselves remain 32-bit words. */
+typedef struct GsOT {
+    u_long length;
+    u_long *org;
+    u_short offset, point;
+    u_long *tag;
+} GsOT;
 
 #endif

@@ -1,4 +1,5 @@
 #include "sdk_gpu.h"
+#include "ps1_gpu.h"
 #include <libgpu.h>
 #include <string.h>
 
@@ -6,9 +7,109 @@ _Static_assert(sizeof(u_long) == 4, "SDK words must be 32-bit");
 _Static_assert(sizeof(RECT) == 8, "SDK rectangles contain four halfwords");
 
 static Ps1Video *vram;
+static Ps1DrawState draw;
+
+#define SDK_END 0xFFFFFFul
+#define SDK_MAP_COUNT 32
+typedef struct PacketMap {
+    unsigned char *memory;
+    size_t size;
+    u_long first;
+} PacketMap;
+static PacketMap maps[SDK_MAP_COUNT];
+static unsigned map_count;
+static u_long next_id;
+static bool packet_error;
+
+void sdk_gpu_reset_packets(void) {
+    map_count = 0;
+    next_id = 4;
+    packet_error = false;
+}
+
+bool sdk_gpu_ok(void) { return !packet_error; }
+
+bool sdk_gpu_map(void *memory, size_t size) {
+    uintptr_t start = (uintptr_t)memory;
+    if (memory == NULL || size == 0 || (start & 3) || (size & 3)
+        || size > SDK_END - next_id || start > UINTPTR_MAX - size
+        || map_count == SDK_MAP_COUNT) return false;
+    for (unsigned i = 0; i < map_count; ++i) {
+        uintptr_t other = (uintptr_t)maps[i].memory;
+        if (start < other + maps[i].size && other < start + size) return false;
+    }
+    maps[map_count++] = (PacketMap){memory, size, next_id};
+    next_id += (u_long)size;
+    return true;
+}
+
+static u_long address_id(const void *pointer, size_t bytes) {
+    uintptr_t address = (uintptr_t)pointer;
+    if (address & 3) return 0;
+    for (unsigned i = 0; i < map_count; ++i) {
+        uintptr_t base = (uintptr_t)maps[i].memory;
+        if (address >= base && address - base <= maps[i].size
+            && bytes <= maps[i].size - (address - base))
+            return maps[i].first + (u_long)(address - base);
+    }
+    return 0;
+}
+
+static u_long *resolve_id(u_long id, size_t bytes) {
+    for (unsigned i = 0; i < map_count; ++i) {
+        if (id >= maps[i].first && id - maps[i].first <= maps[i].size
+            && bytes <= maps[i].size - (id - maps[i].first))
+            return (u_long *)(maps[i].memory + id - maps[i].first);
+    }
+    return NULL;
+}
+
+void ClearOTagR(u_long *ot, long count) {
+    if (count <= 0 || !address_id(ot, (size_t)count * 4)) {
+        packet_error = true;
+        return;
+    }
+    ot[0] = SDK_END;
+    for (long i = 1; i < count; ++i) ot[i] = address_id(ot + i - 1, 4);
+}
+
+void sdk_add_prim(void *ot, void *packet) {
+    if (!address_id(ot, 4) || !address_id(packet, 4) || ot == packet) {
+        packet_error = true;
+        return;
+    }
+    u_long *tag = packet;
+    u_long id = address_id(packet, (size_t)((*tag >> 24) + 1) * 4);
+    if (!id) { packet_error = true; return; }
+    *tag = (*tag & 0xFF000000ul) | (*(u_long *)ot & SDK_END);
+    *(u_long *)ot = (*(u_long *)ot & 0xFF000000ul) | id;
+}
+
+void DrawOTag(u_long *ot) {
+    u_long id = address_id(ot, 4);
+    size_t budget = next_id / 4;
+    if (vram == NULL || !id || packet_error) { packet_error = true; return; }
+    while (id != SDK_END && budget-- > 0) {
+        u_long *packet = resolve_id(id, 4);
+        if (!packet || (id & 3)) { packet_error = true; return; }
+        unsigned words = *packet >> 24;
+        if (!resolve_id(id, (size_t)(words + 1) * 4)) { packet_error = true; return; }
+        if (words) {
+            /* long and uint32_t have the same representation on Windows, but
+             * copy into the dispatcher's type instead of aliasing them. */
+            uint32_t commands[255];
+            memcpy(commands, packet + 1, (size_t)words * 4);
+            if (!ps1_gpu_exec(vram, &draw, commands, words)) { packet_error = true; return; }
+        }
+        id = *packet & SDK_END;
+    }
+    if (id != SDK_END) packet_error = true; /* Cycles cannot hang the host. */
+}
 
 void sdk_gpu_bind(Ps1Video *video) {
     vram = video;
+    ps1_draw_state_reset(&draw);
+    sdk_gpu_reset_packets();
 }
 
 static int valid_transfer(const RECT *rect, const void *pixels) {

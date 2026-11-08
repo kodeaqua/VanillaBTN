@@ -8,6 +8,8 @@ Update the relevant item after completing a task or discovering a blocker.
 - [ ] Connect original game code through platform/SDK interfaces. Do not rebuild scene, menu, dialog or game logic in the native host.
   - [x] Compile the original texture-pack loader against native GPU transfers.
   - [ ] Connect original primitive/ordering-table submission and animation code.
+    - [x] Compile original prim.c and submit its packets through mapped native OT links.
+    - [ ] Compile original animation drawing and connect frame cursor insertion.
   - [ ] Connect original disc requests, startup and native overlay dispatch.
 - [ ] Native executable remains a backend smoke harness; original game execution is not connected.
 - [ ] Graphics/GTE: verify hardware rounding, saturation, flags, and primitive edge coverage against independent fixtures.
@@ -24,6 +26,7 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Completed
 
+- [x] Run original primitive builders through native SDK packet submission, reverse OT traversal and bounded GS work storage. Synthetic fixtures verify color bytes, layer order, same-bucket order and rejection of unmapped/cyclic/oversized links in Debug/Release.
 - [x] Add native LoadImage/StoreImage/DrawSync entry points and compile original texture_pack.c with preserved file offsets. Synthetic fixtures exercise raw/RLE uploads through the original loader; the host binds its VRAM to the SDK bridge. Full game execution remains pending.
 - [x] Decode GP0 packet color bytes in PS1 order; an independent raw-byte red fixture protects the backend conversion.
 

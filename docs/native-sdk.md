@@ -26,9 +26,9 @@ native `sizeof(ImageBank)` or `sizeof(BankImage)`. PS1 declarations stay intact.
 
 Unused private original helpers reference animation code not compiled yet.
 Function sections and dead-code elimination discard those unreachable helpers;
-there are no pretend animation implementations. Forward-declared primitive
-types are intentionally incomplete. Unsupported SDK operations remain build
-or link errors rather than silent no-ops.
+there are no pretend animation implementations. Primitive declarations preserve
+the PS1 wire layout. Unsupported SDK operations remain build or link errors
+rather than silent no-ops.
 
 `original_texture_pack` tests real original loader calls with synthetic banks,
 raw/RLE pixels, placement offsets and image-bank expansion. Transfer fixtures
@@ -41,3 +41,24 @@ buffer, and valid image indices. It does not accept a byte length or validate
 malformed input; an absent image index can leave its result undefined. These
 original preconditions are not relaxed by compiling it natively. A validated
 asset handoff remains necessary before connecting imported data to gameplay.
+
+## Original primitive submission
+
+`game_prim` compiles the original `prim.c`. SDK packet declarations retain their
+32-bit tags and GP0 payload fields; static fixtures check TILE/SPRT/FT4 sizes.
+The host supplies bounded GS work storage through `sdk_work_bind`; the original
+builders still own command construction, colors, coordinates and packet sizes.
+Arena exhaustion stops execution instead of corrupting adjacent host memory.
+
+Before building a frame, register its complete OT and packet arenas through
+`sdk_gpu_map`. Tags use a 24-bit mapped offset, never a truncated host pointer.
+Mappings are disjoint and frame-local; reset them only after draws complete.
+`ClearOTagR` links each OT entry to its predecessor. `addPrim` inserts at the
+head of that entry; `DrawOTag` resolves links and submits packets to the existing
+GPU dispatcher. The dispatcher still has incomplete primitive coverage.
+
+Unmapped, unaligned and out-of-range links are rejected, and a traversal budget
+terminates cycles. `sdk_gpu_ok` reports a sticky submission error until mapping
+reset. The host must check it when wiring the original frame loop. Existing
+single-GPU synchronous transfer and lifetime constraints still apply. No game
+scene is connected by this step.
