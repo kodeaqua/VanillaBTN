@@ -291,8 +291,9 @@ void ps1_spu_mix(Ps1Spu *spu, int16_t *out, int frames, int accumulate) {
             }
         }
 
-        int32_t out_l = (mix_l * mvol_l) >> 15;
-        int32_t out_r = (mix_r * mvol_r) >> 15;
+        /* The sum of 24 voices can exceed 16-bit range before master scaling. */
+        int32_t out_l = (int32_t)(((int64_t)mix_l * mvol_l) >> 15);
+        int32_t out_r = (int32_t)(((int64_t)mix_r * mvol_r) >> 15);
 
         if (accumulate) {
             out_l += out[f * 2 + 0];

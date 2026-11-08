@@ -101,6 +101,16 @@ static void test_xa_player_filtering_and_fading(void) {
 }
 
 int main(void) {
+    Ps1XaPlayer player;
+    int16_t pcm[2];
+    ps1_xa_init(&player);
+    player.state = PS1_XA_PLAYING;
+    player.curr_sample = 32767;
+    player.next_sample = 32767;
+    player.resample_step = 0;
+    player.serial_volume = 128;
+    ps1_xa_mix(&player, pcm, 1, 32767, 32767, 0);
+    assert(pcm[0] == 32767 && pcm[1] == 32767);
     test_xa_synthetic_decode();
     test_xa_player_filtering_and_fading();
     printf("ps1_xa tests passed.\n");

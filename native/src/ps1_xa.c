@@ -216,7 +216,7 @@ void ps1_xa_mix(Ps1XaPlayer *player, int16_t *out, int frames,
         /* Resample with linear interpolation */
         int32_t frac = (int32_t)(player->frac_pos & 0xFFFF);
         int32_t diff = (int32_t)player->next_sample - (int32_t)player->curr_sample;
-        int32_t samp = (int32_t)player->curr_sample + ((diff * frac) >> 16);
+        int32_t samp = (int32_t)player->curr_sample + (int32_t)(((int64_t)diff * frac) >> 16);
 
         player->frac_pos += player->resample_step;
         while (player->frac_pos >= 0x10000 && player->state != PS1_XA_IDLE) {
@@ -226,8 +226,9 @@ void ps1_xa_mix(Ps1XaPlayer *player, int16_t *out, int frames,
         }
 
         /* Volume scaling: sample * serial_vol (out of 128) * cd_vol (out of 32767) */
-        int32_t out_l = (samp * svol * cvol_l) / (128 * 32767);
-        int32_t out_r = (samp * svol * cvol_r) / (128 * 32767);
+        /* Full-scale PCM and mixer volumes exceed a signed 32-bit product. */
+        int32_t out_l = (int32_t)(((int64_t)samp * svol * cvol_l) / (128 * 32767));
+        int32_t out_r = (int32_t)(((int64_t)samp * svol * cvol_r) / (128 * 32767));
 
         if (accumulate) {
             out_l += out[f * 2 + 0];
