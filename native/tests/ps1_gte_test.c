@@ -96,5 +96,19 @@ int main(void) {
     if (ps1_gte_avsz3(&gte) != 65535 || !(gte.flag & (1 << 18))) return 19;
     gte.zsf4 = -1;
     if (ps1_gte_avsz4(&gte) != 0 || !(gte.flag & (1 << 18))) return 20;
+    /* Hardware SXY lanes saturate to [-1024,1023], rather than wrapping
+     * huge projected coordinates into a drawable triangle. */
+    ps1_gte_init(&gte);
+    int32_t clipped_translation[3] = {2000, -2000, 1000};
+    ps1_gte_set_trans_matrix(&gte, clipped_translation);
+    Ps1Vector3 zero = {0};
+    if (ps1_gte_rtps(&gte, &zero)) return 21;
+    if (gte.sxy[2].x != 1023 || gte.sxy[2].y != -1024) return 22;
+    if ((gte.flag & 0x80006000u) != 0x80006000u) return 23;
+    /* RTPT accumulates clipping from earlier vertices as well. */
+    Ps1Vector3 inside = {-2000, 2000, 0, 0};
+    if (ps1_gte_rtpt(&gte, &zero, &inside, &inside)) return 24;
+    if (gte.sxy[0].x != 1023 || gte.sxy[2].x != 0) return 25;
+    if ((gte.flag & 0x6000u) != 0x6000u) return 26;
     return 0;
 }

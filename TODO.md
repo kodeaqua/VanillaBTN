@@ -45,6 +45,7 @@ Update the relevant item after completing a task or discovering a blocker.
   - [x] Saturate SZ to 16 bits, preserve triple-projection FIFO order and use SDK ZSF3/ZSF4 scales for average depth; long demo reaches 5,000 vblanks without invalid GPU links.
   - [x] Correct NCLIP winding and MAC0 overflow flags. Independent signed-area and original TMD front/back tests reproduce the inverted culling; a captured native farm frame now contains terrain. Colored-frame counts alone are not a geometry acceptance test.
   - [x] Preserve translation in SDK matrix snapshots and distinguish saturated IR stores from wide MAC stores; register loads truncate like hardware. Two regressions fail before the fix; Debug/Release pass 30 checks and all 14 PS1 code hashes match.
+  - [x] Saturate projected SXY coordinates to the hardware signed 11-bit range and set axis overflow flags; RTPS/RTPT regressions fail before the fix and after temporary reversion. Both native profiles pass 30 tests and the 14-file PS1 code check passes.
   - [ ] Replace csin/ccos aliases with the distinct SDK function quantization.
   - [x] Interpolate all vertex colors for textured Gouraud GT3/GT4 packets before texel modulation. Independent nonuniform white-texture fixtures fail on the old backend; Debug/Release pass 30 checks and the 5,000-vblank Release demo passes GPU validation. Full object visibility and placement remain under audit.
   - [ ] Verify textured-polygon subpixel interpolation with nonuniform original FT4 fixtures; packet-generation tests do not establish texel fidelity.

@@ -72,8 +72,15 @@ static bool transform_vertex(const Ps1Gte *gte, const Ps1Vector3 *v,
     }
     cz = *out_sz;
 
-    *out_sx = (int32_t)(gte->ofx + (cx * (int64_t)gte->h) / cz);
-    *out_sy = (int32_t)(gte->ofy + (cy * (int64_t)gte->h) / cz);
+    int64_t sx = gte->ofx + (cx * (int64_t)gte->h) / cz;
+    int64_t sy = gte->ofy + (cy * (int64_t)gte->h) / cz;
+    /* SXY is a saturated signed 11-bit FIFO. These flags let original model
+     * code reject overflowed geometry instead of drawing wrapped triangles.
+     * See psx-spx, GTE Saturation (FLAG bits 14 and 13). */
+    if (sx < -1024 || sx > 1023) *flags |= 1u << 14;
+    if (sy < -1024 || sy > 1023) *flags |= 1u << 13;
+    *out_sx = sx < -1024 ? -1024 : sx > 1023 ? 1023 : (int32_t)sx;
+    *out_sy = sy < -1024 ? -1024 : sy > 1023 ? 1023 : (int32_t)sy;
     return *flags == 0;
 }
 
