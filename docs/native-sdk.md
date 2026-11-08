@@ -544,3 +544,13 @@ microcalls, including mixed positive/negative angles, supply independent
 numerical fixtures. Translation fields remain unchanged. This does not establish
 all GTE precision or fix the separate csin/ccos alias discrepancy found during
 the audit.
+
+### Estate queue layout
+
+The original estate queue reset writes kind bytes at fixed PS1 FarmState offsets.
+Those offsets overlap native entryStep after runtime pointers grow. Native builds
+now address the same queue members directly, preserving message/timer fields;
+the reference branch keeps its original byte writes. An independent guard test
+starts entryStep at 1 and reproduces the old corruption to 0x00FF0001.
+The extended demo probe advanced beyond this fault to initial scene selection;
+full farm execution is still under investigation.

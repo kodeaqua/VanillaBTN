@@ -10,7 +10,8 @@ Update the relevant item after completing a task or discovering a blocker.
   - [x] Finish the interrupted MSVC farm-source build: case ranges, nested helpers, byte-pointer arithmetic and required type declarations.
   - [x] Resolve startup/farm linkage, SDK bootstrap and GS/matrix entry points; preserve original frame-region addresses in host RAM.
   - [x] Preserve event-block/stash and animal/toy buffer pointers at host width; remove integer-address addition from cue/entry indexing. A real event-tail regression segfaults on the old code and passes after restoration.
-  - [ ] Audit remaining farm serialized addresses/layouts before claiming a runnable full farm.
+  - [x] Clear estate queue kind fields through native member addresses; the original PS1 offsets overwrite x64 entryStep. Synthetic guards reproduce the corruption and protect message/timer fields.
+  - [ ] Audit remaining farm serialized addresses/layouts before claiming a runnable full farm; automatic demo currently reaches scene selection and encounters a PS1 physical-zero pointer read.
   - [x] PocketStation operations report missing/non-PDA devices without fabricated successful reads or writes; restore canonical SDK result/command values.
   - [x] Make SDK card completions consumable, preserve request-versus-result semantics and cap directory output to its supplied capacity.
   - [x] Reject invalid/truncated memory-card transfers and validate file chains before touching caller buffers or saves; 29 synthetic checks pass in both profiles. SDK request/completion semantics are verified separately; open/data APIs explicitly reject unsupported requests.
