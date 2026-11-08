@@ -5,6 +5,17 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Active
 
+- [ ] Milestone 3: map input and fixed simulation timing to the PS1 behavior.
+  - [x] Emulate PS1 InputRecord button states and auto-repeat channels (ps1_input); Debug and Release repeat tests pass.
+  - [ ] Add fixed simulation clock and wire input loop into native window.
+
+## Next
+
+- [ ] Audio: native PS1 sound decode and mixing to PCM, SDL3 audio stream for playback.
+
+## Completed
+
+- [x] Emulate PS1 InputRecord button states and auto-repeat channels (ps1_input); Debug and Release repeat tests pass.
 - [x] Developer: open and close the native Debug/Release window on Windows.
 - [x] Developer: verify the importer recognizes a personally supplied USA disc.
 - [x] Milestone 2: implement required GPU primitives, CLUT, ordering, and GTE behavior with synthetic pixel checks.
@@ -12,14 +23,6 @@ Update the relevant item after completing a task or discovering a blocker.
   - [x] Wire OT walk to GPU dispatcher (ps1_gpu_submit_ot/frame) for frame submission; Debug and Release multi-table tests pass.
   - [x] Implement flat and textured polygons (POLY_F3/F4/FT3/FT4) for scene rendering; Debug and Release rasterization tests pass.
   - [x] Add host-side GTE compatibility layer (ps1_gte) for transforms, projection, culling, and depth; Debug and Release math tests pass.
-
-## Next
-
-- [ ] After graphics, map input and fixed simulation timing to the PS1 behavior.
-
-## Completed
-
-- [x] Add host-side GTE compatibility layer (ps1_gte) for transforms, projection, culling, and depth; Debug and Release math tests pass.
 - [x] Implement flat and textured polygons (POLY_F3/F4/FT3/FT4) for scene rendering; Debug and Release rasterization tests pass.
 - [x] Wire OT walk to GPU dispatcher (ps1_gpu_submit_ot/frame) for frame submission; Debug and Release multi-table tests pass.
 - [x] Add GP0 command dispatcher (ps1_gpu_exec) covering fill, untextured tiles, textured sprites, and draw-environment commands; Debug and Release dispatch tests pass.

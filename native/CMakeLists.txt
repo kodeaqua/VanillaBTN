@@ -73,3 +73,14 @@ set_target_properties(ps1_gte_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED 
 target_link_libraries(ps1_gte_test PRIVATE ps1_gte)
 target_compile_options(ps1_gte_test PRIVATE /W4)
 add_test(NAME ps1_gte_math COMMAND ps1_gte_test)
+
+add_library(ps1_input STATIC src/ps1_input.c)
+set_target_properties(ps1_input PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_include_directories(ps1_input PUBLIC src)
+target_compile_options(ps1_input PRIVATE /W4)
+
+add_executable(ps1_input_test tests/ps1_input_test.c)
+set_target_properties(ps1_input_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_link_libraries(ps1_input_test PRIVATE ps1_input)
+target_compile_options(ps1_input_test PRIVATE /W4)
+add_test(NAME ps1_input_repeat COMMAND ps1_input_test)
