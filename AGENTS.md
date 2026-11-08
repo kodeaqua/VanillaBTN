@@ -99,6 +99,9 @@ for this repository's agent workflow:
 - For large or major changes, create a dedicated work branch. Make atomic
   commits on that branch, run the relevant checks, and open a pull request for
   developer review.
+- Do not add, modify, or remove GitHub Actions or CI workflows as part of
+  routine work. Leave the existing workflows as they are unless the developer
+  explicitly requests a change to them.
 - Wait for the developer to review and explicitly instruct the agent to merge
   an approved pull request. Do not merge based on an assumed approval.
 - After the pull request is merged, delete its work branch locally and on the
