@@ -224,7 +224,28 @@ static void test_card_manager(void) {
     rmdir(custom_dir);
 }
 
+static void test_failed_replacement_preserves_card(void) {
+    Ps1Card *card = malloc(sizeof(*card));
+    Ps1Card *before = malloc(sizeof(*before));
+    uint8_t *data = calloc(PS1_CARD_DATA_BLOCKS, PS1_CARD_BLOCK_SIZE);
+    assert(card && before && data);
+    ps1_card_format(card);
+    assert(ps1_card_write_file(card, "save", data, PS1_CARD_BLOCK_SIZE) == PS1_CARD_OK);
+    assert(ps1_card_write_file(card, "filler", data,
+        14u * PS1_CARD_BLOCK_SIZE) == PS1_CARD_OK);
+    memcpy(before, card, sizeof(*before));
+    assert(ps1_card_write_file(card, "save", data,
+        2u * PS1_CARD_BLOCK_SIZE) == PS1_CARD_ERR_FULL);
+    assert(memcmp(before, card, sizeof(*card)) == 0);
+    assert(ps1_card_write_file(card, "save", data, SIZE_MAX) == PS1_CARD_ERR_FULL);
+    assert(memcmp(before, card, sizeof(*card)) == 0);
+    free(data);
+    free(before);
+    free(card);
+}
+
 int main(void) {
+    test_failed_replacement_preserves_card();
     test_card_format_and_validate();
     test_card_file_roundtrip_and_delete();
     test_card_farm_slot_header_and_checksum();

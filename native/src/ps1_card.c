@@ -172,7 +172,7 @@ Ps1CardStatus ps1_card_delete_file(Ps1Card *card, const char *filename) {
     return PS1_CARD_OK;
 }
 
-Ps1CardStatus ps1_card_write_file(Ps1Card *card, const char *filename,
+static Ps1CardStatus write_file_in_place(Ps1Card *card, const char *filename,
                                   const void *data, size_t size) {
     if (!card || !filename || !data || size == 0) return PS1_CARD_ERR_IO;
     if (ps1_card_validate(card) != PS1_CARD_OK) return PS1_CARD_ERR_UNFORMATTED;
@@ -240,6 +240,25 @@ Ps1CardStatus ps1_card_write_file(Ps1Card *card, const char *filename,
 
     card->dirty = true;
     return PS1_CARD_OK;
+}
+
+Ps1CardStatus ps1_card_write_file(Ps1Card *card, const char *filename,
+                                  const void *data, size_t size) {
+    Ps1Card *staged;
+    Ps1CardStatus status;
+    if (!card || !filename || !data || size == 0 || strlen(filename) > 20) {
+        return PS1_CARD_ERR_IO;
+    }
+    /* Check before rounding so an oversized size cannot wrap or truncate. */
+    if (size > PS1_CARD_DATA_BLOCKS * PS1_CARD_BLOCK_SIZE) return PS1_CARD_ERR_FULL;
+    staged = malloc(sizeof(*staged));
+    if (!staged) return PS1_CARD_ERR_IO;
+    memcpy(staged, card, sizeof(*staged));
+    status = write_file_in_place(staged, filename, data, size);
+    /* A failed replacement must leave the original save and directory intact. */
+    if (status == PS1_CARD_OK) memcpy(card, staged, sizeof(*card));
+    free(staged);
+    return status;
 }
 
 /* -------------------------------------------------------------------------
