@@ -20,6 +20,7 @@ uint8_t ps1_adpcm_decode_block(const uint8_t *block, int16_t *out,
     uint8_t hdr = block[0];
     uint8_t flags = block[1];
     int shift = hdr & 0x0F;
+    if (shift > 12) shift = 9;
     int filter = (hdr >> 4) & 0x07;
     if (filter > 4) filter = 4;
 
@@ -32,7 +33,7 @@ uint8_t ps1_adpcm_decode_block(const uint8_t *block, int16_t *out,
         uint8_t byte = block[2 + i / 2];
         int nibble = (i & 1) ? (byte >> 4) : (byte & 0x0F);
         int n = (nibble & 0x08) ? (nibble | ~0x0F) : nibble;
-        int sample = (n << shift) + ((f0 * s1 + f1 * s2 + 32) / 64);
+        int sample = ((n * 4096) >> shift) + ((f0 * s1 + f1 * s2 + 32) >> 6);
         if (sample > 32767)  sample = 32767;
         if (sample < -32768) sample = -32768;
         out[i] = (int16_t)sample;
@@ -52,8 +53,9 @@ static int16_t fetch_voice_raw_sample(Ps1Voice *voice) {
     if (!voice->active) return 0;
 
     if (voice->block_sample_idx >= ADPCM_SAMPLES_PER_BLOCK) {
-        if (voice->byte_offset + ADPCM_BLOCK_SIZE > voice->sample_len) {
-            voice->active = 0;
+        if (voice->stop_after_block || voice->byte_offset > voice->sample_len
+            || voice->sample_len - voice->byte_offset < ADPCM_BLOCK_SIZE) {
+            voice->source_ended = 1;
             return 0;
         }
 
@@ -70,10 +72,10 @@ static int16_t fetch_voice_raw_sample(Ps1Voice *voice) {
         voice->block_sample_idx = 0;
 
         if (flags & PS1_ADPCM_FLAG_LOOP_END) {
-            if ((flags & PS1_ADPCM_FLAG_LOOP_REPEAT) && voice->has_loop) {
+            if (flags & PS1_ADPCM_FLAG_LOOP_REPEAT) {
                 voice->byte_offset = voice->loop_offset;
             } else {
-                voice->active = 0;
+                voice->stop_after_block = 1;
             }
         }
     }
@@ -111,7 +113,6 @@ Ps1VabId ps1_spu_load_vab(Ps1Spu *spu, const uint8_t *header, uint32_t header_si
 
     Ps1VabSlot *v = &spu->vabs[slot];
     memset(v, 0, sizeof(*v));
-    v->loaded = 1;
     v->header = header;
     v->header_size = header_size;
 
@@ -124,9 +125,10 @@ Ps1VabId ps1_spu_load_vab(Ps1Spu *spu, const uint8_t *header, uint32_t header_si
         v->body_size = header_size;
     }
 
-    memcpy(&v->num_progs, header + 20, 2);
-    memcpy(&v->num_tones, header + 22, 2);
-    memcpy(&v->num_vags,  header + 24, 2);
+    memcpy(&v->num_progs, header + 18, 2);
+    memcpy(&v->num_tones, header + 20, 2);
+    memcpy(&v->num_vags,  header + 22, 2);
+    if (v->num_progs > 128 || v->num_vags > 255) return PS1_VAB_NONE;
 
     /* VAG offset table location:
      * Header layout:
@@ -137,15 +139,33 @@ Ps1VabId ps1_spu_load_vab(Ps1Spu *spu, const uint8_t *header, uint32_t header_si
      */
     uint32_t tone_count = (uint32_t)v->num_progs * 16u;
     uint32_t offtbl_pos = 32u + 2048u + tone_count * 32u;
-    if (offtbl_pos + 512u <= header_size) {
-        const uint16_t *offtbl = (const uint16_t *)(const void *)(header + offtbl_pos);
-        uint32_t cum_offset = 16u; /* first sample starts after 16 bytes dummy block */
-        for (uint32_t i = 1; i <= v->num_vags && i < 256; i++) {
-            v->vag_body_offsets[i] = cum_offset;
-            cum_offset += (uint32_t)offtbl[i] * 8u;
+    if (offtbl_pos + 512u > header_size) return PS1_VAB_NONE;
+    if (body == NULL) {
+        v->body = header + offtbl_pos + 512u;
+        v->body_size = header_size - offtbl_pos - 512u;
+    }
+    unsigned packed_program = 0;
+    for (unsigned program = 0; program < 128; ++program) {
+        unsigned tones = header[32u + program * 16u];
+        if (tones > 16) return PS1_VAB_NONE;
+        v->program_tone_counts[program] = (uint8_t)tones;
+        if (tones != 0) {
+            if (packed_program >= v->num_progs) return PS1_VAB_NONE;
+            v->program_tone_offsets[program] = 0x820u + packed_program++ * 512u;
         }
     }
-
+    if (packed_program != v->num_progs) return PS1_VAB_NONE;
+    {
+        const uint16_t *offtbl = (const uint16_t *)(const void *)(header + offtbl_pos);
+        uint32_t cum_offset = (uint32_t)offtbl[0] * 8u;
+        for (uint32_t i = 1; i <= v->num_vags && i < 256; i++) {
+            v->vag_body_offsets[i] = cum_offset;
+            v->vag_lengths[i] = (uint32_t)offtbl[i] * 8u;
+            if (cum_offset > v->body_size || v->vag_lengths[i] > v->body_size - cum_offset) return PS1_VAB_NONE;
+            cum_offset += v->vag_lengths[i];
+        }
+    }
+    v->loaded = 1;
     return slot;
 }
 
@@ -189,10 +209,10 @@ void ps1_spu_key_on_vab(Ps1Spu *spu, int voice_idx, Ps1VabId vab_id,
     if (vab_id < 0 || vab_id >= PS1_SPU_VAB_SLOTS || !spu->vabs[vab_id].loaded) return;
 
     Ps1VabSlot *slot = &spu->vabs[vab_id];
-    if (prog >= (int)slot->num_progs || tone >= 16) return;
+    if (prog < 0 || prog >= 128 || tone < 0 || tone >= slot->program_tone_counts[prog]) return;
 
     /* VagAtr offset */
-    uint32_t vag_atr_offset = 32u + 2048u + ((uint32_t)prog * 16u + (uint32_t)tone) * 32u;
+    uint32_t vag_atr_offset = slot->program_tone_offsets[prog] + (uint32_t)tone * 32u;
     if (vag_atr_offset + 32u > slot->header_size) return;
 
     const uint8_t *atr = slot->header + vag_atr_offset;
@@ -206,7 +226,8 @@ void ps1_spu_key_on_vab(Ps1Spu *spu, int voice_idx, Ps1VabId vab_id,
     if (body_off >= slot->body_size) return;
 
     /* Pitch calculation: semitone ratio relative to center note */
-    double semitones = (double)(note - (int)center_note) + (double)fine / 100.0;
+    double semitones = (double)(note - (int)center_note)
+        + (double)fine / 100.0 - (double)atr[5] / 128.0;
     double ratio = pow(2.0, semitones / 12.0);
     uint32_t pitch = (uint32_t)(ratio * 65536.0 + 0.5);
     if (pitch == 0) pitch = 0x10000;
@@ -222,7 +243,7 @@ void ps1_spu_key_on_vab(Ps1Spu *spu, int voice_idx, Ps1VabId vab_id,
     v->active = 1;
     v->vab_id = vab_id;
     v->sample_data = slot->body + body_off;
-    v->sample_len = slot->body_size - body_off;
+    v->sample_len = slot->vag_lengths[vag_idx];
     v->block_sample_idx = ADPCM_SAMPLES_PER_BLOCK;
     v->pitch_step = pitch;
     v->vol_left = (int16_t)vl;
@@ -278,7 +299,7 @@ void ps1_spu_mix(Ps1Spu *spu, int16_t *out, int frames, int accumulate) {
             /* Linear interpolation */
             int32_t frac = (int32_t)(voice->frac_pos & 0xFFFF);
             int32_t diff = (int32_t)voice->next_sample - (int32_t)voice->curr_sample;
-            int32_t samp = (int32_t)voice->curr_sample + ((diff * frac) >> 16);
+            int32_t samp = (int32_t)voice->curr_sample + (int32_t)(((int64_t)diff * frac) >> 16);
 
             mix_l += (samp * (int32_t)voice->vol_left) >> 15;
             mix_r += (samp * (int32_t)voice->vol_right) >> 15;
@@ -286,7 +307,10 @@ void ps1_spu_mix(Ps1Spu *spu, int16_t *out, int frames, int accumulate) {
             voice->frac_pos += voice->pitch_step;
             while (voice->frac_pos >= 0x10000 && voice->active) {
                 voice->curr_sample = voice->next_sample;
-                voice->next_sample = fetch_voice_raw_sample(voice);
+                if (voice->source_ended) {
+                    voice->active = 0;
+                    voice->next_sample = 0;
+                } else voice->next_sample = fetch_voice_raw_sample(voice);
                 voice->frac_pos -= 0x10000;
             }
         }

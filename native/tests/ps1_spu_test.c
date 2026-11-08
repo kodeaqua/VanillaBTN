@@ -23,14 +23,11 @@ static void test_adpcm_decode_basic(void) {
     (void)flags;
 
     assert(flags == 0x00);
-    /* sample 0: 1 << 4 = 16 */
-    assert(out[0] == 16);
-    /* sample 1: 2 << 4 = 32 */
-    assert(out[1] == 32);
-    /* sample 2: -1 << 4 = -16 */
-    assert(out[2] == -16);
-    /* sample 3: -2 << 4 = -32 */
-    assert(out[3] == -32);
+    /* Each signed nibble is expanded to 12 fractional bits, then shifted down. */
+    assert(out[0] == 256);
+    assert(out[1] == 512);
+    assert(out[2] == -256);
+    assert(out[3] == -512);
     /* hist1 should equal out[27] */
     assert(h1 == out[27]);
 }
@@ -67,9 +64,10 @@ static void test_spu_synthetic_vab_and_mix(void) {
     uint16_t num_progs = 1;
     uint16_t num_tones = 1;
     uint16_t num_vags = 1;
-    memcpy(header + 20, &num_progs, 2);
-    memcpy(header + 22, &num_tones, 2);
-    memcpy(header + 24, &num_vags, 2);
+    memcpy(header + 18, &num_progs, 2);
+    memcpy(header + 20, &num_tones, 2);
+    memcpy(header + 22, &num_vags, 2);
+    header[32] = 1;
 
     /* ProgAtr: offset 32 (128 * 16 bytes = 2048) -> ends at 2080 (0x820) */
     /* VagAtr for prog 0, tone 0: starts at 0x820 (32 bytes) */
@@ -83,6 +81,7 @@ static void test_spu_synthetic_vab_and_mix(void) {
     /* VAG offset table: after 16 VagAtr (512 bytes) = 2080 + 512 = 2592 (0xA20) */
     uint32_t offtbl_off = 32 + 2048 + 16 * 32;
     uint16_t vag_len_div8 = 4; /* 4 * 8 = 32 bytes (2 blocks) */
+    header[offtbl_off] = 2; /* Explicit 16-byte dummy prefix. */
     memcpy(header + offtbl_off + 2, &vag_len_div8, 2); /* vag_offset[1] */
 
     /* Body: 16 bytes dummy + 2 blocks (32 bytes) */
@@ -126,6 +125,29 @@ static void test_spu_synthetic_vab_and_mix(void) {
 
     ps1_spu_free_vab(&spu, id);
     assert(!spu.vabs[id].loaded);
+
+    /* Program numbers are sparse; tone blocks are packed by active program. */
+    header[32] = 0;
+    header[32 + 5 * 16] = 1;
+    id = ps1_spu_load_vab(&spu, header, sizeof(header), body, sizeof(body));
+    assert(id >= 0);
+    ps1_spu_key_on_vab(&spu, 1, id, 5, 0, 60, 0, 127, 127);
+    assert(spu.voices[1].active);
+    ps1_spu_free_vab(&spu, id);
+}
+
+static void test_final_adpcm_block_is_not_discarded(void) {
+    Ps1Spu spu;
+    uint8_t block[16];
+    int16_t pcm[29 * 2];
+    ps1_spu_init(&spu);
+    memset(block, 0x11, sizeof(block));
+    block[0] = 4;
+    block[1] = PS1_ADPCM_FLAG_LOOP_END;
+    ps1_spu_key_on_raw(&spu, 0, block, sizeof(block), 0x10000, 32767, 32767);
+    ps1_spu_mix(&spu, pcm, 29, 0);
+    assert(pcm[0] > 0 && pcm[27 * 2] > 0);
+    assert(pcm[28 * 2] == 0);
 }
 
 static void test_spu_raw_playback_and_volume(void) {
@@ -159,6 +181,7 @@ static void test_spu_raw_playback_and_volume(void) {
 }
 
 int main(void) {
+    test_final_adpcm_block_is_not_discarded();
     test_adpcm_decode_basic();
     test_adpcm_filter_prediction();
     test_spu_synthetic_vab_and_mix();

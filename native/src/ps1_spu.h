@@ -35,6 +35,8 @@ typedef struct {
     uint32_t        byte_offset;
     uint32_t        loop_offset;
     int             has_loop;
+    int             stop_after_block;
+    int             source_ended;
     int16_t         hist1;
     int16_t         hist2;
     int16_t         block[28];
@@ -58,6 +60,9 @@ typedef struct {
     uint16_t        num_tones;
     uint16_t        num_vags;
     uint32_t        vag_body_offsets[256]; /* body byte offset for each VAG 1..255 */
+    uint32_t        vag_lengths[256];
+    uint32_t        program_tone_offsets[128];
+    uint8_t         program_tone_counts[128];
 } Ps1VabSlot;
 
 /* SPU state */
