@@ -80,4 +80,10 @@ int LoadImage(RECT *rect, u_long *pixels);
 int StoreImage(RECT *rect, u_long *pixels);
 int DrawSync(int mode);
 
+#ifdef NDEBUG
+#define FntPrint(...) ((void)0)
+#else
+void FntPrint(const char *format, ...);
+#endif
+
 #endif

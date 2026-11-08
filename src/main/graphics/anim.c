@@ -8,7 +8,9 @@
 #include "types.h"
 #include "anim.h"
 #include "cpu_asm.h"
+#ifndef VANILLABTN_NATIVE
 #include "farm_state.h"
+#endif
 #include "main.h"
 #include "math_util.h"
 #include "prim.h"
@@ -28,7 +30,7 @@
 
 /* The file stores its sections as offsets from its own start. */
 static inline void *at_offset(void *file, s32 offset) {
-    return file + offset;
+    return (u8 *)file + offset;
 }
 
 /* Bind an animation state to a loaded .ANI file: check the file, reset the

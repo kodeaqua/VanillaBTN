@@ -62,3 +62,23 @@ terminates cycles. `sdk_gpu_ok` reports a sticky submission error until mapping
 reset. The host must check it when wiring the original frame loop. Existing
 single-GPU synchronous transfer and lifetime constraints still apply. No game
 scene is connected by this step.
+
+## Original animation code
+
+`game_anim` compiles `src/main/graphics/anim.c` directly. Byte-pointer offset
+arithmetic replaces the compiler-specific `void*` addition. Native builds omit
+the farm-state include used only for PS1 return-address diagnostics; those
+MIPS addresses have no native meaning. No playback or drawing rule is replaced.
+`LINK_PRIM` routes through the same mapped SDK links as `addPrim`, preserving
+the original packet length and preventing x64 pointer truncation.
+
+Original fatal debugger waits terminate through the native `host_poll` trap.
+Font diagnostic output exists only in Debug; Release discards calls and their
+arguments at compile time. The native compatibility header does not supply
+fake implementations for unported scratchpad or other CPU operations.
+
+Synthetic fixtures invoke the actual original duration/hold/pause logic and
+SPRT/FT4 generation, including UV orientation and primitive-cursor advancement.
+They supply the main module's frame pointer as fixture state. Uniform texels
+isolate packet generation from the backend's incomplete polygon interpolation;
+independent nonuniform hardware fixtures remain required for texel fidelity.
