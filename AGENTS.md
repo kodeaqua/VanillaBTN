@@ -61,6 +61,20 @@ that the generated EXE and 13 overlays still match the reference SHA-1 hashes.
 - After the pull request is merged, delete its work branch locally and on the
   remote. Keep `main` checked out and up to date.
 
+## Sensitive information
+
+- Never write, commit, upload, or publish secrets or private data, including
+  `.env` files, credentials, tokens, private keys, personal information,
+  machine-specific home paths, original game data, and SDK files. Keep them out
+  of code, documentation, commit messages, pull requests, and shared artifacts.
+- Use repository-relative paths or portable placeholders in examples and
+  reports. Write `~/...` or `$HOME/...` on Unix, `%USERPROFILE%\...` in Windows
+  Command Prompt, and `$env:USERPROFILE\...` in PowerShell. Do not include a
+  real username or home directory in a path that will be shared.
+- Inspect staged changes and artifacts before committing, pushing, or
+  uploading. Remove or redact sensitive values before sharing them, and do not
+  print their contents while checking.
+
 ## Windows and Docker
 
 The old PS1 preprocessor can fail on a Windows bind mount and on CRLF source
