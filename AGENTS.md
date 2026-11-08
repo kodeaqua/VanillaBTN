@@ -15,6 +15,14 @@ that the generated EXE and 13 overlays still match the reference SHA-1 hashes.
 - Keep changes scoped to the requested behavior or documentation. Do not
   reformat unrelated C files: source order, declarations, compiler behavior,
   object layout, and link order can affect the output bytes.
+- Document new or changed code so its purpose and non-obvious behavior are
+  clear. Put concise comments near tricky logic and constraints; use separate
+  documentation for broader workflows or architecture, and update it when the
+  code changes. Explain why the code works this way rather than restating it.
+- Format new and modified code consistently with the surrounding style. Keep
+  indentation, spacing, and line breaks tidy, and limit formatting changes to
+  the code being worked on. Verify that C formatting changes preserve the
+  required binary match with the `check` target.
 - Each image lists its C files in link order in `src/main/CMakeLists.txt` or its
   `src/overlay/*/CMakeLists.txt`. Update these lists deliberately if files move.
 - The EXE lives in `src/main`; scene code lives in `src/overlay`. Shared game
