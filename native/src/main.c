@@ -10,6 +10,8 @@
 #include "ps1_video.h"
 #include "sdk_gpu.h"
 #include "host_display.h"
+#include "sdk_pad.h"
+#include <libpad.h>
 
 _Static_assert(sizeof(void *) == 8, "The Windows port requires x64");
 
@@ -18,6 +20,15 @@ static Ps1InputRecord pad1;
 static Ps1Clock clock;
 static Ps1Audio audio;
 static Ps1CardManager card_mgr;
+
+static void send_rumble(unsigned slot, uint8_t small, uint8_t large, void *context) {
+    SDL_Gamepad *gamepad = *(SDL_Gamepad **)context;
+    if (slot == 0 && gamepad != NULL) {
+        /* Refresh while the SDK polls the original actuator buffer. The short
+         * timeout also stops motors if host polling unexpectedly stalls. */
+        SDL_RumbleGamepad(gamepad, (Uint16)(large * 257u), small ? 65535 : 0, 100);
+    }
+}
 
 static uint32_t map_key_to_ps1_button(SDL_Keycode key) {
     switch (key) {
@@ -101,6 +112,7 @@ int main(int argc, char **argv) {
     if (argc != 1 || !SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD)) {
         return 1;
     }
+    sdk_pad_rumble(send_rumble, &gamepad);
     window = SDL_CreateWindow("VanillaBTN - native bringup", 640, 480,
                               SDL_WINDOW_RESIZABLE);
     if (window == NULL) {
@@ -173,6 +185,12 @@ int main(int argc, char **argv) {
         if ((controller_buttons & PS1_PAD_ARROWS_MASK) == 0) {
             pad1.held |= ps1_input_stick_buttons(stick_x, stick_y);
         }
+        /* Supply raw samples only: original pad.c owns the analog/repeat rules
+         * when original startup is connected. Do not feed folded stick bits. */
+        sdk_pad_sample(0, true, gamepad != NULL,
+            (uint16_t)(keyboard_buttons | controller_buttons),
+            (uint8_t)(((int)stick_x + 32768) / 256),
+            (uint8_t)(((int)stick_y + 32768) / 256));
 
         uint64_t now = SDL_GetTicksNS();
         uint32_t ticks = ps1_clock_advance(&clock, now - last_time);
@@ -192,6 +210,8 @@ int main(int argc, char **argv) {
     result = 0;
 
 done:
+    PadStopCom();
+    sdk_pad_rumble(NULL, NULL);
     sdk_gpu_bind(NULL);
     if (gamepad != NULL) SDL_CloseGamepad(gamepad);
     ps1_card_manager_shutdown(&card_mgr);

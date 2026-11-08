@@ -225,3 +225,31 @@ python tools/check-sdk-math.py --native build/native/Release/sdk_math_test.exe
 
 `--write-table` regenerates the numerical angle results before compilation.
 Keep reference ELF/map files and any SDK material under ignored build storage.
+
+## Original controller polling
+
+`game_pad` compiles `src/main/input/pad.c` unchanged. `sdk_pad` supplies its
+SDK receive buffers and actuator transport; the host submits raw button bits
+and 0..255 stick axes. Dead zones, headings, tilt, repeat channels, d-pad
+priority, replay swapping and vibration requests remain original game code.
+The native cue-header compatibility wrappers only change variadic macro
+spelling; their implementation bodies remain shared and PS1 hashes match.
+
+The SDK bridge supports direct ports 0 and 0x10. A connected device is ready
+at the host boundary; hot swaps report discovery so original code resets its
+mode. Analog actuator alignment observes a three-vblank busy period before
+requests are consumed. This models the used SDK protocol, not full serial or
+Multi Tap emulation. `ChangeClearPAD(0)` has no native interrupt to alter;
+unsupported interrupt-clearing modes stop instead of pretending to work.
+
+The SDL host merges keyboard/controller raw bits into port 1 and supplies
+rumble output for its opened gamepad. The smoke harness still uses its old
+input record while original startup is pending; raw SDK samples are ready
+for the original poller. Port 2 is exercised synthetically but has no second
+physical SDL controller assignment yet. Rumble, disconnects and controller
+feel still require developer validation.
+
+Fixtures supply the actual original main/farm record types, not replacement
+controller algorithms. They cover both ports, repeated and newly pressed
+buttons, analog priority, an exact diagonal sector boundary, replay while
+disconnected, actuator requests, and analog/digital/analog hot swaps.
