@@ -9,7 +9,8 @@ Update the relevant item after completing a task or discovering a blocker.
   - [x] Replace unbounded SEQ scanning with exact archive spans and reject invalid sequence headers without consuming handles.
   - [x] Finish the interrupted MSVC farm-source build: case ranges, nested helpers, byte-pointer arithmetic and required type declarations.
   - [ ] Resolve farm-to-host linkage, remaining pointer truncations and GS lighting/matrix entry points; an archive build does not prove a runnable farm.
-  - [ ] PocketStation operations must report an absent/unsupported device rather than fabricated successful reads or writes.
+  - [x] PocketStation operations report missing/non-PDA devices without fabricated successful reads or writes; restore canonical SDK result/command values.
+  - [ ] Reject invalid/truncated memory-card transfers and validate file chains before touching caller buffers or saves.
 - [ ] Connect original game code through platform/SDK interfaces. Do not rebuild scene, menu, dialog or game logic in the native host.
   - [x] Compile the original texture-pack loader against native GPU transfers.
   - [ ] Connect original primitive/ordering-table submission and animation code.
@@ -45,6 +46,7 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Completed
 
+- [x] Remove fabricated PocketStation serial/time/memory and successful execution/write responses. Standard cards report Invalid (2), missing cards NoCard (1), with canonical command IDs and untouched buffers/card contents. Regression fails on the old bridge and on temporary reversion; both profiles pass 28 tests. No PocketStation device is emulated.
 - [x] Fix SDK sequence opening: carry original archive byte counts into one-shot SDK source views, remove raw EOT byte scanning, and check parser failure before publishing a handle. Invalid PPQN fails before/after temporary reversion; short buffers and an FF/2F delta are covered. Both native profiles pass 27 checks, and the 14-file PS1 code check passes.
 - [x] Compile original PDA sample screen `10_PdaSamp/pdasamp.c` in `game_window_frame`, and add PocketStation `libmcx` SDK bridges (`McxAllInfo`, `McxGetApl`, `McxGetTime`, `McxHideTrans`, `McxGetSerial`, `McxGetMem`, `McxExecFlag`, `McxExecApl`, `McxCurrCtrl`, `McxFlashAcs`, `McxSetMem`, `McxShowTrans`, `McxSetLED`, `McxReadDev`, `McxWriteDev`, `McxSync`). Synthetic checks exercise `pda_sample_run` loop execution, pad polling delivering `PAD_SELECT` through native SDK buffers, and exit scene request to `SCENE_DEBUG` in Debug/Release (27 checks), and all 14 PS1 code hashes match.
 

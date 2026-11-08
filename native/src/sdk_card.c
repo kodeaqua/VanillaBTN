@@ -329,184 +329,115 @@ int MemCardGetDirentry(int chan, const char *name, struct DIRENTRY *dir, long *f
     return 0;
 }
 
+/* A virtual PS1 card is not a PocketStation. Complete the SDK request with
+ * the real absence/type error; never invent PDA memory, identity or clock data.
+ * Immediate return 1 means the request was accepted, not that it succeeded. */
+static int mcx_unavailable(long port, long command) {
+    int slot = port == 0 ? 0 : (port == 1 || port == 0x10) ? 1 : -1;
+    Ps1Card *card = sdk_card_get(slot);
+    s_mcx_last_cmd = command;
+    s_mcx_last_result = slot < 0 ? McxErrInvalid
+        : (!card || !card->present) ? McxErrNoCard : McxErrInvalid;
+    return 1;
+}
+
 int McxCardType(long port) {
-    int p = (port == 0x10 || port == 1) ? 1 : 0;
-    Ps1Card *card = sdk_card_get(p);
-    s_mcx_last_cmd = 1;
-    if (card == NULL || !card->present) {
-        s_mcx_last_result = McxErrNoCard;
-    } else {
-        s_mcx_last_result = McxErrInvalid; /* Standard card, not a PocketStation PDA */
-    }
+    mcx_unavailable(port, McxFuncCardType);
     return 0;
 }
 
-int McxSync(long port, long *cmd, long *result) {
-    (void)port;
-    if (cmd != NULL) {
-        *cmd = s_mcx_last_cmd;
-    }
-    if (result != NULL) {
-        *result = s_mcx_last_result;
-    }
+int McxSync(long mode, long *cmd, long *result) {
+    if (mode != 0 && mode != 1) return -1;
+    if (cmd) *cmd = s_mcx_last_cmd;
+    if (result) *result = s_mcx_last_result;
     return 1;
 }
 
 int McxAllInfo(long port, unsigned char *buf) {
-    (void)port;
-    if (buf != NULL) {
-        memset(buf, 0, 36);
-        buf[2] = 1;
-        buf[3] = 0;
-        buf[4] = 0x78;
-        buf[5] = 0x56;
-        buf[6] = 0x34;
-        buf[7] = 0x12;
-    }
-    s_mcx_last_cmd = 0x01;
-    s_mcx_last_result = McxErrSuccess;
-    return 1;
+    (void)buf;
+    return mcx_unavailable(port, McxFuncAllInfo);
 }
 
 int McxGetApl(long port, void *result) {
-    (void)port;
-    if (result != NULL) {
-        *(long *)result = 0;
-    }
-    s_mcx_last_cmd = 0x02;
-    s_mcx_last_result = McxErrSuccess;
-    return 1;
+    (void)result;
+    return mcx_unavailable(port, McxFuncGetApl);
 }
 
 int McxGetTime(long port, unsigned char *buf) {
-    (void)port;
-    if (buf != NULL) {
-        memset(buf, 0, 8);
-        buf[0] = 0x20;
-        buf[1] = 0x26;
-        buf[2] = 11;
-        buf[3] = 8;
-        buf[4] = 0;
-        buf[5] = 12;
-        buf[6] = 0;
-        buf[7] = 0;
-    }
-    s_mcx_last_cmd = 0x03;
-    s_mcx_last_result = McxErrSuccess;
-    return 1;
+    (void)buf;
+    return mcx_unavailable(port, McxFuncGetTime);
 }
 
 int McxHideTrans(long port) {
-    (void)port;
-    s_mcx_last_cmd = 0x04;
-    s_mcx_last_result = McxErrSuccess;
-    return 1;
+    return mcx_unavailable(port, McxFuncHideTrans);
 }
 
 int McxGetSerial(long port, void *serial) {
-    (void)port;
-    if (serial != NULL) {
-        *(long *)serial = 0x12345678;
-    }
-    s_mcx_last_cmd = 0x05;
-    s_mcx_last_result = McxErrSuccess;
-    return 1;
+    (void)serial;
+    return mcx_unavailable(port, McxFuncGetSerial);
 }
 
 int McxGetMem(long port, void *buf, long addr, long len) {
-    (void)port;
-    (void)addr;
-    if (buf != NULL && len > 0) {
-        memset(buf, 0, (size_t)len);
-    }
-    s_mcx_last_cmd = 0x06;
-    s_mcx_last_result = McxErrSuccess;
-    return 1;
-}
-
-int McxExecFlag(long port, long block, long flag) {
-    (void)port;
-    (void)block;
-    (void)flag;
-    s_mcx_last_cmd = McxFuncExecFlag;
-    s_mcx_last_result = McxErrSuccess;
-    return 1;
-}
-
-int McxExecApl(long port, long apl, long param) {
-    (void)port;
-    (void)apl;
-    (void)param;
-    s_mcx_last_cmd = 0x07;
-    s_mcx_last_result = McxErrSuccess;
-    return 1;
-}
-
-int McxCurrCtrl(long port, long sound, long infrared, long rsv) {
-    (void)port;
-    (void)sound;
-    (void)infrared;
-    (void)rsv;
-    s_mcx_last_cmd = 0x08;
-    s_mcx_last_result = McxErrSuccess;
-    return 1;
-}
-
-int McxFlashAcs(long port, long flag) {
-    (void)port;
-    (void)flag;
-    s_mcx_last_cmd = 0x09;
-    s_mcx_last_result = McxErrSuccess;
-    return 1;
-}
-
-int McxSetMem(long port, const void *buf, long addr, long len) {
-    (void)port;
     (void)buf;
     (void)addr;
     (void)len;
-    s_mcx_last_cmd = 0x0A;
-    s_mcx_last_result = McxErrSuccess;
-    return 1;
+    return mcx_unavailable(port, McxFuncGetMem);
+}
+
+int McxExecFlag(long port, long block, long flag) {
+    (void)block;
+    (void)flag;
+    return mcx_unavailable(port, McxFuncExecFlag);
+}
+
+int McxExecApl(long port, long apl, long param) {
+    (void)apl;
+    (void)param;
+    return mcx_unavailable(port, McxFuncExecApl);
+}
+
+int McxCurrCtrl(long port, long sound, long infrared, long rsv) {
+    (void)sound;
+    (void)infrared;
+    (void)rsv;
+    return mcx_unavailable(port, McxFuncCurrCtrl);
+}
+
+int McxFlashAcs(long port, long flag) {
+    (void)flag;
+    return mcx_unavailable(port, McxFuncFlashAcs);
+}
+
+int McxSetMem(long port, const void *buf, long addr, long len) {
+    (void)buf;
+    (void)addr;
+    (void)len;
+    return mcx_unavailable(port, McxFuncSetMem);
 }
 
 int McxShowTrans(long port, long shown, long timeout) {
-    (void)port;
     (void)shown;
     (void)timeout;
-    s_mcx_last_cmd = 0x0B;
-    s_mcx_last_result = McxErrSuccess;
-    return 1;
+    return mcx_unavailable(port, McxFuncShowTrans);
 }
 
 int McxSetLED(long port, long flag) {
-    (void)port;
     (void)flag;
-    s_mcx_last_cmd = 0x0C;
-    s_mcx_last_result = McxErrSuccess;
-    return 1;
+    return mcx_unavailable(port, McxFuncSetLED);
 }
 
 int McxReadDev(long port, long dev, const void *fix, void *read) {
-    (void)port;
-    (void)dev;
-    (void)fix;
-    if (read != NULL) {
-        memset(read, 0, 128);
-    }
-    s_mcx_last_cmd = 0x0D;
-    s_mcx_last_result = McxErrSuccess;
-    return 1;
-}
-
-int McxWriteDev(long port, long dev, const void *fix, const void *read) {
-    (void)port;
     (void)dev;
     (void)fix;
     (void)read;
-    s_mcx_last_cmd = 0x0E;
-    s_mcx_last_result = McxErrSuccess;
-    return 1;
+    return mcx_unavailable(port, McxFuncReadDev);
+}
+
+int McxWriteDev(long port, long dev, const void *fix, const void *read) {
+    (void)dev;
+    (void)fix;
+    (void)read;
+    return mcx_unavailable(port, McxFuncWriteDev);
 }
 
 int sdk_card_rename(const char *oldpath, const char *newpath) {

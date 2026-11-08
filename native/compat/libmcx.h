@@ -4,14 +4,29 @@
 #include <sys/types.h>
 
 #define McxErrSuccess       (0)
-#define McxErrInvalid       (1)
-#define McxErrNewCard       (2)
-#define McxErrNoCard        (3)
+#define McxErrNoCard        (1)
+#define McxErrInvalid       (2)
+#define McxErrNewCard       (3)
 
-#define McxFuncExecFlag     (0x10)
+#define McxFuncGetApl       (1)
+#define McxFuncExecApl      (2)
+#define McxFuncGetTime      (3)
+#define McxFuncGetMem       (4)
+#define McxFuncSetMem       (5)
+#define McxFuncShowTrans    (6)
+#define McxFuncHideTrans    (7)
+#define McxFuncCurrCtrl     (8)
+#define McxFuncSetLED       (9)
+#define McxFuncGetSerial    (10)
+#define McxFuncExecFlag     (11)
+#define McxFuncAllInfo      (12)
+#define McxFuncFlashAcs     (13)
+#define McxFuncReadDev      (14)
+#define McxFuncWriteDev     (15)
+#define McxFuncCardType     (19)
 
 int McxCardType(long port);
-int McxSync(long port, long *cmd, long *result);
+int McxSync(long mode, long *cmd, long *result);
 int McxAllInfo(long port, unsigned char *buf);
 int McxGetApl(long port, void *result);
 int McxGetTime(long port, unsigned char *buf);

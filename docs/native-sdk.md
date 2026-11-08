@@ -415,10 +415,22 @@ reformatting, and reboot request to `SCENE_DEBUG`.
 `pda_sample_done = 0` initialized under `VANILLABTN_NATIVE` so the interactive
 utility loop can be entered repeatedly.
 
-`native/compat/libmcx.h` and `sdk_card` implement the PocketStation / Mcx API:
+`native/compat/libmcx.h` and `sdk_card` expose the PocketStation / Mcx boundary:
 `McxAllInfo`, `McxGetApl`, `McxGetTime`, `McxHideTrans`, `McxGetSerial`, `McxGetMem`,
 `McxExecFlag`, `McxExecApl`, `McxCurrCtrl`, `McxFlashAcs`, `McxSetMem`, `McxShowTrans`,
 `McxSetLED`, `McxReadDev`, `McxWriteDev`, and `McxSync`.
+
+There is no emulated PocketStation device. Commands complete with the SDK's
+`McxErrInvalid` (2) for a present standard PS1 card and `McxErrNoCard` (1) for
+a missing card. Unsupported commands do not write caller buffers or alter
+card memory. Command IDs follow the SDK (for example serial 10, execution
+flag 11, all-info 12, card-type 19). A request return value of 1 means accepted;
+the operation result comes from `McxSync`, not that immediate return value.
+
+The earlier bridge returned invented serial/time/memory and successful writes
+and execution. The continuation audit removed those false responses. The
+`sdk_absent_pocketstation` fixture checks numeric SDK contracts independently
+of facade macros, unchanged buffers/card data and missing/invalid-port errors.
 
 Synthetic fixtures in `original_window_test` execute `pda_sample_run()`, feeding
 a simulated `PAD_SELECT` press through the native SDK pad buffers to verify loop
