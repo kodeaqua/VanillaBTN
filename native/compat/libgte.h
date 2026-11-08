@@ -12,6 +12,8 @@ typedef struct CVECTOR { u_char r, g, b, cd; } CVECTOR;
 typedef struct MATRIX { short m[3][3]; long t[3]; } MATRIX;
 
 int csqrt(int value);
+int rsin(int angle);
+int rcos(int angle);
 long ratan2(long y, long x);
 
 #endif

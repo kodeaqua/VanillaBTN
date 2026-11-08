@@ -11,7 +11,7 @@ Update the relevant item after completing a task or discovering a blocker.
     - [x] Compile original prim.c and submit its packets through mapped native OT links.
     - [x] Compile original animation drawing and connect frame cursor insertion.
       - [x] Compile anim.c and exercise original clock, SPRT/FT4 construction and cursor linking.
-      - [x] Connect original frame-buffer layout, system display-mask helpers, loading screen and cursor insertion to host storage.
+      - [x] Connect original frame-buffer layout, system display-mask helpers, loading screen, CLUT fades/scrolls, math_util.c and cursor insertion to host storage.
   - [ ] Connect original disc requests, startup and native overlay dispatch.
     - [x] Provide SDK VSync timing with deterministic synthetic clock checks.
     - [x] Compile original afile.c against imported-disc SDK sector reads.
@@ -40,6 +40,7 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Completed
 
+- [x] Support inline `DR_LOAD` (`GP0 0xA0`) CPU-to-VRAM packets, add `rsin`/`rcos` to `sdk_math`, and compile original `clut.c` and `math_util.c` in `game_frame_buffers`. Synthetic checks verify odd-width/out-of-bounds `GP0 0xA0` transfers, `StoreImage` palette capture, `clut_fade_step` midpoint blending with STP bit rules, `clut_scroll_step` bounce/wrap modes, and polar vector math in Debug/Release (27 checks).
 - [x] Compile original system.c (`host_poll`, `display_on`, `display_off`) and loading_screen.c in game_anim/game_frame_buffers without changing their source. Synthetic checks exercise loading-picture texture upload, display-mask toggling, double-buffered frame/environment flips, SPRT/DR_MODE submission at (160, 120) and stop transitions in Debug/Release (27 checks).
 - [x] Compile original pad_vibration.c alongside pad.c in game_pad. Synthetic checks exercise vibration pattern startup gating before pad_init, script step durations, same-script deduplication, actuator0/actuator1 updates through sdk_pad rumble callbacks, explicit stop and replay suppression in Debug/Release (27 checks).
 - [x] Connect host raw input/rumble adapters and compile original pad.c without replacing its logic. Synthetic fixtures exercise two SDK ports, original repeat timing, analog dead zone/d-pad priority, exact sector boundary, replay button swap, actuator negotiation and analog/digital hot swaps. Both profiles pass 27 checks and all 14 PS1 code hashes match; gameplay/controller feel remains developer validation.

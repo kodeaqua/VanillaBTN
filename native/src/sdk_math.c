@@ -1,5 +1,32 @@
 #include <libgte.h>
+#include <math.h>
 #include <stdint.h>
+
+static int rsin_quadrant(unsigned angle) {
+    /* First-quadrant 1.12 fixed-point sine (4096 units per turn, 4096 = 1.0). */
+    return (int)(sin((double)angle * (3.14159265358979323846 / 2048.0)) * 4096.0 + 0.5);
+}
+
+static int rsin_positive(unsigned angle) {
+    angle &= 0xFFFu;
+    if (angle <= 1024u) return rsin_quadrant(angle);
+    if (angle <= 2048u) return rsin_quadrant(2048u - angle);
+    if (angle <= 3072u) return -rsin_quadrant(angle - 2048u);
+    return -rsin_quadrant(4096u - angle);
+}
+
+int rsin(int angle) {
+    if (angle < 0) return -rsin_positive((unsigned)(-(int64_t)angle));
+    return rsin_positive((unsigned)angle);
+}
+
+int rcos(int angle) {
+    unsigned a = (unsigned)(angle < 0 ? -(int64_t)angle : angle) & 0xFFFu;
+    if (a <= 1024u) return rsin_quadrant(1024u - a);
+    if (a <= 2048u) return -rsin_quadrant(a - 1024u);
+    if (a <= 3072u) return -rsin_quadrant(3072u - a);
+    return rsin_quadrant(a - 3072u);
+}
 
 /* Numerical SDK-function results, generated/checked by the optional reference
  * microtest tool. No proprietary SDK source or binaries are included. */

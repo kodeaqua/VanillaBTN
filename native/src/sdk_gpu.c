@@ -239,3 +239,19 @@ int DrawSync(int mode) {
      * Both waiting (0) and polling (1) therefore report completion. */
     return mode == 0 || mode == 1 ? 0 : -1;
 }
+
+void SetDrawLoad(DR_LOAD *p, RECT *r) {
+    if (!p || !r || !valid_area(r->x, r->y, r->w, r->h)) {
+        packet_error = true;
+        return;
+    }
+    unsigned data_words = ((unsigned)r->w * (unsigned)r->h + 1u) / 2u;
+    if (data_words > sizeof(p->p) / sizeof(p->p[0])) {
+        packet_error = true;
+        return;
+    }
+    setlen(p, 3u + data_words);
+    p->code[0] = 0xA0000000ul;
+    p->code[1] = ((u_long)(uint16_t)r->y << 16) | (u_long)(uint16_t)r->x;
+    p->code[2] = ((u_long)(uint16_t)r->h << 16) | (u_long)(uint16_t)r->w;
+}

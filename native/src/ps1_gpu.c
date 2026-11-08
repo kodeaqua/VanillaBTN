@@ -52,6 +52,7 @@
 #define GP0_POLY_FT4_RST    0x2Fu
 
 /* Draw environment. */
+#define GP0_IMAGE_LOAD      0xA0u  /* Inline CPU-to-VRAM rectangle transfer */
 #define GP0_DRAW_MODE       0xE1u  /* Texture page, semi-transparency mode */
 #define GP0_DRAW_AREA_TL    0xE3u  /* Top-left corner of draw area */
 #define GP0_DRAW_AREA_BR    0xE4u  /* Bottom-right corner of draw area */
@@ -417,6 +418,26 @@ bool ps1_gpu_exec(Ps1Video *video, Ps1DrawState *state,
         break;
 
     /* Draw environment commands. */
+    case GP0_IMAGE_LOAD: {
+        if (count < 3) return false;
+        int x = gp0_x(words[1]);
+        int y = gp0_y(words[1]);
+        int w = gp0_x(words[2]);
+        int h = gp0_y(words[2]);
+        if (x < 0 || y < 0 || w <= 0 || h <= 0
+            || w > PS1_VRAM_WIDTH - x || h > PS1_VRAM_HEIGHT - y) {
+            return false;
+        }
+        size_t pixels = (size_t)w * (size_t)h;
+        size_t data_words = (pixels + 1u) / 2u;
+        if (count < 3u + data_words) return false;
+        for (size_t i = 0; i < pixels; ++i) {
+            uint32_t word = words[3u + (i >> 1)];
+            uint16_t texel = (i & 1u) ? (uint16_t)(word >> 16) : (uint16_t)(word & 0xFFFFu);
+            video->vram[y + (int)(i / (size_t)w)][x + (int)(i % (size_t)w)] = texel;
+        }
+        break;
+    }
     case GP0_DRAW_MODE:
         if (count >= 1) exec_draw_mode(state, words[0]);
         break;

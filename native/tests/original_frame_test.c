@@ -1,8 +1,10 @@
 #include "sdk_gpu.h"
 #include "main.h"
 #include "anim.h"
+#include "clut.h"
 #include "frame_buffers.h"
 #include "loading_screen.h"
+#include "math_util.h"
 #include <assert.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -109,6 +111,61 @@ int main(void) {
     assert(loading_screen_is_active() == 0);
     loading_screen_draw();
     assert(current_frame == &frame_records[0] && frame_index == 0);
+
+    /* Original CLUT fade and scroll routines read two 16-entry palettes via
+     * StoreImage and queue DR_LOAD (GP0 0xA0) packets through ot_insert_prim. */
+    for (unsigned i = 0; i < 16; ++i) {
+        video.vram[2][i] = (i == 0) ? 0 : (uint16_t)((4 << 10) | (8 << 5) | 16);
+        video.vram[3][i] = (i == 0) ? 0 : (uint16_t)((20 << 10) | (24 << 5) | 0);
+    }
+    ClutFade fade;
+    u_long saved_clut[16];
+    clut_fade_setup(&fade, saved_clut, 4, 0, 2, 0, 3, 0, 4);
+    assert(fade.span == 4 && fade.position == 0 && fade.direction == -2);
+    assert((saved_clut[0] & 0xFFFFu) == 0 && (saved_clut[0] >> 16) == ((4 << 10) | (8 << 5) | 16));
+    assert((saved_clut[8] & 0xFFFFu) == 0 && (saved_clut[8] >> 16) == ((20 << 10) | (24 << 5) | 0));
+
+    ClearOTagR(current_frame->ot, FRAME_OT_DEPTH);
+    current_frame->primCursor.bytes = current_frame->primStart;
+    clut_fade_step(&fade, 2);
+    DrawOTag(current_frame->ot + FRAME_OT_DEPTH - 1);
+    assert(sdk_gpu_ok());
+    /* Entry 0 stays transparent 0x0000; non-zero blended entries set STP (0x8000). */
+    assert(video.vram[4][0] == 0x0000);
+    assert(video.vram[4][1] == (0x8000 | (12 << 10) | (16 << 5) | 8));
+
+    /* Bounce mode (mode 1): steps 0 -> 2 -> 4, flips direction, then 4 -> 2 -> 0. */
+    clut_scroll_step(&fade, 2, 1);
+    assert(fade.position == 2 && fade.direction == 0);
+    clut_scroll_step(&fade, 2, 1);
+    assert(fade.position == 4 && fade.direction == 0);
+    ClearOTagR(current_frame->ot, FRAME_OT_DEPTH);
+    current_frame->primCursor.bytes = current_frame->primStart;
+    clut_scroll_step(&fade, 2, 1);
+    assert(fade.position == 4 && fade.direction == 1);
+    DrawOTag(current_frame->ot + FRAME_OT_DEPTH - 1);
+    assert(sdk_gpu_ok() && video.vram[4][15] == (0x8000 | (20 << 10) | (24 << 5) | 0));
+
+    clut_scroll_step(&fade, 2, 1);
+    assert(fade.position == 2 && fade.direction == 1);
+    clut_scroll_step(&fade, 2, 1);
+    assert(fade.position == 0 && fade.direction == 1);
+    ClearOTagR(current_frame->ot, FRAME_OT_DEPTH);
+    current_frame->primCursor.bytes = current_frame->primStart;
+    clut_scroll_step(&fade, 2, 1);
+    assert(fade.position == 0 && fade.direction == 0);
+    DrawOTag(current_frame->ot + FRAME_OT_DEPTH - 1);
+    assert(sdk_gpu_ok() && video.vram[4][15] == (0x8000 | (4 << 10) | (8 << 5) | 16));
+
+    /* Wrap mode (mode 0): wraps position >= span back by span. */
+    clut_scroll_step(&fade, 3, 0);
+    assert(fade.position == 3);
+    clut_scroll_step(&fade, 2, 0);
+    assert(fade.position == 1);
+    assert(math_int_pow(3, 4) == 81 && math_int_pow(5, 0) == 1);
+    s32 polar[3] = {0};
+    vec_from_polar(polar, 800, 600, 512);
+    assert(polar[0] == ((2896 * 800) >> 12) && polar[1] == -600 && polar[2] == ((2896 * 800) >> 12));
 
     sdk_gpu_bind(NULL);
     return 0;

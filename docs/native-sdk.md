@@ -89,16 +89,20 @@ They supply the main module's frame pointer as fixture state. Uniform texels
 isolate packet generation from the backend's incomplete polygon interpolation;
 independent nonuniform hardware fixtures remain required for texel fidelity.
 
-`game_frame_buffers` compiles the original frame layout, cursor insertion and
+`game_frame_buffers` compiles the original frame layout, cursor insertion,
+`src/main/geometry/math_util.c`, `src/main/graphics/clut.c` and
 `src/main/ui/loading_screen.c`. Native insertion replaces only the 24-bit
-pointer cast with SDK link mapping. The original OT dimensions, memory offsets,
-clearing, cursor advancement, loading-picture texture upload, double-buffered
+pointer cast with SDK link mapping. `SetDrawLoad` constructs inline `DR_LOAD`
+(`GP0 0xA0`) CPU-to-VRAM transfer packets while preserving any link already
+stored in the tag's low 24 bits by `ot_insert_prim`, and `ps1_gpu_exec` copies
+those halfwords into VRAM with bounds and word-count validation. The original
+OT dimensions, memory offsets, clearing, cursor advancement, CLUT palette
+blending/bouncing/wrapping, loading-picture texture upload, double-buffered
 loading OT/packet slots and environment flips remain authoritative. Tests
 allocate a sufficiently large host region, map it once, invoke the original
 layout for both frames, submit inserted packets, and exercise loading-screen
-initialization, double-buffered drawing and stop transitions. Frame storage is
-runtime-only; its host pointer layout is never serialized as a PS1 frame record
-or saved game.
+and CLUT-fade/scroll execution. Frame storage is runtime-only; its host
+pointer layout is never serialized as a PS1 frame record or saved game.
 
 ## SDK timing
 
@@ -204,11 +208,14 @@ interior Gouraud rows. The original window drawing code is unchanged.
 
 ## Controller math compatibility
 
-`sdk_math` supplies `csqrt` and `ratan2` used by the original analog reader.
+`sdk_math` supplies `csqrt`, `ratan2`, `rsin` and `rcos` used by the original
+analog reader and polar/camera geometry.
 `csqrt` preserves the fixed-point CORDIC shifts, including the repeated stage,
 rather than substituting a floating-point square root. `ratan2` preserves SDK
-normalization and quantized integer angles. Its generated include contains
-numerical function results, not SDK instructions, headers or binary data files.
+normalization and quantized integer angles, and `rsin`/`rcos` match all 1,025
+first-quadrant 1.12 fixed-point sine entries across all four quadrants. Its
+generated include contains numerical function results, not SDK instructions,
+headers or binary data files.
 
 The optional `tools/check-sdk-math.py` checker executes only these SDK math
 microcalls from the locally built reference ELF in Unicorn. The CPU model

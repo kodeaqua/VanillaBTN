@@ -184,6 +184,23 @@ int main(void) {
         const uint32_t e6[1] = { (0xE6u << 24) | 3u };
         if (!ps1_gpu_exec(&video, &draw, e6, 1)) return 6;
         if (!draw.force_mask || !draw.check_mask) return 6;
+
+        /* GP0(A0): inline CPU-to-VRAM image transfer (odd pixel count + bounds). */
+        const uint32_t load_ok[5] = {
+            0xA0000000u,
+            xy_word(12, 34),
+            wh_word(3, 1),
+            0x03E0001Fu,
+            0xDEAD7C00u,
+        };
+        if (!ps1_gpu_exec(&video, &draw, load_ok, 5)) return 6;
+        if (video.vram[34][12] != 0x001Fu
+            || video.vram[34][13] != 0x03E0u
+            || video.vram[34][14] != 0x7C00u
+            || video.vram[34][15] != 0) return 6;
+        if (ps1_gpu_exec(&video, &draw, load_ok, 4)) return 6;
+        const uint32_t load_oob[4] = { 0xA0000000u, xy_word(1023, 0), wh_word(2, 1), 0 };
+        if (ps1_gpu_exec(&video, &draw, load_oob, 4)) return 6;
     }
 
     /* Adjacent triangles must blend each pixel of a quad exactly once. */

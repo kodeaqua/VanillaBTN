@@ -130,13 +130,25 @@ target_link_libraries(original_anim_test PRIVATE game_anim)
 target_compile_options(original_anim_test PRIVATE /W4 /UNDEBUG)
 add_test(NAME original_animation_packets COMMAND original_anim_test)
 
+add_library(sdk_math STATIC src/sdk_math.c)
+set_target_properties(sdk_math PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_include_directories(sdk_math PUBLIC compat)
+target_compile_options(sdk_math PRIVATE /W4)
+add_executable(sdk_math_test tests/sdk_math_test.c)
+set_target_properties(sdk_math_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_link_libraries(sdk_math_test PRIVATE sdk_math)
+target_compile_options(sdk_math_test PRIVATE /W4)
+add_test(NAME sdk_fixed_math COMMAND sdk_math_test)
+
 add_library(game_frame_buffers STATIC
+    ../src/main/geometry/math_util.c
+    ../src/main/graphics/clut.c
     ../src/main/graphics/frame_buffers.c
     ../src/main/ui/loading_screen.c
 )
 set_target_properties(game_frame_buffers PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
-target_include_directories(game_frame_buffers PUBLIC ../src/main/ui)
-target_link_libraries(game_frame_buffers PUBLIC game_anim)
+target_include_directories(game_frame_buffers PUBLIC ../src/main/geometry ../src/main/ui)
+target_link_libraries(game_frame_buffers PUBLIC game_anim sdk_math)
 target_compile_options(game_frame_buffers PRIVATE /W4 /Gy)
 add_executable(original_frame_test tests/original_frame_test.c)
 set_target_properties(original_frame_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
@@ -218,16 +230,6 @@ set_target_properties(original_window_test PROPERTIES C_STANDARD 17 C_STANDARD_R
 target_link_libraries(original_window_test PRIVATE game_window_frame)
 target_compile_options(original_window_test PRIVATE /W4 /UNDEBUG)
 add_test(NAME original_window_packets COMMAND original_window_test)
-
-add_library(sdk_math STATIC src/sdk_math.c)
-set_target_properties(sdk_math PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
-target_include_directories(sdk_math PUBLIC compat)
-target_compile_options(sdk_math PRIVATE /W4)
-add_executable(sdk_math_test tests/sdk_math_test.c)
-set_target_properties(sdk_math_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
-target_link_libraries(sdk_math_test PRIVATE sdk_math)
-target_compile_options(sdk_math_test PRIVATE /W4)
-add_test(NAME sdk_fixed_math COMMAND sdk_math_test)
 
 add_library(sdk_pad STATIC src/sdk_pad.c)
 set_target_properties(sdk_pad PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
