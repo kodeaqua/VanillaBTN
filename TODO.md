@@ -18,7 +18,7 @@ Update the relevant item after completing a task or discovering a blocker.
     - [x] Map original overlay data regions into bounded host main RAM.
     - [x] Honor SDK-selected draw/display rectangles and display mask in SDL presentation.
     - [x] Compile and exercise original screen fades through SDK GPU submission.
-    - [x] Compile original window-frame drawing and support its line/Gouraud packets.
+    - [x] Compile original window-frame drawing, text engine (`text.c`), menu window (`menu_window.c`), heart icon (`heart.c`) and name entry (`name_entry.c`), and support `DR_AREA` (`SetDrawArea`) and line/Gouraud packets.
     - [ ] Connect original startup and module dispatch to the host loop.
 - [ ] Native executable remains a backend smoke harness; original game execution is not connected.
 - [ ] Connect original controller polling through native SDK receive buffers and rumble.
@@ -40,6 +40,7 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Completed
 
+- [x] Compile original `text.c`, `menu_window.c`, `heart.c` and `name_entry.c` in `game_window_frame`, add `DR_AREA`/`SetDrawArea`, `HWD0`/`VWD0` and `SystemError` to the native SDK boundary, and preserve 64-bit pointers in `LOCALIZED`/`LOCALIZED_NAME` (`text_bank.h`). Synthetic checks verify `text_format_number`, `text_write_season`, `text_write_weekday`, `text_list_append`, `text_match_either`, `text_window_draw` typing/close lifecycle with `DR_AREA` clipping, `menu_box_animate`, `heart_icon_draw`, and `name_entry_start`/`name_entry_step` in Debug/Release (27 checks), and all 14 PS1 code hashes match.
 - [x] Connect `sdk_sound` (`libsnd`/`libspu`) to `ps1_spu` and `ps1_seq` and compile original `sound.c` and `sound_request.c` in `game_afile`. Synthetic checks verify `sound_fader_init`, `sound_init`, `sound_init_stereo_xa`, master-volume fader steps, `sound_request(SOUND_REQUEST_RESET)` VAB chunk streaming via `sound_load_tick`, `sound_play` ADPCM voice playback and `sound_queue_seq_pair`/`sound_seq_start_reverb` sequence playback in Debug/Release (27 checks), and all 14 PS1 code hashes match.
 - [x] Compile original `camera.c`, `ui_icons.c` and `bg_tile.c` in `game_frame_buffers`, and `shop_restock.c`, `cooking_recipes.c`, `text_bank.c`, `picture_codes.c`, `horse_names.c`, `farm_data_size.c` and `debug_stubs.c` in `game_screen`. Synthetic checks verify `camera_init`, UI icon blink cycles/sprite drawing, 165-tile background tiling, recipe/picture/glyph tables, and distinct horse-race runner restocking in Debug/Release (27 checks).
 - [x] Compile original `cd_audio.c` and `event_flags.c` in `game_afile` with `sdk_cd` XA control commands (`CdlStandby`, `CdlSetfilter`, `CdlSetmode` `0xC8`, `CdlGetlocP`, `CdlReadS`, `CdControlB`, `CdControlF`, `CdLastCom`) and `sdk_sound` (`SsSetSerialVol`). Synthetic checks exercise `xa_search_files`, `cd_audio_play_track` (valid, out-of-range and event-flag muted), `cd_audio_fade_tick` (fade-out, end-of-track stop and loop seek), `cd_audio_stop`, `event_flag_set`/`event_flag_get`, and `afile_read_bytes` stopping active XA playback in Debug/Release (27 checks).

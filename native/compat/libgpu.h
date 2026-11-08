@@ -23,6 +23,7 @@ typedef struct TILE {
 } TILE;
 
 typedef struct DR_MODE { u_long tag, code[2]; } DR_MODE;
+typedef struct DR_AREA { u_long tag, code[2]; } DR_AREA;
 typedef struct DR_TPAGE { u_long tag, code[1]; } DR_TPAGE;
 typedef struct DR_LOAD { u_long tag, code[3], p[13]; } DR_LOAD;
 typedef struct DR_ENV { u_long tag, code[15]; } DR_ENV;
@@ -87,6 +88,7 @@ void DrawOTag(u_long *ot);
 int LoadImage(RECT *rect, u_long *pixels);
 int StoreImage(RECT *rect, u_long *pixels);
 int DrawSync(int mode);
+void SetDrawArea(DR_AREA *p, RECT *r);
 void SetDrawLoad(DR_LOAD *p, RECT *r);
 DRAWENV *SetDefDrawEnv(DRAWENV *env, int x, int y, int w, int h);
 DISPENV *SetDefDispEnv(DISPENV *env, int x, int y, int w, int h);

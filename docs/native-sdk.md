@@ -236,7 +236,16 @@ in/out frames verify resulting VRAM values, and table/restock checks verify
 distinct runner selection and player-horse slot overrides. This does not wire
 startup or replace its publisher/title sequence.
 
-`game_window_frame` compiles the original bevel/gradient drawing routine.
+`game_window_frame` compiles the original bevel/gradient drawing routine
+(`window_frame.c`), message-window and glyph-layout engine (`text.c`), field
+menu box/dispatcher (`menu_window.c`), villager affection heart icon
+(`heart.c`) and name/birthday entry screen (`name_entry.c`). In `text_bank.h`,
+`VANILLABTN_NATIVE` preserves full 64-bit host pointers in `LOCALIZED` and
+`LOCALIZED_NAME` instead of truncating string addresses to 32-bit `u32`/`s32`.
+`sdk_gpu` supplies `DR_AREA` and `SetDrawArea` (`GP0 0xE3` and `0xE4` draw-area
+packets), `ps1_gpu_exec` dispatches multi-word `0xE1..0xE6` environment packets,
+`libgs.h` exposes `HWD0`/`VWD0` (`320`/`240`), and `sdk_work` supplies
+`SystemError` at the fatal platform boundary.
 Its actual packets exposed missing flat-line and Gouraud-polygon dispatch in
 the software GPU. The backend now draws inclusive flat-line endpoints and
 untextured Gouraud triangles/quads, retaining clipping, masks and blending.
@@ -250,7 +259,11 @@ Regression evidence: the original window fixture fails on its missing upper
 edge before the fix, passes afterward, and fails again when line dispatch is
 removed. Keeping lines but removing Gouraud dispatch instead fails its gradient
 pixel. Independent GP0 fixtures cover inclusive/coincident line endpoints and
-interior Gouraud rows. The original window drawing code is unchanged.
+interior Gouraud rows, and the window/text fixture exercises `text_format_number`,
+`text_write_season`, `text_write_weekday`, `text_list_append`,
+`text_match_either`, `text_window_draw` typing and close states with `DR_AREA`
+clipping, `menu_box_animate`, `heart_icon_draw`, and `name_entry_start`/
+`name_entry_step`. The original window drawing code is unchanged.
 
 ## Controller math compatibility
 

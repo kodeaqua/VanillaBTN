@@ -245,11 +245,17 @@ target_link_libraries(original_screen_test PRIVATE game_screen)
 target_compile_options(original_screen_test PRIVATE /W4 /UNDEBUG)
 add_test(NAME original_screen_fades COMMAND original_screen_test)
 
-add_library(game_window_frame STATIC ../src/main/ui/window_frame.c)
+add_library(game_window_frame STATIC
+    ../src/main/text/text.c
+    ../src/main/ui/heart.c
+    ../src/main/ui/menu_window.c
+    ../src/main/ui/name_entry.c
+    ../src/main/ui/window_frame.c
+)
 set_target_properties(game_window_frame PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
-target_include_directories(game_window_frame PUBLIC ../src/main/ui)
-target_link_libraries(game_window_frame PUBLIC game_prim)
-target_compile_options(game_window_frame PRIVATE /W4)
+target_include_directories(game_window_frame PUBLIC ${game_include_dirs})
+target_link_libraries(game_window_frame PUBLIC game_afile game_pad)
+target_compile_options(game_window_frame PRIVATE /W4 /Gy)
 add_executable(original_window_test tests/original_window_test.c)
 set_target_properties(original_window_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_link_libraries(original_window_test PRIVATE game_window_frame)

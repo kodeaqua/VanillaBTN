@@ -1,11 +1,14 @@
 #include "sdk_gpu.h"
 #include "ps1_gpu.h"
 #include <libgpu.h>
+#include <libgs.h>
 #include <string.h>
 #include <stdlib.h>
 
 _Static_assert(sizeof(u_long) == 4, "SDK words must be 32-bit");
 _Static_assert(sizeof(RECT) == 8, "SDK rectangles contain four halfwords");
+
+short HWD0 = 320, VWD0 = 240;
 
 static Ps1Video *vram;
 static Ps1DrawState draw;
@@ -238,6 +241,18 @@ int DrawSync(int mode) {
     /* There is no pending queue: transfers above finish before returning.
      * Both waiting (0) and polling (1) therefore report completion. */
     return mode == 0 || mode == 1 ? 0 : -1;
+}
+
+void SetDrawArea(DR_AREA *p, RECT *r) {
+    if (!p || !r || !valid_area(r->x, r->y, r->w, r->h)) {
+        packet_error = true;
+        return;
+    }
+    setlen(p, 2);
+    p->code[0] = 0xE3000000ul | (((u_long)((unsigned)r->y & 0x3FFu)) << 10)
+               | ((u_long)((unsigned)r->x & 0x3FFu));
+    p->code[1] = 0xE4000000ul | (((u_long)((unsigned)(r->y + r->h - 1) & 0x3FFu)) << 10)
+               | ((u_long)((unsigned)(r->x + r->w - 1) & 0x3FFu));
 }
 
 void SetDrawLoad(DR_LOAD *p, RECT *r) {

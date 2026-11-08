@@ -116,7 +116,7 @@ void text_load_record(void *record) {
 
     bank = *(signed int *)record;
     if (bank != -1) {
-        texture_pack_load(record + 4);
+        texture_pack_load((u8 *)record + 4);
         text_set_bank(bank);
     }
 }

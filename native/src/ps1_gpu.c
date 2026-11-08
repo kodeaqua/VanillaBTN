@@ -439,19 +439,20 @@ bool ps1_gpu_exec(Ps1Video *video, Ps1DrawState *state,
         break;
     }
     case GP0_DRAW_MODE:
-        if (count >= 1) exec_draw_mode(state, words[0]);
-        break;
     case GP0_DRAW_AREA_TL:
-        if (count >= 1) exec_draw_area_tl(state, words[0]);
-        break;
     case GP0_DRAW_AREA_BR:
-        if (count >= 1) exec_draw_area_br(state, words[0]);
-        break;
     case GP0_DRAW_OFFSET:
-        if (count >= 1) exec_draw_offset(state, words[0]);
-        break;
     case GP0_MASK_SETTING:
-        if (count >= 1) exec_mask_setting(state, words[0]);
+        for (size_t i = 0; i < count; ++i) {
+            switch (gp0_code(words[i])) {
+            case GP0_DRAW_MODE:    exec_draw_mode(state, words[i]); break;
+            case GP0_DRAW_AREA_TL: exec_draw_area_tl(state, words[i]); break;
+            case GP0_DRAW_AREA_BR: exec_draw_area_br(state, words[i]); break;
+            case GP0_DRAW_OFFSET:  exec_draw_offset(state, words[i]); break;
+            case GP0_MASK_SETTING: exec_mask_setting(state, words[i]); break;
+            default: break;
+            }
+        }
         break;
 
     default:

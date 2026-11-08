@@ -12,4 +12,6 @@ typedef struct GsOT {
     u_long *tag;
 } GsOT;
 
+extern short HWD0, VWD0;
+
 #endif
