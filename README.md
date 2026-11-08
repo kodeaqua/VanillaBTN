@@ -56,5 +56,7 @@ Two things in the build are not compiled from source:
 
 ## License
 
-[CC0 1.0](LICENSE), covering this repository's own work only; `tools/maspsx` keeps its
-own license. The game and the PSY-Q SDK belong to their owners and are not included.
+[MIT](LICENSE) covers this repository's own work in the current revision.
+Earlier revisions published under CC0 retain that grant. `tools/maspsx` keeps
+its own license. The game and the PSY-Q SDK belong to their owners and are not
+included.

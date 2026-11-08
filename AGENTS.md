@@ -77,8 +77,8 @@ for this repository's agent workflow:
   successful compile alone is not sufficient. Report whether the 14-file code
   check or the full 17-file disc check ran.
 - Do not add original game data, disc images, extracted assets, or PSY-Q SDK
-  files to the repository. The project's own work is CC0; `tools/maspsx` has
-  its own license.
+  files to the repository. The project's current work is MIT; earlier CC0
+  revisions retain their original grant. `tools/maspsx` has its own license.
 
 ## Native Windows build profiles
 
