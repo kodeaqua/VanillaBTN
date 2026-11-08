@@ -1,6 +1,7 @@
 #include "sdk_pad.h"
 #include "sdk_sync.h"
 #include "farm_state.h"
+#include "input/pad_vibration.h"
 #include "main.h"
 #include <libpad.h>
 #include <stdio.h>
@@ -31,6 +32,9 @@ int main(void) {
     sdk_pad_rumble(rumble, NULL);
     sdk_pad_sample(0, true, false, PAD_CROSS, 128, 128);
     sdk_pad_sample(1, true, false, PAD_TRIANGLE, 128, 128);
+    pad_vibration_start(0, 2); /* Ignored before pad_init sets pad_started. */
+    pad_vibration_tick();
+    CHECK(input_pad1->actuator0 == 0 && input_pad1->actuator1 == 0);
     pad_init();
     pad_reset_records();
     pad_poll_ports();
@@ -75,14 +79,44 @@ int main(void) {
     clock_time = 100000000;
     pad_poll_ports();
     CHECK(input_pad1->held == PAD_RIGHT);
-    input_pad1->actuator0 = 1;
-    input_pad1->actuator1 = 200;
+    pad_vibration_start(0, 2); /* Step 0 (0x01,0x40,4), Step 1 (0x02,0x20,4), Step 2 (0x02,0x40,4). */
+    pad_vibration_tick();
+    CHECK(input_pad1->actuator0 == 1 && input_pad1->actuator1 == 0);
+    pad_vibration_start(0, 2); /* Same script at start cursor does not reset repeat count. */
+    pad_vibration_tick();
+    CHECK(input_pad1->actuator0 == 1 && input_pad1->actuator1 == 0);
     pad_poll_ports();
     PadGetState(0);
-    CHECK(small_motor == 1 && large_motor == 200);
+    CHECK(small_motor == 1 && large_motor == 0);
+    pad_vibration_tick(); /* Advances to step 1: large motor 0x20. */
+    CHECK(input_pad1->actuator0 == 0 && input_pad1->actuator1 == 0x20);
+    pad_poll_ports();
+    PadGetState(0);
+    CHECK(small_motor == 0 && large_motor == 0x20);
+    pad_vibration_tick();
+    pad_vibration_tick();
+    CHECK(input_pad1->actuator0 == 0 && input_pad1->actuator1 == 0x20);
+    pad_vibration_tick(); /* Advances to step 2: large motor 0x40. */
+    CHECK(input_pad1->actuator0 == 0 && input_pad1->actuator1 == 0x40);
+    pad_vibration_tick();
+    pad_vibration_tick();
+    CHECK(input_pad1->actuator0 == 0 && input_pad1->actuator1 == 0x40);
+    pad_vibration_tick(); /* Reaches 0xFF end marker and clears actuators. */
+    CHECK(input_pad1->actuator0 == 0 && input_pad1->actuator1 == 0);
+    pad_vibration_start(0, 7); /* 0x02, 0xFF, 5: large motor 0xFF. */
+    pad_vibration_tick();
+    CHECK(input_pad1->actuator0 == 0 && input_pad1->actuator1 == 0xFF);
+    pad_poll_ports();
+    PadGetState(0);
+    CHECK(small_motor == 0 && large_motor == 0xFF);
+    pad_vibration_stop(0);
+    CHECK(input_pad1->actuator0 == 0 && input_pad1->actuator1 == 0);
     InputDemo demo = {0};
     game_state.demo = &demo;
     game_state.globalFlags = GLOBAL_FLAG_INPUT_REPLAY;
+    pad_vibration_start(0, 2);
+    pad_vibration_tick();
+    CHECK(input_pad1->actuator0 == 0 && input_pad1->actuator1 == 0);
     demo.buttons = PAD_CIRCLE;
     sdk_pad_sample(0, false, true, 0, 128, 128);
     pad_poll_ports();

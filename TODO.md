@@ -23,7 +23,7 @@ Update the relevant item after completing a task or discovering a blocker.
 - [ ] Native executable remains a backend smoke harness; original game execution is not connected.
 - [ ] Connect original controller polling through native SDK receive buffers and rumble.
   - [x] Match SDK atan/CORDIC math across all 16,641 analog magnitude pairs in both profiles.
-  - [x] Compile original pad.c against native receive buffers; verify repeats, sectors, replay, hot swaps and actuator requests.
+  - [x] Compile original pad.c and pad_vibration.c against native receive buffers; verify repeats, sectors, replay, hot swaps and vibration script actuator requests.
   - [ ] Invoke original pad polling from original startup/frame execution; assign a second physical host controller.
 - [ ] Graphics/GTE: verify hardware rounding, saturation, flags, and primitive edge coverage against independent fixtures.
   - [ ] Verify textured-polygon subpixel interpolation with nonuniform original FT4 fixtures; packet-generation tests do not establish texel fidelity.
@@ -40,6 +40,7 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Completed
 
+- [x] Compile original pad_vibration.c alongside pad.c in game_pad. Synthetic checks exercise vibration pattern startup gating before pad_init, script step durations, same-script deduplication, actuator0/actuator1 updates through sdk_pad rumble callbacks, explicit stop and replay suppression in Debug/Release (27 checks).
 - [x] Connect host raw input/rumble adapters and compile original pad.c without replacing its logic. Synthetic fixtures exercise two SDK ports, original repeat timing, analog dead zone/d-pad priority, exact sector boundary, replay button swap, actuator negotiation and analog/digital hot swaps. Both profiles pass 27 checks and all 14 PS1 code hashes match; gameplay/controller feel remains developer validation.
 - [x] Implement native SDK csqrt/ratan2 with the reference SDK's fixed-point quantization. Optional VM microchecks execute only SDK math functions from the local reference ELF, with an explicit leading-sign-bit hook, and compare all analog magnitudes against Debug/Release. Normal builds require neither the VM package nor SDK files; 26 synthetic checks pass.
 - [x] Correct missing original window borders/gradients by supporting flat-line and untextured Gouraud polygon commands in the backend. The unchanged window_frame.c fixture fails before the fix; separate line/Gouraud removal makes it fail again. Both profiles pass 25 checks; all 14 PS1 code hashes match. Hardware dithering and diagonal precision remain open.

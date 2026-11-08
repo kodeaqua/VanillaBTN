@@ -228,10 +228,11 @@ Keep reference ELF/map files and any SDK material under ignored build storage.
 
 ## Original controller polling
 
-`game_pad` compiles `src/main/input/pad.c` unchanged. `sdk_pad` supplies its
+`game_pad` compiles `src/main/input/pad.c` and
+`src/main/input/pad_vibration.c` unchanged. `sdk_pad` supplies its
 SDK receive buffers and actuator transport; the host submits raw button bits
 and 0..255 stick axes. Dead zones, headings, tilt, repeat channels, d-pad
-priority, replay swapping and vibration requests remain original game code.
+priority, replay swapping and vibration scripts remain original game code.
 The native cue-header compatibility wrappers only change variadic macro
 spelling; their implementation bodies remain shared and PS1 hashes match.
 
@@ -252,4 +253,5 @@ feel still require developer validation.
 Fixtures supply the actual original main/farm record types, not replacement
 controller algorithms. They cover both ports, repeated and newly pressed
 buttons, analog priority, an exact diagonal sector boundary, replay while
-disconnected, actuator requests, and analog/digital/analog hot swaps.
+disconnected, vibration script step durations/deduplication/replay suppression
+through actuator requests, and analog/digital/analog hot swaps.

@@ -230,7 +230,10 @@ set_target_properties(sdk_pad PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_include_directories(sdk_pad PUBLIC compat src)
 target_link_libraries(sdk_pad PUBLIC sdk_sync)
 target_compile_options(sdk_pad PRIVATE /W4)
-add_library(game_pad STATIC ../src/main/input/pad.c)
+add_library(game_pad STATIC
+    ../src/main/input/pad.c
+    ../src/main/input/pad_vibration.c
+)
 set_target_properties(game_pad PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_include_directories(game_pad PUBLIC ${game_include_dirs})
 target_link_libraries(game_pad PUBLIC sdk_pad sdk_math game_prim)
