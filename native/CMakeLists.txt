@@ -141,3 +141,10 @@ set_target_properties(ps1_card_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED
 target_link_libraries(ps1_card_test PRIVATE ps1_card SDL3::SDL3)
 target_compile_options(ps1_card_test PRIVATE /W4)
 add_test(NAME ps1_card_storage COMMAND ps1_card_test)
+
+# Synthetic assertions remain active when testing optimized Release libraries.
+foreach(test_target ps1_video_test ps1_sprite_test ps1_ot_test ps1_gpu_test
+        ps1_gte_test ps1_input_test ps1_clock_test ps1_spu_test ps1_xa_test
+        ps1_audio_test ps1_card_test)
+    target_compile_options(${test_target} PRIVATE /UNDEBUG)
+endforeach()
