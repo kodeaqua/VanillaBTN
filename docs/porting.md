@@ -17,6 +17,23 @@ behavioral and data-layout reference for that work.
 - Do not distribute the original disc data or proprietary SDK. Use a player-
   supplied copy of the game for any assets the port needs.
 
+## Native build profiles
+
+The future Windows target must have distinct `Debug` and `Release` builds.
+`Debug` should prioritize short compile times and useful diagnostic symbols.
+Logs, console prints, traces, assertions, and debug UI belong in that build.
+
+`Release` should use optimizations suited to runtime performance. Developer
+diagnostics must be excluded at compile time so they do not execute or add
+runtime overhead. Neither profile may depend on side effects inside diagnostic
+code. User-facing game messages and required error handling are gameplay or
+product behavior, not developer diagnostics.
+
+Once the native target exists, verify that both profiles build and run, that
+Release produces no developer diagnostic output, and that optimization does
+not change the original game's behavior or timing. The PS1 reference build
+keeps its existing compiler settings and SHA-1 checks.
+
 ## Bringup sequence
 
 1. Identify PS1 platform calls and shared game logic in the existing code;

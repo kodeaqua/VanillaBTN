@@ -60,6 +60,19 @@ for this repository's agent workflow:
   files to the repository. The project's own work is CC0; `tools/maspsx` has
   its own license.
 
+## Native Windows build profiles
+
+- Provide separate `Debug` and `Release` profiles when adding the native port.
+  These profiles do not replace the fixed, byte-matching PS1 reference build.
+- Favor fast compilation and useful symbols in `Debug`. Developer logs,
+  prints, traces, assertions, and debug UI may run only in this profile.
+- Optimize `Release` for runtime performance. Compile developer diagnostics
+  out of the Release executable; hiding their output at runtime is not enough.
+  Do not let diagnostic expressions carry gameplay side effects.
+- Verify both profiles when native code exists: Debug must support diagnosis,
+  and Release must run without developer diagnostics while preserving the same
+  gameplay behavior and timing requirements.
+
 ## Commits
 
 - Use Conventional Commits for every new commit: `type(scope): summary` or
