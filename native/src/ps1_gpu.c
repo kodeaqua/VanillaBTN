@@ -293,3 +293,55 @@ bool ps1_gpu_exec(Ps1Video *video, Ps1DrawState *state,
 
     return true;
 }
+
+typedef struct OtSubmitContext {
+    Ps1Video *video;
+    Ps1DrawState *state;
+    const uint32_t *buffer;
+    size_t buffer_words;
+} OtSubmitContext;
+
+static bool submit_ot_node(uint32_t packet_id, void *context) {
+    OtSubmitContext *ctx = (OtSubmitContext *)context;
+    if ((size_t)packet_id >= ctx->buffer_words) {
+        return false;
+    }
+    uint32_t tag = ctx->buffer[packet_id];
+    size_t len = (tag >> 24) & 0xFFu;
+    if (len == 0) {
+        return true;
+    }
+    if (len > ctx->buffer_words - 1 - (size_t)packet_id) {
+        return false;
+    }
+    return ps1_gpu_exec(ctx->video, ctx->state, &ctx->buffer[packet_id + 1], len);
+}
+
+bool ps1_gpu_submit_ot(Ps1Video *video, Ps1DrawState *state,
+                       const Ps1Ot *ot,
+                       const uint32_t *packet_buffer, size_t buffer_words) {
+    if (video == NULL || state == NULL || ot == NULL || packet_buffer == NULL) {
+        return false;
+    }
+    OtSubmitContext ctx = {video, state, packet_buffer, buffer_words};
+    return ps1_ot_walk(ot, submit_ot_node, &ctx);
+}
+
+bool ps1_gpu_submit_frame(Ps1Video *video, Ps1DrawState *state,
+                          const Ps1Ot * const *ots, size_t ot_count,
+                          const uint32_t *packet_buffer, size_t buffer_words) {
+    if (video == NULL || state == NULL || packet_buffer == NULL) {
+        return false;
+    }
+    if (ots == NULL && ot_count > 0) {
+        return false;
+    }
+    for (size_t i = 0; i < ot_count; ++i) {
+        if (ots[i] != NULL) {
+            if (!ps1_gpu_submit_ot(video, state, ots[i], packet_buffer, buffer_words)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}

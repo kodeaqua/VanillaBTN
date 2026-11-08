@@ -23,10 +23,15 @@ set_target_properties(ps1_video PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES
 target_include_directories(ps1_video PUBLIC src)
 target_compile_options(ps1_video PRIVATE /W4)
 
+add_library(ps1_ot STATIC src/ps1_ot.c)
+set_target_properties(ps1_ot PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_include_directories(ps1_ot PUBLIC src)
+target_compile_options(ps1_ot PRIVATE /W4)
+
 add_library(ps1_gpu STATIC src/ps1_gpu.c)
 set_target_properties(ps1_gpu PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_include_directories(ps1_gpu PUBLIC src)
-target_link_libraries(ps1_gpu PUBLIC ps1_video)
+target_link_libraries(ps1_gpu PUBLIC ps1_video ps1_ot)
 target_compile_options(ps1_gpu PRIVATE /W4)
 
 add_executable(vanillabtn WIN32 src/main.c)
@@ -46,10 +51,6 @@ set_target_properties(ps1_sprite_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIR
 target_link_libraries(ps1_sprite_test PRIVATE ps1_video)
 target_compile_options(ps1_sprite_test PRIVATE /W4)
 add_test(NAME ps1_sprite_pixels COMMAND ps1_sprite_test)
-add_library(ps1_ot STATIC src/ps1_ot.c)
-set_target_properties(ps1_ot PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
-target_include_directories(ps1_ot PUBLIC src)
-target_compile_options(ps1_ot PRIVATE /W4)
 add_executable(ps1_ot_test tests/ps1_ot_test.c)
 set_target_properties(ps1_ot_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_link_libraries(ps1_ot_test PRIVATE ps1_ot)

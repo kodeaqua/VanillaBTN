@@ -31,6 +31,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "ps1_ot.h"
 #include "ps1_video.h"
 
 /*
@@ -46,5 +47,31 @@
  */
 bool ps1_gpu_exec(Ps1Video *video, Ps1DrawState *state,
                   const uint32_t *words, size_t count);
+
+/*
+ * Submit all packets in an ordering table to the GPU dispatcher.
+ *
+ * Each packet_id visited in the OT is a word index into `packet_buffer`.
+ * The word at `packet_buffer[packet_id]` is the PS1 primitive tag:
+ * bits 31-24 hold the packet length in 32-bit words (excluding the tag).
+ * The GP0 command words follow at `packet_buffer[packet_id + 1]` through
+ * `packet_buffer[packet_id + len]`.
+ *
+ * Returns false if arguments are NULL or a packet extends beyond buffer_words.
+ */
+bool ps1_gpu_submit_ot(Ps1Video *video, Ps1DrawState *state,
+                       const Ps1Ot *ot,
+                       const uint32_t *packet_buffer, size_t buffer_words);
+
+/*
+ * Submit an ordered sequence of ordering tables for a complete frame.
+ *
+ * Traverses tables in `ots[0]` .. `ots[ot_count - 1]`, dispatching all
+ * packets through `ps1_gpu_submit_ot`. Any NULL table pointer in the array
+ * is skipped (matching the game's optional OT tags).
+ */
+bool ps1_gpu_submit_frame(Ps1Video *video, Ps1DrawState *state,
+                          const Ps1Ot * const *ots, size_t ot_count,
+                          const uint32_t *packet_buffer, size_t buffer_words);
 
 #endif /* VANILLABTN_PS1_GPU_H */

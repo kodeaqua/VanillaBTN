@@ -180,5 +180,141 @@ int main(void) {
         if (ps1_gpu_exec(&video, &draw, pkt, 0)) return 7;
     }
 
+    /* --- ps1_gpu_submit_ot: ordering-table walk to GPU dispatch ---
+     * Packets in buffer:
+     *   idx 0: tag len=2 | GP0(68) red 1x1 at (10, 10)
+     *   idx 3: tag len=2 | GP0(68) green 1x1 at (10, 10)
+     *   idx 6: tag len=2 | GP0(68) blue 1x1 at (10, 10)
+     *
+     * In PS1 OT, higher bucket = farther distance = drawn earlier.
+     * Lower bucket = closer distance = drawn later (on top). */
+    {
+        ps1_draw_state_reset(&draw);
+        const uint32_t buffer[9] = {
+            /* Packet 0: red pixel */
+            (2u << 24), cmd_rgb(0x68, 0xF8, 0, 0), xy_word(10, 10),
+            /* Packet 1 (idx 3): green pixel */
+            (2u << 24), cmd_rgb(0x68, 0, 0xF8, 0), xy_word(10, 10),
+            /* Packet 2 (idx 6): blue pixel */
+            (2u << 24), cmd_rgb(0x68, 0, 0, 0xF8), xy_word(10, 10),
+        };
+
+        Ps1Ot ot = {0};
+        if (!ps1_ot_init(&ot, 4, 8)) return 8;
+
+        /* Far (bucket 3) = red, mid (bucket 1) = green, near (bucket 0) = blue. */
+        if (!ps1_ot_insert(&ot, 3, 0)
+            || !ps1_ot_insert(&ot, 1, 3)
+            || !ps1_ot_insert(&ot, 0, 6)) {
+            ps1_ot_destroy(&ot);
+            return 8;
+        }
+
+        video.vram[10][10] = 0;
+        if (!ps1_gpu_submit_ot(&video, &draw, &ot, buffer, 9)) {
+            ps1_ot_destroy(&ot);
+            return 8;
+        }
+        /* Blue (bucket 0) was drawn last, overwriting red and green. */
+        if (video.vram[10][10] != 0x7C00u) {
+            ps1_ot_destroy(&ot);
+            return 8;
+        }
+
+        /* Intra-bucket order: newest packet is visited first in ps1_ot_walk.
+         * Inserting packet 0 (red) then packet 3 (green) into bucket 2 means
+         * packet 3 draws first, then packet 0 draws over it. */
+        ps1_ot_clear(&ot);
+        video.vram[10][10] = 0;
+        if (!ps1_ot_insert(&ot, 2, 0)
+            || !ps1_ot_insert(&ot, 2, 3)
+            || !ps1_gpu_submit_ot(&video, &draw, &ot, buffer, 9)) {
+            ps1_ot_destroy(&ot);
+            return 9;
+        }
+        /* Packet 0 (red) was visited second, so red remains. */
+        if (video.vram[10][10] != 0x001Fu) {
+            ps1_ot_destroy(&ot);
+            return 9;
+        }
+
+        /* Out-of-bounds packet in buffer must fail cleanly. */
+        ps1_ot_clear(&ot);
+        /* packet_id 6 requires 3 words (tag + 2 cmd words, indices 6..8);
+         * buffer size 7 cannot contain it. */
+        if (!ps1_ot_insert(&ot, 0, 6)
+            || ps1_gpu_submit_ot(&video, &draw, &ot, buffer, 7)) {
+            ps1_ot_destroy(&ot);
+            return 10;
+        }
+        /* packet_id equal to or greater than buffer size must fail. */
+        ps1_ot_clear(&ot);
+        if (!ps1_ot_insert(&ot, 0, 9)
+            || ps1_gpu_submit_ot(&video, &draw, &ot, buffer, 9)) {
+            ps1_ot_destroy(&ot);
+            return 10;
+        }
+
+        /* NULL guards. */
+        if (ps1_gpu_submit_ot(NULL, &draw, &ot, buffer, 9)
+            || ps1_gpu_submit_ot(&video, NULL, &ot, buffer, 9)
+            || ps1_gpu_submit_ot(&video, &draw, NULL, buffer, 9)
+            || ps1_gpu_submit_ot(&video, &draw, &ot, NULL, 9)) {
+            ps1_ot_destroy(&ot);
+            return 11;
+        }
+
+        ps1_ot_destroy(&ot);
+    }
+
+    /* --- ps1_gpu_submit_frame: multi-table frame submission ---
+     * Submits an array of OTs in sequence (e.g., background OT then foreground OT),
+     * ignoring NULL entries (optional tables). */
+    {
+        ps1_draw_state_reset(&draw);
+        const uint32_t buffer[6] = {
+            (2u << 24), cmd_rgb(0x68, 0xF8, 0, 0), xy_word(25, 25), /* red */
+            (2u << 24), cmd_rgb(0x68, 0, 0xF8, 0), xy_word(25, 25), /* green */
+        };
+
+        Ps1Ot ot_bg = {0};
+        Ps1Ot ot_fg = {0};
+        if (!ps1_ot_init(&ot_bg, 2, 2) || !ps1_ot_init(&ot_fg, 2, 2)) return 12;
+
+        if (!ps1_ot_insert(&ot_bg, 0, 0)   /* red at idx 0 */
+            || !ps1_ot_insert(&ot_fg, 0, 3)) { /* green at idx 3 */
+            ps1_ot_destroy(&ot_bg);
+            ps1_ot_destroy(&ot_fg);
+            return 12;
+        }
+
+        const Ps1Ot *frame_ots_list[3] = { &ot_bg, NULL, &ot_fg };
+        video.vram[25][25] = 0;
+        if (!ps1_gpu_submit_frame(&video, &draw, frame_ots_list, 3, buffer, 6)) {
+            ps1_ot_destroy(&ot_bg);
+            ps1_ot_destroy(&ot_fg);
+            return 12;
+        }
+        /* Foreground table ran after background, leaving green. */
+        if (video.vram[25][25] != 0x03E0u) {
+            ps1_ot_destroy(&ot_bg);
+            ps1_ot_destroy(&ot_fg);
+            return 12;
+        }
+
+        /* NULL frame checks. */
+        if (ps1_gpu_submit_frame(NULL, &draw, frame_ots_list, 3, buffer, 6)
+            || ps1_gpu_submit_frame(&video, NULL, frame_ots_list, 3, buffer, 6)
+            || ps1_gpu_submit_frame(&video, &draw, NULL, 1, buffer, 6)
+            || ps1_gpu_submit_frame(&video, &draw, frame_ots_list, 3, NULL, 6)) {
+            ps1_ot_destroy(&ot_bg);
+            ps1_ot_destroy(&ot_fg);
+            return 13;
+        }
+
+        ps1_ot_destroy(&ot_bg);
+        ps1_ot_destroy(&ot_fg);
+    }
+
     return 0;
 }

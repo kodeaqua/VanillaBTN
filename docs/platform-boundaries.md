@@ -50,6 +50,7 @@ No game scene issues these commands through the native target yet.
 `native/src/ps1_ot.c` stores packet IDs behind host-sized links rather than
 the PS1's 24-bit MIPS addresses. A table walks buckets from high to low and
 visits newer packets first within one bucket, matching `ClearOTagR` and
-`addPrim`. `src/main/main.c` draws optional table 3, optional table 2, the
-2048-entry main table, optional table 1, optional table 0, then the active
-table. Native scene submission and command dispatch still need wiring.
+`addPrim`. `ps1_gpu_submit_ot` and `ps1_gpu_submit_frame` walk single or multiple
+ordering tables, unpack each packet tag's length, and route GP0 command words
+into the dispatcher, supporting the game's table sequence (OT3, OT2, main OT,
+OT1, OT0, active OT). Textured polygons, GTE, and scene wiring remain pending.
