@@ -5,6 +5,10 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Active
 
+- [ ] Audit follow-up: integrate game scenes with the native executable before requesting gameplay acceptance; see `docs/native-audit.md`.
+- [ ] Graphics/GTE: verify hardware rounding, saturation, flags, and primitive edge coverage against independent fixtures.
+- [ ] Audio: implement SEQ scheduling, ADSR/reverb, XA stereo histories and coding-info sample rates.
+- [ ] Save/load: verify external card chain encoding, corruption handling, and original save layout before game integration.
 - [ ] Developer: check controller feel and simulation pacing in native window.
 - [ ] Developer: compare music, effects, speech/streams, and timing by ear.
 - [ ] Developer: save, reload, and compare farms in game.
@@ -16,12 +20,12 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Completed
 
-- [x] Milestone 5: keep two virtual card slots and original save-file format/UI semantics.
+- [x] Milestone 5 foundation: standalone virtual card API; original format/UI compatibility remains under audit.
   - [x] Emulate dual 128 KB PS1 memory card images, Frame 0 header, and directory allocation chains (ps1_card); Debug and Release tests pass.
   - [x] Implement 32 KB HM:BTN farm save slots (BASLUS-01115-FARM0..2) with 0x200 header checksum validation; Debug and Release tests pass.
   - [x] Add safe atomic file writing with .tmp staging, .bak backup, and crash recovery; Debug and Release recovery tests pass.
   - [x] Wire Ps1CardManager with SDL pref path into main.c; Debug and Release storage tests pass.
-- [x] Milestone 4: native PS1 sound decode and mixing to PCM, SDL3 audio stream for playback.
+- [x] Milestone 4 foundation: standalone sample decode/mixing and SDL PCM output; music/game integration remains pending.
   - [x] Emulate PS1 24-voice SPU mixer and VAB/ADPCM decoding (ps1_spu); Debug and Release decode tests pass.
   - [x] Implement CD-ROM XA sector stream filtering, ADPCM decoding, and track fading (ps1_xa); Debug and Release XA tests pass.
   - [x] Bridge SPU and CD-XA PCM output to SDL3 AudioStream with headless fallback (ps1_audio), wired into main loop; Debug and Release playback tests pass.
@@ -30,7 +34,7 @@ Update the relevant item after completing a task or discovering a blocker.
 - [x] Milestone 3: map input and fixed simulation timing to the PS1 behavior.
 - [x] Developer: open and close the native Debug/Release window on Windows.
 - [x] Developer: verify the importer recognizes a personally supplied USA disc.
-- [x] Milestone 2: implement required GPU primitives, CLUT, ordering, and GTE behavior with synthetic pixel checks.
+- [x] Milestone 2 foundation: a GPU/GTE subset with synthetic checks; hardware fidelity remains pending.
   - [x] Add GP0 command dispatcher (ps1_gpu_exec) covering fill, untextured tiles, textured sprites, and draw-environment commands; Debug and Release dispatch tests pass.
   - [x] Wire OT walk to GPU dispatcher (ps1_gpu_submit_ot/frame) for frame submission; Debug and Release multi-table tests pass.
   - [x] Implement flat and textured polygons (POLY_F3/F4/FT3/FT4) for scene rendering; Debug and Release rasterization tests pass.
