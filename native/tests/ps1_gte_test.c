@@ -34,20 +34,26 @@ int main(void) {
     if (gte.sxy[2].x != 160 || gte.sxy[2].y != 220) return 7;
     if (gte.sz[0] != 1000) return 21; /* Three pushes retain previous SZ3. */
 
-    /* 3. NCLIP on front-facing triangle:
-     * (160,120), (360,120), (160,220) -> OPZ = (160-360)*(220-120) - (120-120)*(160-360)
-     * = -200 * 100 = -20000.
-     * In PS1 GTE: OPZ = (x0-x1)*(y2-y1) - (y0-y1)*(x2-x1).
-     * Clockwise / counter-clockwise: */
+    /* Hardware NCLIP is the signed shoelace area. In screen Y-down space,
+     * this clockwise triangle has positive OPZ = 20000. */
     int32_t opz = ps1_gte_nclip(&gte);
-    /* For t0, t1, t2: (160,120) to (360,120) is right, (160,220) is down -> clockwise in screen Y-down */
-    if (opz == 0) return 8;
+    if (opz != 20000 || gte.flag != 0) return 8;
 
     /* Reverse order should flip sign of OPZ */
     gte.sxy[1] = (Ps1ScreenCoord){ 160, 220 };
     gte.sxy[2] = (Ps1ScreenCoord){ 360, 120 };
     int32_t opz_rev = ps1_gte_nclip(&gte);
     if (opz_rev != -opz) return 9;
+    /* Software writes to SXY preserve all signed 16-bit input bits. MAC0
+     * wraps at 32 bits and reports which direction overflowed. */
+    gte.sxy[0] = (Ps1ScreenCoord){-32768, -32768};
+    gte.sxy[1] = (Ps1ScreenCoord){32767, -32768};
+    gte.sxy[2] = (Ps1ScreenCoord){-32768, 32767};
+    if (ps1_gte_nclip(&gte) != -131071 || !(gte.flag & (1 << 16)) || gte.flag >= 0) return 22;
+    gte.sxy[1] = (Ps1ScreenCoord){-32768, 32767};
+    gte.sxy[2] = (Ps1ScreenCoord){32767, -32768};
+    if (ps1_gte_nclip(&gte) != 131071 || !(gte.flag & (1 << 15)) ||
+        (gte.flag & (1 << 16)) || gte.flag >= 0) return 23;
 
     /* 4. Clip flag behind camera (Z <= 0):
      * Point with Z = -10 must fail and set flag < 0. */

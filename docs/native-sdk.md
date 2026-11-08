@@ -595,3 +595,16 @@ Full MAC/IR and perspective-division precision remain open.
 The extended Debug probe reaches 5,001 pumps in the original farm without a GPU
 link fault. Colored output includes sprites/UI and does not prove 3D terrain:
 the developer reported black farm geometry, and NCLIP winding needs correction.
+
+### NCLIP terrain culling
+
+NCLIP now uses the hardware signed shoelace area and reports MAC0 overflow.
+The previous sign was reversed: sprites/UI remained visible while original
+terrain faces were discarded. An independent screen-space area fixture verifies
+backface rejection and, after reversing the TMD indices, a visible green triangle
+through original model.c. Scalar fixtures check both winding signs and 32-bit
+overflow. The old implementation fails both winding tests.
+
+A local headless frame captured after the fix shows farm terrain instead of the
+black area reported in the developer's window. This confirms the culling fix,
+not full gameplay, lighting or audiovisual fidelity.

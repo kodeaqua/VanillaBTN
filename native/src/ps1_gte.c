@@ -125,10 +125,16 @@ int32_t ps1_gte_nclip(Ps1Gte *gte) {
     int64_t x1 = gte->sxy[1].x, y1 = gte->sxy[1].y;
     int64_t x2 = gte->sxy[2].x, y2 = gte->sxy[2].y;
 
-    /* OPZ = (x0 - x1) * (y2 - y1) - (y0 - y1) * (x2 - x1) */
-    int32_t opz = (int32_t)((x0 - x1) * (y2 - y1) - (y0 - y1) * (x2 - x1));
-    gte->opz = opz;
-    return opz;
+    /* Hardware MAC0 uses this winding; reversing it culls the visible sides
+     * of original TMD terrain while leaving 2D sprites unaffected. */
+    int64_t area = x0 * y1 + x1 * y2 + x2 * y0
+        - x0 * y2 - x1 * y0 - x2 * y1;
+    uint32_t flags = 0;
+    if (area > INT32_MAX) flags |= 1u << 16;
+    if (area < INT32_MIN) flags |= 1u << 15;
+    gte->flag = (int32_t)(flags ? flags | (1u << 31) : 0);
+    gte->opz = (int32_t)(uint32_t)area;
+    return gte->opz;
 }
 
 static int32_t average_depth(Ps1Gte *gte, uint32_t sum, int16_t scale) {

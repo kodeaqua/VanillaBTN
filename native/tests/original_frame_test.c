@@ -284,8 +284,8 @@ int main(void) {
     tmd_file.objects[0].n_primitive = 1;
     tmd_file.clip = 400;
     /* Triangle at y = 50 spanning (-100..100, -100..100) in XZ, oriented so
-     * ground_triangle_under passes; facing a camera at (0, -200, 500) looking
-     * at (0, 50, 0) with roll 0x800, its projected vertices have OPZ > 0. */
+     * ground_triangle_under passes. The chosen view sees this winding as a
+     * backface; the drawing check reverses it after verifying ground access. */
     tmd_file.verts[0] = (SVECTOR){ -100, 50, -100, 0 };
     tmd_file.verts[1] = (SVECTOR){  100, 50, -100, 0 };
     tmd_file.verts[2] = (SVECTOR){    0, 50,  100, 0 };
@@ -317,6 +317,15 @@ int main(void) {
 
     ClearOTagR(current_frame->ot, FRAME_OT_DEPTH);
     current_frame->primCursor.bytes = current_frame->primStart;
+    FarmScreenXY projected[3];
+    for (int i = 0; i < 3; ++i) gte_project_vertex(&projected[i], &tmd_file.verts[i]);
+    int64_t area = (int64_t)(projected[1].x - projected[0].x) * (projected[2].y - projected[0].y)
+        - (int64_t)(projected[1].y - projected[0].y) * (projected[2].x - projected[0].x);
+    assert(area < 0); /* Independent screen-coordinate winding, not GTE NCLIP. */
+    model_draw(&test_model);
+    assert(current_frame->primCursor.bytes == current_frame->primStart);
+    tmd_file.f3_packet[2] = 0u | (2u << 16);
+    tmd_file.f3_packet[3] = 1u;
     model_draw(&test_model);
     assert(current_frame->primCursor.bytes == current_frame->primStart + sizeof(POLY_F3));
     DrawOTag(current_frame->ot + FRAME_OT_DEPTH - 1);

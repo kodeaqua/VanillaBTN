@@ -43,7 +43,7 @@ Update the relevant item after completing a task or discovering a blocker.
 - [ ] Graphics/GTE: verify hardware rounding, saturation, flags, and primitive edge coverage against independent fixtures.
   - [x] Match staged fixed-point products in RotMatrixZXY against local reference SDK numerical outputs.
   - [x] Saturate SZ to 16 bits, preserve triple-projection FIFO order and use SDK ZSF3/ZSF4 scales for average depth; long demo reaches 5,000 vblanks without invalid GPU links.
-  - [ ] Correct NCLIP winding: developer window shows sprites/UI but black farm geometry; colored-frame counts do not establish terrain rendering.
+  - [x] Correct NCLIP winding and MAC0 overflow flags. Independent signed-area and original TMD front/back tests reproduce the inverted culling; a captured native farm frame now contains terrain. Colored-frame counts alone are not a geometry acceptance test.
   - [ ] Replace csin/ccos aliases with the distinct SDK function quantization.
   - [ ] Verify textured-polygon subpixel interpolation with nonuniform original FT4 fixtures; packet-generation tests do not establish texel fidelity.
 - [ ] Audio: implement ADSR/reverb, XA stereo histories and coding-info sample rates.
