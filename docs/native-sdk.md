@@ -196,3 +196,32 @@ edge before the fix, passes afterward, and fails again when line dispatch is
 removed. Keeping lines but removing Gouraud dispatch instead fails its gradient
 pixel. Independent GP0 fixtures cover inclusive/coincident line endpoints and
 interior Gouraud rows. The original window drawing code is unchanged.
+
+## Controller math compatibility
+
+`sdk_math` supplies `csqrt` and `ratan2` used by the original analog reader.
+`csqrt` preserves the fixed-point CORDIC shifts, including the repeated stage,
+rather than substituting a floating-point square root. `ratan2` preserves SDK
+normalization and quantized integer angles. Its generated include contains
+numerical function results, not SDK instructions, headers or binary data files.
+
+The optional `tools/check-sdk-math.py` checker executes only these SDK math
+microcalls from the locally built reference ELF in Unicorn. The CPU model
+uses an explicit hook for COP2 leading-sign-bit count; it does not replace
+atan/CORDIC computation. It compares every 0..128 pair used by the analog
+reader with the native executable (16,641 pairs), including square-root input
+`(x*x + y*y) << 12`. This is a synthetic SDK check, not a gameplay trace.
+It does not establish all 32-bit math inputs or GTE hardware fidelity.
+
+Normal builds and CTest use fixed numerical fixtures and need no SDK or VM.
+To reproduce the additional check after building the reference and native
+profiles, install the optional checker dependency `unicorn==2.1.4` into your
+development Python environment and run:
+
+```powershell
+python tools/check-sdk-math.py
+python tools/check-sdk-math.py --native build/native/Release/sdk_math_test.exe
+```
+
+`--write-table` regenerates the numerical angle results before compilation.
+Keep reference ELF/map files and any SDK material under ignored build storage.
