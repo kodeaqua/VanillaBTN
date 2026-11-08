@@ -25,6 +25,7 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Completed
 
+- [x] Add sample-timed SEQ note/program/volume/pan events, running status, tempo, and loop scheduling; synthetic timing and malformed-loop checks pass in Debug/Release.
 - [x] Map signed host sticks through the original pad dead zone and four cardinal sectors; synthetic axis checks pass in both profiles.
 - [x] Exclude polygon bottom/right edges and give shared edges one owner; translucent quad regression passes in Debug and Release.
 - [x] Correct VAB header fields/sparse programs, ADPCM shifts, interpolation overflow, and final-block playback; synthetic checks pass in Debug and Release.
