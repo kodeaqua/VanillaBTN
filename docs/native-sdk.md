@@ -356,3 +356,24 @@ controller algorithms. They cover both ports, repeated and newly pressed
 buttons, analog priority, an exact diagonal sector boundary, replay while
 disconnected, vibration script step durations/deduplication/replay suppression
 through actuator requests, and analog/digital/analog hot swaps.
+
+## Debug menu and minigame overlays
+
+`game_window_frame` compiles `src/overlay/08_DEBUG/debug.c` alongside minigame
+overlays `src/overlay/17_GF_MG1/mg1.c`, `src/overlay/19_GF_MG2/mg2.c`,
+`src/overlay/21_GF_MG3/mg3.c`, `src/overlay/23_GF_MG4/mg4.c`, and
+`src/overlay/25_GF_MG5/mg5.c`.
+
+`08_DEBUG/debug.c` drives the original scene selector and vibration diagnostic
+screens via `KanjiFntOpen`, `KanjiFntClose`, `KanjiFntPrint` and `KanjiFntFlush`.
+In `Debug` builds these route to formatted console streams (`stderr`); in
+`Release` (`NDEBUG`), font diagnostics compile out entirely.
+
+Minigame overlays 1 through 5 preserve their original simulation logic, race
+tuning, AI actor thoughts, collision checks, timer formatting, and scene
+request handoffs (`SCENE_FARM_MINIGAME_EXIT`). GTE rotation/translation
+helpers (`RotMatrix`, `SetRotMatrix`, `SetTransMatrix`, `RotTrans`, `csin`,
+`ccos`) and SPU channel bitmask macros (`SPU_00CH`..`SPU_23CH`) are implemented
+in `sdk_math` and `libspu.h`. A nested helper in `mg2.c` (`mg2_draw_board_marker`)
+is hoisted to file-scope `static` under `VANILLABTN_NATIVE`, leaving the PS1
+nested function syntax intact when compiling the matching reference build.

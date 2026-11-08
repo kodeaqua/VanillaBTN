@@ -198,8 +198,16 @@ void SetDispMask(int mask);
 
 #ifdef NDEBUG
 #define FntPrint(...) ((void)0)
+#define KanjiFntOpen(...) (0)
+#define KanjiFntClose() ((void)0)
+#define KanjiFntPrint(...) (0)
+#define KanjiFntFlush(...) ((void)0)
 #else
 void FntPrint(const char *format, ...);
+int KanjiFntOpen(int x, int y, int w, int h, int dx, int dy, int cx, int cy, int isbg, int n);
+void KanjiFntClose(void);
+int KanjiFntPrint(const char *format, ...);
+void KanjiFntFlush(int id);
 #endif
 
 #endif

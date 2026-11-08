@@ -264,8 +264,14 @@ add_library(game_window_frame STATIC
     ../src/main/ui/menu_window.c
     ../src/main/ui/name_entry.c
     ../src/main/ui/window_frame.c
+    ../src/overlay/08_DEBUG/debug.c
     ../src/overlay/11_GF_FARM/menu/item_storage.c
     ../src/overlay/11_GF_FARM/picture_cells.c
+    ../src/overlay/17_GF_MG1/mg1.c
+    ../src/overlay/19_GF_MG2/mg2.c
+    ../src/overlay/21_GF_MG3/mg3.c
+    ../src/overlay/23_GF_MG4/mg4.c
+    ../src/overlay/25_GF_MG5/mg5.c
     ../src/overlay/27_GF_TITLE/title.c
     ../src/overlay/28_GF_STAFF/staff.c
 )

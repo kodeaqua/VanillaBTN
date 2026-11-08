@@ -15,6 +15,8 @@ int csqrt(int value);
 long SquareRoot0(long value);
 int rsin(int angle);
 int rcos(int angle);
+int csin(int angle);
+int ccos(int angle);
 long ratan2(long y, long x);
 
 void SetGeomOffset(long ofx, long ofy);
@@ -24,9 +26,13 @@ void SetFarColor(long rfc, long gfc, long bfc);
 void PushMatrix(void);
 void PopMatrix(void);
 
+MATRIX *RotMatrix(SVECTOR *r, MATRIX *m);
 MATRIX *RotMatrixX(long r, MATRIX *m);
 MATRIX *RotMatrixY(long r, MATRIX *m);
 MATRIX *RotMatrixZ(long r, MATRIX *m);
+void SetRotMatrix(MATRIX *m);
+void SetTransMatrix(MATRIX *m);
+void RotTrans(SVECTOR *v0, VECTOR *v1, long *flag);
 VECTOR *ApplyMatrixLV(MATRIX *m, VECTOR *v0, VECTOR *v1);
 void OuterProduct0(VECTOR *v0, VECTOR *v1, VECTOR *v2);
 void gte_OuterProduct12(VECTOR *v0, VECTOR *v1, VECTOR *v2);

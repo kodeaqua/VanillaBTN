@@ -1,14 +1,20 @@
+#include "debug.h"
 #include "farm_state.h"
 #include "farm_tables.h"
 #include "heart.h"
 #include "item_storage.h"
 #include "main.h"
 #include "menu_window.h"
+#include "mg1.h"
+#include "mg2.h"
+#include "mg4.h"
 #include "name_entry.h"
 #include "pad.h"
 #include "picture_cells.h"
+#include "screen_fade.h"
 #include "sdk_gpu.h"
 #include "sdk_work.h"
+#include "sound_request.h"
 #include "staff.h"
 #include "text.h"
 #include "title.h"
@@ -230,6 +236,47 @@ int main(void) {
     game_state.progress.entryStep = 6;
     staff_tick();
     CHECK(requested_scene == SCENE_TITLE);
+
+    /* Exercise 08_DEBUG/debug.c jump menu and setup. */
+    sound_fader_init();
+    frame_records[0].drawEnv.r0 = 0;
+    debug_tick();
+    CHECK(frame_records[0].drawEnv.r0 == 0x40);
+    debug_tick();
+    input_pad1->pressed = PAD_CIRCLE;
+    requested_scene = -1;
+    fade_start_in(0, 0, 0);
+    debug_tick();
+    CHECK(requested_scene == SCENE_DEBUG);
+    input_pad1->pressed = 0;
+
+    /* Exercise minigame step and player actions (17_GF_MG1, 19_GF_MG2, 23_GF_MG4). */
+    game_state.progress.entrySubStep = 3;
+    mg1_run_state();
+    CHECK(game_state.progress.entrySubStep == 4);
+
+    {
+        Mg2Player player;
+        memset(&player, 0, sizeof(player));
+        mg2_player_set_action(&player, 3, 3, 15);
+        CHECK(player.state == 3);
+        CHECK(player.dir == 3);
+        CHECK(player.timer == 15);
+        mg2_move_step(&player);
+    }
+
+    game_state.progress.entrySubStep = 3;
+    mg4_run_step();
+    CHECK(game_state.progress.entrySubStep == 4);
+
+    fade_start_in(0, 0, 0);
+    sound_fader_init();
+    requested_scene = -1;
+    game_state.globalFlags = 0;
+    mg4_run_step();
+    CHECK(game_state.progress.entrySubStep == 0xFF);
+    CHECK(requested_scene == SCENE_FARM_MINIGAME_EXIT);
+    CHECK((game_state.globalFlags & GLOBAL_FLAG_MINIGAME_EXIT) != 0);
 
     sdk_gpu_bind(NULL);
     CHECK(sdk_work_bind(NULL, 0));

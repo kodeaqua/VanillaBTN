@@ -1659,12 +1659,22 @@ static void mg2_draw_scenery_piece(u_long *ot, AnimState *sprite, Mg2Vector *vec
 }
 
 /* The results board: a 2x4 grid of labels (the farm's text in the first cell, then the messages of picks 1..7), then the markers for the rounds reached. */
+#ifdef VANILLABTN_NATIVE
+static void mg2_draw_board_marker(s32 bank, s32 frame) {
+    anim_select_range(&mg2_state.iconSprite, bank & 0xFF);
+    anim_set_frame(&mg2_state.iconSprite, frame);
+    anim_draw_sprt_cursor(&current_frame->otTags[0][5], &mg2_state.iconSprite,
+                  mg2_state.iconSprite.animation, mg2_state.iconSprite.frame, 0, 0);
+}
+#endif
+
 static void mg2_draw_results_board(void) {
     s32 saved;
     s32 row;
     s32 col;
     u16 *text;
 
+#ifndef VANILLABTN_NATIVE
     /* Draw frame `frame` of sprite bank `bank`. */
     void mg2_draw_board_marker(s32 bank, s32 frame) {
         anim_select_range(&mg2_state.iconSprite, bank & 0xFF);
@@ -1672,6 +1682,7 @@ static void mg2_draw_results_board(void) {
         anim_draw_sprt_cursor(&current_frame->otTags[0][5], &mg2_state.iconSprite,
                       mg2_state.iconSprite.animation, mg2_state.iconSprite.frame, 0, 0);
     }
+#endif
 
     anim_select_range(&mg2_state.iconSprite, 0);
     anim_draw_sprt_cursor(&current_frame->otTags[0][6], &mg2_state.iconSprite,

@@ -59,6 +59,14 @@ int rcos(int angle) {
     return rsin_quadrant(a - 3072u);
 }
 
+int csin(int angle) {
+    return rsin(angle);
+}
+
+int ccos(int angle) {
+    return rcos(angle);
+}
+
 /* Numerical SDK-function results, generated/checked by the optional reference
  * microtest tool. No proprietary SDK source or binaries are included. */
 static const unsigned short atan_octant[1025] = {
@@ -167,6 +175,19 @@ MATRIX *gte_MulMatrix0(MATRIX *m0, MATRIX *m1, MATRIX *m2) {
     return m2;
 }
 
+MATRIX *RotMatrix(SVECTOR *r, MATRIX *m) {
+    if (!r || !m) return m;
+    int32_t t0 = m->t[0], t1 = m->t[1], t2 = m->t[2];
+    *m = GsIDMATRIX;
+    m->t[0] = t0;
+    m->t[1] = t1;
+    m->t[2] = t2;
+    RotMatrixZ(r->vz, m);
+    RotMatrixY(r->vy, m);
+    RotMatrixX(r->vx, m);
+    return m;
+}
+
 MATRIX *RotMatrixX(long r, MATRIX *m) {
     if (!m) return NULL;
     int s = rsin((int)r);
@@ -201,6 +222,33 @@ MATRIX *RotMatrixZ(long r, MATRIX *m) {
     rz.m[1][0] = (short)s;
     rz.m[1][1] = (short)c;
     return gte_MulMatrix0(&rz, m, m);
+}
+
+void SetRotMatrix(MATRIX *m) {
+    gte_SetRotMatrix(m);
+}
+
+void SetTransMatrix(MATRIX *m) {
+    gte_SetTransMatrix(m);
+}
+
+void RotTrans(SVECTOR *v0, VECTOR *v1, long *flag) {
+    if (!v0 || !v1) return;
+    int64_t vx = v0->vx, vy = v0->vy, vz = v0->vz;
+    for (int i = 0; i < 3; ++i) {
+        int64_t sum = ((int64_t)g_sdk_gte.trans[i] << 12)
+                    + (int64_t)g_sdk_gte.rot[i][0] * vx
+                    + (int64_t)g_sdk_gte.rot[i][1] * vy
+                    + (int64_t)g_sdk_gte.rot[i][2] * vz;
+        g_gte_mac[i + 1] = (int32_t)(sum >> 12);
+        g_gte_ir[i + 1] = clamp_ir(g_gte_mac[i + 1]);
+    }
+    v1->vx = g_gte_mac[1];
+    v1->vy = g_gte_mac[2];
+    v1->vz = g_gte_mac[3];
+    if (flag) {
+        *flag = (long)g_sdk_gte.flag;
+    }
 }
 
 VECTOR *ApplyMatrixLV(MATRIX *m, VECTOR *v0, VECTOR *v1) {
