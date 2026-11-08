@@ -21,6 +21,8 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Completed
 
+- [x] Decode GP0 packet color bytes in PS1 order; an independent raw-byte red fixture protects the backend conversion.
+
 - [x] Keep SEQ note/control/termination and allocation from modifying active voices owned by other banks or raw effects. The current mixer supports one sequence; shared-bank ownership and SDK voice reservation remain open.
 
 - [x] Use nominal 30 Hz two-vblank game cadence, 44.1 kHz audio and FAST_2 input-repeat scaling in the backend harness.

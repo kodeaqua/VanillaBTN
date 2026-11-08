@@ -16,12 +16,10 @@ static Ps1Video  video;
 static Ps1DrawState draw;
 
 /*
- * Helper: pack colour components into the 0xRRGGBB word the game stores.
- * The GP0 first word has the command in bits 31-24 and r/g/b in 23-0
- * with red in bits 23-16 (matching the PS1 convention).
+ * GP0 packs the command above B/G/R bytes: red occupies bits 0..7.
  */
 static uint32_t cmd_rgb(unsigned code, uint8_t r, uint8_t g, uint8_t b) {
-    return ((uint32_t)code << 24) | ((uint32_t)r << 16) | ((uint32_t)g << 8) | b;
+    return ((uint32_t)code << 24) | ((uint32_t)b << 16) | ((uint32_t)g << 8) | r;
 }
 
 static uint32_t xy_word(int16_t x, int16_t y) {
@@ -35,6 +33,10 @@ static uint32_t wh_word(int16_t w, int16_t h) {
 int main(void) {
     memset(&video, 0, sizeof(video));
     ps1_draw_state_reset(&draw);
+    /* Independent GP0 byte fixture: R occupies bits 0..7, B bits 16..23. */
+    const uint32_t red_pixel[] = {0x680000F8u, 0x00050005u};
+    if (!ps1_gpu_exec(&video, &draw, red_pixel, 2) || video.vram[5][5] != 0x001Fu) return 100;
+    memset(&video, 0, sizeof(video));
 
     /* --- GP0(02): quick fill ---
      * Fill a 16-pixel-wide stripe at (32, 10) with pure red (0xF80000 = red

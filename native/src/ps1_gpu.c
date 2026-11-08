@@ -66,13 +66,12 @@
 /* Extract GP0 command byte from first packet word. */
 static unsigned gp0_code(uint32_t word) { return (word >> 24) & 0xFFu; }
 
-/* Extract 24-bit RGB from first packet word (0x00RRGGBB on PS1 = 0x00BBGGRR
- * in the GP0 word with blue in bits 23-16; we store it as 0x00RRGGBB). */
+/* GP0 stores R in bits 0..7 and B in bits 16..23. The native drawing API
+ * deliberately takes 0xRRGGBB, so convert at this packet boundary. */
 static uint32_t gp0_rgb24(uint32_t word) {
-    uint32_t r = (word >> 16) & 0xFFu;
+    uint32_t r = word & 0xFFu;
     uint32_t g = (word >>  8) & 0xFFu;
-    uint32_t b =  word        & 0xFFu;
-    /* The game stores colour as r,g,b bytes, so bits 23-16 = red. */
+    uint32_t b = (word >> 16) & 0xFFu;
     return (r << 16) | (g << 8) | b;
 }
 
