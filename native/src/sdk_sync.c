@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include "sdk_sync.h"
 #include <libetc.h>
 #include <SDL3/SDL.h>
@@ -103,3 +104,14 @@ int VSync(int mode) {
     last_wait = now;
     return elapsed;
 }
+
+long SetVideoMode(long mode) {
+    /* The current port targets the USA NTSC release exclusively. */
+    if (mode != 0) abort();
+    return 0;
+}
+
+static bool game_running;
+void sdk_sync_start(void) { game_running = true; }
+void sdk_sync_stop(void) { game_running = false; }
+bool sdk_sync_running(void) { return game_running; }

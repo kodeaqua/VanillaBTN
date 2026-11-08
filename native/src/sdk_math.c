@@ -1,5 +1,7 @@
 #include "ps1_gte.h"
 #include <libgte.h>
+#include <libgs.h>
+#include <stdlib.h>
 #include <math.h>
 #include <stdint.h>
 #include <string.h>
@@ -536,3 +538,59 @@ void gte_stclmv(void *out) {
     col[3] = g_gte_ir[2];
     col[6] = g_gte_ir[3];
 }
+
+void InitGeom(void) {
+    memset(&g_sdk_gte, 0, sizeof(g_sdk_gte));
+    memcpy(g_sdk_gte.rot, GsIDMATRIX.m, sizeof(g_sdk_gte.rot));
+    g_sdk_gte.h = 1000;
+    memset(g_gte_ir, 0, sizeof(g_gte_ir));
+    memset(g_gte_mac, 0, sizeof(g_gte_mac));
+    memset(g_gte_color_matrix, 0, sizeof(g_gte_color_matrix));
+    memset(g_gte_light_matrix, 0, sizeof(g_gte_light_matrix));
+    memset(g_gte_back_color, 0, sizeof(g_gte_back_color));
+    memset(g_gte_far_color, 0, sizeof(g_gte_far_color));
+    g_matrix_sp = 0;
+}
+
+MATRIX *TransMatrix(MATRIX *m, VECTOR *v) {
+    if (!m || !v) return m;
+    m->t[0] = v->vx;
+    m->t[1] = v->vy;
+    m->t[2] = v->vz;
+    return m;
+}
+
+MATRIX *RotMatrixZXY(SVECTOR *r, MATRIX *m) {
+    if (!r || !m) return m;
+    /* Axis functions premultiply, hence apply Y, X, Z for Z*X*Y. */
+    memcpy(m->m, GsIDMATRIX.m, sizeof(m->m));
+    RotMatrixY(r->vy, m);
+    RotMatrixX(r->vx, m);
+    RotMatrixZ(r->vz, m);
+    return m;
+}
+
+int GsSetFlatLight(int id, GsF_LIGHT *light) {
+    if (id < 0 || id >= 3 || !light) return -1;
+    VECTOR direction = {light->vx, light->vy, light->vz, 0}, normal;
+    if (!VectorNormal(&direction, &normal)) return -1;
+    g_gte_light_matrix[id][0] = (short)normal.vx;
+    g_gte_light_matrix[id][1] = (short)normal.vy;
+    g_gte_light_matrix[id][2] = (short)normal.vz;
+    g_gte_color_matrix[0][id] = (short)(light->r << 4);
+    g_gte_color_matrix[1][id] = (short)(light->g << 4);
+    g_gte_color_matrix[2][id] = (short)(light->b << 4);
+    return 0;
+}
+
+void GsSetAmbient(long r, long g, long b) {
+    gte_SetBackColor(r >> 4, g >> 4, b >> 4);
+}
+
+void GsSetLightMode(int mode) {
+    /* Original farm selects normal parallel lighting. Fog mode needs a
+     * separate implementation; never report it as silently supported. */
+    if (mode != 0) abort();
+}
+
+void GsSetProjection(long distance) { SetGeomScreen(distance); }

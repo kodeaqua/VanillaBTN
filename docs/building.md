@@ -40,13 +40,32 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/import-game.ps1 `
 
 The importer writes extracted disc files to `build/game-data/disc/` and 32
 archive members to `build/game-data/members/`. Those files are local,
-proprietary game data in the ignored `build/` tree. The current native
-executable does not load them yet. Its runtime build needs no Python.
+proprietary game data in the ignored `build/` tree. Run from the repository root after importing:
+
+```powershell
+& .\build\native\Debug\vanillabtn.exe --data .\build\game-data\disc
+```
+
+The host mounts this disc tree and runs the original startup and scene
+handlers. Its runtime needs no Python. The native port remains incomplete;
+full farm, save/load and audiovisual fidelity require further work.
+
+For an optional code-level integration check using your local disc data:
+
+```powershell
+& .\build\native\Debug\original_boot_test.exe --data .\build\game-data\disc
+```
+
+This separate probe uses dummy SDL devices, a synthetic clock, in-memory cards
+and a finite 900-vblank budget. It checks GPU status and counts colored frames
+and nonzero PCM intervals without displaying or judging gameplay. It is not
+part of CTest because the normal suite requires no proprietary data. Diagnostics
+belong to this test executable, not the Release game executable.
 
 ## PS1 reference build
 
-These commands build PS1 binaries, even when Docker runs on Windows. A native
-Windows game is not available yet. The PS1 reference build requires Docker and
+These commands build PS1 binaries, even when Docker runs on Windows. The incomplete native
+Windows runtime is built separately by the command above. The PS1 reference build requires Docker and
 produces the EXE and 13 overlays from source.
 With your own USA `SLUS_011.15` disc image in MODE2/2352 `.bin` format, it also
 rebuilds `A_FILE` and a `.bin`/`.cue` disc image. The original game data and

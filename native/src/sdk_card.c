@@ -422,3 +422,8 @@ int sdk_card_rename(const char *oldpath, const char *newpath) {
     }
     return -1;
 }
+
+void McxStartCom(void) {
+    s_mcx_last_cmd = 0;
+    s_mcx_last_result = McxErrInvalid;
+}

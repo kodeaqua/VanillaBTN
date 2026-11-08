@@ -8,7 +8,8 @@ Update the relevant item after completing a task or discovering a blocker.
 - [ ] Continuation audit: complete farm linkage/address translation and remove unsupported SDK success paths before claiming runtime integration.
   - [x] Replace unbounded SEQ scanning with exact archive spans and reject invalid sequence headers without consuming handles.
   - [x] Finish the interrupted MSVC farm-source build: case ranges, nested helpers, byte-pointer arithmetic and required type declarations.
-  - [ ] Resolve farm-to-host linkage, remaining pointer truncations and GS lighting/matrix entry points; an archive build does not prove a runnable farm.
+  - [x] Resolve startup/farm linkage, SDK bootstrap and GS/matrix entry points; preserve original frame-region addresses in host RAM.
+  - [ ] Audit remaining farm pointer truncations and serialized layouts before claiming a runnable full farm.
   - [x] PocketStation operations report missing/non-PDA devices without fabricated successful reads or writes; restore canonical SDK result/command values.
   - [x] Reject invalid/truncated memory-card transfers and validate file chains before touching caller buffers or saves; 29 synthetic checks pass in both profiles. SDK completion semantics and open/data APIs remain under audit.
 - [ ] Connect original game code through platform/SDK interfaces. Do not rebuild scene, menu, dialog or game logic in the native host.
@@ -27,12 +28,13 @@ Update the relevant item after completing a task or discovering a blocker.
     - [x] Compile original window-frame drawing, text engine (`text.c`), menu window (`menu_window.c`), heart icon (`heart.c`), name entry (`name_entry.c`), `11_GF_FARM` picture/storage helpers (`picture_cells.c`, `menu/item_storage.c`), `08_DEBUG/debug.c`, PDA sample screen (`10_PdaSamp/pdasamp.c`), all 5 minigames (`17_GF_MG1`..`25_GF_MG5`), title overlay (`27_GF_TITLE/title.c`), staff-roll overlay (`28_GF_STAFF/staff.c`), and memory-card test screen (`31_gf_mcard/mcard.c`), and support `DR_AREA` (`SetDrawArea`), `SetDrawMode`, `SetPolyF4`, `SetSemiTrans`, `AddPrim`, `MoveImage2`, GTE matrix transforms (`RotMatrix`, `SetRotMatrix`, `SetTransMatrix`, `RotTrans`), SPU channel masks, line/Gouraud packets, GPU font helpers (`FntLoad`, `FntOpen`, `FntFlush`, `SetDumpFnt`), and PS1 memory-card / PocketStation SDK bridges (`libmcrd`, `libmcx`).
     - [x] Compile original startup/main loop and save/load overlay with MSVC; SDK declarations checked against the local reference headers.
     - [x] Dispatch original VSync callbacks and provide a cooperative host pump, with per-vblank synthetic timing checks.
-    - [ ] Connect original startup and module dispatch to the host loop. Full linkage exposes 21 missing SDK entry points plus a duplicate work allocator; replace neither scenes nor save/load logic.
-- [ ] Native executable remains a backend smoke harness; original game execution is not connected.
+    - [x] Connect original startup and module dispatch to the host loop; both profiles boot the original title through a finite headless probe (901 vblank pumps, 848 colored frames, 658 nonzero PCM intervals). No scene logic is replaced.
+- [x] Replace the blank backend harness with original startup/game execution; full-game acceptance remains open.
 - [ ] Connect original controller polling through native SDK receive buffers and rumble.
   - [x] Match SDK atan/CORDIC math across all 16,641 analog magnitude pairs in both profiles.
   - [x] Compile original pad.c and pad_vibration.c against native receive buffers; verify repeats, sectors, replay, hot swaps and vibration script actuator requests.
-  - [ ] Invoke original pad polling from original startup/frame execution; assign a second physical host controller.
+  - [x] Invoke original pad polling from original startup/frame execution.
+  - [ ] Assign a second physical host controller.
 - [ ] Graphics/GTE: verify hardware rounding, saturation, flags, and primitive edge coverage against independent fixtures.
   - [ ] Verify textured-polygon subpixel interpolation with nonuniform original FT4 fixtures; packet-generation tests do not establish texel fidelity.
 - [ ] Audio: implement ADSR/reverb, XA stereo histories and coding-info sample rates.

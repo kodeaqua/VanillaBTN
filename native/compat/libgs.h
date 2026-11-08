@@ -16,9 +16,8 @@ typedef struct GsOT {
 extern short HWD0, VWD0;
 extern MATRIX GsIDMATRIX;
 
-/* Original scene descriptors are runtime data. Declaring the remaining GS
- * lighting boundary does not provide a pretend implementation: linking a
- * caller still requires its platform implementation. */
+/* Original scene descriptors are runtime data. Native lighting currently
+ * supports the parallel-light mode selected by the original farm. */
 typedef struct GsF_LIGHT {
     int vx, vy, vz;
     unsigned char r, g, b;

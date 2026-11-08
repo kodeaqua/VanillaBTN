@@ -7,12 +7,6 @@
 static unsigned char *base;
 static size_t capacity, used;
 
-void SystemError(char type, long errorcode) {
-    (void)type;
-    (void)errorcode;
-    abort();
-}
-
 bool sdk_work_bind(void *memory, size_t size) {
     if ((memory == NULL) != (size == 0) || ((uintptr_t)memory & 3) || (size & 3)) return false;
     base = memory;

@@ -281,3 +281,63 @@ void SetDrawLoad(DR_LOAD *p, RECT *r) {
     p->code[1] = ((u_long)(uint16_t)r->y << 16) | (u_long)(uint16_t)r->x;
     p->code[2] = ((u_long)(uint16_t)r->h << 16) | (u_long)(uint16_t)r->w;
 }
+
+/* GS bootstrap state is kept separately from the game's explicit per-frame
+ * environments. PutDrawEnv/PutDispEnv remain authoritative when submitted. */
+static DRAWENV gs_draw[2];
+static DISPENV gs_display[2];
+static u_long *gs_work;
+static int graph_debug;
+
+int ResetGraph(int mode) {
+    if (mode != 0) abort(); /* Reset variants are not used by this port yet. */
+    ps1_draw_state_reset(&draw);
+    display_enabled = false;
+    return 0;
+}
+
+int SetGraphDebug(int level) {
+    int previous = graph_debug;
+    graph_debug = level;
+    /* Diagnostics are intentionally not emitted in either profile. */
+    return previous;
+}
+
+void GsSetWorkBase(u_long *packets) { gs_work = packets; }
+u_long *GsGetWorkBase(void) { return gs_work; }
+
+void GsInitGraph(unsigned short x, unsigned short y, unsigned short mode,
+                 unsigned short dith, unsigned short vrammode) {
+    if (!x || !y || mode || vrammode) abort();
+    HWD0 = (short)x;
+    VWD0 = (short)y;
+    for (unsigned i = 0; i < 2; ++i) {
+        if (!SetDefDrawEnv(&gs_draw[i], 0, 0, x, y) ||
+            !SetDefDispEnv(&gs_display[i], 0, 0, x, y)) abort();
+        gs_draw[i].dtd = dith != 0;
+    }
+}
+
+void GsDefDispBuff(unsigned short x0, unsigned short y0,
+                   unsigned short x1, unsigned short y1) {
+    if (!SetDefDrawEnv(&gs_draw[0], x0, y0, HWD0, VWD0) ||
+        !SetDefDrawEnv(&gs_draw[1], x1, y1, HWD0, VWD0) ||
+        !SetDefDispEnv(&gs_display[0], x1, y1, HWD0, VWD0) ||
+        !SetDefDispEnv(&gs_display[1], x0, y0, HWD0, VWD0)) abort();
+}
+
+void GsSetOffset(long x, long y) {
+    for (unsigned i = 0; i < 2; ++i) {
+        gs_draw[i].ofs[0] = (short)(gs_draw[i].clip.x + x);
+        gs_draw[i].ofs[1] = (short)(gs_draw[i].clip.y + y);
+    }
+}
+
+void GsSetDrawBuffOffset(void) {
+    PutDrawEnv(&gs_draw[0]);
+}
+
+void GsInit3D(void) {
+    InitGeom();
+    GsSetDrawBuffOffset();
+}

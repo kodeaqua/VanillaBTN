@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include "sdk_memory.h"
 #include <string.h>
 
@@ -12,3 +13,8 @@ void *sdk_memory_resolve(uint32_t address, size_t size) {
 }
 
 void sdk_memory_clear(void) { memset(sdk_main_ram, 0, sizeof(sdk_main_ram)); }
+
+/* Native storage has the original retail machine's fixed 2 MB capacity. */
+void SetMem(long megabytes) {
+    if (megabytes != 2) abort();
+}

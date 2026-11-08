@@ -1,8 +1,9 @@
 # Repository guidance
 
 VanillaBTN aims to bring *Harvest Moon: Back to Nature* to native Windows while
-preserving the original experience. Today this repository is a matching PS1
-decompilation, not a native port. Its EXE and 13 overlays form the reference
+preserving the original experience. The repository contains a matching PS1
+decompilation and an incomplete native Windows bringup. Native startup now
+calls the original game loop; this does not establish full gameplay fidelity. Its EXE and 13 overlays form the reference
 baseline and must continue to match their original SHA-1 hashes.
 
 ## Read first

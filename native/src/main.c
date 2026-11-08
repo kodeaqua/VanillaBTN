@@ -2,24 +2,33 @@
 #include <SDL3/SDL_main.h>
 
 #include <string.h>
+#ifdef VANILLABTN_BOOT_TEST
+#include <stdio.h>
+#endif
 
 #include "ps1_audio.h"
 #include "ps1_card.h"
-#include "ps1_clock.h"
 #include "ps1_input.h"
 #include "ps1_video.h"
 #include "sdk_gpu.h"
 #include "host_display.h"
 #include "sdk_pad.h"
+#include "sdk_card.h"
+#include "sdk_cd.h"
+#include "sdk_memory.h"
+#include "sdk_sound.h"
+#include "sdk_sync.h"
+#include <libetc.h>
+#include <libcd.h>
 #include <libpad.h>
 
 _Static_assert(sizeof(void *) == 8, "The Windows port requires x64");
 
 static Ps1Video video;
-static Ps1InputRecord pad1;
-static Ps1Clock clock;
 static Ps1Audio audio;
+#ifndef VANILLABTN_BOOT_TEST
 static Ps1CardManager card_mgr;
+#endif
 
 static void send_rumble(unsigned slot, uint8_t small, uint8_t large, void *context) {
     SDL_Gamepad *gamepad = *(SDL_Gamepad **)context;
@@ -94,131 +103,198 @@ static uint32_t map_gamepad_to_ps1_button(uint8_t button) {
 }
 
 
-int main(int argc, char **argv) {
-    SDL_Window *window = NULL;
-    SDL_Renderer *renderer = NULL;
-    SDL_Texture *texture = NULL;
+typedef struct HostGame {
+    SDL_Window *window;
+    SDL_Renderer *renderer;
+    SDL_Texture *texture;
+    SDL_Gamepad *gamepad;
+    bool running;
+    uint32_t keyboard_buttons, controller_buttons;
+    int16_t stick_x, stick_y;
+#ifdef VANILLABTN_BOOT_TEST
+    unsigned vblanks, colored_frames, audible_frames;
+#endif
+} HostGame;
+
+static void host_game_pump(void *context) {
+    HostGame *host = context;
     SDL_Event event;
-    bool running = true;
-    int result = 1;
-    SDL_Gamepad *gamepad = NULL;
-    uint32_t keyboard_buttons = 0, controller_buttons = 0;
-    int16_t stick_x = 0, stick_y = 0;
-
-    /* CTest can verify executable startup without opening a window. */
-    if (argc == 2 && strcmp(argv[1], "--check-build") == 0) {
-        return 0;
+#ifdef VANILLABTN_BOOT_TEST
+    if (++host->vblanks >= 900 || !sdk_gpu_ok()) {
+        sdk_sync_stop();
+        host->running = false;
+        return;
     }
-    if (argc != 1 || !SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD)) {
-        return 1;
-    }
-    sdk_pad_rumble(send_rumble, &gamepad);
-    window = SDL_CreateWindow("VanillaBTN - native bringup", 640, 480,
-                              SDL_WINDOW_RESIZABLE);
-    if (window == NULL) {
-        goto done;
-    }
-    renderer = SDL_CreateRenderer(window, NULL);
-    if (renderer == NULL
-        || !SDL_SetRenderLogicalPresentation(renderer, 320, 240,
-                                             SDL_LOGICAL_PRESENTATION_LETTERBOX)
-        || !SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255)) {
-        goto done;
-    }
-    sdk_gpu_bind(&video);
-    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
-                                SDL_TEXTUREACCESS_STREAMING, 320, 240);
-    if (texture == NULL || !SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST)
-        || !host_present_frame(&video, renderer, &texture)) {
-        goto done;
-    }
-    ps1_input_init(&pad1);
-    ps1_clock_init(&clock, PS1_TICK_DURATION_NS, PS1_MAX_TICKS_PER_STEP);
-    ps1_audio_init(&audio);
-    ps1_card_manager_init(&card_mgr, NULL);
-    uint64_t last_time = SDL_GetTicksNS();
-
-    while (running) {
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_EVENT_QUIT) {
-                running = false;
-            } else if (event.type == SDL_EVENT_GAMEPAD_ADDED && gamepad == NULL) {
-                gamepad = SDL_OpenGamepad(event.gdevice.which);
-            } else if (event.type == SDL_EVENT_GAMEPAD_REMOVED && gamepad != NULL
-                       && SDL_GetGamepadID(gamepad) == event.gdevice.which) {
-                SDL_CloseGamepad(gamepad);
-                gamepad = NULL;
-                controller_buttons = 0;
-                stick_x = stick_y = 0;
-            } else if (event.type == SDL_EVENT_WINDOW_FOCUS_LOST) {
-                keyboard_buttons = controller_buttons = 0;
-                stick_x = stick_y = 0;
-                ps1_input_clear(&pad1);
-            } else if (event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP) {
-                uint32_t btn = map_key_to_ps1_button(event.key.key);
-                if (btn != 0) {
-                    if (event.type == SDL_EVENT_KEY_DOWN) keyboard_buttons |= btn;
-                    else keyboard_buttons &= ~btn;
-                }
-            } else if (event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN
-                       || event.type == SDL_EVENT_GAMEPAD_BUTTON_UP) {
-                uint32_t btn = gamepad != NULL && SDL_GetGamepadID(gamepad) == event.gbutton.which
-                    ? map_gamepad_to_ps1_button(event.gbutton.button) : 0;
-                if (btn != 0) {
-                    if (event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN) controller_buttons |= btn;
-                    else controller_buttons &= ~btn;
-                }
-            } else if (event.type == SDL_EVENT_GAMEPAD_AXIS_MOTION && gamepad != NULL
-                       && SDL_GetGamepadID(gamepad) == event.gaxis.which) {
-                if (event.gaxis.axis == SDL_GAMEPAD_AXIS_LEFTX) stick_x = event.gaxis.value;
-                if (event.gaxis.axis == SDL_GAMEPAD_AXIS_LEFTY) stick_y = event.gaxis.value;
-            } else if (event.type == SDL_EVENT_WINDOW_EXPOSED
-                       || event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) {
-                if (!host_present_frame(&video, renderer, &texture)) {
-                    goto done;
-                }
+#endif
+    while (SDL_PollEvent(&event)) {
+        if (event.type == SDL_EVENT_QUIT) {
+            host->running = false;
+        } else if (event.type == SDL_EVENT_GAMEPAD_ADDED && host->gamepad == NULL) {
+            host->gamepad = SDL_OpenGamepad(event.gdevice.which);
+        } else if (event.type == SDL_EVENT_GAMEPAD_REMOVED && host->gamepad != NULL
+                   && SDL_GetGamepadID(host->gamepad) == event.gdevice.which) {
+            SDL_CloseGamepad(host->gamepad);
+            host->gamepad = NULL;
+            host->controller_buttons = 0;
+            host->stick_x = host->stick_y = 0;
+        } else if (event.type == SDL_EVENT_WINDOW_FOCUS_LOST) {
+            host->keyboard_buttons = host->controller_buttons = 0;
+            host->stick_x = host->stick_y = 0;
+        } else if (event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP) {
+            uint32_t btn = map_key_to_ps1_button(event.key.key);
+            if (btn != 0) {
+                if (event.type == SDL_EVENT_KEY_DOWN) host->keyboard_buttons |= btn;
+                else host->keyboard_buttons &= ~btn;
+            }
+        } else if (event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN
+                   || event.type == SDL_EVENT_GAMEPAD_BUTTON_UP) {
+            uint32_t btn = host->gamepad != NULL && SDL_GetGamepadID(host->gamepad) == event.gbutton.which
+                ? map_gamepad_to_ps1_button(event.gbutton.button) : 0;
+            if (btn != 0) {
+                if (event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN) host->controller_buttons |= btn;
+                else host->controller_buttons &= ~btn;
+            }
+        } else if (event.type == SDL_EVENT_GAMEPAD_AXIS_MOTION && host->gamepad != NULL
+                   && SDL_GetGamepadID(host->gamepad) == event.gaxis.which) {
+            if (event.gaxis.axis == SDL_GAMEPAD_AXIS_LEFTX) host->stick_x = event.gaxis.value;
+            if (event.gaxis.axis == SDL_GAMEPAD_AXIS_LEFTY) host->stick_y = event.gaxis.value;
+        } else if (event.type == SDL_EVENT_WINDOW_EXPOSED
+                   || event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) {
+            if (!host_present_frame(&video, host->renderer, &host->texture)) {
+                host->running = false;
+                sdk_sync_stop();
+                return;
             }
         }
-
-        if (!running) break;
-        pad1.held = keyboard_buttons | controller_buttons;
-        if ((controller_buttons & PS1_PAD_ARROWS_MASK) == 0) {
-            pad1.held |= ps1_input_stick_buttons(stick_x, stick_y);
-        }
-        /* Supply raw samples only: original pad.c owns the analog/repeat rules
-         * when original startup is connected. Do not feed folded stick bits. */
-        sdk_pad_sample(0, true, gamepad != NULL,
-            (uint16_t)(keyboard_buttons | controller_buttons),
-            (uint8_t)(((int)stick_x + 32768) / 256),
-            (uint8_t)(((int)stick_y + 32768) / 256));
-
-        uint64_t now = SDL_GetTicksNS();
-        uint32_t ticks = ps1_clock_advance(&clock, now - last_time);
-        last_time = now;
-
-        while (ticks-- > 0) {
-            ps1_input_tick_speed(&pad1, 2);
-            ps1_audio_tick(&audio, 2);
-        }
-
-        if (!host_present_frame(&video, renderer, &texture)) {
-            goto done;
-        }
-
-        SDL_Delay(1);
     }
-    result = 0;
+
+    if (!host->running) { sdk_sync_stop(); return; }
+    /* Supply raw samples only: original pad.c owns the analog/repeat rules
+     * in the original game. Do not feed folded stick bits. */
+    sdk_pad_sample(0, true, host->gamepad != NULL,
+        (uint16_t)(host->keyboard_buttons | host->controller_buttons),
+        (uint8_t)(((int)host->stick_x + 32768) / 256),
+        (uint8_t)(((int)host->stick_y + 32768) / 256));
+
+    /* Original game timing owns the cadence. Submit exactly one 60 Hz audio
+     * interval from the same SDK SPU used by sound.c, not the smoke mixer. */
+    int16_t samples[735 * 2];
+    sdk_sound_mix(samples, 735);
+#ifdef VANILLABTN_BOOT_TEST
+    for (unsigned i = 0; i < 735 * 2; ++i) {
+        if (samples[i]) { ++host->audible_frames; break; }
+    }
+    SdkDisplay output = sdk_gpu_display();
+    bool colored = false;
+    if (output.enabled && output.x >= 0 && output.y >= 0 &&
+        output.width <= PS1_VRAM_WIDTH - output.x &&
+        output.height <= PS1_VRAM_HEIGHT - output.y) {
+        for (int y = 0; y < output.height && !colored; ++y) {
+            for (int x = 0; x < output.width; ++x) {
+                unsigned pixel = video.vram[output.y + y][output.x + x] & 0x7FFF;
+                if (pixel && pixel != 0x7FFF) { colored = true; break; }
+            }
+        }
+    }
+    if (colored) ++host->colored_frames;
+#endif
+    if (audio.stream && SDL_GetAudioStreamQueued(audio.stream) <
+        (int)(sizeof(samples) * 4)) {
+        SDL_PutAudioStreamData(audio.stream, samples, sizeof(samples));
+    }
+    if (!host_present_frame(&video, host->renderer, &host->texture)) {
+        host->running = false;
+        sdk_sync_stop();
+    }
+}
+
+#ifdef VANILLABTN_BOOT_TEST
+static uint64_t boot_time;
+static uint64_t boot_now(void *context) { (void)context; return boot_time; }
+static void boot_wait(uint64_t deadline, void *context) {
+    (void)context;
+    boot_time = deadline;
+}
+#endif
+
+int game_main(void);
+
+int main(int argc, char **argv) {
+    HostGame host = {0};
+    int result = 1;
+    const char *disc = "build/game-data/disc";
+    if (argc == 2 && strcmp(argv[1], "--check-build") == 0) return 0;
+    if (argc == 3 && strcmp(argv[1], "--data") == 0) disc = argv[2];
+    else if (argc != 1) return 1;
+#ifdef VANILLABTN_BOOT_TEST
+    SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "dummy");
+    SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "dummy");
+#endif
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD)) return 1;
+    if (!sdk_cd_mount(disc)) {
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "VanillaBTN",
+            "Game data was not found. Import your disc and use --data with its disc directory.", NULL);
+        goto done;
+    }
+    /* Fail before the original SDK's retry loops when required files are absent. */
+    CdlFILE required;
+    if (!CdSearchFile(&required, "\\A_FILE.HDT;1") ||
+        !CdSearchFile(&required, "\\A_FILE.BIN;1")) {
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "VanillaBTN",
+            "The disc directory is missing A_FILE.HDT or A_FILE.BIN.", NULL);
+        goto done;
+    }
+    host.window = SDL_CreateWindow("VanillaBTN", 640, 480, SDL_WINDOW_RESIZABLE);
+    if (!host.window) goto done;
+    host.renderer = SDL_CreateRenderer(host.window, NULL);
+    if (!host.renderer || !SDL_SetRenderLogicalPresentation(host.renderer,
+        320, 240, SDL_LOGICAL_PRESENTATION_LETTERBOX)) goto done;
+    sdk_memory_clear();
+    sdk_gpu_bind(&video);
+    if (!sdk_gpu_map(sdk_main_ram, SDK_RAM_SIZE)) goto done;
+    host.texture = SDL_CreateTexture(host.renderer, SDL_PIXELFORMAT_ARGB8888,
+        SDL_TEXTUREACCESS_STREAMING, 320, 240);
+    if (!host.texture || !SDL_SetTextureScaleMode(host.texture, SDL_SCALEMODE_NEAREST)) goto done;
+    ps1_audio_init(&audio);
+#ifndef VANILLABTN_BOOT_TEST
+    ps1_card_manager_init(&card_mgr, NULL);
+    sdk_card_bind_manager(&card_mgr);
+#else
+    /* This probe must never read, recover, create or flush user save files. */
+    sdk_card_bind_manager(NULL);
+#endif
+    sdk_pad_rumble(send_rumble, &host.gamepad);
+    host.running = true;
+    sdk_sync_pump(host_game_pump, &host);
+#ifdef VANILLABTN_BOOT_TEST
+    sdk_sync_bind(boot_now, boot_wait, NULL);
+#endif
+    sdk_sync_start();
+    result = game_main();
+#ifdef VANILLABTN_BOOT_TEST
+    extern int main_scene;
+    fprintf(stderr, "boot: vblanks=%u scene=%d gpu=%d colored=%u audible=%u\n",
+        host.vblanks, main_scene, sdk_gpu_ok(), host.colored_frames, host.audible_frames);
+    if (host.vblanks < 900 || !sdk_gpu_ok() || !host.colored_frames) result = 2;
+#endif
 
 done:
+    sdk_sync_stop();
+    sdk_sync_pump(NULL, NULL);
+    VSyncCallback(NULL);
     PadStopCom();
     sdk_pad_rumble(NULL, NULL);
+    sdk_card_bind_manager(NULL);
+    sdk_cd_unmount();
     sdk_gpu_bind(NULL);
-    if (gamepad != NULL) SDL_CloseGamepad(gamepad);
+    if (host.gamepad) SDL_CloseGamepad(host.gamepad);
+#ifndef VANILLABTN_BOOT_TEST
     ps1_card_manager_shutdown(&card_mgr);
+#endif
     ps1_audio_shutdown(&audio);
-    if (texture != NULL) SDL_DestroyTexture(texture);
-    if (renderer != NULL) SDL_DestroyRenderer(renderer);
-    if (window != NULL) SDL_DestroyWindow(window);
+    if (host.texture) SDL_DestroyTexture(host.texture);
+    if (host.renderer) SDL_DestroyRenderer(host.renderer);
+    if (host.window) SDL_DestroyWindow(host.window);
     SDL_Quit();
     return result;
 }

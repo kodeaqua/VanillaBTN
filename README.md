@@ -10,8 +10,10 @@ should be optional and separate from that default experience.
 
 This repository contains a matching decompilation of the PlayStation USA
 release (`SLUS_011.15`) and a minimal native Windows bringup executable. The
-native executable presents a blank PS1-size frame; it does not run the game
-yet. The PS1 source builds the EXE and its 13 overlays byte for byte and,
+native executable now runs the original startup and scene dispatcher against
+locally imported disc data. A headless boot check reaches the original title
+with colored frames and nonzero PCM in both profiles. Full gameplay, save/load
+and audiovisual fidelity remain under audit. The PS1 source builds the EXE and its 13 overlays byte for byte and,
 given your own copy of the disc, the whole disc image. That build remains
 the reference baseline. Building it with Docker on Windows still produces
 PS1 binaries.

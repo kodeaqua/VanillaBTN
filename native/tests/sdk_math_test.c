@@ -21,5 +21,13 @@ int main(int argc, char **argv) {
         || rsin(2048) != 0 || rsin(3072) != -4096 || rsin(-512) != -2896) return 5;
     if (rcos(0) != 4096 || rcos(512) != 2896 || rcos(1024) != 0
         || rcos(2048) != -4096 || rcos(3072) != 0 || rcos(-512) != 2896) return 6;
+    MATRIX matrix = {0};
+    VECTOR translation = {123, -456, 789, 0};
+    SVECTOR angles = {1024, 1024, 0, 0};
+    if (TransMatrix(&matrix, &translation) != &matrix) return 7;
+    RotMatrixZXY(&angles, &matrix);
+    const short expected[3][3] = {{0, 0, 4096}, {4096, 0, 0}, {0, 4096, 0}};
+    if (memcmp(matrix.m, expected, sizeof(expected)) ||
+        matrix.t[0] != 123 || matrix.t[1] != -456 || matrix.t[2] != 789) return 8;
     return 0;
 }

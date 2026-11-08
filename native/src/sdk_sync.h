@@ -13,4 +13,9 @@ bool sdk_sync_bind(uint64_t (*now)(void *), void (*wait)(uint64_t, void *), void
  * Only waiting VSync calls pump; query modes never submit another frame. */
 void sdk_sync_pump(void (*pump)(void *), void *context);
 
+/* Cooperative cancellation allows the original loop to return on window close. */
+void sdk_sync_start(void);
+void sdk_sync_stop(void);
+bool sdk_sync_running(void);
+
 #endif

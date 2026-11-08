@@ -486,3 +486,24 @@ intervening nominal 60 Hz boundary. A host pump runs afterward for SDL events
 and presentation. Query modes remain side-effect-free; late work delivers one
 current callback instead of replaying stale draws. This is cooperative dispatch,
 not an asynchronous hardware interrupt. It does not alone connect game startup.
+
+### Original startup integration
+
+The SDL host now mounts an imported disc tree, binds main RAM/VRAM, raw input,
+cards and audio output, then calls the original main function. Its outer scene
+dispatcher and inner frame loop remain authoritative. Native-only guards map
+fixed frame addresses into main RAM and permit window-close cancellation.
+The original GS allocator is linked into the runtime; the fixture allocator
+remains available to isolated tests without duplicate symbols.
+
+SDK bootstrap supports the current NTSC, non-interlaced graph setup, 2 MB RAM,
+GS work cursor, parallel lighting and the missing translation/ZXY matrix calls.
+Unsupported initialization/light modes fail explicitly. Numerical SDK rounding,
+remaining farm pointer conversions, complete XA streaming, SPU ADSR/reverb and
+original save/load completion remain open. This is not full-game acceptance.
+
+The optional original_boot_test executable uses dummy SDL devices and a fake
+clock against locally imported assets. Both profiles reach the original title
+with 848 colored frames and 658 nonzero PCM intervals over 901 vblank pumps.
+Only this test executable includes probe diagnostics. It uses in-memory cards
+and performs no save-file access. The ordinary suite remains asset-free.

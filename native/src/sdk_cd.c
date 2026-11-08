@@ -247,3 +247,10 @@ int CdReadSync(int mode, u_char *result) {
 
 void CdReadBreak(void) { memset(&read_job, 0, sizeof(read_job)); }
 void CdFlush(void) { /* No unread controller response FIFO exists on the host. */ }
+
+int CdInit(void) {
+    /* Drive initialization must preserve the host-mounted disc. */
+    memset(&read_job, 0, sizeof(read_job));
+    xa_streaming = false;
+    return 1;
+}

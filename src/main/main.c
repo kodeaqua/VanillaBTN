@@ -50,7 +50,17 @@
 /* Offsets within the region at region_base where each frame's pieces start: the
  * tag arrays of its three ordering tables (64, 16 and 2 entries), the main OT,
  * the primitive buffer and the work area. */
+#ifdef VANILLABTN_NATIVE
+#include "sdk_memory.h"
+#include "sdk_sync.h"
+#define WORK_REGION (sdk_main_ram + 0x1BE1B0)
+#define MAIN_RAM_POINTER(address) (sdk_main_ram + ((address) & 0x1FFFFF))
+#define MAIN_HOST_RUNNING() sdk_sync_running()
+#else
 #define WORK_REGION ((u8 *)0x801BE1B0)
+#define MAIN_RAM_POINTER(address) ((u8 *)(address))
+#define MAIN_HOST_RUNNING() 1
+#endif
 #define REGION_TAGS1 0x200
 #define REGION_TAGS2 0x280
 #define REGION_WORK 0x33090
@@ -198,7 +208,7 @@ int main(void) {
     text_set_palette(3);
     text_set_speed(3);
     prim_copy_pending = 0;
-    while(1) {
+    while (MAIN_HOST_RUNNING()) {
         if (prim_copy_pending == 1) {
             main_copy_prim_buffer(1, 0);
         }
@@ -373,6 +383,9 @@ int main(void) {
         }
         main_run_frame();
     }
+#ifdef VANILLABTN_NATIVE
+    return 0;
+#endif
 }
 
 /* One pass of the frame loop. While the loading screen is up only the scene handler runs. Otherwise
@@ -424,7 +437,7 @@ static void main_run_frame(void) {
             vsync_pending_callback = main_draw_ots;
             VSync(2);
         }
-    } while (main_loop_running == 1);
+    } while (main_loop_running == 1 && MAIN_HOST_RUNNING());
 }
 
 s32 main_put_env_enabled;
@@ -632,7 +645,7 @@ static void main_init_frame_records(void) {
     base = WORK_REGION;
     region_base = base;
     memset(base, 0, REGION_BYTES);
-    frame_ot_base_init = frame_ot_base = (u8 *)0x801F7000;
+    frame_ot_base_init = frame_ot_base = MAIN_RAM_POINTER(0x801F7000);
     for (i = 0; i < 2; i++) {
         frame_records[i].otTags[0] = (u_long *)(base + i * 0x100);
         frame_records[i].otTagCounts[0] = 64;
@@ -696,7 +709,7 @@ static void main_init_frame_records_wide(void) {
     base = WORK_REGION;
     region_base = base;
     memset(base, 0, REGION_BYTES);
-    frame_ot_base_init = frame_ot_base = (u8 *)0x801FCFF8;
+    frame_ot_base_init = frame_ot_base = MAIN_RAM_POINTER(0x801FCFF8);
     for (i = 0; i < 2; i++) {
         frame_records[i].otTags[0] = (u_long *)(base + i * 0x100);
         frame_records[i].otTagCounts[0] = 64;

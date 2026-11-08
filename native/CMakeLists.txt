@@ -108,7 +108,7 @@ target_link_libraries(sdk_gpu_test PRIVATE game_texture_pack)
 target_compile_options(sdk_gpu_test PRIVATE /W4 /UNDEBUG)
 add_test(NAME original_texture_pack COMMAND sdk_gpu_test)
 
-add_library(game_prim STATIC ../src/main/graphics/prim.c src/sdk_work.c)
+add_library(game_prim STATIC ../src/main/graphics/prim.c src/sdk_work.c src/sdk_error.c)
 set_target_properties(game_prim PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_include_directories(game_prim PUBLIC ../src/main ../src/main/input ../src/main/sound)
 target_link_libraries(game_prim PUBLIC game_texture_pack)
@@ -476,7 +476,7 @@ foreach(test_target ps1_video_test ps1_sprite_test ps1_ot_test ps1_gpu_test
     target_compile_options(${test_target} PRIVATE /UNDEBUG)
 endforeach()
 
-# Compile the authoritative startup before connecting it to the SDL host.
+# Link the authoritative startup and overlays into the SDL host.
 add_library(game_main STATIC ../src/main/main.c)
 set_target_properties(game_main PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_include_directories(game_main PUBLIC compat ${game_include_dirs} src)
@@ -491,3 +491,15 @@ target_compile_options(game_saveload PRIVATE /W4 /Gy /we4013)
 
 target_link_libraries(game_main PUBLIC game_farm game_saveload game_window_frame
     game_afile game_pad sdk_card)
+
+target_link_libraries(vanillabtn PRIVATE game_main)
+target_link_libraries(sdk_gpu PUBLIC sdk_math)
+
+# Optional integration probe uses locally imported assets and dummy SDL devices.
+# It is deliberately outside CTest: normal builds must not require game data.
+add_executable(original_boot_test src/main.c)
+set_target_properties(original_boot_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_compile_definitions(original_boot_test PRIVATE VANILLABTN_BOOT_TEST)
+target_compile_options(original_boot_test PRIVATE /W4)
+target_link_libraries(original_boot_test PRIVATE game_main host_display SDL3::SDL3
+    ps1_input ps1_audio ps1_card)
