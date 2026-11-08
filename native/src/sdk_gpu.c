@@ -72,7 +72,8 @@ static u_long *resolve_id(u_long id, size_t bytes) {
 }
 
 void ClearOTagR(u_long *ot, long count) {
-    if (count <= 0 || !address_id(ot, (size_t)count * 4)) {
+    if (count <= 0 || (!address_id(ot, (size_t)count * 4)
+        && !sdk_gpu_map(ot, (size_t)count * 4))) {
         packet_error = true;
         return;
     }
@@ -81,12 +82,18 @@ void ClearOTagR(u_long *ot, long count) {
 }
 
 void sdk_add_prim(void *ot, void *packet) {
-    if (!address_id(ot, 4) || !address_id(packet, 4) || ot == packet) {
+    if (!address_id(ot, 4) || !packet || ((uintptr_t)packet & 3) || ot == packet) {
         packet_error = true;
         return;
     }
     u_long *tag = packet;
-    u_long id = address_id(packet, (size_t)((*tag >> 24) + 1) * 4);
+    size_t bytes = (size_t)((*tag >> 24) + 1) * 4;
+    /* Original modules also own private static packets outside their frame
+     * arenas. The SDK call receives a trusted live host pointer; register that
+     * packet lazily. Serialized links still resolve only through mappings.
+     * Partial overlap with a declared arena remains a hard bounds failure. */
+    u_long id = address_id(packet, bytes);
+    if (!id && sdk_gpu_map(packet, bytes)) id = address_id(packet, bytes);
     if (!id) { packet_error = true; return; }
     *tag = (*tag & 0xFF000000ul) | (*(u_long *)ot & SDK_END);
     *(u_long *)ot = (*(u_long *)ot & 0xFF000000ul) | id;

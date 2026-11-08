@@ -50,8 +50,12 @@ The host supplies bounded GS work storage through `sdk_work_bind`; the original
 builders still own command construction, colors, coordinates and packet sizes.
 Arena exhaustion stops execution instead of corrupting adjacent host memory.
 
-Before building a frame, register its complete OT and packet arenas through
-`sdk_gpu_map`. Tags use a 24-bit mapped offset, never a truncated host pointer.
+Before building a frame, prefer registering complete packet arenas through
+`sdk_gpu_map`. `ClearOTagR` maps module-owned OTs and `addPrim` lazily maps
+private packets outside arenas, using trusted live SDK-call pointers. Partial
+overlap cannot extend a declared arena's bounds. Serialized links are still
+resolved only through registered spans. Tags use a 24-bit mapped offset, never
+a truncated host pointer.
 Mappings are disjoint and frame-local; reset them only after draws complete.
 `ClearOTagR` links each OT entry to its predecessor. `addPrim` inserts at the
 head of that entry; `DrawOTag` resolves links and submits packets to the existing
@@ -170,3 +174,9 @@ RGB24 display and nonzero texture windows are explicitly rejected at this
 boundary. Dithering, scanline/interlace timing, screen overscan placement and
 drawing-to-displayed-area restrictions remain incomplete; accepting an
 environment does not establish those hardware behaviors.
+
+`game_screen` compiles the original `screen_fade.c` unchanged. The fixture
+provides main-loop frame globals and records/isolates main control boundaries;
+fade counters, private packets, blend mode and shader levels come from the
+original code. Synthetic in/out frames verify resulting VRAM values. This
+does not wire startup or replace its publisher/title sequence.

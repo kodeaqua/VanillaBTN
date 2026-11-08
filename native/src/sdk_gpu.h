@@ -8,7 +8,8 @@
 void sdk_gpu_bind(Ps1Video *video);
 
 /* Frame-local mappings preserve 24-bit links without truncating host pointers.
- * Register each complete OT/packet arena before any primitive is linked.
+ * Prefer registering complete packet arenas before primitives are linked.
+ * SDK calls also map module-owned OTs/private static packets lazily.
  * Reset only after all draws using these arenas have completed. */
 void sdk_gpu_reset_packets(void);
 bool sdk_gpu_map(void *memory, size_t size);

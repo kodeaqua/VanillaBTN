@@ -17,6 +17,7 @@ Update the relevant item after completing a task or discovering a blocker.
     - [x] Compile original afile.c against imported-disc SDK sector reads.
     - [x] Map original overlay data regions into bounded host main RAM.
     - [x] Honor SDK-selected draw/display rectangles and display mask in SDL presentation.
+    - [x] Compile and exercise original screen fades through SDK GPU submission.
     - [ ] Connect original CD audio, startup and module dispatch to the host loop.
 - [ ] Native executable remains a backend smoke harness; original game execution is not connected.
 - [ ] Graphics/GTE: verify hardware rounding, saturation, flags, and primitive edge coverage against independent fixtures.
@@ -34,6 +35,7 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Completed
 
+- [x] Compile original screen_fade.c and lazily map its private packets through the native SDK. Synthetic frames verify original fade counters and VRAM subtraction in/out; Debug/Release pass 24 checks. Main-loop frame globals/control hooks are fixture boundaries, not game startup.
 - [x] Add SDK draw/display environments, clear and VRAM moves; SDL follows selected frame-buffer location and original internal size. Memory-only software-renderer fixtures verify buffer flips, display mask and 320x240/640x480 texture changes without opening a window. Debug/Release pass 23 checks.
 - [x] Map 2 MB main RAM and its cached/uncached aliases without pointer truncation, and compile the original overlay-region table with host-backed data offsets. Boundary/overflow/alias/reset tests pass in both profiles (22 checks). Original startup and native scene dispatch remain pending; imported MIPS bytes are never executed.
 - [x] Read synthetic disc trees through original A_FILE initialization, blocking/range and start/poll reads, using native CD SDK entry points. Validate HDT size/offsets before scratch reads, preserve sector padding, cancel pending reads and reject unsupported raw/XA modes. Debug/Release pass 21 checks; XA control is not connected yet.

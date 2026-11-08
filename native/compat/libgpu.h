@@ -43,6 +43,12 @@ typedef struct POLY_FT4 {
     u_short pad3;
 } POLY_FT4;
 
+typedef struct POLY_F4 {
+    u_long tag;
+    u_char r0, g0, b0, code;
+    short x0, y0, x1, y1, x2, y2, x3, y3;
+} POLY_F4;
+
 typedef struct DRAWENV {
     RECT clip;
     short ofs[2];
@@ -58,7 +64,8 @@ typedef struct DISPENV {
 } DISPENV;
 
 /* Tags keep PS1 packet lengths but hold mapped IDs instead of truncated x64
- * pointers. All referenced memory must be registered with sdk_gpu_map. */
+ * pointers. Arenas may be registered explicitly; module-owned OTs and private
+ * static packets are mapped by ClearOTagR/addPrim from trusted host pointers. */
 void sdk_add_prim(void *ot, void *packet);
 void ClearOTagR(u_long *ot, long count);
 void DrawOTag(u_long *ot);
