@@ -554,3 +554,19 @@ the reference branch keeps its original byte writes. An independent guard test
 starts entryStep at 1 and reproduces the old corruption to 0x00FF0001.
 The extended demo probe advanced beyond this fault to initial scene selection;
 full farm execution is still under investigation.
+
+### Physical-zero data access
+
+Original scene setup and ground consumers dereference zero addresses that map
+to retail PS1 main RAM. Native code must translate these data accesses rather
+than dereference Windows null or change the game's null-sentinel checks.
+sdk_memory_field selects host member offsets for runtime objects and explicit
+PS1 offsets for serialized RAM addresses, with range/overflow validation.
+Absent marked-scene flags retain the PS1 0x28 offset even though native Model
+pointers move their host field. Ground flags are translated only at unchecked
+reads; callers that test for no hit still receive the original null sentinel.
+
+Synthetic fixtures seed a nonzero byte at physical zero, read it through the
+original ground helper, and exercise missing marked-entry writes. The previous
+code faults on each fixture. The long headless probe now advances beyond scene
+setup into farm frames; callback ABI adaptation remains unfinished.

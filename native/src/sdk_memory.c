@@ -18,3 +18,15 @@ void sdk_memory_clear(void) { memset(sdk_main_ram, 0, sizeof(sdk_main_ram)); }
 void SetMem(long megabytes) {
     if (megabytes != 2) abort();
 }
+
+void *sdk_memory_field(void *base, size_t native_offset, uint32_t ps1_offset,
+                       size_t size) {
+    uintptr_t address = (uintptr_t)base;
+    if (address <= UINT32_MAX) {
+        if (ps1_offset > UINT32_MAX - address) return NULL;
+        return sdk_memory_resolve((uint32_t)address + ps1_offset, size);
+    }
+    if (native_offset > UINTPTR_MAX - address ||
+        size > UINTPTR_MAX - (address + native_offset)) return NULL;
+    return (unsigned char *)base + native_offset;
+}

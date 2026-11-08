@@ -1,6 +1,9 @@
 /* Mine grid: the cell-digging puzzle in the farm's mine, one layer at a time. */
 
 #include "types.h"
+#ifdef VANILLABTN_NATIVE
+#include "sdk_memory.h"
+#endif
 #include "event_flags.h"
 #include "farm.h"
 #include "farm_probe.h"
@@ -171,7 +174,12 @@ s32 mine_probe_grid(s16 restart) {
         do {
             farm_settle_on_ground(&mine_probe_point, 0xC000);
             hit = ground_hit_primitive();
-            if (hit->header & FARM_QUAD_CELL_BIT) {
+#ifdef VANILLABTN_NATIVE
+            if (*(u32 *)sdk_memory_field(hit, 0, 0, sizeof(u32)) & FARM_QUAD_CELL_BIT)
+#else
+            if (hit->header & FARM_QUAD_CELL_BIT)
+#endif
+            {
                 grid->quads[mine_row][mine_column] = hit;
             }
             mine_column++;

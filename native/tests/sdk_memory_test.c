@@ -25,5 +25,11 @@ int main(void) {
     CHECK(*(unsigned char *)sdk_memory_resolve(0xA0000010, 1) == 0xAB);
     sdk_memory_clear();
     CHECK(sdk_main_ram[16] == 0);
+    CHECK(sdk_memory_field(NULL, 48, 40, 2) == sdk_main_ram + 40);
+    CHECK(sdk_memory_field((void *)(uintptr_t)0xA0000010, 48, 40, 2) == sdk_main_ram + 56);
+    CHECK(sdk_memory_field((void *)(uintptr_t)0x1FFFFF, 0, 1, 2) == NULL);
+    CHECK(sdk_memory_field((void *)(uintptr_t)UINT32_MAX, 0, 1, 2) == NULL);
+    struct { void *pointer; unsigned value; } runtime = {0};
+    CHECK(sdk_memory_field(&runtime, sizeof(void *), 4, sizeof(unsigned)) == &runtime.value);
     return 0;
 }

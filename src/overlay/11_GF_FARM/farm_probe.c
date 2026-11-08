@@ -6,6 +6,9 @@
 #include <libgte.h>
 #include <libgpu.h>
 #include "types.h"
+#ifdef VANILLABTN_NATIVE
+#include "sdk_memory.h"
+#endif
 #include "actor.h"
 #include "animal_actions.h"
 #include "chicken.h"
@@ -917,7 +920,11 @@ s32 farm_record_find_key(ZonePoint *point, LimitPair *place) {
 
 /* The top bit of the first byte of the ground hit primitive. The caller passes a primitive. */
 unsigned int farm_status_upper_bits(void) {
+#ifdef VANILLABTN_NATIVE
+    return *(u8 *)sdk_memory_field(ground_hit_primitive(), 0, 0, sizeof(u8)) >> 7;
+#else
     return *(u8 *)ground_hit_primitive() >> 7;
+#endif
 }
 
 /* The kind of the ground hit primitive's flags: 2 for 0x4, 3 for 0x40, 1 for 0x2, else 0;

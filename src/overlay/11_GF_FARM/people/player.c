@@ -5,6 +5,9 @@
 #include <memory.h>
 #include <libgte.h>
 #include "types.h"
+#ifdef VANILLABTN_NATIVE
+#include "sdk_memory.h"
+#endif
 #include "actor.h"
 #include "anim.h"
 #include "animal_actions.h"
@@ -739,7 +742,11 @@ static void player_build_result(FarmPlayer *player)
     values.vz += table[1];
     farm_settle_on_ground(&values, 0);
     status_word = &player_status_word;
+#ifdef VANILLABTN_NATIVE
+    result_value = *(s32 *)sdk_memory_field(ground_hit_primitive(), 0, 0, sizeof(s32));
+#else
     result_value = *(s32 *)ground_hit_primitive();
+#endif
     *status_word = result_value;
     if (!(result_value & 0xFFFF0000))
     {
@@ -4377,7 +4384,11 @@ void player_update_position(void)
     {
         player_slide_on_bump();
     }
+#ifdef VANILLABTN_NATIVE
+    player_status_word = *(u32 *)sdk_memory_field(ground_hit_primitive(), 0, 0, sizeof(u32));
+#else
     player_status_word = *(u32 *)ground_hit_primitive();
+#endif
     pos = player->position;
     if (player->stateFlags & PLAYER_FLAG_AIRBORNE)
     {

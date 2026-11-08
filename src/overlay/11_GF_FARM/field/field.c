@@ -2,6 +2,9 @@
  * growth, their cell textures, their drawing and the tools that clear them. */
 
 #include "types.h"
+#ifdef VANILLABTN_NATIVE
+#include "sdk_memory.h"
+#endif
 #include "anim.h"
 #include "animals.h"
 #include "clock.h"
@@ -266,7 +269,12 @@ s32 field_probe_sweep(s16 restart) {
         do {
             farm_settle_on_ground(&field_probe_point, 0xC000);
             hit = ground_hit_primitive();
-            if (hit->header & 8) {
+#ifdef VANILLABTN_NATIVE
+            if (*(u32 *)sdk_memory_field(hit, 0, 0, sizeof(u32)) & 8)
+#else
+            if (hit->header & 8)
+#endif
+            {
                 grid->quads[field_row][field_column] = hit;
             }
             field_column++;
