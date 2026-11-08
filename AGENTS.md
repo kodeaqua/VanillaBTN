@@ -11,6 +11,7 @@ baseline and must continue to match their original SHA-1 hashes.
 - [docs/architecture.md](docs/architecture.md) maps the runtime and build layout.
 - [docs/building.md](docs/building.md) gives the build and verification commands.
 - [docs/porting.md](docs/porting.md) states the Windows port direction and fidelity rules.
+- [docs/versioning.md](docs/versioning.md) defines the project's version increments.
 
 ## Engineering approach
 
@@ -75,6 +76,11 @@ for this repository's agent workflow:
 
 ## Commits
 
+- Follow [docs/versioning.md](docs/versioning.md) for `MAJOR.MINOR.PATCH`.
+  The developer alone chooses MAJOR; never change `VERSION_MAJOR` without that
+  decision. Mark the final commit of a completed larger feature with
+  `Feature-Complete: true` as its last message line. Other atomic commits
+  advance PATCH automatically through `tools/version.py`.
 - Use Conventional Commits for every new commit: `type(scope): summary` or
   `type: summary` when a scope adds no value. Write the summary in the
   imperative, for example `docs: clarify the Windows build steps`.

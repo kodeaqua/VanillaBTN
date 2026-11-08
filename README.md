@@ -18,6 +18,8 @@ binaries.
 The [Windows port plan](docs/porting.md) describes the intended bringup and
 its fidelity rules. The [architecture guide](docs/architecture.md) maps the
 current code. [AGENTS.md](AGENTS.md) records repository rules for coding agents.
+The [versioning policy](docs/versioning.md) explains the project's development
+version, which can be printed with `python tools/version.py`.
 
 ## Building
 
