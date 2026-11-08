@@ -14,4 +14,10 @@ void sdk_gpu_reset_packets(void);
 bool sdk_gpu_map(void *memory, size_t size);
 bool sdk_gpu_ok(void);
 
+typedef struct SdkDisplay {
+    int x, y, width, height;
+    bool enabled;
+} SdkDisplay;
+SdkDisplay sdk_gpu_display(void);
+
 #endif

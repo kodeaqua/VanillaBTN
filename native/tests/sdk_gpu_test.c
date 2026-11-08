@@ -50,9 +50,36 @@ static void test_original_loader(void) {
     assert(video.vram[50][40] == 0x7C00 && video.vram[50][41] == 0x801F);
 }
 
+static void test_environments(void) {
+    DRAWENV env;
+    DISPENV disp;
+    assert(SetDefDrawEnv(&env, 0, 240, 320, 240) == &env);
+    env.isbg = 1;
+    env.r0 = 255;
+    assert(PutDrawEnv(&env) == &env);
+    assert(video.vram[240][0] == 0x001F && video.vram[479][319] == 0x001F);
+    assert(SetDefDispEnv(&disp, 0, 0, 320, 240) == &disp);
+    assert(PutDispEnv(&disp) == &disp);
+    SdkDisplay selected = sdk_gpu_display();
+    assert(selected.y == 0 && selected.width == 320 && selected.enabled);
+    SetDispMask(0);
+    assert(!sdk_gpu_display().enabled);
+    SetDispMask(1);
+    assert(SetDefDispEnv(&disp, 0, 0, 640, 480) == &disp);
+    assert(PutDispEnv(&disp) == &disp);
+    assert(sdk_gpu_display().width == 640 && sdk_gpu_display().height == 480);
+    DISPENV copy;
+    assert(GetDispEnv(&copy) == &copy && memcmp(&copy, &disp, sizeof(disp)) == 0);
+    RECT rect = {0, 240, 2, 2};
+    assert(MoveImage(&rect, 100, 100) == 0 && video.vram[100][100] == 0x001F);
+    assert(MoveImage(&rect, 1023, 511) == -1);
+    assert(SetDefDrawEnv(&env, 1024, 0, 1, 1) == NULL);
+}
+
 int main(void) {
     test_transfers();
     test_original_loader();
+    test_environments();
     sdk_gpu_bind(NULL);
     return 0;
 }

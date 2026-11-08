@@ -150,3 +150,23 @@ their linker-defined symbols. These are data destinations; native scene
 functions still need separate linkage and dispatch. Imported MIPS code is
 never executed or cast to a host function pointer. This does not yet connect
 original global-state initialization, startup or the game loop.
+
+## Display environments
+
+`SetDefDrawEnv`/`PutDrawEnv` select clipping, draw offsets, texture page and
+blend mode; `isbg` clears the selected area through the existing quick-fill
+rules. `ClearImage` and `MoveImage` provide direct VRAM operations independent
+of draw clipping. Moves currently snapshot the source, including overlaps;
+hardware overlap ordering still needs independent fixtures.
+
+`SetDefDispEnv`/`PutDispEnv` select the displayed VRAM rectangle and
+`SetDispMask` controls visibility. SDL presents that rectangle and recreates
+its nearest-neighbor texture when the original internal display size changes.
+This supports original 320x240 and 640x480 buffers without a resolution upgrade.
+The memory-only SDL software-renderer test verifies flips, masking and resize;
+it opens no window and performs no gameplay or visual acceptance test.
+
+RGB24 display and nonzero texture windows are explicitly rejected at this
+boundary. Dithering, scanline/interlace timing, screen overscan placement and
+drawing-to-displayed-area restrictions remain incomplete; accepting an
+environment does not establish those hardware behaviors.

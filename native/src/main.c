@@ -9,6 +9,7 @@
 #include "ps1_input.h"
 #include "ps1_video.h"
 #include "sdk_gpu.h"
+#include "host_display.h"
 
 _Static_assert(sizeof(void *) == 8, "The Windows port requires x64");
 
@@ -81,22 +82,6 @@ static uint32_t map_gamepad_to_ps1_button(uint8_t button) {
     }
 }
 
-/* Keep PS1 pixels in VRAM; SDL only presents the selected display rectangle. */
-static bool present_frame(SDL_Renderer *renderer, SDL_Texture *texture) {
-    void *pixels;
-    int pitch;
-    bool copied;
-
-    if (!SDL_LockTexture(texture, NULL, &pixels, &pitch)) {
-        return false;
-    }
-    copied = ps1_video_copy_argb(&video, 0, 240, 320, 240, pixels,
-                                 (size_t)pitch / sizeof(uint32_t));
-    SDL_UnlockTexture(texture);
-    return copied && SDL_RenderClear(renderer)
-        && SDL_RenderTexture(renderer, texture, NULL, NULL)
-        && SDL_RenderPresent(renderer);
-}
 
 int main(int argc, char **argv) {
     SDL_Window *window = NULL;
@@ -128,14 +113,14 @@ int main(int argc, char **argv) {
         || !SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255)) {
         goto done;
     }
+    sdk_gpu_bind(&video);
     texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
                                 SDL_TEXTUREACCESS_STREAMING, 320, 240);
     if (texture == NULL || !SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST)
-        || !present_frame(renderer, texture)) {
+        || !host_present_frame(&video, renderer, &texture)) {
         goto done;
     }
     ps1_input_init(&pad1);
-    sdk_gpu_bind(&video);
     ps1_clock_init(&clock, PS1_TICK_DURATION_NS, PS1_MAX_TICKS_PER_STEP);
     ps1_audio_init(&audio);
     ps1_card_manager_init(&card_mgr, NULL);
@@ -177,7 +162,7 @@ int main(int argc, char **argv) {
                 if (event.gaxis.axis == SDL_GAMEPAD_AXIS_LEFTY) stick_y = event.gaxis.value;
             } else if (event.type == SDL_EVENT_WINDOW_EXPOSED
                        || event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) {
-                if (!present_frame(renderer, texture)) {
+                if (!host_present_frame(&video, renderer, &texture)) {
                     goto done;
                 }
             }
@@ -198,7 +183,7 @@ int main(int argc, char **argv) {
             ps1_audio_tick(&audio, 2);
         }
 
-        if (!present_frame(renderer, texture)) {
+        if (!host_present_frame(&video, renderer, &texture)) {
             goto done;
         }
 

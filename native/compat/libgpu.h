@@ -79,6 +79,14 @@ void DrawOTag(u_long *ot);
 int LoadImage(RECT *rect, u_long *pixels);
 int StoreImage(RECT *rect, u_long *pixels);
 int DrawSync(int mode);
+DRAWENV *SetDefDrawEnv(DRAWENV *env, int x, int y, int w, int h);
+DISPENV *SetDefDispEnv(DISPENV *env, int x, int y, int w, int h);
+DRAWENV *PutDrawEnv(DRAWENV *env);
+DISPENV *PutDispEnv(DISPENV *env);
+DISPENV *GetDispEnv(DISPENV *env);
+int ClearImage(RECT *rect, u_char r, u_char g, u_char b);
+int MoveImage(RECT *rect, int x, int y);
+void SetDispMask(int mask);
 
 #ifdef NDEBUG
 #define FntPrint(...) ((void)0)

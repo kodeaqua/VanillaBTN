@@ -2,12 +2,19 @@
 #include "ps1_gpu.h"
 #include <libgpu.h>
 #include <string.h>
+#include <stdlib.h>
 
 _Static_assert(sizeof(u_long) == 4, "SDK words must be 32-bit");
 _Static_assert(sizeof(RECT) == 8, "SDK rectangles contain four halfwords");
 
 static Ps1Video *vram;
 static Ps1DrawState draw;
+static DISPENV display;
+static bool display_enabled;
+
+SdkDisplay sdk_gpu_display(void) {
+    return (SdkDisplay){display.disp.x, display.disp.y, display.disp.w, display.disp.h, display_enabled};
+}
 
 #define SDK_END 0xFFFFFFul
 #define SDK_MAP_COUNT 32
@@ -110,6 +117,86 @@ void sdk_gpu_bind(Ps1Video *video) {
     vram = video;
     ps1_draw_state_reset(&draw);
     sdk_gpu_reset_packets();
+    SetDefDispEnv(&display, 0, 240, 320, 240);
+    display_enabled = true;
+}
+
+static bool valid_area(int x, int y, int w, int h) {
+    return x >= 0 && y >= 0 && w > 0 && h > 0
+        && w <= PS1_VRAM_WIDTH - x && h <= PS1_VRAM_HEIGHT - y;
+}
+
+DRAWENV *SetDefDrawEnv(DRAWENV *env, int x, int y, int w, int h) {
+    if (!env || !valid_area(x, y, w, h)) return NULL;
+    memset(env, 0, sizeof(*env));
+    env->clip = (RECT){(short)x, (short)y, (short)w, (short)h};
+    env->ofs[0] = (short)x;
+    env->ofs[1] = (short)y;
+    env->dtd = 1;
+    return env;
+}
+
+DISPENV *SetDefDispEnv(DISPENV *env, int x, int y, int w, int h) {
+    if (!env || !valid_area(x, y, w, h)) return NULL;
+    memset(env, 0, sizeof(*env));
+    env->disp = (RECT){(short)x, (short)y, (short)w, (short)h};
+    return env;
+}
+
+DRAWENV *PutDrawEnv(DRAWENV *env) {
+    if (!vram || !env || !valid_area(env->clip.x, env->clip.y, env->clip.w, env->clip.h)
+        || env->tw.x || env->tw.y || env->tw.w || env->tw.h) {
+        packet_error = true;
+        return NULL;
+    }
+    draw.left = env->clip.x;
+    draw.top = env->clip.y;
+    draw.right = env->clip.x + env->clip.w - 1;
+    draw.bottom = env->clip.y + env->clip.h - 1;
+    draw.offset_x = env->ofs[0];
+    draw.offset_y = env->ofs[1];
+    draw.tpage = env->tpage & 0x1FF;
+    draw.blend_mode = (env->tpage >> 5) & 3;
+    if (env->isbg) ClearImage(&env->clip, env->r0, env->g0, env->b0);
+    return env;
+}
+
+DISPENV *PutDispEnv(DISPENV *env) {
+    if (!env || !valid_area(env->disp.x, env->disp.y, env->disp.w, env->disp.h) || env->isrgb24) {
+        packet_error = true;
+        return NULL;
+    }
+    display = *env;
+    return env;
+}
+
+DISPENV *GetDispEnv(DISPENV *env) {
+    if (!env) return NULL;
+    *env = display;
+    return env;
+}
+
+void SetDispMask(int mask) { display_enabled = mask != 0; }
+
+int ClearImage(RECT *rect, u_char r, u_char g, u_char b) {
+    if (!vram || !rect || !valid_area(rect->x, rect->y, rect->w, rect->h)) return -1;
+    ps1_video_quick_fill(vram, rect->x, rect->y, rect->w, rect->h,
+                        (uint32_t)r << 16 | (uint32_t)g << 8 | b);
+    return 0;
+}
+
+int MoveImage(RECT *rect, int x, int y) {
+    if (!vram || !rect || !valid_area(rect->x, rect->y, rect->w, rect->h)
+        || !valid_area(x, y, rect->w, rect->h)) return -1;
+    size_t size = (size_t)rect->w * rect->h * 2;
+    unsigned char *copy = malloc(size);
+    if (!copy) return -1;
+    for (int row = 0; row < rect->h; ++row)
+        memcpy(copy + (size_t)row * rect->w * 2, &vram->vram[rect->y + row][rect->x], (size_t)rect->w * 2);
+    for (int row = 0; row < rect->h; ++row)
+        memcpy(&vram->vram[y + row][x], copy + (size_t)row * rect->w * 2, (size_t)rect->w * 2);
+    free(copy);
+    return 0;
 }
 
 static int valid_transfer(const RECT *rect, const void *pixels) {
