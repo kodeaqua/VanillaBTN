@@ -324,13 +324,19 @@ int main(void) {
     assert(ground_hit_primitive() == (void *)tmd_file.f3_packet);
 
     camera_init_projection();
+    /* Keep all fixture vertices beyond H/2; the old H=1000 setup crossed
+     * the real near plane and only drew because divide overflow was missing. */
+    SetGeomScreen(500);
     camera_set_eye_roll(0, -200, 500, 0x800);
     camera_set_target(0, 50, 0);
     model_load_lighting();
     FarmScreenXY proj_xy = { 0, 0 };
     SVECTOR center_v = { 0, 50, 0, 0 };
     s32 otz = gte_project_vertex(&proj_xy, &center_v);
-    assert(otz > 0 && proj_xy.x == 160 && proj_xy.y == 120);
+    /* Quantized view row Y is (0,-3663,-1831), translation 44.
+     * SAR12(-3663*50) + 44 = -1; perspective SAR16 at H=500 gives Y=119.
+     * Truncating the negative dot product previously hid this quantization. */
+    assert(otz > 0 && proj_xy.x == 160 && proj_xy.y == 119);
 
     ClearOTagR(current_frame->ot, FRAME_OT_DEPTH);
     current_frame->primCursor.bytes = current_frame->primStart;

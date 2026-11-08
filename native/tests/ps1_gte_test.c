@@ -110,5 +110,41 @@ int main(void) {
     if (ps1_gte_rtpt(&gte, &zero, &inside, &inside)) return 24;
     if (gte.sxy[0].x != 1023 || gte.sxy[2].x != 0) return 25;
     if ((gte.flag & 0x6000u) != 0x6000u) return 26;
+    /* Near-plane quotient saturates at 0x1FFFF, even with nonzero SZ.
+     * Negative projection rounds down, as the hardware arithmetic shift does. */
+    ps1_gte_init(&gte);
+    Ps1Vector3 near = {1, -1, 500, 0};
+    if (ps1_gte_rtps(&gte, &near)) return 27;
+    if (gte.flag != (int32_t)0x80020000u || gte.sxy[2].x != 1
+        || gte.sxy[2].y != -2 || gte.sz[3] != 500) return 28;
+    /* 1/3 quantizes to 21845 in 16.16; (21845*3)>>16 is zero. */
+    ps1_gte_set_geom_screen(&gte, 1);
+    Ps1Vector3 third = {3, -3, 3, 0};
+    if (!ps1_gte_rtps(&gte, &third)) return 29;
+    if (gte.sxy[2].x != 0 || gte.sxy[2].y != -1) return 30;
+    /* Rotation also uses SAR12, rather than truncating toward zero. */
+    gte.rot[0][0] = -1;
+    ps1_gte_set_geom_screen(&gte, 1000);
+    Ps1Vector3 fraction = {1, 0, 1000, 0};
+    if (!ps1_gte_rtps(&gte, &fraction) || gte.sxy[2].x != -1) return 31;
+    /* IR3 saturation by itself is excluded from FLAG's summary bit. */
+    ps1_gte_init(&gte);
+    int32_t far_ir[3] = {0, 0, 40000};
+    ps1_gte_set_trans_matrix(&gte, far_ir);
+    if (!ps1_gte_rtps(&gte, &zero) || gte.flag != (1 << 22)) return 32;
+    /* Projection consumes saturated IR1/IR2, not unbounded translation. */
+    ps1_gte_init(&gte);
+    ps1_gte_set_geom_screen(&gte, 100);
+    int32_t wide_xy[3] = {40000, -40000, 10000};
+    ps1_gte_set_trans_matrix(&gte, wide_xy);
+    if (ps1_gte_rtps(&gte, &zero)) return 33;
+    if (gte.sxy[2].x != 327 || gte.sxy[2].y != -328
+        || gte.flag != (int32_t)0x81800000u) return 34;
+    /* UNR's final clamp alone must not raise divide overflow. */
+    ps1_gte_init(&gte);
+    ps1_gte_set_geom_screen(&gte, 0xFE3F);
+    Ps1Vector3 reciprocal_edge = {1, 0, 0x7F20, 0};
+    if (!ps1_gte_rtps(&gte, &reciprocal_edge) || gte.flag != 0
+        || gte.sxy[2].x != 1) return 35;
     return 0;
 }
