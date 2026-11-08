@@ -21,7 +21,8 @@ The executable currently presents a blank 320x240 PS1 framebuffer, scaled
 without filtering. The `native_startup` CTest check launches it headlessly
 with `--check-build`; `ps1_video_pixels` checks VRAM conversion, quick fill,
 tiles, mask bits, blending, CLUT sampling, and sprite pixels with synthetic
-fixtures. The developer checks the window manually. This build does not yet
+fixtures. `ps1_ot_order` checks ordering-table traversal. The developer checks
+the window manually. This build does not yet
 load game data or run gameplay.
 To inspect the Debug window, run `& .\build\native\Debug\vanillabtn.exe` and
 close it with the window's close button.

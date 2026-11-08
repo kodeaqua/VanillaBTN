@@ -46,3 +46,10 @@ only texels with bit 15 when semitransparency is requested, and applies the
 drawing area's clipping and mask rules. Texture windows, flips, CLUT cache
 timing, and textured polygons are still pending.
 No game scene issues these commands through the native target yet.
+
+`native/src/ps1_ot.c` stores packet IDs behind host-sized links rather than
+the PS1's 24-bit MIPS addresses. A table walks buckets from high to low and
+visits newer packets first within one bucket, matching `ClearOTagR` and
+`addPrim`. `src/main/main.c` draws optional table 3, optional table 2, the
+2048-entry main table, optional table 1, optional table 0, then the active
+table. Native scene submission and command dispatch still need wiring.
