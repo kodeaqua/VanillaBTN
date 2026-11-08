@@ -8,6 +8,7 @@ your own copy of the disc, the whole disc image.
 
 ```sh
 docker build -t hmbtn-build .
+mkdir -p /tmp/hmbtn-build
 docker run --rm --user "$(id -u):$(id -g)" -v "$PWD":/src:ro -v /tmp/hmbtn-build:/build \
     -v /path/to/disc:/disc:ro hmbtn-build bash -c 'cmake -S /src -B /build -G Ninja \
     -DORIGINAL_DISC=/disc/disc.bin && cmake --build /build --target check'
@@ -15,6 +16,12 @@ docker run --rm --user "$(id -u):$(id -g)" -v "$PWD":/src:ro -v /tmp/hmbtn-build
 
 `check` compares every output with the original's SHA-1. Without `-DORIGINAL_DISC` it
 builds and checks only the 14 code binaries, which needs no game data.
+
+For Windows PowerShell, use the container build helper described in
+[docs/building.md](docs/building.md). It avoids problems with the old compiler
+on Windows bind mounts and CRLF checkouts. The [architecture guide](docs/architecture.md)
+maps the code and build layout. [AGENTS.md](AGENTS.md) records repository rules
+for coding agents.
 
 ## Exceptions
 
