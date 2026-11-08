@@ -38,6 +38,21 @@ that the generated EXE and 13 overlays still match the reference SHA-1 hashes.
 - Explain why in the commit body when the reason is not obvious. Mark breaking
   changes with `!` after the type or scope and a `BREAKING CHANGE:` footer.
 
+## Workflow
+
+- Finish each requested task with an atomic commit. Split independent work into
+  separate commits so every commit has one clear purpose. Do not leave a
+  completed task uncommitted.
+- Small, self-contained work without a larger topic may be committed directly
+  to `main`.
+- For large or major changes, create a dedicated work branch. Make atomic
+  commits on that branch, run the relevant checks, and open a pull request for
+  developer review.
+- Wait for the developer to review and explicitly instruct the agent to merge
+  an approved pull request. Do not merge based on an assumed approval.
+- After the pull request is merged, delete its work branch locally and on the
+  remote. Keep `main` checked out and up to date.
+
 ## Windows and Docker
 
 The old PS1 preprocessor can fail on a Windows bind mount and on CRLF source
