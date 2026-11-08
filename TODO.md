@@ -5,7 +5,7 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Active
 
-- [ ] Developer: open and close the native Debug/Release window on Windows.
+- [x] Developer: open and close the native Debug/Release window on Windows.
 - [ ] Developer: verify the importer recognizes a personally supplied USA disc.
 - [ ] Milestone 2: implement required GPU primitives, CLUT, ordering, and GTE behavior with synthetic pixel checks.
   - [x] Add GP0 command dispatcher (ps1_gpu_exec) covering fill, untextured tiles, textured sprites, and draw-environment commands; Debug and Release dispatch tests pass.
