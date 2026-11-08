@@ -15,7 +15,8 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Completed
 
-- [x] Add native 16-bit VRAM storage and SDL presentation at original 320×240 pixels; Debug and Release pixel checks pass.
+- [x] Add software quick fill and untextured tile rules with clipping, mask, and blend tests in Debug and Release.
+- [x] Add native 16-bit VRAM storage and SDL presentation at original 320x240 pixels; Debug and Release pixel checks pass.
 - [x] Map PS1 platform boundaries and add a Windows disc importer; synthetic checks and all 17 PS1 reference hashes pass.
 - [x] Merge PR #1, sync `main`, and delete its work branch.
 - [x] Add the native Windows MSVC/CMake/SDL3 build foundation; Debug and Release pass headless CTest, and all 14 PS1 code hashes still match.
