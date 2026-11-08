@@ -6,7 +6,6 @@
 
 #define SDK_MAX_VABS 8
 #define SDK_MAX_SEQS 8
-#define SDK_MAX_SEQ_BYTES 0xA000u
 #define VAB_MAGIC 0x56414270u
 
 typedef struct SdkVabRecord {
@@ -38,6 +37,8 @@ static uint8_t serial_attr[2];
 static uint8_t serial_mode[2];
 static SdkVabRecord vab_records[SDK_MAX_VABS];
 static SdkSeqRecord seq_records[SDK_MAX_SEQS];
+static const void *sequence_source;
+static size_t sequence_source_size;
 static bool sound_initialized;
 static bool sound_running;
 static bool sound_stereo_enabled = true;
@@ -113,22 +114,9 @@ static bool load_vab_into_spu_slot(int slot) {
     return true;
 }
 
-static size_t measure_seq_bytes(const uint8_t *data) {
-    if (!data || memcmp(data, "pQES", 4) != 0) return 0;
-    size_t i = 15;
-    while (i + 1 < SDK_MAX_SEQ_BYTES) {
-        if (data[i] == 0xFF) {
-            if (data[i + 1] == 0x2F) {
-                return i + 2;
-            }
-            if (data[i + 1] == 0x51 && i + 5 <= SDK_MAX_SEQ_BYTES) {
-                i += 5;
-                continue;
-            }
-        }
-        ++i;
-    }
-    return SDK_MAX_SEQ_BYTES;
+void sdk_sound_sequence_source(const void *data, size_t size) {
+    sequence_source = data;
+    sequence_source_size = size;
 }
 
 void sdk_sound_reset(void) {
@@ -136,6 +124,8 @@ void sdk_sound_reset(void) {
         free_vab_record(i);
     }
     memset(seq_records, 0, sizeof(seq_records));
+    sequence_source = NULL;
+    sequence_source_size = 0;
     ps1_spu_init(&spu);
     serial_vol[0] = (SdkSerialVol){0, 0};
     serial_vol[1] = (SdkSerialVol){0, 0};
@@ -381,7 +371,13 @@ void SsVabClose(int vabid) {
 }
 
 short SsSeqOpen(u_long *addr, int vab_id) {
-    if (!addr) return -1;
+    const uint8_t *bytes = sequence_source;
+    size_t size = sequence_source_size;
+    sequence_source = NULL;
+    sequence_source_size = 0;
+    if (!addr || (const void *)addr != bytes || size < 16) return -1;
+    Ps1Seq sequence;
+    if (!ps1_seq_open(&sequence, bytes, size, vab_id, true)) return -1;
     int slot = -1;
     for (int i = 0; i < table_s_max && i < SDK_MAX_SEQS; ++i) {
         if (!seq_records[i].open) {
@@ -391,10 +387,6 @@ short SsSeqOpen(u_long *addr, int vab_id) {
     }
     if (slot < 0) return -1;
 
-    const uint8_t *bytes = (const uint8_t *)addr;
-    size_t size = measure_seq_bytes(bytes);
-    if (size == 0) return -1;
-
     SdkSeqRecord *rec = &seq_records[slot];
     memset(rec, 0, sizeof(*rec));
     rec->open = true;
@@ -403,7 +395,7 @@ short SsSeqOpen(u_long *addr, int vab_id) {
     rec->vol_right = 127;
     rec->data = bytes;
     rec->data_size = size;
-    ps1_seq_open(&rec->seq, bytes, size, vab_id, true);
+    rec->seq = sequence;
     return (short)slot;
 }
 

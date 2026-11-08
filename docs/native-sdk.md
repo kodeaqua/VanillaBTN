@@ -423,3 +423,19 @@ utility loop can be entered repeatedly.
 Synthetic fixtures in `original_window_test` execute `pda_sample_run()`, feeding
 a simulated `PAD_SELECT` press through the native SDK pad buffers to verify loop
 execution, menu input handling, and exit transition back to `SCENE_DEBUG`.
+
+## Continuation audit: bounded SEQ opening
+
+The native original sound loader now retains each copied sequence's archive
+byte count. Immediately before `SsSeqOpen`, it supplies that exact borrowed
+span through `sdk_sound_sequence_source`. This is a one-shot view: unknown
+buffers and calls without a fresh view fail without reading data. The bytes
+must remain live until the sequence is closed, as before.
+
+The previous bridge scanned up to an assumed 40 KB looking for raw `FF 2F`
+bytes. That could read past a buffer and mistake delta-time bytes for an end
+event. It also published a handle when `ps1_seq_open` rejected the header.
+Opening now uses the bounded parser and publishes only a successful result.
+Fixtures cover invalid PPQN, a short header, an unregistered buffer and a
+valid `FF 2F` delta followed by the actual end event. The invalid-header check
+fails on the previous implementation and again on temporary reversion.

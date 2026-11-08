@@ -10,6 +10,7 @@
 #include "sound_request.h"
 #include <libcd.h>
 #include <libetc.h>
+#include <libsnd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -260,6 +261,30 @@ int main(void) {
     }
     CHECK(sound_fader_ready() == 1 && sound_current_entry() == -1);
     CHECK(sdk_sound_status().open_vab_count == 1 && sdk_sound_spu()->vabs[0].loaded == 1);
+
+    /* Invalid PPQN must fail without consuming an SDK sequence handle. */
+    uint8_t invalid_seq[20] = {'p','Q','E','S',0,0,0,1,0,0,0x0F,0x42,0x40,4,2,
+                              0,0xFF,0x2F,0,0};
+    sdk_sound_sequence_source(invalid_seq, sizeof(invalid_seq));
+    CHECK(SsSeqOpen((u_long *)invalid_seq, 0) == -1);
+    CHECK(sdk_sound_status().open_seq_count == 0);
+    /* A short buffer cannot be scanned past its declared extent, and a valid
+     * sequence needs a fresh view for each SDK call. */
+    uint8_t short_seq[15] = {'p','Q','E','S',0,0,0,1,0,100,0x0F,0x42,0x40,4,2};
+    sdk_sound_sequence_source(short_seq, sizeof(short_seq));
+    CHECK(SsSeqOpen((u_long *)short_seq, 0) == -1);
+    uint8_t sequence[] = {'p','Q','E','S',0,0,0,1,255,255,0,0,1,4,2,
+                          0,0x90,60,127, 0xFF,0x2F,0xFF,0x2F};
+    CHECK(SsSeqOpen((u_long *)sequence, 0) == -1);
+    sdk_sound_sequence_source(sequence, sizeof(sequence));
+    short handle = SsSeqOpen((u_long *)sequence, 0);
+    CHECK(handle >= 0);
+    SsSeqPlay(handle, SSPLAY_PLAY, SSPLAY_INFINITY);
+    int16_t fast_pcm[4];
+    sdk_sound_mix(fast_pcm, 2);
+    CHECK(sdk_sound_spu()->voices[0].active);
+    SsSeqClose(handle);
+    CHECK(sdk_sound_status().open_seq_count == 0);
 
     /* Trigger SOUND_MENU_CONFIRM (VAB 0, prog 0, tone 0, note 60) and verify SPU voice + PCM mix. */
     VSync(0); /* Advance VSync counter so voice_stamps[0] != now. */

@@ -5,6 +5,9 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Active
 
+- [ ] Continuation audit: complete farm linkage/address translation and remove unsupported SDK success paths before claiming runtime integration.
+  - [x] Replace unbounded SEQ scanning with exact archive spans and reject invalid sequence headers without consuming handles.
+  - [ ] PocketStation operations must report an absent/unsupported device rather than fabricated successful reads or writes.
 - [ ] Connect original game code through platform/SDK interfaces. Do not rebuild scene, menu, dialog or game logic in the native host.
   - [x] Compile the original texture-pack loader against native GPU transfers.
   - [ ] Connect original primitive/ordering-table submission and animation code.
@@ -40,6 +43,7 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Completed
 
+- [x] Fix SDK sequence opening: carry original archive byte counts into one-shot SDK source views, remove raw EOT byte scanning, and check parser failure before publishing a handle. Invalid PPQN fails before/after temporary reversion; short buffers and an FF/2F delta are covered. Both native profiles pass 27 checks, and the 14-file PS1 code check passes.
 - [x] Compile original PDA sample screen `10_PdaSamp/pdasamp.c` in `game_window_frame`, and add PocketStation `libmcx` SDK bridges (`McxAllInfo`, `McxGetApl`, `McxGetTime`, `McxHideTrans`, `McxGetSerial`, `McxGetMem`, `McxExecFlag`, `McxExecApl`, `McxCurrCtrl`, `McxFlashAcs`, `McxSetMem`, `McxShowTrans`, `McxSetLED`, `McxReadDev`, `McxWriteDev`, `McxSync`). Synthetic checks exercise `pda_sample_run` loop execution, pad polling delivering `PAD_SELECT` through native SDK buffers, and exit scene request to `SCENE_DEBUG` in Debug/Release (27 checks), and all 14 PS1 code hashes match.
 
 - [x] Compile original memory-card test screen `31_gf_mcard/mcard.c` unchanged in `game_window_frame`, and add PS1 memory card SDK bridges `libmcrd` and `libmcx` backed by `ps1_card` with `sdk_card_rename`, `MemCardAccept`, `MemCardSync`, `MemCardFormat`, `MemCardUnformat`, `MemCardGetDirentry`, and GPU font streams (`FntLoad`, `FntOpen`, `FntFlush`, `SetDumpFnt`). Synthetic checks verify menu layout, card probe type (`MCARD_CARD`), rename of save files (`BISLPS-00000-FARM0` -> `BISLPS-02489-FARM0`), directory listing, unformat/format cycle, and reboot debug scene request in Debug/Release (27 checks), and all 14 PS1 code hashes match.

@@ -39,4 +39,9 @@ SdkSoundStatus sdk_sound_status(void);
 const Ps1Spu *sdk_sound_spu(void);
 void sdk_sound_mix(int16_t *out, int frames);
 
+/* Supply the exact borrowed asset span for the next SsSeqOpen call. The SDK
+ * signature omits a length, so unknown/unregistered source buffers are rejected.
+ * The view is consumed once; playback borrows the bytes until SsSeqClose. */
+void sdk_sound_sequence_source(const void *data, size_t size);
+
 #endif

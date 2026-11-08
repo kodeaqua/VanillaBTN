@@ -13,6 +13,9 @@
 #include "main.h"
 #include "screen_fade.h"
 #include "sound.h"
+#ifdef VANILLABTN_NATIVE
+#include "sdk_sound.h"
+#endif
 
 /* What sound_key_on_voice last started on each voice. */
 typedef struct {
@@ -86,6 +89,11 @@ static Vol seq_slots[8];
 static u8 *vab_bodies[8];
 static u8 *vab_ends[8];
 static u8 *seq_data[8];
+#ifdef VANILLABTN_NATIVE
+/* Native SDK pointers cannot recover an asset's allocation size. Keep the
+ * original archive span alongside each copied sequence, without scanning it. */
+static u32 native_seq_bytes[8];
+#endif
 static s32 seq_offsets[8];
 static s32 seq_vabs[8];
 /* Per-slot state, parallel to seq_slots. */
@@ -224,6 +232,9 @@ static void sound_reset_slots(void) {
         vab_ids[slot] = -1;
         *(s32 *)&seq_slots[slot] = -1;
         seq_data[slot] = SOUND_BUFFER_NONE;
+#ifdef VANILLABTN_NATIVE
+        native_seq_bytes[slot] = 0;
+#endif
         vab_bodies[slot] = SOUND_BUFFER_NONE;
         vab_ends[slot] = SOUND_BUFFER_NONE;
         seq_vabs[slot] = -1;
@@ -431,6 +442,9 @@ s32 sound_update(void) {
 #else
         if ((s32)seq_data[i] != sentinel && *(s32 *)&seq_slots[i] == sentinel) {
 #endif
+#ifdef VANILLABTN_NATIVE
+            sdk_sound_sequence_source(seq_data[i], native_seq_bytes[i]);
+#endif
             *(s32 *)&seq_slots[i] = SsSeqOpen((u_long *)seq_data[i], seq_vabs[i]);
         }
     }
@@ -588,6 +602,9 @@ s32 sound_release_from(s32 vabFirst, s32 seqFirst) {
             *(s32 *)&seq_slots[slot] = -1;
         }
         seq_data[slot] = SOUND_BUFFER_NONE;
+#ifdef VANILLABTN_NATIVE
+        native_seq_bytes[slot] = 0;
+#endif
         seq_vabs[slot] = -1;
         seq_offsets[slot] = -1;
     }
@@ -634,6 +651,9 @@ s32 sound_load_step(void) {
         memcpy(sound_write_ptr, sound_read_ptr, sound_seq_bytes);
         sound_load_state = SOUND_LOAD_IDLE;
         seq_data[seq_slot] = sound_write_ptr;
+#ifdef VANILLABTN_NATIVE
+        native_seq_bytes[seq_slot] = sound_seq_bytes;
+#endif
         seq_vabs[seq_slot] = vab_ids[entry_args[current_entry]];
         sound_write_ptr += SOUND_OFFSET(2) - SOUND_OFFSET(0);
         seq_slot++;
