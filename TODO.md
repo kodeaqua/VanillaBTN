@@ -12,7 +12,8 @@ Update the relevant item after completing a task or discovering a blocker.
   - [x] Preserve event-block/stash and animal/toy buffer pointers at host width; remove integer-address addition from cue/entry indexing. A real event-tail regression segfaults on the old code and passes after restoration.
   - [ ] Audit remaining farm serialized addresses/layouts before claiming a runnable full farm.
   - [x] PocketStation operations report missing/non-PDA devices without fabricated successful reads or writes; restore canonical SDK result/command values.
-  - [x] Reject invalid/truncated memory-card transfers and validate file chains before touching caller buffers or saves; 29 synthetic checks pass in both profiles. SDK completion semantics and open/data APIs remain under audit.
+  - [x] Make SDK card completions consumable, preserve request-versus-result semantics and cap directory output to its supplied capacity.
+  - [x] Reject invalid/truncated memory-card transfers and validate file chains before touching caller buffers or saves; 29 synthetic checks pass in both profiles. SDK request/completion semantics are verified separately; open/data APIs explicitly reject unsupported requests.
 - [ ] Connect original game code through platform/SDK interfaces. Do not rebuild scene, menu, dialog or game logic in the native host.
   - [x] Compile the original texture-pack loader against native GPU transfers.
   - [ ] Connect original primitive/ordering-table submission and animation code.

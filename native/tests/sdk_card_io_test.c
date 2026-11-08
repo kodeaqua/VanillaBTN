@@ -7,23 +7,61 @@
 #define CHECK(c) do { if (!(c)) { fprintf(stderr, "line %d: %s\n", __LINE__, #c); exit(1); } } while (0)
 
 static unsigned char data[16384], snapshot[PS1_CARD_SIZE];
-static unsigned int buffer[8];
+static unsigned int buffer[32];
+
+static void completion(long expected, long expected_command) {
+    long command = -1, result = -1;
+    CHECK(MemCardSync(1, &command, &result) == 1);
+    CHECK(result == expected && command == expected_command);
+    CHECK(MemCardSync(1, &command, &result) == -1);
+}
 
 int main(void) {
     Ps1Card *card = sdk_card_get(0);
+    MemCardInit(0);
+    CHECK(MemCardSync(1, NULL, NULL) == -1);
     for (size_t i = 0; i < sizeof(data); ++i) data[i] = (unsigned char)i;
     CHECK(ps1_card_write_file(card, "TEST", data, sizeof(data)) == PS1_CARD_OK);
-    CHECK(MemCardReadFile(0, "TEST", buffer, 8184, sizeof(buffer)) == 0);
-    CHECK(memcmp(buffer, data + 8184, sizeof(buffer)) == 0);
+    CHECK(MemCardReadFile(0, "TEST", buffer, 8128, sizeof(buffer)) == 1);
+    completion(McErrNone, 3);
+    CHECK(memcmp(buffer, data + 8128, sizeof(buffer)) == 0);
+    CHECK(ps1_card_write_file(card, "SECOND", data, 128) == PS1_CARD_OK);
+    CHECK(ps1_card_write_file(card, "THIRD", data, 128) == PS1_CARD_OK);
+    struct DIRENTRY entries[2], guard;
+    memset(entries, 0xA5, sizeof(entries));
+    guard = entries[1];
+    long files = -1;
+    CHECK(MemCardGetDirentry(0, "*", entries, &files, 0, 1) == 0);
+    CHECK(files == 1 && memcmp(&guard, &entries[1], sizeof(guard)) == 0);
+    CHECK(MemCardGetDirentry(0, "*", NULL, &files, 0, 0) == 0 && files == 0);
+    CHECK(MemCardGetDirentry(0, "*", entries, &files, -1, 1) == -1);
+    CHECK(MemCardCreateFile(0, "HUGE", 16) == -1);
+    CHECK(MemCardOpen(0, "TEST", 0) == -1);
+    CHECK(MemCardReadData(buffer, 0, 128) == 0);
+    CHECK(MemCardWriteData(buffer, 0, 128) == 0);
     card->dirty = false;
     memcpy(snapshot, card->data, sizeof(snapshot));
-    CHECK(MemCardWriteFile(0, "TEST", buffer, -1, 4) == -1);
-    CHECK(MemCardWriteFile(0, "TEST", buffer, sizeof(data) - 2, 4) == -1);
-    CHECK(MemCardWriteFile(42, "TEST", buffer, 0, 4) == -1);
+    CHECK(MemCardWriteFile(0, "TEST", buffer, -1, 128) == 0);
+    CHECK(MemCardWriteFile(0, "TEST", buffer, sizeof(data) - 2, 128) == 1);
+    completion(McErrCardInvalid, 4);
+    CHECK(MemCardWriteFile(42, "TEST", buffer, 0, 128) == 1);
+    completion(McErrCardInvalid, 4);
     CHECK(!card->dirty && memcmp(snapshot, card->data, sizeof(snapshot)) == 0);
-    CHECK(MemCardReadFile(0, "TEST", buffer, 0, -1) == -1);
+    CHECK(MemCardReadFile(0, "TEST", buffer, 0, -1) == 0);
+    CHECK(MemCardReadFile(0, "TEST", buffer, 0, 4) == 0);
+    CHECK(MemCardAccept(0) == 1);
+    CHECK(MemCardExist(0) == 0); /* One unconsumed completion at a time. */
+    completion(McErrNone, 2);
+    CHECK(MemCardExist(0) == 1);
+    completion(McErrNone, 1);
+    CHECK(MemCardExist(0) == 1);
+    long command = -1, result = -1;
+    CHECK(MemCardSync(2, &command, &result) == -1);
+    CHECK(MemCardSync(0, &command, &result) == 1);
+    CHECK(command == 1 && result == 0);
     card->present = false;
-    CHECK(MemCardReadFile(0, "TEST", buffer, 0, 4) == -1);
+    CHECK(MemCardReadFile(0, "TEST", buffer, 0, 128) == 1);
+    completion(McErrCardNotExist, 3);
     card->present = true;
     /* A checksum-valid truncated chain must fail before even its first byte. */
     int first = ps1_card_find_file(card, "TEST", NULL);
@@ -33,9 +71,11 @@ int main(void) {
     for (int i = 0; i < 127; ++i) entry[127] ^= entry[i];
     memcpy(snapshot, card->data, sizeof(snapshot));
     memset(buffer, 0xA5, sizeof(buffer));
-    CHECK(MemCardReadFile(0, "TEST", buffer, 0, 4) == -1);
+    CHECK(MemCardReadFile(0, "TEST", buffer, 0, 128) == 1);
+    completion(McErrCardInvalid, 3);
     CHECK(buffer[0] == 0xA5A5A5A5u);
-    CHECK(MemCardWriteFile(0, "TEST", buffer, 0, 4) == -1);
+    CHECK(MemCardWriteFile(0, "TEST", buffer, 0, 128) == 1);
+    completion(McErrCardInvalid, 4);
     CHECK(!card->dirty && memcmp(snapshot, card->data, sizeof(snapshot)) == 0);
     return 0;
 }

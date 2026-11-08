@@ -476,8 +476,9 @@ The SDK ReadFile/WriteFile bridge validates signed ranges, card presence and
 all directory-chain blocks before copying. Invalid, repeated or truncated chains
 leave caller buffers and saves unchanged. This follows the current internal
 1-based block representation; external card-format compatibility remains under
-audit. Open/ReadData/WriteData and completion polling are not yet validated for
-original save/load runtime integration.
+audit. Open/ReadData/WriteData explicitly reject requests until implemented. File
+request registration and completion polling follow the SDK contract; full
+original save serialization remains under audit.
 
 ### Cooperative VSync callbacks
 
@@ -500,7 +501,7 @@ SDK bootstrap supports the current NTSC, non-interlaced graph setup, 2 MB RAM,
 GS work cursor, parallel lighting and the missing translation/ZXY matrix calls.
 Unsupported initialization/light modes fail explicitly. Numerical SDK rounding,
 remaining farm pointer conversions, complete XA streaming, SPU ADSR/reverb and
-original save/load completion remain open. This is not full-game acceptance.
+original save serialization remain open. This is not full-game acceptance.
 
 The optional original_boot_test executable uses dummy SDL devices and a fake
 clock against locally imported assets. Both profiles reach the original title
@@ -518,3 +519,19 @@ reads chunks split between VRAM and a host tail, including a wholly borrowed
 tail. The previous 32-bit tail storage causes that test to fault. Test-only GS
 allocation is a separate library so event integration can link original main
 without pulling a duplicate allocator.
+
+### Memory-card request completion
+
+Exist, Accept, ReadFile and WriteFile register one operation at a time. Native
+file copies finish immediately, but Sync reports one completed operation and
+then idle; it no longer reports busy forever. File requests return registration
+success separately from the card/file result consumed through Sync. Transfers
+must have nonnegative ranges and byte counts divisible by 128. Both Sync modes
+consume completion; idle and invalid modes leave output pointers untouched.
+These contracts follow the linked SDK reference. An optional local reference
+microcall confirmed the idle result and untouched outputs for both modes.
+
+Directory results never exceed the supplied record capacity. Unsupported
+Open/ReadData/WriteData calls reject work instead of claiming successful I/O.
+The card tests cover command IDs, registration conflicts, completion consumption,
+failed transfers preserving buffers/saves, and directory-buffer sentinels.

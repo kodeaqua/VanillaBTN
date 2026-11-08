@@ -11,6 +11,8 @@ static Ps1CardManager *s_bound_manager = NULL;
 
 static long s_last_cmd = 0;
 static long s_last_result = McErrNone;
+/* Transfers finish synchronously, but expose one consumable SDK completion. */
+static bool s_completion_pending;
 static long s_mcx_last_cmd = 0;
 static long s_mcx_last_result = McxErrInvalid;
 
@@ -43,26 +45,40 @@ static Ps1Card *get_card_for_chan(int chan) {
 void MemCardInit(int val) {
     (void)val;
     sdk_card_get(0);
+    s_completion_pending = false;
+    s_last_cmd = 0;
+    s_last_result = McErrNone;
 }
 
 void MemCardEnd(void) {
+    s_completion_pending = false;
 }
 
 void MemCardStart(void) {
 }
 
 void MemCardStop(void) {
+    s_completion_pending = false;
 }
 
 int MemCardExist(int chan) {
+    if (s_completion_pending) return 0;
     Ps1Card *card = get_card_for_chan(chan);
-    return (card != NULL && card->present) ? 1 : 0;
+    s_last_cmd = McFuncExist;
+    s_last_result = card == NULL ? McErrCardInvalid :
+        card->present ? McErrNone : McErrCardNotExist;
+    s_completion_pending = true;
+    return 1;
 }
 
 int MemCardAccept(int chan) {
+    if (s_completion_pending) return 0;
+    s_completion_pending = true;
     Ps1Card *card = get_card_for_chan(chan);
     s_last_cmd = McFuncAccept;
-    if (card == NULL || !card->present) {
+    if (card == NULL) {
+        s_last_result = McErrCardInvalid;
+    } else if (!card->present) {
         s_last_result = McErrCardNotExist;
     } else if (card->data[0] != 'M' || card->data[1] != 'C') {
         s_last_result = McErrNotFormat;
@@ -78,7 +94,8 @@ int MemCardOpen(int chan, char *file, int flag) {
     (void)chan;
     (void)file;
     (void)flag;
-    return 0;
+    /* Open/data access is not implemented; never claim a file was opened. */
+    return -1;
 }
 
 void MemCardClose(void) {
@@ -145,8 +162,19 @@ static int transfer_file(int chan, char *file, unsigned int *adrs,
     return 0;
 }
 
+static int register_transfer(int chan, char *file, unsigned int *adrs,
+                             int ofs, int bytes, bool write) {
+    if (s_completion_pending || !file || !adrs || ofs < 0 || bytes < 0 ||
+        bytes % PS1_CARD_FRAME_SIZE != 0) return 0;
+    s_completion_pending = true;
+    transfer_file(chan, file, adrs, ofs, bytes, write);
+    /* Registration succeeds even when the completed operation reports a card
+     * or file error. Original save/load obtains that result through Sync. */
+    return 1;
+}
+
 int MemCardReadFile(int chan, char *file, unsigned int *adrs, int ofs, int bytes) {
-    return transfer_file(chan, file, adrs, ofs, bytes, false);
+    return register_transfer(chan, file, adrs, ofs, bytes, false);
 }
 
 int MemCardWriteData(unsigned int *adrs, int ofs, int bytes) {
@@ -157,12 +185,12 @@ int MemCardWriteData(unsigned int *adrs, int ofs, int bytes) {
 }
 
 int MemCardWriteFile(int chan, char *file, unsigned int *adrs, int ofs, int bytes) {
-    return transfer_file(chan, file, adrs, ofs, bytes, true);
+    return register_transfer(chan, file, adrs, ofs, bytes, true);
 }
 
 int MemCardCreateFile(int chan, char *file, int blocks) {
     Ps1Card *card = get_card_for_chan(chan);
-    if (card == NULL || file == NULL || blocks <= 0) {
+    if (card == NULL || file == NULL || blocks <= 0 || blocks > (int)PS1_CARD_DATA_BLOCKS) {
         return -1;
     }
     size_t total_size = (size_t)blocks * PS1_CARD_BLOCK_SIZE;
@@ -209,14 +237,11 @@ int MemCardUnformat(int chan) {
 }
 
 int MemCardSync(int mode, long *cmds, long *rslt) {
-    (void)mode;
-    if (cmds != NULL) {
-        *cmds = s_last_cmd;
-    }
-    if (rslt != NULL) {
-        *rslt = s_last_result;
-    }
-    return 0;
+    if ((mode != 0 && mode != 1) || !s_completion_pending) return -1;
+    if (cmds != NULL) *cmds = s_last_cmd;
+    if (rslt != NULL) *rslt = s_last_result;
+    s_completion_pending = false;
+    return 1;
 }
 
 static bool pattern_matches(const char *name, const char *pattern) {
@@ -231,11 +256,13 @@ static bool pattern_matches(const char *name, const char *pattern) {
 }
 
 int MemCardGetDirentry(int chan, const char *name, struct DIRENTRY *dir, long *files, int ofs, int max) {
+    if (s_completion_pending) return -1;
     Ps1Card *card = get_card_for_chan(chan);
     long count = 0;
 
     s_last_cmd = 0x08;
-    if (card == NULL || ps1_card_validate(card) != PS1_CARD_OK) {
+    if (card == NULL || !card->present || ofs < 0 || max < 0 ||
+        (max > 0 && dir == NULL) || ps1_card_validate(card) != PS1_CARD_OK) {
         s_last_result = McErrCardInvalid;
         if (files != NULL) {
             *files = 0;
@@ -256,7 +283,8 @@ int MemCardGetDirentry(int chan, const char *name, struct DIRENTRY *dir, long *f
                     skip--;
                     continue;
                 }
-                if (count < max && dir != NULL) {
+                if (count >= max) break;
+                if (dir != NULL) {
                     memset(&dir[count], 0, sizeof(struct DIRENTRY));
                     memcpy(dir[count].name, name_buf, 20);
                     uint32_t sz;
