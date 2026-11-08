@@ -82,3 +82,11 @@ SPRT/FT4 generation, including UV orientation and primitive-cursor advancement.
 They supply the main module's frame pointer as fixture state. Uniform texels
 isolate packet generation from the backend's incomplete polygon interpolation;
 independent nonuniform hardware fixtures remain required for texel fidelity.
+
+`game_frame_buffers` compiles the original frame layout and cursor insertion.
+Native insertion replaces only the 24-bit pointer cast with SDK link mapping.
+The original OT dimensions, memory offsets, clearing and cursor advancement
+remain authoritative. Tests allocate a sufficiently large host region, map it
+once, invoke the original layout for both frames, then submit inserted packets.
+Frame storage is runtime-only; its host pointer layout is never serialized as
+a PS1 frame record or saved game.
