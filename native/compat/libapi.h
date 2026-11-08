@@ -13,4 +13,6 @@ int sdk_card_rename(const char *oldpath, const char *newpath);
 #endif
 #define rename sdk_card_rename
 
+void SetMem(long megabytes);
+
 #endif

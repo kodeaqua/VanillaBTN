@@ -218,4 +218,7 @@ int KanjiFntPrint(const char *format, ...);
 void KanjiFntFlush(int id);
 #endif
 
+int ResetGraph(int mode);
+int SetGraphDebug(int level);
+
 #endif

@@ -25,7 +25,8 @@ Update the relevant item after completing a task or discovering a blocker.
     - [x] Honor SDK-selected draw/display rectangles and display mask in SDL presentation.
     - [x] Compile and exercise original screen fades, `farm_state.c`, `farm_tables.c` and `11_GF_FARM` shared tables/vars (`farm_data.c`, `farm_vars.c`) through `game_screen`.
     - [x] Compile original window-frame drawing, text engine (`text.c`), menu window (`menu_window.c`), heart icon (`heart.c`), name entry (`name_entry.c`), `11_GF_FARM` picture/storage helpers (`picture_cells.c`, `menu/item_storage.c`), `08_DEBUG/debug.c`, PDA sample screen (`10_PdaSamp/pdasamp.c`), all 5 minigames (`17_GF_MG1`..`25_GF_MG5`), title overlay (`27_GF_TITLE/title.c`), staff-roll overlay (`28_GF_STAFF/staff.c`), and memory-card test screen (`31_gf_mcard/mcard.c`), and support `DR_AREA` (`SetDrawArea`), `SetDrawMode`, `SetPolyF4`, `SetSemiTrans`, `AddPrim`, `MoveImage2`, GTE matrix transforms (`RotMatrix`, `SetRotMatrix`, `SetTransMatrix`, `RotTrans`), SPU channel masks, line/Gouraud packets, GPU font helpers (`FntLoad`, `FntOpen`, `FntFlush`, `SetDumpFnt`), and PS1 memory-card / PocketStation SDK bridges (`libmcrd`, `libmcx`).
-    - [ ] Connect original startup and module dispatch to the host loop.
+    - [x] Compile original startup/main loop and save/load overlay with MSVC; SDK declarations checked against the local reference headers.
+    - [ ] Connect original startup and module dispatch to the host loop. Full linkage exposes 21 missing SDK entry points plus a duplicate work allocator; replace neither scenes nor save/load logic.
 - [ ] Native executable remains a backend smoke harness; original game execution is not connected.
 - [ ] Connect original controller polling through native SDK receive buffers and rumble.
   - [x] Match SDK atan/CORDIC math across all 16,641 analog magnitude pairs in both profiles.

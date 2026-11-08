@@ -475,3 +475,19 @@ foreach(test_target ps1_video_test ps1_sprite_test ps1_ot_test ps1_gpu_test
         ps1_audio_test ps1_card_test)
     target_compile_options(${test_target} PRIVATE /UNDEBUG)
 endforeach()
+
+# Compile the authoritative startup before connecting it to the SDL host.
+add_library(game_main STATIC ../src/main/main.c)
+set_target_properties(game_main PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_include_directories(game_main PUBLIC compat ${game_include_dirs} src)
+target_compile_definitions(game_main PUBLIC VANILLABTN_NATIVE PRIVATE main=game_main)
+target_compile_options(game_main PRIVATE /W4 /Gy /we4013)
+
+add_library(game_saveload STATIC ../src/overlay/15_saveload/saveload.c)
+set_target_properties(game_saveload PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_include_directories(game_saveload PUBLIC compat ${game_include_dirs} src)
+target_compile_definitions(game_saveload PUBLIC VANILLABTN_NATIVE)
+target_compile_options(game_saveload PRIVATE /W4 /Gy /we4013)
+
+target_link_libraries(game_main PUBLIC game_farm game_saveload game_window_frame
+    game_afile game_pad sdk_card)

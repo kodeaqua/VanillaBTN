@@ -84,4 +84,6 @@ void gte_stlvnl(void *out);
 void gte_stlvl(void *out);
 void gte_stclmv(void *out);
 
+void InitGeom(void);
+
 #endif

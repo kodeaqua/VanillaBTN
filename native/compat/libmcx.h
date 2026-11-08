@@ -43,4 +43,6 @@ int McxSetLED(long port, long flag);
 int McxReadDev(long port, long dev, const void *fix, void *read);
 int McxWriteDev(long port, long dev, const void *fix, const void *read);
 
+void McxStartCom(void);
+
 #endif /* VANILLABTN_COMPAT_LIBMCX_H */

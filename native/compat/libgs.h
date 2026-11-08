@@ -29,4 +29,16 @@ void GsSetAmbient(long r, long g, long b);
 void GsSetLightMode(int mode);
 void GsSetProjection(long distance);
 
+/* Packet tags retain the SDK word size even in host descriptors. */
+typedef u_long GsOT_TAG;
+void GsInitGraph(unsigned short x, unsigned short y, unsigned short mode,
+                 unsigned short dith, unsigned short vrammode);
+void GsInit3D(void);
+void GsDefDispBuff(unsigned short x0, unsigned short y0,
+                   unsigned short x1, unsigned short y1);
+void GsSetOffset(long x, long y);
+void GsSetDrawBuffOffset(void);
+u_long *GsGetWorkBase(void);
+void GsSetWorkBase(u_long *packets);
+
 #endif

@@ -30,4 +30,6 @@ int CdReadSync(int mode, u_char *result);
 void CdReadBreak(void);
 void CdFlush(void);
 
+int CdInit(void);
+
 #endif

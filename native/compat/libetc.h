@@ -4,4 +4,7 @@
 int ResetCallback(void);
 int VSync(int mode);
 
+int VSyncCallback(void (*callback)(void));
+long SetVideoMode(long mode);
+
 #endif
