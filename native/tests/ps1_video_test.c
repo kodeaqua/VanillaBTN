@@ -88,5 +88,39 @@ int main(void) {
         || video.vram[4][16] != 0) {
         return 12;
     }
+
+    uint16_t texel = 0xFFFFu;
+    video.vram[0][64] = 0x3210u;
+    video.vram[1][32] = 0;       /* CLUT index zero remains transparent. */
+    video.vram[1][33] = 0x001Fu;
+    video.vram[1][34] = 0x801Fu; /* The texel keeps its semi-transparent bit. */
+    video.vram[1][35] = 0x03E0u;
+    unsigned clut4 = (1u << 6) | 2u;
+    if (!ps1_video_sample_texel(&video, 1, clut4, 0, 0, &texel) || texel != 0
+        || !ps1_video_sample_texel(&video, 1, clut4, 1, 0, &texel) || texel != 0x001Fu
+        || !ps1_video_sample_texel(&video, 1, clut4, 2, 0, &texel) || texel != 0x801Fu
+        || !ps1_video_sample_texel(&video, 1, clut4, 3, 0, &texel) || texel != 0x03E0u) {
+        return 13;
+    }
+
+    video.vram[0][64] = 0xAB34u;
+    video.vram[2][0x34] = 0x7C00u;
+    video.vram[2][0xAB] = 0x03E0u;
+    unsigned tpage8 = 1u | (1u << 7);
+    unsigned clut8 = 2u << 6;
+    if (!ps1_video_sample_texel(&video, tpage8, clut8, 0, 0, &texel)
+        || texel != 0x7C00u
+        || !ps1_video_sample_texel(&video, tpage8, clut8, 1, 0, &texel)
+        || texel != 0x03E0u) {
+        return 14;
+    }
+
+    video.vram[0][191] = 0x801Fu;
+    unsigned tpage15 = 15u | (2u << 7);
+    if (!ps1_video_sample_texel(&video, tpage15, 0, 255, 0, &texel)
+        || texel != 0x801Fu
+        || ps1_video_sample_texel(&video, 3u << 7, 0, 0, 0, &texel)) {
+        return 15;
+    }
     return 0;
 }

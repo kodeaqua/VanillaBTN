@@ -91,6 +91,32 @@ bool ps1_video_draw_tile(Ps1Video *video, const Ps1DrawState *state, int x, int 
     return true;
 }
 
+bool ps1_video_sample_texel(const Ps1Video *video, unsigned tpage, unsigned clut,
+                            unsigned u, unsigned v, uint16_t *texel) {
+    if (video == NULL || texel == NULL) return false;
+
+    unsigned depth = (tpage >> 7) & 3u;
+    if (depth == 3) return false; /* Reserved PS1 texture depth. */
+    unsigned base_x = (tpage & 15u) * 64u;
+    unsigned base_y = ((tpage >> 4) & 1u) * 256u;
+    unsigned uv_x = u & 255u;
+    unsigned uv_y = v & 255u;
+    unsigned word_x = (base_x + uv_x / (4u >> depth))
+                      & (PS1_VRAM_WIDTH - 1);
+    uint16_t word = video->vram[(base_y + uv_y) & (PS1_VRAM_HEIGHT - 1)][word_x];
+
+    if (depth == 2) {
+        *texel = word;
+        return true;
+    }
+    unsigned index = depth == 0 ? (word >> ((uv_x & 3u) * 4u)) & 15u
+                                : (word >> ((uv_x & 1u) * 8u)) & 255u;
+    unsigned clut_x = (((clut & 63u) * 16u) + index) & (PS1_VRAM_WIDTH - 1);
+    unsigned clut_y = (clut >> 6) & (PS1_VRAM_HEIGHT - 1);
+    *texel = video->vram[clut_y][clut_x];
+    return true;
+}
+
 bool ps1_video_upload(Ps1Video *video, int x, int y, int width, int height,
                       const uint16_t *source, size_t source_stride) {
     if (video == NULL || source == NULL || !valid_rect(x, y, width, height)

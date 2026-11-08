@@ -37,4 +37,8 @@ void ps1_video_quick_fill(Ps1Video *video, int x, int y, int width, int height,
 bool ps1_video_draw_tile(Ps1Video *video, const Ps1DrawState *state, int x, int y,
                          int width, int height, uint32_t rgb24, bool semi_transparent);
 
+/* Read one raw texel through the GP0 texture page and CLUT fields. Zero is transparent. */
+bool ps1_video_sample_texel(const Ps1Video *video, unsigned tpage, unsigned clut,
+                            unsigned u, unsigned v, uint16_t *texel);
+
 #endif

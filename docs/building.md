@@ -20,8 +20,8 @@ No WSL, MSYS, Docker, or Python is needed for this native target.
 The executable currently presents a blank 320x240 PS1 framebuffer, scaled
 without filtering. The `native_startup` CTest check launches it headlessly
 with `--check-build`; `ps1_video_pixels` checks VRAM conversion, quick fill,
-tiles, mask bits, and blending with synthetic pixels. The developer checks
-the window manually. This build does not yet load
+tiles, mask bits, blending, and CLUT sampling with synthetic pixels. The
+developer checks the window manually. This build does not yet load
 game data or run gameplay.
 To inspect the Debug window, run `& .\build\native\Debug\vanillabtn.exe` and
 close it with the window's close button.
