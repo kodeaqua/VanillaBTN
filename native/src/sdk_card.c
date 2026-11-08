@@ -36,7 +36,7 @@ Ps1Card *sdk_card_get(int port) {
 }
 
 static Ps1Card *get_card_for_chan(int chan) {
-    int port = (chan == 0x10 || chan == 1) ? 1 : 0;
+    int port = chan == 0 ? 0 : (chan == 0x10 || chan == 1) ? 1 : -1;
     return sdk_card_get(port);
 }
 
@@ -91,61 +91,62 @@ int MemCardReadData(unsigned int *adrs, int ofs, int bytes) {
     return 0;
 }
 
-int MemCardReadFile(int chan, char *file, unsigned int *adrs, int ofs, int bytes) {
+/* Validate the entire internal 1-based chain before copying anything. This
+ * prevents a damaged tail from causing partial reads or corrupting a save. */
+static int transfer_file(int chan, char *file, unsigned int *adrs,
+                         int ofs, int bytes, bool write) {
     Ps1Card *card = get_card_for_chan(chan);
-    uint32_t file_size = 0;
-    int start_block;
-    int curr_block;
-    size_t block_ofs = 0;
-    size_t bytes_read = 0;
-    uint8_t *dst = (uint8_t *)adrs;
-
-    s_last_cmd = McFuncReadFile;
-    if (card == NULL || file == NULL || adrs == NULL) {
-        s_last_result = McErrCardInvalid;
+    uint32_t size = 0;
+    int chain[PS1_CARD_DATA_BLOCKS];
+    unsigned seen = 0;
+    s_last_cmd = write ? McFuncWriteFile : McFuncReadFile;
+    s_last_result = McErrCardInvalid;
+    if (!card || !file || !adrs || ofs < 0 || bytes < 0) return -1;
+    if (!card->present) {
+        s_last_result = McErrCardNotExist;
         return -1;
     }
-
-    start_block = ps1_card_find_file(card, file, &file_size);
-    if (start_block == 0) {
+    if (ps1_card_validate(card) != PS1_CARD_OK) return -1;
+    int block = ps1_card_find_file(card, file, &size);
+    if (!block) {
         s_last_result = McErrFileNotExist;
         return -1;
     }
-
-    curr_block = start_block;
-    while (curr_block >= 1 && curr_block <= (int)PS1_CARD_DATA_BLOCKS && bytes_read < (size_t)bytes) {
-        if ((size_t)ofs >= block_ofs + PS1_CARD_BLOCK_SIZE) {
-            const uint8_t *df = card->data + curr_block * PS1_CARD_FRAME_SIZE;
-            uint16_t next;
-            memcpy(&next, df + 8, 2);
-            if (next == 0xFFFF) {
-                break;
-            }
-            curr_block = (int)next;
-            block_ofs += PS1_CARD_BLOCK_SIZE;
-            continue;
-        }
-
-        size_t in_block_start = (ofs > (int)block_ofs) ? ((size_t)ofs - block_ofs) : 0;
-        size_t in_block_avail = PS1_CARD_BLOCK_SIZE - in_block_start;
-        size_t chunk = ((size_t)bytes - bytes_read < in_block_avail) ? ((size_t)bytes - bytes_read) : in_block_avail;
-        const uint8_t *src = card->data + (size_t)curr_block * PS1_CARD_BLOCK_SIZE + in_block_start;
-
-        memcpy(dst + bytes_read, src, chunk);
-        bytes_read += chunk;
-
-        const uint8_t *df = card->data + curr_block * PS1_CARD_FRAME_SIZE;
-        uint16_t next;
-        memcpy(&next, df + 8, 2);
-        if (next == 0xFFFF) {
-            break;
-        }
-        curr_block = (int)next;
-        block_ofs += PS1_CARD_BLOCK_SIZE;
+    if (!size || size > PS1_CARD_DATA_BLOCKS * PS1_CARD_BLOCK_SIZE ||
+        (unsigned)ofs > size || (unsigned)bytes > size - (unsigned)ofs) return -1;
+    unsigned count = (size + PS1_CARD_BLOCK_SIZE - 1) / PS1_CARD_BLOCK_SIZE;
+    for (unsigned i = 0; i < count; ++i) {
+        if (block < 1 || block > PS1_CARD_DATA_BLOCKS ||
+            (seen & (1u << block))) return -1;
+        seen |= 1u << block;
+        chain[i] = block;
+        const uint8_t *entry = card->data + block * PS1_CARD_FRAME_SIZE;
+        unsigned tag = i == 0 ? PS1_CARD_BLOCK_FIRST :
+            i + 1 == count ? PS1_CARD_BLOCK_LAST : PS1_CARD_BLOCK_MIDDLE;
+        unsigned next = entry[8] | ((unsigned)entry[9] << 8);
+        if (entry[0] != tag || (i + 1 == count && next != 0xFFFF)) return -1;
+        block = (int)next;
     }
-
+    size_t done = 0;
+    while (done < (size_t)bytes) {
+        size_t pos = (size_t)ofs + done;
+        size_t local = pos % PS1_CARD_BLOCK_SIZE;
+        size_t chunk = PS1_CARD_BLOCK_SIZE - local;
+        if (chunk > (size_t)bytes - done) chunk = (size_t)bytes - done;
+        uint8_t *storage = card->data +
+            chain[pos / PS1_CARD_BLOCK_SIZE] * PS1_CARD_BLOCK_SIZE + local;
+        uint8_t *buffer = (uint8_t *)adrs + done;
+        if (write) memcpy(storage, buffer, chunk);
+        else memcpy(buffer, storage, chunk);
+        done += chunk;
+    }
+    if (write && bytes) card->dirty = true;
     s_last_result = McErrNone;
     return 0;
+}
+
+int MemCardReadFile(int chan, char *file, unsigned int *adrs, int ofs, int bytes) {
+    return transfer_file(chan, file, adrs, ofs, bytes, false);
 }
 
 int MemCardWriteData(unsigned int *adrs, int ofs, int bytes) {
@@ -156,61 +157,7 @@ int MemCardWriteData(unsigned int *adrs, int ofs, int bytes) {
 }
 
 int MemCardWriteFile(int chan, char *file, unsigned int *adrs, int ofs, int bytes) {
-    Ps1Card *card = get_card_for_chan(chan);
-    uint32_t file_size = 0;
-    int start_block;
-    int curr_block;
-    size_t block_ofs = 0;
-    size_t bytes_written = 0;
-    const uint8_t *src = (const uint8_t *)adrs;
-
-    s_last_cmd = McFuncWriteFile;
-    if (card == NULL || file == NULL || adrs == NULL) {
-        s_last_result = McErrCardInvalid;
-        return -1;
-    }
-
-    start_block = ps1_card_find_file(card, file, &file_size);
-    if (start_block == 0) {
-        s_last_result = McErrFileNotExist;
-        return -1;
-    }
-
-    curr_block = start_block;
-    while (curr_block >= 1 && curr_block <= (int)PS1_CARD_DATA_BLOCKS && bytes_written < (size_t)bytes) {
-        if ((size_t)ofs >= block_ofs + PS1_CARD_BLOCK_SIZE) {
-            const uint8_t *df = card->data + curr_block * PS1_CARD_FRAME_SIZE;
-            uint16_t next;
-            memcpy(&next, df + 8, 2);
-            if (next == 0xFFFF) {
-                break;
-            }
-            curr_block = (int)next;
-            block_ofs += PS1_CARD_BLOCK_SIZE;
-            continue;
-        }
-
-        size_t in_block_start = (ofs > (int)block_ofs) ? ((size_t)ofs - block_ofs) : 0;
-        size_t in_block_avail = PS1_CARD_BLOCK_SIZE - in_block_start;
-        size_t chunk = ((size_t)bytes - bytes_written < in_block_avail) ? ((size_t)bytes - bytes_written) : in_block_avail;
-        uint8_t *dst = card->data + (size_t)curr_block * PS1_CARD_BLOCK_SIZE + in_block_start;
-
-        memcpy(dst, src + bytes_written, chunk);
-        bytes_written += chunk;
-
-        const uint8_t *df = card->data + curr_block * PS1_CARD_FRAME_SIZE;
-        uint16_t next;
-        memcpy(&next, df + 8, 2);
-        if (next == 0xFFFF) {
-            break;
-        }
-        curr_block = (int)next;
-        block_ofs += PS1_CARD_BLOCK_SIZE;
-    }
-
-    card->dirty = true;
-    s_last_result = McErrNone;
-    return 0;
+    return transfer_file(chan, file, adrs, ofs, bytes, true);
 }
 
 int MemCardCreateFile(int chan, char *file, int blocks) {

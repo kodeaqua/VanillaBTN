@@ -10,7 +10,7 @@ Update the relevant item after completing a task or discovering a blocker.
   - [x] Finish the interrupted MSVC farm-source build: case ranges, nested helpers, byte-pointer arithmetic and required type declarations.
   - [ ] Resolve farm-to-host linkage, remaining pointer truncations and GS lighting/matrix entry points; an archive build does not prove a runnable farm.
   - [x] PocketStation operations report missing/non-PDA devices without fabricated successful reads or writes; restore canonical SDK result/command values.
-  - [ ] Reject invalid/truncated memory-card transfers and validate file chains before touching caller buffers or saves.
+  - [x] Reject invalid/truncated memory-card transfers and validate file chains before touching caller buffers or saves; 29 synthetic checks pass in both profiles. SDK completion semantics and open/data APIs remain under audit.
 - [ ] Connect original game code through platform/SDK interfaces. Do not rebuild scene, menu, dialog or game logic in the native host.
   - [x] Compile the original texture-pack loader against native GPU transfers.
   - [ ] Connect original primitive/ordering-table submission and animation code.

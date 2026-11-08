@@ -469,3 +469,12 @@ the host executable and is not a playable farm: unresolved host/runtime entry
 points and serialized/host pointer boundaries still need work. In particular,
 the source build still reports pointer truncations in animal actions, event
 scripts/cue history and player code; those must be resolved before execution.
+
+### Bounded memory-card file transfers
+
+The SDK ReadFile/WriteFile bridge validates signed ranges, card presence and
+all directory-chain blocks before copying. Invalid, repeated or truncated chains
+leave caller buffers and saves unchanged. This follows the current internal
+1-based block representation; external card-format compatibility remains under
+audit. Open/ReadData/WriteData and completion polling are not yet validated for
+original save/load runtime integration.

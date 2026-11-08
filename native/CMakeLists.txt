@@ -265,6 +265,12 @@ target_link_libraries(sdk_card PUBLIC ps1_card)
 target_compile_definitions(sdk_card PRIVATE _CRT_SECURE_NO_WARNINGS)
 target_compile_options(sdk_card PRIVATE /W4)
 
+add_executable(sdk_card_io_test tests/sdk_card_io_test.c)
+set_target_properties(sdk_card_io_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_link_libraries(sdk_card_io_test PRIVATE sdk_card)
+target_compile_options(sdk_card_io_test PRIVATE /W4)
+add_test(NAME sdk_card_bounded_io COMMAND sdk_card_io_test)
+
 add_executable(sdk_pocketstation_test tests/sdk_pocketstation_test.c)
 set_target_properties(sdk_pocketstation_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_link_libraries(sdk_pocketstation_test PRIVATE sdk_card)
