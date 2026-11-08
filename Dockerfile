@@ -1,6 +1,6 @@
 # The build image: everything `cmake --build <build> --target check` needs.
 #
-#   docker build -t hmbtn-build .
+#   docker build -t vanillabtn-build .
 #
 # GCC 2.95.2 for the PlayStation (decompals/old-gcc 0.17), the PSY-Q Runtime Library 4.7
 # (the release every library object in SLUS_011.15 comes from), MIPS GNU binutils, CMake,

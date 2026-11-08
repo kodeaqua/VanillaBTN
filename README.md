@@ -1,20 +1,43 @@
-# Harvest Moon: Back to Nature
+# VanillaBTN
 
-A matching decompilation of *Harvest Moon: Back to Nature* (PlayStation, USA,
-`SLUS_011.15`). The C source builds the EXE and its 13 overlays byte for byte and, given
-your own copy of the disc, the whole disc image.
+VanillaBTN is working toward a native Windows port of *Harvest Moon: Back to
+Nature*. Its goal is to preserve the original game's play, pacing, audiovisual
+identity, and content. Community mods can be creative, but the default VanillaBTN
+experience should remain faithful to the unmodified game. Any future mod support
+should be optional and separate from that default experience.
+
+## Current status
+
+This repository currently contains a matching decompilation of the PlayStation
+USA release (`SLUS_011.15`), **not a native Windows game executable**. The C
+source builds the PS1 EXE and its 13 overlays byte for byte and, given your own
+copy of the disc, the whole disc image. That build is the reference baseline
+for the planned port. Building it with Docker on Windows still produces PS1
+binaries.
+
+The [Windows roadmap](docs/roadmap.md) orders the bringup work, and the
+[porting rules](docs/porting.md) define its fidelity boundaries. The
+[architecture guide](docs/architecture.md) maps the
+current code. [AGENTS.md](AGENTS.md) records repository rules for coding agents.
+The [versioning policy](docs/versioning.md) explains the project's development
+version, which can be printed with `python tools/version.py`.
 
 ## Building
 
 ```sh
-docker build -t hmbtn-build .
-docker run --rm --user "$(id -u):$(id -g)" -v "$PWD":/src:ro -v /tmp/hmbtn-build:/build \
-    -v /path/to/disc:/disc:ro hmbtn-build bash -c 'cmake -S /src -B /build -G Ninja \
+docker build -t vanillabtn-build .
+mkdir -p /tmp/vanillabtn-build
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD":/src:ro -v /tmp/vanillabtn-build:/build \
+    -v /path/to/disc:/disc:ro vanillabtn-build bash -c 'cmake -S /src -B /build -G Ninja \
     -DORIGINAL_DISC=/disc/disc.bin && cmake --build /build --target check'
 ```
 
 `check` compares every output with the original's SHA-1. Without `-DORIGINAL_DISC` it
 builds and checks only the 14 code binaries, which needs no game data.
+
+For Windows PowerShell, use the container build helper described in
+[docs/building.md](docs/building.md). It avoids problems with the old compiler
+on Windows bind mounts and CRLF checkouts.
 
 ## Exceptions
 
@@ -33,5 +56,7 @@ Two things in the build are not compiled from source:
 
 ## License
 
-[CC0 1.0](LICENSE), covering this repository's own work only; `tools/maspsx` keeps its
-own license. The game and the PSY-Q SDK belong to their owners and are not included.
+[MIT](LICENSE) covers this repository's own work in the current revision.
+Earlier revisions published under CC0 retain that grant. `tools/maspsx` keeps
+its own license. The game and the PSY-Q SDK belong to their owners and are not
+included.

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copy the toolchain out of the hmbtn-build image into sdk/ (git-ignored) so the
+# Copy the toolchain out of the vanillabtn-build image into sdk/ (git-ignored) so the
 # host can build without Docker.
 #   sdk/psyq-4.7/     PSY-Q 4.7 libraries
 #   sdk/include/      PSY-Q 4.7 headers, lower-case (-DPSYQ_INCLUDE_DIR=sdk/include)
@@ -7,7 +7,7 @@
 #   sdk/bin/          mips-linux-gnu-* wrappers that run the image's binutils
 set -eu
 cd "$(dirname "$0")/.."
-image=${1:-hmbtn-build}
+image=${1:-vanillabtn-build}
 c=$(docker create "$image")
 trap 'docker rm "$c" >/dev/null' EXIT
 rm -rf sdk/psyq-4.7 sdk/include sdk/gcc-2.95.2 sdk/bin
