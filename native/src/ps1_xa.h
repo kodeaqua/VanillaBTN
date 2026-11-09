@@ -70,8 +70,8 @@ typedef struct {
     int16_t         next_sample;
     int16_t         curr_sample_r;
     int16_t         next_sample_r;
-    uint32_t        frac_pos;         /* 16.16 */
-    uint32_t        resample_step;    /* 16.16 */
+    uint32_t        frac_pos;         /* source clock remainder, denominator 44100 */
+    int             next_valid;       /* lookahead has another decoded frame */
 
     /* ADPCM filter history across sound groups */
     int16_t         hist1;

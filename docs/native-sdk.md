@@ -203,7 +203,9 @@ the SPU CD-input gain (258 times the 0..127 SDK value, checked against the local
 reference function); it is not a second multiplier. Muted CD input still
 advances, and libsnd voice mono mode does not fold CD channels together.
 Hardware zigzag resampling, exact interleave/seek timing and listening acceptance
-remain open; the current backend interpolation is linear.
+remain open; the current backend interpolation is linear. Its source/output
+clock ratio is exact, and buffered final frames survive lookahead EOF; duration
+fixtures cover both sample rates, sample widths and channel layouts.
 File lookup failure is real failure: the host must validate the data tree before
 entering original retry loops. Mount/unmount invalidates all pending requests.
 

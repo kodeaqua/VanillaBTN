@@ -100,7 +100,6 @@ void ps1_xa_init(Ps1XaPlayer *player) {
     player->serial_volume = 45;
     player->sample_rate = 18900;
     /* 18900 Hz source -> 44100 Hz output */
-    player->resample_step = (18900u * 65536u) / 44100u; /* 28087 */
 }
 
 void ps1_xa_set_file(Ps1XaPlayer *player, int file_idx, const uint8_t *data, uint32_t size) {
@@ -135,7 +134,6 @@ static int fetch_next_sector(Ps1XaPlayer *player) {
             uint8_t coding_info = sec[3];
             player->is_stereo = (coding_info & 0x01) != 0;
             player->sample_rate = ((coding_info >> 2) & 0x01) ? 18900u : 37800u;
-            player->resample_step = (player->sample_rate * 65536u) / 44100u;
 
             int n;
             if (player->is_stereo) {
@@ -161,27 +159,25 @@ static int fetch_next_sector(Ps1XaPlayer *player) {
     return 0;
 }
 
-static int16_t fetch_xa_raw_sample(Ps1XaPlayer *player) {
-    if (player->state == PS1_XA_IDLE) return 0;
-
-    if (player->sector_sample_idx >= player->sector_sample_count) {
-        if (!fetch_next_sector(player)) {
-            player->state = PS1_XA_IDLE;
-            return 0;
-        }
-    }
-
-    return player->sector_pcm[player->sector_sample_idx++];
+/* Fetch whole frames so mono/stereo layout never changes halfway through a
+ * pair. Lookahead EOF must not discard the still-buffered current frame. */
+static int fetch_xa_frame(Ps1XaPlayer *player, int16_t *left, int16_t *right) {
+    if (player->sector_sample_idx >= player->sector_sample_count
+        && !fetch_next_sector(player)) return 0;
+    *left = player->sector_pcm[player->sector_sample_idx++];
+    *right = player->is_stereo ? player->sector_pcm[player->sector_sample_idx++] : *left;
+    return 1;
 }
 
 static void prime_stream(Ps1XaPlayer *player) {
-    player->curr_sample = fetch_xa_raw_sample(player);
-    if (player->is_stereo) {
-        player->curr_sample_r = fetch_xa_raw_sample(player);
-        player->next_sample = fetch_xa_raw_sample(player);
-        player->next_sample_r = fetch_xa_raw_sample(player);
-    } else {
-        player->next_sample = fetch_xa_raw_sample(player);
+    if (!fetch_xa_frame(player, &player->curr_sample, &player->curr_sample_r)) {
+        player->state = PS1_XA_IDLE;
+        return;
+    }
+    player->next_valid = fetch_xa_frame(player, &player->next_sample, &player->next_sample_r);
+    if (!player->next_valid) {
+        player->next_sample = player->curr_sample;
+        player->next_sample_r = player->curr_sample_r;
     }
 }
 
@@ -219,7 +215,6 @@ void ps1_xa_play_track(Ps1XaPlayer *player, int track) {
     player->sector_sample_idx = 0;
     player->is_stereo = 0;
     player->sample_rate = 18900;
-    player->resample_step = (18900u * 65536u) / 44100u;
     player->hist1 = 0;
     player->hist2 = 0;
     player->hist1_l = 0;
@@ -291,37 +286,26 @@ void ps1_xa_mix(Ps1XaPlayer *player, int16_t *out, int frames,
             continue;
         }
 
-        int32_t samp_l = 0;
-        int32_t samp_r = 0;
-
-        if (player->is_stereo) {
-            int32_t frac = (int32_t)(player->frac_pos & 0xFFFF);
-            int32_t diff_l = (int32_t)player->next_sample - (int32_t)player->curr_sample;
-            samp_l = (int32_t)player->curr_sample + (int32_t)(((int64_t)diff_l * frac) >> 16);
-            int32_t diff_r = (int32_t)player->next_sample_r - (int32_t)player->curr_sample_r;
-            samp_r = (int32_t)player->curr_sample_r + (int32_t)(((int64_t)diff_r * frac) >> 16);
-
-            player->frac_pos += player->resample_step;
-            while (player->frac_pos >= 0x10000 && player->state != PS1_XA_IDLE) {
-                player->curr_sample = player->next_sample;
-                player->curr_sample_r = player->next_sample_r;
-                player->next_sample = fetch_xa_raw_sample(player);
-                player->next_sample_r = fetch_xa_raw_sample(player);
-                player->frac_pos -= 0x10000;
+        /* Integer source/output clocks retain the exact 7:6 or 7:3 ratio.
+         * Interpolation remains linear until the hardware zigzag FIR is added. */
+        int32_t frac = (int32_t)(((uint64_t)player->frac_pos << 16) / 44100u);
+        int32_t diff_l = (int32_t)player->next_sample - player->curr_sample;
+        int32_t diff_r = (int32_t)player->next_sample_r - player->curr_sample_r;
+        int32_t samp_l = player->curr_sample + (int32_t)(((int64_t)diff_l * frac) >> 16);
+        int32_t samp_r = player->curr_sample_r + (int32_t)(((int64_t)diff_r * frac) >> 16);
+        player->frac_pos += player->sample_rate;
+        while (player->frac_pos >= 44100u && player->state != PS1_XA_IDLE) {
+            player->frac_pos -= 44100u;
+            if (!player->next_valid) {
+                player->state = PS1_XA_IDLE;
+                break;
             }
-        } else {
-            /* Mono resampling */
-            int32_t frac = (int32_t)(player->frac_pos & 0xFFFF);
-            int32_t diff = (int32_t)player->next_sample - (int32_t)player->curr_sample;
-            int32_t samp = (int32_t)player->curr_sample + (int32_t)(((int64_t)diff * frac) >> 16);
-            samp_l = samp;
-            samp_r = samp;
-
-            player->frac_pos += player->resample_step;
-            while (player->frac_pos >= 0x10000 && player->state != PS1_XA_IDLE) {
-                player->curr_sample = player->next_sample;
-                player->next_sample = fetch_xa_raw_sample(player);
-                player->frac_pos -= 0x10000;
+            player->curr_sample = player->next_sample;
+            player->curr_sample_r = player->next_sample_r;
+            player->next_valid = fetch_xa_frame(player, &player->next_sample, &player->next_sample_r);
+            if (!player->next_valid) {
+                player->next_sample = player->curr_sample;
+                player->next_sample_r = player->curr_sample_r;
             }
         }
 

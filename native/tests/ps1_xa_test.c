@@ -177,13 +177,11 @@ static void test_xa_coding_info_rates_and_stereo(void) {
     ps1_xa_play_track(&player, 0);
     assert(player.is_stereo == 0);
     assert(player.sample_rate == 37800);
-    assert(player.resample_step == (37800u * 65536u) / 44100u);
 
     /* Play track 1 (file 0, channel 1) -> 18.9 kHz stereo */
     ps1_xa_play_track(&player, 1);
     assert(player.is_stereo == 1);
     assert(player.sample_rate == 18900);
-    assert(player.resample_step == (18900u * 65536u) / 44100u);
 
     /* Mix stereo and verify distinct channels */
     int16_t pcm[256];
@@ -245,7 +243,45 @@ static void test_xa_hardware_units(void) {
     assert(left == -7 && samples[0] == 1234);
 }
 
+static int read_one_sector(void *context, uint32_t index, uint8_t *sector) {
+    assert(index == 0);
+    memcpy(sector, context, PS1_XA_SECTOR_SIZE);
+    return 1;
+}
+
+static void test_xa_exact_stream_duration(void) {
+    for (int width = 0; width < 2; width++) {
+        for (int slow = 0; slow < 2; slow++) {
+            for (int stereo = 0; stereo < 2; stereo++) {
+                uint8_t sector[PS1_XA_SECTOR_SIZE] = {1, 0, 0x64};
+                sector[3] = (uint8_t)((width << 4) | (slow << 2) | stereo);
+                for (int g = 0; g < PS1_XA_SOUND_GROUPS; g++) {
+                    uint8_t *group = sector + 8 + g * 128;
+                    memset(group, width ? 8 : 12, 16);
+                    memset(group + 16, width ? 1 : 0x11, 112);
+                }
+                Ps1XaPlayer player;
+                ps1_xa_play_source(&player, read_one_sector, sector, 0, 1, 1, 0);
+                int source_frames = 4032 / (width ? 2 : 1) / (stereo ? 2 : 1);
+                int expected_frames = source_frames * 7 / (slow ? 3 : 6);
+                int16_t pcm[2];
+                /* Every source sample is exactly one. The last decoded frame
+                 * must survive lookahead EOF; duration follows the exact 7:6
+                 * or 7:3 clock ratio, not a truncated 16.16 increment. */
+                for (int i = 0; i < expected_frames; i++) {
+                    ps1_xa_mix(&player, pcm, 1, 32767, 32767, 0);
+                    assert(pcm[0] == 1 && pcm[1] == 1);
+                }
+                ps1_xa_mix(&player, pcm, 1, 32767, 32767, 0);
+                assert(pcm[0] == 0 && pcm[1] == 0);
+                assert(player.state == PS1_XA_IDLE);
+            }
+        }
+    }
+}
+
 int main(void) {
+    test_xa_exact_stream_duration();
     test_xa_hardware_units();
     Ps1XaPlayer player;
     int16_t pcm[2];
@@ -253,7 +289,8 @@ int main(void) {
     player.state = PS1_XA_PLAYING;
     player.curr_sample = 32767;
     player.next_sample = 32767;
-    player.resample_step = 0;
+    player.curr_sample_r = player.next_sample_r = 32767;
+    player.sample_rate = 0;
     player.serial_volume = 128;
     ps1_xa_mix(&player, pcm, 1, 32767, 32767, 0);
     assert(pcm[0] == 32767 && pcm[1] == 32767);
