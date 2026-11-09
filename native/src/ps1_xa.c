@@ -119,14 +119,16 @@ static int fetch_next_sector(Ps1XaPlayer *player) {
     }
     uint8_t sector[PS1_XA_SECTOR_SIZE];
     while (player->sector_index < num_sectors) {
-        uint32_t index = player->sector_index++;
+        uint32_t index = player->sector_index;
         const uint8_t *sec;
         if (player->reader) {
-            if (!player->reader(player->reader_context, index, sector)) return 0;
+            int status = player->reader(player->reader_context, index, sector);
+            if (status <= 0) return status;
             sec = sector;
         } else {
             sec = file_data + index * PS1_XA_SECTOR_SIZE;
         }
+        player->sector_index++;
         /* Invalid/non-audio subheaders must not change the current format. */
         if (sec[1] == (uint8_t)player->channel && (sec[2] & 0x64) == 0x64
             && (player->filter_file < 0 || sec[0] == player->filter_file)
@@ -162,15 +164,17 @@ static int fetch_next_sector(Ps1XaPlayer *player) {
 /* Fetch whole frames so mono/stereo layout never changes halfway through a
  * pair. Lookahead EOF must not discard the still-buffered current frame. */
 static int fetch_xa_frame(Ps1XaPlayer *player, int16_t *left, int16_t *right) {
-    if (player->sector_sample_idx >= player->sector_sample_count
-        && !fetch_next_sector(player)) return 0;
+    if (player->sector_sample_idx >= player->sector_sample_count) {
+        int status = fetch_next_sector(player);
+        if (status <= 0) return status;
+    }
     *left = player->sector_pcm[player->sector_sample_idx++];
     *right = player->is_stereo ? player->sector_pcm[player->sector_sample_idx++] : *left;
     return 1;
 }
 
 static void prime_stream(Ps1XaPlayer *player) {
-    if (!fetch_next_sector(player)) player->state = PS1_XA_IDLE;
+    if (fetch_next_sector(player) == 0) player->state = PS1_XA_IDLE;
 }
 
 static int fill_output(Ps1XaPlayer *player) {
@@ -178,7 +182,8 @@ static int fill_output(Ps1XaPlayer *player) {
         if (player->repeat_input) {
             player->repeat_input = 0;
         } else {
-            if (!fetch_xa_frame(player, &player->held_left, &player->held_right)) return 0;
+            int status = fetch_xa_frame(player, &player->held_left, &player->held_right);
+            if (status <= 0) return status;
             player->repeat_input = player->sample_rate == 18900;
         }
         if (ps1_xa_filter_push(&player->filter, player->held_left,
@@ -297,10 +302,13 @@ void ps1_xa_mix(Ps1XaPlayer *player, int16_t *out, int frames,
             continue;
         }
 
-        if (player->output_index == player->output_count && !fill_output(player)) {
-            player->state = PS1_XA_IDLE;
-            if (!accumulate) out[f * 2] = out[f * 2 + 1] = 0;
-            continue;
+        if (player->output_index == player->output_count) {
+            int status = fill_output(player);
+            if (status <= 0) {
+                if (status == 0) player->state = PS1_XA_IDLE;
+                if (!accumulate) out[f * 2] = out[f * 2 + 1] = 0;
+                continue;
+            }
         }
         int32_t samp_l = player->output[player->output_index][0];
         int32_t samp_r = player->output[player->output_index++][1];

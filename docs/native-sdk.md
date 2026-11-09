@@ -196,7 +196,8 @@ to data mode (`0x80`). `sdk_cd` now feeds original filter/location/ReadS control
 2336-byte sector reader into `ps1_xa`; the SDK sound mixer combines this PCM with
 the same SPU output sent to SDL. Imported XA sizes use 2336 physical bytes per
 sector, while SDK file sizes and virtual LBA allocation use 2048 logical bytes.
-Pause retains decoded buffers, a new seek resets playback, and data reads,
+Pause retains decoded buffers, Setloc records a target without moving or
+stopping the current stream, ReadS dispatches the pending seek, and data reads,
 standby or unmount cancel the stream. GetlocP reports a 150-sector/s playback
 clock in mode C8, independently of decoder lookahead. Serial A volume writes
 the SPU CD-input gain (258 times the 0..127 SDK value, checked against the local
@@ -207,8 +208,12 @@ history, per-product signed truncation, output saturation and 18.9 kHz input
 duplication. Impulse fixtures verify numerical output; mix-call and sector
 boundaries do not reset the filter. Its startup phase is deterministic because
 hardware power-on phase is unspecified; the published coefficient model also
-notes small rounding discrepancies. Physical sector arrival/seek timing and
-listening acceptance remain separate checks.
+notes small rounding discrepancies. The C8 drive exposes one sector after each 294 output samples. A reader wait
+preserves the filter and produces silence until that physical sector arrives;
+EOF is separate, and interleaved sectors cannot be fetched ahead of the clock.
+Pause freezes both reader and audio state. There is no fabricated mechanical
+seek-distance delay: ReadS resets sector cadence at its new target; actual
+optical seek/spin-up latency and listening acceptance remain developer checks.
 File lookup failure is real failure: the host must validate the data tree before
 entering original retry loops. Mount/unmount invalidates all pending requests.
 

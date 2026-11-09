@@ -37,7 +37,7 @@ typedef struct {
     int16_t  channel;
 } Ps1XaTrackEntry;
 
-/* Supply one complete imported 2336-byte sector; return zero on read failure.
+/* Supply one complete imported 2336-byte sector; return 0 at EOF/error, -1 while the sector has not arrived.
  * The caller owns the source for the duration of playback. */
 typedef int (*Ps1XaSectorReader)(void *context, uint32_t index, uint8_t *sector);
 

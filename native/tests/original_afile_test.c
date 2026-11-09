@@ -155,7 +155,8 @@ static void fixtures(void) {
         for (unsigned sector = 0; sector < 16; sector++) {
             uint8_t xa[2336] = {0};
             xa[0] = sector == 0 ? 2 : 1;
-            xa[1] = sector == 1 ? 1 : 0;
+            unsigned second_audio = i == 2 ? 11 : 10; /* file 3 has an underrun gap */
+            xa[1] = sector == 2 || sector == second_audio ? 0 : 1;
             xa[2] = 0x64;
             xa[3] = 1; /* stereo, 37.8 kHz, 4-bit */
             memcpy(xa + 4, xa, 4);
@@ -190,20 +191,14 @@ static void test_xa_sdk_stream(void) {
     CdlLOC start = xa_file.pos;
     CHECK(CdControl(CdlSetloc, (uint8_t *)&start, NULL));
     CHECK(CdControl(CdlReadS, NULL, NULL));
-    int16_t pcm[735 * 2];
+    int16_t pcm[2940 * 2];
     sdk_sound_mix(pcm, 735);
-    /* Decode the selected file/channel only. The first two sectors contain
-     * deliberately different samples under a different file/channel filter. */
-    /* Independent hardware FIR startup values for constant 256/-512 input. */
+    /* At double speed each sector arrives after 294 output frames. The
+     * selected channel is in sectors 2 and 10 (one 37.8 kHz stereo block
+     * every 8 sectors). It cannot sound during the first 735 frames. */
+    for (int i = 0; i < 1470; i++) CHECK(pcm[i] == 0);
     const int raw_left[10] = {-1,-1,-3,-2,-3,-2,-4,-3,-2,-10};
     const int raw_right[10] = {0,-1,-1,-3,-3,-4,-2,-4,-6,5};
-    for (int i = 0; i < 10; i++) {
-        int l = ((raw_left[i] * (127 * 258)) >> 15) * 32767 >> 15;
-        int r = ((raw_right[i] * (64 * 258)) >> 15) * 32767 >> 15;
-        CHECK(pcm[i * 2] == l && pcm[i * 2 + 1] == r);
-    }
-    int left = ((221 * (127 * 258)) >> 15) * 32767 >> 15;
-    int right = ((-476 * (64 * 258)) >> 15) * 32767 >> 15;
     uint8_t location[8];
     CHECK(CdControl(CdlGetlocP, NULL, location));
     CHECK(CdPosToInt((CdlLOC *)(location + 5)) == CdPosToInt(&start) + 2);
@@ -213,20 +208,28 @@ static void test_xa_sdk_stream(void) {
     CHECK(sdk_cd_xa_status().sector == (unsigned long)CdPosToInt(&start) + 2);
     CHECK(CdControl(CdlReadS, NULL, NULL)); /* Resume buffered audio. */
     sdk_sound_mix(pcm, 735);
-    CHECK(pcm[0] == left && pcm[1] == right);
+    for (int i = 0; i < 146 * 2; i++) CHECK(pcm[i] == 0);
+    for (int i = 0; i < 10; i++) {
+        int l = ((raw_left[i] * (127 * 258)) >> 15) * 32767 >> 15;
+        int r = ((raw_right[i] * (64 * 258)) >> 15) * 32767 >> 15;
+        CHECK(pcm[(146 + i) * 2] == l && pcm[(146 + i) * 2 + 1] == r);
+    }
     CHECK(sdk_cd_xa_status().sector == (unsigned long)CdPosToInt(&start) + 5);
     CHECK(CdControl(CdlPause, NULL, NULL));
     CdlLOC offset;
     CHECK(CdIntToPos(CdPosToInt(&start) + 3, &offset));
     CHECK(CdControl(CdlSetloc, (uint8_t *)&offset, NULL));
+    CHECK(sdk_cd_xa_status().sector == (unsigned long)CdPosToInt(&start) + 5);
     CHECK(CdControl(CdlReadS, NULL, NULL));
+    sdk_sound_mix(pcm, 2351);
+    for (int i = 0; i < 2351 * 2; i++) CHECK(pcm[i] == 0);
     sdk_sound_mix(pcm, 10);
     CHECK(pcm[0] == -1 && pcm[1] == 0);
 
     CHECK(CdControl(CdlReadS, (uint8_t *)&start, NULL));
     SsSetSerialAttr(0, SS_MIX, SS_OFF);
-    sdk_sound_mix(pcm, 10);
-    for (int i = 0; i < 20; i++) CHECK(pcm[i] == 0);
+    sdk_sound_mix(pcm, 892);
+    for (int i = 0; i < 1784; i++) CHECK(pcm[i] == 0);
     SsSetSerialAttr(0, SS_MIX, SS_ON);
     SsSetSerialVol(0, 0, 0);
     sdk_sound_mix(pcm, 10);
@@ -236,8 +239,12 @@ static void test_xa_sdk_stream(void) {
     SsSetSerialVol(0, 127, 64);
     CHECK(CdControl(CdlReadS, (uint8_t *)&start, NULL));
     SsSetMono(); /* libsnd mono mode affects voices, not the CD input. */
-    sdk_sound_mix(pcm, 10);
-    CHECK(pcm[0] == -1 && pcm[1] == 0);
+    sdk_sound_mix(pcm, 892);
+    for (int i = 0; i < 10; i++) {
+        int l = ((raw_left[i] * (127 * 258)) >> 15) * 32767 >> 15;
+        int r = ((raw_right[i] * (64 * 258)) >> 15) * 32767 >> 15;
+        CHECK(pcm[(881 + i) * 2] == l && pcm[(881 + i) * 2 + 1] == r);
+    }
     SsSetStereo();
     /* Normal data reads cancel the XA drive stream. */
     CdlFILE archive;
@@ -247,6 +254,30 @@ static void test_xa_sdk_stream(void) {
     CHECK(CdReadSync(0, NULL) == 0 && !sdk_cd_xa_status().streaming);
     sdk_sound_mix(pcm, 10);
     for (int i = 0; i < 20; i++) CHECK(pcm[i] == 0);
+    /* A late interleaved sector creates actual silence instead of allowing
+     * the decoder to read ahead. FIR history survives this underflow. */
+    CHECK(CdSearchFile(&xa_file, "\\STR\\03.XA;1"));
+    CHECK(CdControl(CdlSetmode, &mode, NULL));
+    CHECK(CdControl(CdlReadS, (uint8_t *)&xa_file.pos, NULL));
+    sdk_sound_mix(pcm, 2940);
+    sdk_sound_mix(pcm, 293);
+    sdk_sound_mix(pcm, 294);
+    for (int i = 0; i < 588; i++) CHECK(pcm[i] == 0);
+    sdk_sound_mix(pcm, 1);
+    int l = ((221 * (127 * 258)) >> 15) * 32767 >> 15;
+    int r = ((-476 * (64 * 258)) >> 15) * 32767 >> 15;
+    CHECK(pcm[0] == l && pcm[1] == r);
+    unsigned long position_before = sdk_cd_xa_status().sector;
+    for (int i = 0; i < 50; i++) CHECK(CdControl(CdlGetlocP, NULL, location));
+    CHECK(sdk_cd_xa_status().sector == position_before);
+    CHECK(CdControl(CdlSetloc, (uint8_t *)&start, NULL));
+    CHECK(sdk_cd_xa_status().sector == position_before); /* target only */
+    sdk_sound_mix(pcm, 1);
+    CHECK(pcm[0] != 0 && pcm[1] != 0); /* Setloc alone does not pause audio. */
+    CHECK(CdControl(CdlReadS, NULL, NULL));
+    sdk_sound_mix(pcm, 1);
+    CHECK(pcm[0] == 0 && pcm[1] == 0);
+    CHECK(CdControl(CdlStandby, NULL, NULL));
     sdk_sound_reset();
 }
 
