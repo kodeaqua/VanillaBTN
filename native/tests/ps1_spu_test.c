@@ -263,50 +263,26 @@ static void test_spu_adsr_envelope(void) {
 
 }
 
-static void test_spu_reverb_processing(void) {
-    Ps1Spu spu;
-    ps1_spu_init(&spu);
-    ps1_spu_set_reverb_enabled(&spu, 1);
-    ps1_spu_set_reverb_params(&spu, 5, 64, 64, 0x4000, 0x4000, 60, 64);
-
-    /* Non-looping single block pulse */
-    uint8_t block[16];
-    memset(block, 0, sizeof(block));
-    block[0] = 0x04;
-    block[1] = PS1_ADPCM_FLAG_LOOP_END;
+static void test_spu_reverb_without_voice_sends(void) {
+    Ps1Spu dry, configured;
+    ps1_spu_init(&dry);
+    ps1_spu_init(&configured);
+    ps1_spu_set_reverb_enabled(&configured, 1);
+    ps1_spu_set_reverb_params(&configured, 5, 64, 64, 0x4000, 0x4000, 60, 64);
+    assert(configured.reverb_enabled && configured.reverb_type == 5);
+    assert(configured.reverb_vol_left == 0x4000 && configured.reverb_delay == 64);
+    uint8_t block[16] = {4, PS1_ADPCM_FLAG_LOOP_END};
     memset(block + 2, 0x77, 14);
-
-    ps1_spu_key_on_raw(&spu, 0, block, sizeof(block), 0x10000, 0x7FFF, 0x7FFF);
-
-    /* Mix initial frames: voice produces audio and feeds into reverb */
-    int16_t pcm[1024];
-    ps1_spu_mix(&spu, pcm, 512, 0);
-
-    /* Wait until voice has ended */
-    while (ps1_spu_voice_is_active(&spu, 0)) {
-        ps1_spu_mix(&spu, pcm, 512, 0);
-    }
-    assert(!ps1_spu_voice_is_active(&spu, 0));
-
-    /* Mix further frames: even though voice is dead, reverb ring buffer produces tail echo! */
-    int has_reverb_tail = 0;
-    for (int step = 0; step < 10; step++) {
-        ps1_spu_mix(&spu, pcm, 512, 0);
-        for (int i = 0; i < 1024; i++) {
-            if (pcm[i] != 0) {
-                has_reverb_tail = 1;
-                break;
-            }
-        }
-        if (has_reverb_tail) break;
-    }
-    assert(has_reverb_tail);
-
-    /* Disable reverb: output drops to silence */
-    ps1_spu_set_reverb_enabled(&spu, 0);
-    ps1_spu_mix(&spu, pcm, 512, 0);
-    for (int i = 0; i < 1024; i++) {
-        assert(pcm[i] == 0);
+    ps1_spu_key_on_raw(&dry, 0, block, sizeof(block), 0x10000, 32767, 32767);
+    ps1_spu_key_on_raw(&configured, 0, block, sizeof(block), 0x10000, 32767, 32767);
+    int16_t dry_pcm[1024], configured_pcm[1024];
+    /* No voice has a modeled EON send. Global enable/configuration must not
+     * invent a wet signal; compare past both old fabricated echo taps. */
+    for (int chunk = 0; chunk < 12; chunk++) {
+        ps1_spu_mix(&dry, dry_pcm, 512, 0);
+        ps1_spu_mix(&configured, configured_pcm, 512, 0);
+        if (chunk == 0) assert(dry_pcm[0] > 0);
+        assert(memcmp(dry_pcm, configured_pcm, sizeof(dry_pcm)) == 0);
     }
 }
 
@@ -317,7 +293,7 @@ int main(void) {
     test_spu_synthetic_vab_and_mix();
     test_spu_raw_playback_and_volume();
     test_spu_adsr_envelope();
-    test_spu_reverb_processing();
+    test_spu_reverb_without_voice_sends();
     printf("ps1_spu tests passed.\n");
     return 0;
 }

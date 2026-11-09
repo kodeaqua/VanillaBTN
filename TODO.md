@@ -60,7 +60,8 @@ Update the relevant item after completing a task or discovering a blocker.
 - [ ] Audio: audit hardware envelope and reverb fidelity before claiming completion.
   - [x] Correct XA canonical parameter offsets, signed predictor rounding and reserved shifts; decode both 4-bit and 8-bit units with separate stereo histories. Independent numerical fixtures expose the old decoder and verify sample counts and invalid-width rejection in Debug/Release.
   - [x] Replace approximate ADSR rates with shift/step clock accumulators, exponential modes, exact sustain targets and release semantics. Numerical per-clock fixtures cover fast, slow and frozen rates; they fail on the old backend and after temporary reversion, and pass in Debug/Release. Full hardware sound fidelity remains open.
-  - [ ] Replace the generic global echo with PS1 reverb DSP and per-voice sends; the existing delay-tail test does not establish hardware fidelity.
+  - [x] Remove the fabricated global two-tap echo while retaining SDK reverb controls. A dry-versus-configured PCM regression fails on the old mixer and after temporary reversion; seven related checks pass in Debug/Release.
+  - [ ] Implement PS1 reverb RAM/filter DSP, half-rate processing, presets and per-voice sends. Reverb remains unavailable; a generic delay-tail test is not hardware fidelity.
   - [ ] Verify original CD SDK stream integration and hardware XA resampling; standalone decoder tests do not establish in-game streaming.
 - [x] Save/load: verify original save layout before game integration.
   - [x] Give the original save header, icon frames, slot record and payload one aligned native backing image. The original reset, shift/checksum and 4-block SDK transfer are exercised by an asset-free regression that fails before the fix and after temporary reversion; both profiles pass 31 checks and all 14 PS1 code hashes match.

@@ -24,7 +24,6 @@
 #define PS1_ADPCM_FLAG_LOOP_REPEAT 0x02
 #define PS1_ADPCM_FLAG_LOOP_START  0x04
 
-#define PS1_SPU_REVERB_BUF_SIZE 8192
 
 typedef int Ps1VabId;
 
@@ -101,7 +100,7 @@ typedef struct {
     int16_t         cd_vol_left;      /* 0..0x7FFF */
     int16_t         cd_vol_right;
 
-    /* Reverb configuration and state */
+    /* Retained SDK reverb controls; hardware DSP/sends are not implemented. */
     int             reverb_enabled;
     int16_t         reverb_type;
     int16_t         reverb_depth_left;   /* 0..127 */
@@ -110,8 +109,6 @@ typedef struct {
     int16_t         reverb_vol_right;    /* 0..0x7FFF */
     int16_t         reverb_feedback;     /* 0..127 */
     int16_t         reverb_delay;        /* delay parameter */
-    int16_t         reverb_ring[PS1_SPU_REVERB_BUF_SIZE][2];
-    uint32_t        reverb_pos;
 } Ps1Spu;
 
 /* Initialize SPU state */
@@ -161,10 +158,10 @@ void ps1_spu_set_cd_vol(Ps1Spu *spu, int16_t left, int16_t right);
 /* Restart the voice envelope with explicit ADSR registers (raw/test callers). */
 void ps1_spu_voice_set_adsr(Ps1Spu *spu, int voice_idx, uint16_t adsr1, uint16_t adsr2);
 
-/* Enable or disable reverb processing */
+/* Retain requested reverb enable state; no wet output is modeled yet. */
 void ps1_spu_set_reverb_enabled(Ps1Spu *spu, int enabled);
 
-/* Set reverb parameters */
+/* Retain SDK reverb parameters for the future hardware DSP bridge. */
 void ps1_spu_set_reverb_params(Ps1Spu *spu, int type, int depth_l, int depth_r,
                                int vol_l, int vol_r, int feedback, int delay);
 

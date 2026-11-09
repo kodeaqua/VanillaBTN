@@ -188,8 +188,11 @@ A zero-valued VAB ADSR register starts the fastest attack; only the standalone r
 sample helper explicitly holds full envelope volume. Key-off starts release and
 repeated key-offs do not abruptly silence a releasing voice. Numerical tests
 cover envelope clock values; interpolation and full sound fidelity remain open.
-The current circular delay-line effect is a generic echo, not validated PS1
-reverb DSP; hardware reverb remains an open task. Starting an archive sector read via
+Reverb SDK controls are retained, but no wet output is synthesized until the
+actual PS1 reverb RAM/filter pipeline and per-voice EON sends are implemented.
+The generic global echo was removed because it applied an invented effect to
+all voices. Hardware reverb remains an open task; an enabled setting alone does
+not prove reverb implementation. Starting an archive sector read via
 `afile_read_bytes` invokes the real `cd_audio_stop` and switches the drive back
 to data mode (`0x80`). Feeding `cd_audio.c` filter/location/volume state into
 the live `ps1_xa` audio mixer stream remains a separate integration step.

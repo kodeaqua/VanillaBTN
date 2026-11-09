@@ -458,37 +458,9 @@ void ps1_spu_mix(Ps1Spu *spu, int16_t *out, int frames, int accumulate) {
             }
         }
 
-        /* Reverb DSP */
-        if (spu->reverb_enabled) {
-            uint32_t rpos = spu->reverb_pos;
-            uint32_t delay_base = spu->reverb_delay ? ((uint32_t)spu->reverb_delay * 32u) : 2048u;
-            if (delay_base > 4000u) delay_base = 4000u;
-            uint32_t tap1 = (rpos + PS1_SPU_REVERB_BUF_SIZE - delay_base) % PS1_SPU_REVERB_BUF_SIZE;
-            uint32_t tap2 = (rpos + PS1_SPU_REVERB_BUF_SIZE - (delay_base * 3u / 2u)) % PS1_SPU_REVERB_BUF_SIZE;
-
-            int32_t delayed_l = ((int32_t)spu->reverb_ring[tap1][0] * 3 + (int32_t)spu->reverb_ring[tap2][0] * 2) / 5;
-            int32_t delayed_r = ((int32_t)spu->reverb_ring[tap1][1] * 3 + (int32_t)spu->reverb_ring[tap2][1] * 2) / 5;
-
-            int32_t fb = spu->reverb_feedback;
-            if (fb < 0) fb = 0;
-            if (fb > 127) fb = 127;
-
-            int32_t in_l = mix_l + ((delayed_l * fb) / 128);
-            int32_t in_r = mix_r + ((delayed_r * fb) / 128);
-            if (in_l > 32767) in_l = 32767;
-            if (in_l < -32768) in_l = -32768;
-            if (in_r > 32767) in_r = 32767;
-            if (in_r < -32768) in_r = -32768;
-
-            spu->reverb_ring[rpos][0] = (int16_t)in_l;
-            spu->reverb_ring[rpos][1] = (int16_t)in_r;
-            spu->reverb_pos = (rpos + 1) % PS1_SPU_REVERB_BUF_SIZE;
-
-            int32_t rdepth_l = spu->reverb_depth_left;
-            int32_t rdepth_r = spu->reverb_depth_right;
-            mix_l += (delayed_l * rdepth_l) / 128;
-            mix_r += (delayed_r * rdepth_r) / 128;
-        }
+        /* Reverb controls are retained at the SDK boundary. Do not synthesize
+         * a global echo: PS1 wet output requires EON sends and the actual
+         * half-rate reverb RAM/filter pipeline, which is not implemented. */
 
         /* The sum of 24 voices can exceed 16-bit range before master scaling. */
         int32_t out_l = (int32_t)(((int64_t)mix_l * mvol_l) >> 15);
