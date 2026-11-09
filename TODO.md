@@ -6,6 +6,9 @@ Update the relevant item after completing a task or discovering a blocker.
 ## Active
 
 - [ ] Continuation audit: complete farm linkage/address translation and remove unsupported SDK success paths before claiming runtime integration.
+  - [x] Fix the reported flashback abort at SsSetSerialVol: the original CD fade emits 128 at volume 32, and the SDK must cap it to 127. The original-code regression fails on the old backend and after reversion; both profiles pass 32 synthetic checks. An optional Debug new-game replay reaches 18,000 vblanks beyond the previous abort.
+  - [ ] Investigate a separate optimized new-game probe failure in native menu state/callback handling before claiming Release gameplay stability.
+
   - [x] Replace unbounded SEQ scanning with exact archive spans and reject invalid sequence headers without consuming handles.
   - [x] Finish the interrupted MSVC farm-source build: case ranges, nested helpers, byte-pointer arithmetic and required type declarations.
   - [x] Resolve startup/farm linkage, SDK bootstrap and GS/matrix entry points; preserve original frame-region addresses in host RAM.

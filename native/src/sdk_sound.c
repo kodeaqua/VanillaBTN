@@ -288,12 +288,15 @@ void SsSetSerialAttr(char s_num, char attr, char mode) {
 }
 
 void SsSetSerialVol(short s_num, short voll, short volr) {
-    if (s_num < 0 || s_num > 1 || voll < 0 || voll > 127 || volr < 0 || volr > 127) {
-        abort();
-    }
+    if (s_num < 0 || s_num > 1) abort();
+    /* The original CD fade can request 128 (32 * 4). The reference SDK
+     * saturates values above 127 instead of treating them as fatal errors. */
+    if (voll > 127) voll = 127;
+    if (volr > 127) volr = 127;
     serial_vol[s_num] = (SdkSerialVol){voll, volr};
-    /* Reference SDK scales serial A by 2 * 129 into the SPU CD registers. */
-    if (s_num == SS_SERIAL_A) ps1_spu_set_cd_vol(&spu, voll * 258, volr * 258);
+    /* Keep the register's signed 16-bit conversion, including phase inversion. */
+    if (s_num == SS_SERIAL_A)
+        ps1_spu_set_cd_vol(&spu, (int16_t)(voll * 258), (int16_t)(volr * 258));
 }
 
 short SsVabOpenHead(u_char *addr, int vabid) {

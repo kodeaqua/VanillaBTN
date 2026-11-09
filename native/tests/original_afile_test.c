@@ -14,6 +14,7 @@
 #include <libspu.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <signal.h>
 #include <string.h>
 
 #define CHECK(condition) do { if (!(condition)) { \
@@ -26,6 +27,13 @@
 #define AFILE_TOTAL_BYTES (ENTRY9_OFFSET + ENTRY9_BYTES)
 
 extern s32 sound_offsets[151];
+extern s16 cd_audio_volume;
+
+static void unexpected_abort(int signal_number) {
+    (void)signal_number;
+    fputs("Unexpected SDK abort in original-code fixture\n", stderr);
+    _Exit(3);
+}
 
 static u8 demo_and_region_storage[sizeof(InputDemo) + 64];
 u8 *region_base = demo_and_region_storage + sizeof(InputDemo);
@@ -282,6 +290,8 @@ static void test_xa_sdk_stream(void) {
 }
 
 int main(void) {
+    _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+    signal(SIGABRT, unexpected_abort);
     _Static_assert(sizeof(CdlLOC) == 4 && sizeof(CdlFILE) == 24, "CD SDK wire sizes");
     fixtures();
     sdk_sound_reset();
@@ -335,6 +345,18 @@ int main(void) {
     CHECK(cd_audio_get_state() == CD_AUDIO_FADING);
     CHECK(sdk_sound_serial_vol(0).left == 45 && sdk_sound_serial_vol(0).right == 45);
     CHECK(CdLastCom() == CdlGetlocP);
+    /* The original fade emits 32 * 4 = 128 at this even-volume boundary.
+     * The reference SDK caps it to 127; aborting here crashes the flashback. */
+    s16 previous_volume = cd_audio_volume;
+    cd_audio_volume = 34;
+    cd_audio_fade_tick();
+    CHECK(cd_audio_volume == 32);
+    CHECK(sdk_sound_serial_vol(0).left == 127 && sdk_sound_serial_vol(0).right == 127);
+    CHECK(sdk_sound_spu()->cd_vol_left == 32766);
+    SsSetSerialVol(SS_SERIAL_B, 128, 32767);
+    CHECK(sdk_sound_serial_vol(1).left == 127 && sdk_sound_serial_vol(1).right == 127);
+    cd_audio_volume = previous_volume;
+
 
     /* Archive streamed reads stop active CD audio through original cd_audio_stop. */
     memset(buffer, 0xAA, sizeof(buffer));

@@ -215,7 +215,9 @@ stopping the current stream, ReadS dispatches the pending seek, and data reads,
 standby or unmount cancel the stream. GetlocP reports a 150-sector/s playback
 clock in mode C8, independently of decoder lookahead. Serial A volume writes
 the SPU CD-input gain (258 times the 0..127 SDK value, checked against the local
-reference function); it is not a second multiplier. Muted CD input still
+reference function); it is not a second multiplier. Values above 127 saturate
+at 127, including the original fade's `32 * 4 = 128` request. Rejecting that
+request caused the reported flashback abort. Muted CD input still
 advances, and libsnd voice mono mode does not fold CD channels together.
 XA uses the documented seven-phase zigzag FIR with persistent per-channel
 history, per-product signed truncation, output saturation and 18.9 kHz input
