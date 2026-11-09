@@ -22,6 +22,10 @@ int main(void) {
     CHECK(MemCardSync(1, NULL, NULL) == -1);
     for (size_t i = 0; i < sizeof(data); ++i) data[i] = (unsigned char)i;
     CHECK(ps1_card_write_file(card, "TEST", data, sizeof(data)) == PS1_CARD_OK);
+    card->dirty = false;
+    memcpy(snapshot, card->data, sizeof(snapshot));
+    CHECK(MemCardCreateFile(0, "TEST", 1) == McErrAlreadyExist);
+    CHECK(!card->dirty && memcmp(snapshot, card->data, sizeof(snapshot)) == 0);
     CHECK(MemCardReadFile(0, "TEST", buffer, 8128, sizeof(buffer)) == 1);
     completion(McErrNone, 3);
     CHECK(memcmp(buffer, data + 8128, sizeof(buffer)) == 0);
@@ -60,6 +64,8 @@ int main(void) {
     CHECK(MemCardSync(0, &command, &result) == 1);
     CHECK(command == 1 && result == 0);
     card->present = false;
+    CHECK(MemCardCreateFile(0, "MISSING", 1) == McErrCardNotExist);
+    CHECK(!card->dirty && memcmp(snapshot, card->data, sizeof(snapshot)) == 0);
     CHECK(MemCardReadFile(0, "TEST", buffer, 0, 128) == 1);
     completion(McErrCardNotExist, 3);
     card->present = true;
@@ -104,5 +110,16 @@ int main(void) {
     }
     CHECK(card->data[5 * PS1_CARD_BLOCK_SIZE] == 0x12);
     CHECK(card->data[PS1_CARD_BLOCK_SIZE + 64] == 0x34);
+    CHECK(MemCardCreateFile(0, "FILLER", 13) == McErrNone);
+    CHECK(ps1_card_get_free_blocks(card) == 0);
+    card->dirty = false;
+    memcpy(snapshot, card->data, sizeof(snapshot));
+    CHECK(MemCardCreateFile(0, "FULL", 1) == McErrBlockFull);
+    CHECK(!card->dirty && memcmp(snapshot, card->data, sizeof(snapshot)) == 0);
+    card->data[0] = 'X';
+    CHECK(MemCardCreateFile(0, "UNFORMATTED", 1) == McErrNotFormat);
+    card->data[0] = 'M';
+    card->data[127] ^= 1;
+    CHECK(MemCardCreateFile(0, "DAMAGED", 1) == McErrCardInvalid);
     return 0;
 }

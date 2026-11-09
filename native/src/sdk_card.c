@@ -172,9 +172,16 @@ int MemCardWriteFile(int chan, char *file, unsigned int *adrs, int ofs, int byte
 
 int MemCardCreateFile(int chan, char *file, int blocks) {
     Ps1Card *card = get_card_for_chan(chan);
-    if (card == NULL || file == NULL || blocks <= 0 || blocks > (int)PS1_CARD_DATA_BLOCKS) {
-        return -1;
-    }
+    if (card == NULL || file == NULL || !file[0] || strlen(file) > 20 ||
+        blocks <= 0 || blocks > (int)PS1_CARD_DATA_BLOCKS) return -1;
+    if (!card->present) return McErrCardNotExist;
+    Ps1CardStatus validation = ps1_card_validate(card);
+    if (validation == PS1_CARD_ERR_UNFORMATTED) return McErrNotFormat;
+    if (validation != PS1_CARD_OK) return McErrCardInvalid;
+    /* SDK creation is exclusive. The core replacement API is deliberately
+     * stronger and must not erase an existing diary for a create request. */
+    if (ps1_card_find_file(card, file, NULL)) return McErrAlreadyExist;
+    if (ps1_card_get_free_blocks(card) < blocks) return McErrBlockFull;
     size_t total_size = (size_t)blocks * PS1_CARD_BLOCK_SIZE;
     void *zero_buf = calloc(1, total_size);
     if (!zero_buf) {
