@@ -184,6 +184,7 @@ void ps1_spu_init(Ps1Spu *spu) {
     spu->master_vol_right = 0x3FFF;
     spu->cd_vol_left = 0x1FFF;
     spu->cd_vol_right = 0x1FFF;
+    ps1_reverb_set_preset(&spu->reverb, 0, 1);
     spu->reverb_enabled = 0;
     spu->reverb_feedback = 64;
     spu->reverb_depth_left = 64;
@@ -355,6 +356,7 @@ void ps1_spu_key_on_vab(Ps1Spu *spu, int voice_idx, Ps1VabId vab_id,
     memcpy(&adsr1, atr + 16, 2);
     memcpy(&adsr2, atr + 18, 2);
     voice_init_adsr(v, adsr1, adsr2);
+    ps1_spu_set_reverb_voice(spu, 1u << voice_idx, (atr[1] & 4) != 0);
 
     v->curr_sample = fetch_voice_raw_sample(v);
     v->next_sample = fetch_voice_raw_sample(v);
@@ -405,7 +407,12 @@ void ps1_spu_set_reverb_enabled(Ps1Spu *spu, int enabled) {
 
 void ps1_spu_set_reverb_params(Ps1Spu *spu, int type, int depth_l, int depth_r,
                                int vol_l, int vol_r, int feedback, int delay) {
-    if (!spu) return;
+    if (!spu || type < -9 || type > 9) return;
+    int clear = type < 0;
+    if (clear) type = -type;
+    if (spu->reverb_type != type || clear) {
+        ps1_reverb_set_preset(&spu->reverb, type, clear);
+    }
     spu->reverb_type = (int16_t)type;
     spu->reverb_depth_left = (int16_t)depth_l;
     spu->reverb_depth_right = (int16_t)depth_r;
@@ -413,6 +420,20 @@ void ps1_spu_set_reverb_params(Ps1Spu *spu, int type, int depth_l, int depth_r,
     spu->reverb_vol_right = (int16_t)vol_r;
     spu->reverb_feedback = (int16_t)feedback;
     spu->reverb_delay = (int16_t)delay;
+    if (depth_l < -127) depth_l = -127;
+    if (depth_l > 127) depth_l = 127;
+    if (depth_r < -127) depth_r = -127;
+    if (depth_r > 127) depth_r = 127;
+    spu->reverb_gain_left = (int16_t)(depth_l * 32767 / 127);
+    spu->reverb_gain_right = (int16_t)(depth_r * 32767 / 127);
+    ps1_reverb_set_echo(&spu->reverb, type, delay, feedback);
+}
+
+uint32_t ps1_spu_set_reverb_voice(Ps1Spu *spu, uint32_t mask, int enabled) {
+    mask &= 0x00ffffff;
+    if (enabled) spu->reverb_voice_mask |= mask;
+    else spu->reverb_voice_mask &= ~mask;
+    return spu->reverb_voice_mask;
 }
 
 /* -------------------------------------------------------------------------
@@ -427,6 +448,7 @@ void ps1_spu_mix(Ps1Spu *spu, int16_t *out, int frames, int accumulate) {
     for (int f = 0; f < frames; f++) {
         int32_t mix_l = 0;
         int32_t mix_r = 0;
+        int32_t send_l = 0, send_r = 0;
 
         for (int v = 0; v < PS1_SPU_VOICES; v++) {
             Ps1Voice *voice = &spu->voices[v];
@@ -440,8 +462,14 @@ void ps1_spu_mix(Ps1Spu *spu, int16_t *out, int frames, int accumulate) {
             /* ADSR envelope scaling */
             samp = (int32_t)(((int64_t)samp * voice->env_level) >> 15);
 
-            mix_l += (samp * (int32_t)voice->vol_left) >> 15;
-            mix_r += (samp * (int32_t)voice->vol_right) >> 15;
+            int32_t left = (samp * (int32_t)voice->vol_left) >> 15;
+            int32_t right = (samp * (int32_t)voice->vol_right) >> 15;
+            mix_l += left;
+            mix_r += right;
+            if (spu->reverb_voice_mask & (1u << v)) {
+                send_l += left;
+                send_r += right;
+            }
 
             voice_step_adsr(voice);
 
@@ -458,9 +486,21 @@ void ps1_spu_mix(Ps1Spu *spu, int16_t *out, int frames, int accumulate) {
             }
         }
 
-        /* Reverb controls are retained at the SDK boundary. Do not synthesize
-         * a global echo: PS1 wet output requires EON sends and the actual
-         * half-rate reverb RAM/filter pipeline, which is not implemented. */
+        if (spu->mono_voices) {
+            mix_l = mix_r = (mix_l + mix_r) / 2;
+            send_l = send_r = (send_l + send_r) / 2;
+        }
+        if (spu->cd_input && spu->cd_input_position < spu->cd_input_frames) {
+            unsigned index = spu->cd_input_position++ * 2;
+            int left = (spu->cd_input[index] * (int32_t)spu->cd_vol_left) >> 15;
+            int right = (spu->cd_input[index + 1] * (int32_t)spu->cd_vol_right) >> 15;
+            if (spu->cd_mix) { mix_l += left; mix_r += right; }
+            if (spu->cd_reverb) { send_l += left; send_r += right; }
+        }
+        int16_t wet[2];
+        ps1_reverb_clock(&spu->reverb, send_l, send_r, spu->reverb_enabled, wet);
+        mix_l += (wet[0] * (int32_t)spu->reverb_gain_left) >> 15;
+        mix_r += (wet[1] * (int32_t)spu->reverb_gain_right) >> 15;
 
         /* The sum of 24 voices can exceed 16-bit range before master scaling. */
         int32_t out_l = (int32_t)(((int64_t)mix_l * mvol_l) >> 15);

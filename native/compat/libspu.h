@@ -37,6 +37,7 @@
 #define SPU_COMMON_MVOLR (1 << 1)
 #define SPU_COMMON_CDVOLL (1 << 6)
 #define SPU_COMMON_CDVOLR (1 << 7)
+#define SPU_COMMON_CDREV (1 << 8)
 #define SPU_COMMON_CDMIX (1 << 9)
 
 typedef struct SpuVolume {
@@ -60,6 +61,7 @@ typedef struct SpuCommonAttr {
 } SpuCommonAttr;
 
 void SpuSetCommonAttr(SpuCommonAttr *attr);
+unsigned long SpuSetReverbVoice(long on, unsigned long voice_bit);
 void SpuGetAllKeysStatus(void *status);
 long SpuGetKeyStatus(unsigned long voice_bit);
 

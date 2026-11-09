@@ -468,6 +468,23 @@ int main(void) {
     CHECK(sdk_sound_status().playing_seq_count == 0);
     CHECK(sound_release_from(0, 0) == 0);
     CHECK(sdk_sound_status().open_vab_count == 0 && sdk_sound_status().open_seq_count == 0);
+    SsSetSerialAttr(SS_SERIAL_A, SS_REV, SS_ON);
+    CHECK(sdk_sound_spu()->cd_reverb);
+    SsSetSerialAttr(SS_SERIAL_A, SS_REV, SS_OFF);
+    CHECK(!sdk_sound_spu()->cd_reverb);
+    CHECK(SpuSetReverbVoice(SPU_ON, SPU_23CH) & SPU_23CH);
+    CHECK(!(SpuSetReverbVoice(SPU_OFF, SPU_23CH) & SPU_23CH));
+    CHECK(SsUtSetReverbType(10) == -1 && sdk_sound_status().reverb_type == 5);
+    CHECK(SsUtSetReverbType(-7) == 7); /* negative type clears the work area */
+    SsUtSetReverbDelay(63);
+    SsUtSetReverbFeedback(64);
+    CHECK(sdk_sound_spu()->reverb.registers[RV_MLSAME] == 4062);
+    CHECK(sdk_sound_spu()->reverb.registers[RV_VWALL] == 16642);
+    SsUtSetReverbDepth(40, 40);
+    CHECK(sdk_sound_spu()->reverb_gain_left == 10320);
+    SsSetRVol(20, 20); /* same EVOL register, not an additional multiplier */
+    CHECK(sdk_sound_spu()->reverb_gain_left == 5160);
+
 
     CHECK(CdSearchFile(&file, "\\A_FILE.HDT;1") == &file);
     CHECK(CdControl(CdlSetloc, (u_char *)&file.pos, NULL));

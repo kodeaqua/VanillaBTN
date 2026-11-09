@@ -178,7 +178,7 @@ points used by `sound.c` and `sound_request.c`: `SsInit`, `SsSetTableSize`,
 `SsUtSetReverbDelay`, `SpuSetCommonAttr`, `SpuGetAllKeysStatus` and
 `SpuGetKeyStatus`. VAB headers and chunk-streamed bodies are copied into
 per-slot SPU buffers and loaded into `Ps1Spu`, while opened `pQES` sequences
-and keyed voices drive `Ps1Seq` and `Ps1Spu` directly. `Ps1Spu` implements voice
+and keyed voices drive `Ps1Seq` and `Ps1Spu` directly. Voice
 ADSR envelopes use 44.1 kHz shift/step counters, exponential modes, all-ones
 rate holds and the original sustain targets, following the
 [SPU envelope specification](https://psx-spx.consoledev.net/soundprocessingunitspu/).
@@ -186,13 +186,27 @@ A zero-valued VAB ADSR register starts the fastest attack; only the standalone r
 sample helper explicitly holds full envelope volume. Key-off starts release and
 repeated key-offs do not abruptly silence a releasing voice. Numerical tests
 cover envelope clock values; interpolation and full sound fidelity remain open.
-Reverb SDK controls are retained, but no wet output is synthesized until the
-actual PS1 reverb RAM/filter pipeline and per-voice EON sends are implemented.
-The generic global echo was removed because it applied an invented effect to
-all voices. Hardware reverb remains an open task; an enabled setting alone does
-not prove reverb implementation. Starting an archive sector read via
+Reverb uses a bounded SPU work area, same/cross IIR reflections, four comb taps
+and two all-pass stages. Channels alternate at 44.1 kHz (each processes at
+22.05 kHz), with the documented 39-tap half-band filter for input decimation
+and output interpolation. SDK presets 0..9 have their register values and work
+sizes checked against the local reference; no SDK instructions or assets are
+included. Register addresses wrap inside the selected work area, and writes
+saturate to signed 16-bit samples. VAB tone mode 4 selects EON per voice;
+`SpuSetReverbVoice`, serial-A `SS_REV` and `SPU_COMMON_CDREV` control explicit
+voice/CD sends. Dry and wet audio share the SPU clock and final master gain.
+`SsUtSetReverbDepth` and `SsSetRVol` write the same output gain, so they do not
+multiply together. Negative preset numbers clear the selected work area;
+echo/delay parameters affect modes 7/8 without clearing history. Disabling
+reverb stops RAM writes while reads/output continue; set depth to zero to mute
+wet output. The host models these DSP operations, not the SPU DMA/IRQ bus or
+optical drive mechanics. Synthetic fixtures validate numerical operations and
+routing, not console-identical listening acceptance.
+
+Starting an archive sector read via
 `afile_read_bytes` invokes the real `cd_audio_stop` and switches the drive back
-to data mode (`0x80`). `sdk_cd` now feeds original filter/location/ReadS controls through a bounded
+to data mode (`0x80`). `sdk_cd` feeds original filter/location/ReadS controls
+through a bounded
 2336-byte sector reader into `ps1_xa`; the SDK sound mixer combines this PCM with
 the same SPU output sent to SDL. Imported XA sizes use 2336 physical bytes per
 sector, while SDK file sizes and virtual LBA allocation use 2048 logical bytes.
@@ -208,7 +222,8 @@ history, per-product signed truncation, output saturation and 18.9 kHz input
 duplication. Impulse fixtures verify numerical output; mix-call and sector
 boundaries do not reset the filter. Its startup phase is deterministic because
 hardware power-on phase is unspecified; the published coefficient model also
-notes small rounding discrepancies. The C8 drive exposes one sector after each 294 output samples. A reader wait
+notes small rounding discrepancies. The C8 drive exposes one sector after each
+294 output samples. A reader wait
 preserves the filter and produces silence until that physical sector arrives;
 EOF is separate, and interleaved sectors cannot be fetched ahead of the clock.
 Pause freezes both reader and audio state. There is no fabricated mechanical

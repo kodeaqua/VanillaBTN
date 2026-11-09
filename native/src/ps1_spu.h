@@ -13,6 +13,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include "ps1_reverb.h"
 
 #define PS1_SPU_VOICES 24
 #define PS1_SPU_SAMPLE_RATE 44100
@@ -100,7 +101,15 @@ typedef struct {
     int16_t         cd_vol_left;      /* 0..0x7FFF */
     int16_t         cd_vol_right;
 
-    /* Retained SDK reverb controls; hardware DSP/sends are not implemented. */
+    /* Borrowed SDK CD PCM is consumed exactly once by the shared SPU clock. */
+    const int16_t  *cd_input;
+    unsigned        cd_input_frames, cd_input_position;
+    int             cd_mix, cd_reverb, mono_voices;
+    uint32_t        reverb_voice_mask;
+    Ps1Reverb       reverb;
+    int16_t         reverb_gain_left, reverb_gain_right;
+
+    /* SDK control metadata; depth/RVol address the same hardware gain. */
     int             reverb_enabled;
     int16_t         reverb_type;
     int16_t         reverb_depth_left;   /* 0..127 */
@@ -158,12 +167,15 @@ void ps1_spu_set_cd_vol(Ps1Spu *spu, int16_t left, int16_t right);
 /* Restart the voice envelope with explicit ADSR registers (raw/test callers). */
 void ps1_spu_voice_set_adsr(Ps1Spu *spu, int voice_idx, uint16_t adsr1, uint16_t adsr2);
 
-/* Retain requested reverb enable state; no wet output is modeled yet. */
+/* Enable/disable reverb RAM writes; buffered wet output continues. */
 void ps1_spu_set_reverb_enabled(Ps1Spu *spu, int enabled);
 
-/* Retain SDK reverb parameters for the future hardware DSP bridge. */
+/* Select a hardware preset and SDK depth/echo controls without resetting tails. */
 void ps1_spu_set_reverb_params(Ps1Spu *spu, int type, int depth_l, int depth_r,
                                int vol_l, int vol_r, int feedback, int delay);
+
+/* Update EON independently of key-on/off; return the complete enabled mask. */
+uint32_t ps1_spu_set_reverb_voice(Ps1Spu *spu, uint32_t mask, int enabled);
 
 /* Mix frames stereo 16-bit PCM samples into out (interleaved L/R).
  * If accumulate is non-zero, samples are added to existing contents of out.

@@ -197,46 +197,28 @@ const Ps1Spu *sdk_sound_spu(void) {
 
 void sdk_sound_mix(int16_t *out, int frames) {
     if (!out || frames <= 0) return;
-    bool seq_mixed = false;
-    for (int i = 0; i < SDK_MAX_SEQS; ++i) {
-        SdkSeqRecord *slot = &seq_records[i];
-        if (slot->open && slot->playing && !slot->paused && slot->seq.active) {
-            ps1_seq_mix(&slot->seq, &spu, out, frames);
-            seq_mixed = true;
-            break;
-        }
-    }
-    if (!seq_mixed) {
-        ps1_spu_mix(&spu, out, frames, 0);
-    }
-    if (!sound_stereo_enabled) {
-        for (int f = 0; f < frames; ++f) {
-            int32_t mono = ((int32_t)out[f * 2] + (int32_t)out[f * 2 + 1]) / 2;
-            out[f * 2] = (int16_t)mono;
-            out[f * 2 + 1] = (int16_t)mono;
-        }
-    }
-    /* CD input has its own SPU gain and then shares master gain. Serial volume
-     * writes that same CD gain; applying both would attenuate it twice.
-     * Drain muted input too so unmuting cannot replay old decoded audio. */
     int16_t cd[256 * 2];
+    spu.mono_voices = !sound_stereo_enabled;
     for (int first = 0; first < frames; first += 256) {
         int count = frames - first;
         if (count > 256) count = 256;
-        sdk_cd_mix(cd, count);
-        if (!cd_mix_enabled) continue;
-        for (int f = 0; f < count; f++) {
-            for (int channel = 0; channel < 2; channel++) {
-                int volume = channel ? spu.cd_vol_right : spu.cd_vol_left;
-                int master = channel ? spu.master_vol_right : spu.master_vol_left;
-                int sample = ((cd[f * 2 + channel] * volume) >> 15) * master >> 15;
-                int index = (first + f) * 2 + channel;
-                sample += out[index];
-                if (sample > 32767) sample = 32767;
-                if (sample < -32768) sample = -32768;
-                out[index] = (int16_t)sample;
+        sdk_cd_mix(cd, count); /* Drain even muted input on the same clock. */
+        spu.cd_input = cd;
+        spu.cd_input_frames = (unsigned)count;
+        spu.cd_input_position = 0;
+        spu.cd_mix = cd_mix_enabled;
+        bool seq_mixed = false;
+        for (int i = 0; i < SDK_MAX_SEQS; ++i) {
+            SdkSeqRecord *slot = &seq_records[i];
+            if (slot->open && slot->playing && !slot->paused && slot->seq.active) {
+                ps1_seq_mix(&slot->seq, &spu, out + first * 2, count);
+                seq_mixed = true;
+                break;
             }
         }
+        if (!seq_mixed) ps1_spu_mix(&spu, out + first * 2, count, 0);
+        spu.cd_input = NULL; /* The borrowed stack buffer cannot escape. */
+        spu.cd_input_frames = spu.cd_input_position = 0;
     }
 }
 
@@ -283,6 +265,10 @@ void SsSetRVol(int voll, int volr) {
     if (voll < 0 || voll > 127 || volr < 0 || volr > 127) abort();
     reverb_vol_l = (int16_t)voll;
     reverb_vol_r = (int16_t)volr;
+    reverb_depth_l = (int16_t)voll;
+    reverb_depth_r = (int16_t)volr;
+    ps1_spu_set_reverb_params(&spu, reverb_type_val, voll, volr,
+        voll, volr, reverb_feedback_val, reverb_delay_val);
 }
 
 void SsSetStereo(void) {
@@ -298,6 +284,7 @@ void SsSetSerialAttr(char s_num, char attr, char mode) {
     serial_attr[(int)s_num] = (uint8_t)attr;
     serial_mode[(int)s_num] = (uint8_t)mode;
     if (s_num == SS_SERIAL_A && attr == SS_MIX) cd_mix_enabled = mode != 0;
+    if (s_num == SS_SERIAL_A && attr == SS_REV) spu.cd_reverb = mode != 0;
 }
 
 void SsSetSerialVol(short s_num, short voll, short volr) {
@@ -557,16 +544,27 @@ void SsUtReverbOff(void) {
 }
 
 short SsUtSetReverbType(short type) {
-    if (type < 0) return -1;
-    reverb_type_val = type;
-    ps1_spu_set_reverb_params(&spu, reverb_type_val, reverb_depth_l, reverb_depth_r,
-                              reverb_vol_l, reverb_vol_r, reverb_feedback_val, reverb_delay_val);
-    return type;
+    if (type < -9 || type > 9) return -1;
+    int mode = type < 0 ? -type : type;
+    if (mode != reverb_type_val) {
+        reverb_delay_val = mode == 7 || mode == 8 ? 127 : 0;
+        reverb_feedback_val = mode == 7 ? 127 : 0;
+    }
+    reverb_type_val = (int16_t)mode;
+    if (!mode) {
+        reverb_enabled = false;
+        ps1_spu_set_reverb_enabled(&spu, 0);
+    }
+    ps1_spu_set_reverb_params(&spu, type, reverb_depth_l, reverb_depth_r,
+        reverb_vol_l, reverb_vol_r, reverb_feedback_val, reverb_delay_val);
+    return (short)mode;
 }
 
 void SsUtSetReverbDepth(short ldepth, short rdepth) {
     reverb_depth_l = ldepth;
     reverb_depth_r = rdepth;
+    reverb_vol_l = ldepth;
+    reverb_vol_r = rdepth;
     ps1_spu_set_reverb_params(&spu, reverb_type_val, reverb_depth_l, reverb_depth_r,
                               reverb_vol_l, reverb_vol_r, reverb_feedback_val, reverb_delay_val);
 }
@@ -596,6 +594,7 @@ void SpuSetCommonAttr(SpuCommonAttr *attr) {
     if (mask == 0 || (mask & SPU_COMMON_CDVOLL)) cd_l = attr->cd.volume.left;
     if (mask == 0 || (mask & SPU_COMMON_CDVOLR)) cd_r = attr->cd.volume.right;
     if (mask == 0 || (mask & SPU_COMMON_CDMIX)) cd_mix_enabled = (attr->cd.mix != 0);
+    if (mask == 0 || (mask & SPU_COMMON_CDREV)) spu.cd_reverb = attr->cd.reverb != 0;
 
     ps1_spu_set_master_vol(&spu, mvol_l, mvol_r);
     ps1_spu_set_cd_vol(&spu, cd_l, cd_r);
@@ -616,4 +615,8 @@ long SpuGetKeyStatus(unsigned long voice_bit) {
         }
     }
     return SPU_OFF;
+}
+
+unsigned long SpuSetReverbVoice(long on, unsigned long voice_bit) {
+    return ps1_spu_set_reverb_voice(&spu, (uint32_t)voice_bit, on != 0);
 }

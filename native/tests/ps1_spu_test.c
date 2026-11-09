@@ -286,7 +286,49 @@ static void test_spu_reverb_without_voice_sends(void) {
     }
 }
 
+static void test_spu_vab_reverb_tail(void) {
+    Ps1Spu spu;
+    ps1_spu_init(&spu);
+    uint8_t header[4096] = {0};
+    uint8_t body[16] = {4, 1};
+    memcpy(header, "pBAV", 4);
+    header[18] = header[20] = header[22] = 1;
+    header[24] = 127; header[25] = 64;
+    header[32] = 1; header[33] = 127; header[36] = 64;
+    header[0x821] = 4; /* Original VagAtr mode selects the voice's EON send. */
+    header[0x822] = 127; header[0x823] = 64;
+    header[0x824] = 60; header[0x827] = 127;
+    header[0x830] = 0xff; header[0x832] = 0xc0; header[0x833] = 0x1f;
+    header[0x836] = 1; header[0xa22] = 2;
+    memset(body + 2, 0x77, 14);
+    int bank = ps1_spu_load_vab(&spu, header, sizeof(header), body, sizeof(body));
+    assert(bank >= 0);
+    ps1_spu_set_reverb_params(&spu, 5, 127, 127, 0, 0, 0, 0);
+    ps1_spu_set_reverb_enabled(&spu, 1);
+    ps1_spu_key_on_vab(&spu, 0, bank, 0, 0, 60, 0, 127, 127);
+    int16_t pcm[512];
+    ps1_spu_mix(&spu, pcm, 256, 0);
+    assert(!ps1_spu_voice_is_active(&spu, 0));
+    int tail = 0;
+    for (int i = 0; i < 100; i++) {
+        ps1_spu_mix(&spu, pcm, 256, 0);
+        for (int sample = 0; sample < 512; sample++) if (pcm[sample]) tail = 1;
+    }
+    assert(tail); /* The voice ended; only the hardware reverb RAM can sound. */
+    header[0x821] = 0;
+    ps1_spu_set_reverb_params(&spu, -5, 127, 127, 0, 0, 0, 0);
+    ps1_spu_key_on_vab(&spu, 0, bank, 0, 0, 60, 0, 127, 127);
+    assert(!(spu.reverb_voice_mask & 1));
+    ps1_spu_mix(&spu, pcm, 256, 0); /* drain the old FIR and direct pulse */
+    for (int i = 0; i < 100; i++) {
+        ps1_spu_mix(&spu, pcm, 256, 0);
+        for (int sample = 0; sample < 512; sample++) assert(pcm[sample] == 0);
+    }
+
+}
+
 int main(void) {
+    test_spu_vab_reverb_tail();
     test_final_adpcm_block_is_not_discarded();
     test_adpcm_decode_basic();
     test_adpcm_filter_prediction();

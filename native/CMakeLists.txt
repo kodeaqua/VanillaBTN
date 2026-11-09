@@ -51,7 +51,7 @@ set_target_properties(ps1_clock PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES
 target_include_directories(ps1_clock PUBLIC src)
 target_compile_options(ps1_clock PRIVATE /W4)
 
-add_library(ps1_spu STATIC src/ps1_spu.c)
+add_library(ps1_spu STATIC src/ps1_spu.c src/ps1_reverb.c)
 set_target_properties(ps1_spu PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_include_directories(ps1_spu PUBLIC src)
 target_compile_options(ps1_spu PRIVATE /W4)
@@ -458,6 +458,12 @@ set_target_properties(ps1_spu_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED 
 target_link_libraries(ps1_spu_test PRIVATE ps1_spu)
 target_compile_options(ps1_spu_test PRIVATE /W4)
 add_test(NAME ps1_spu_decode COMMAND ps1_spu_test)
+
+add_executable(ps1_reverb_test tests/ps1_reverb_test.c)
+set_target_properties(ps1_reverb_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_link_libraries(ps1_reverb_test PRIVATE ps1_spu)
+target_compile_options(ps1_reverb_test PRIVATE /W4 /UNDEBUG)
+add_test(NAME ps1_reverb_dsp COMMAND ps1_reverb_test)
 
 add_executable(ps1_xa_test tests/ps1_xa_test.c)
 set_target_properties(ps1_xa_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
