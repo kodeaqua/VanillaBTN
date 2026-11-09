@@ -116,7 +116,7 @@ typedef struct HostGame {
     int16_t stick_x[2], stick_y[2];
 #ifdef VANILLABTN_BOOT_TEST
     unsigned vblanks, vblank_limit, colored_frames, audible_frames;
-    bool cycle_required, visited_farm, returned_title;
+    bool cycle_required, visited_farm, returned_title, new_game_required;
 #endif
 } HostGame;
 
@@ -148,6 +148,11 @@ static void host_game_pump(void *context) {
     if (main_scene == SCENE_FARM && (game_state.globalFlags & GLOBAL_FLAG_INPUT_REPLAY))
         host->visited_farm = true;
     if (host->visited_farm && main_scene == SCENE_TITLE) host->returned_title = true;
+    if (host->new_game_required && main_scene == SCENE_FARM
+        && !(game_state.globalFlags & GLOBAL_FLAG_INPUT_REPLAY)) host->visited_farm = true;
+    if (host->new_game_required && host->vblanks % 1000 == 0)
+        fprintf(stderr, "probe: vblank=%u scene=%d entry=%u\n", host->vblanks,
+            main_scene, game_state.progress.entryStep);
     if (++host->vblanks >= host->vblank_limit || !sdk_gpu_ok()) {
         if (host->vblank_limit > 900 && host->vblanks == host->vblank_limit)
             fprintf(stderr, "frame snapshot: %d\n", boot_save_frame());
@@ -228,6 +233,14 @@ static void host_game_pump(void *context) {
     if (!host->running) { sdk_sync_stop(); return; }
     /* Supply raw samples only: original pad.c owns the analog/repeat rules
      * in the original game. Do not feed folded stick bits. */
+#ifdef VANILLABTN_BOOT_TEST
+    if (host->new_game_required) {
+        unsigned phase = host->vblanks % 120;
+        host->keyboard_buttons = phase < 2 || (phase >= 30 && phase < 32) ? PS1_PAD_UP :
+            phase >= 24 && phase < 26 ? PS1_PAD_START :
+            phase % 12 < 2 ? PS1_PAD_CROSS : 0;
+    }
+#endif
     sdk_pad_sample(0, true, host->gamepads[0] != NULL,
         (uint16_t)(host->keyboard_buttons | host->controller_buttons[0]),
         (uint8_t)(((int)host->stick_x[0] + 32768) / 256),
@@ -303,6 +316,10 @@ int main(int argc, char **argv) {
         else if (strcmp(argv[i], "--card-dir") == 0 && i + 1 < argc) card_directory = argv[++i];
 #ifdef VANILLABTN_BOOT_TEST
         else if (strcmp(argv[i], "--demo") == 0) host.vblank_limit = 5000;
+        else if (strcmp(argv[i], "--new-game") == 0) {
+            host.vblank_limit = 18000;
+            host.new_game_required = true;
+        }
         else if (strcmp(argv[i], "--cycle") == 0) {
             host.vblank_limit = 10000;
             host.cycle_required = true;
@@ -367,6 +384,11 @@ int main(int argc, char **argv) {
 #ifdef VANILLABTN_BOOT_TEST
     fprintf(stderr, "boot: vblanks=%u scene=%d gpu=%d colored=%u audible=%u\n",
         host.vblanks, main_scene, sdk_gpu_ok(), host.colored_frames, host.audible_frames);
+    if (host.new_game_required) {
+        fprintf(stderr, "new game: farm=%d entry=%u frame=%u\n", host.visited_farm,
+            game_state.progress.entryStep, game_state.frameCount);
+        if (!host.visited_farm) result = 2;
+    }
     if (host.cycle_required) {
         fprintf(stderr, "cycle: farm=%d returned_title=%d\n",
             host.visited_farm, host.returned_title);

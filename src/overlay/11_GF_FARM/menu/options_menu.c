@@ -140,6 +140,9 @@ static void options_menu_tick(void) {
             game_state.globalFlags |= GLOBAL_FLAG_TRANSITION_END;
             options_apply_settings();
         }
+#ifdef VANILLABTN_NATIVE
+        return;
+#endif
     } else {
         result = menu_phase_is_result();
         if ((result == 1) && (input_pad1->pressed & PAD_START)) {
@@ -152,7 +155,13 @@ static void options_menu_tick(void) {
         if (mode != OPTIONS_OPENING) {
             handler = options_state_handlers;
             handler_index = (mode >> 4) - 1;
+#ifdef VANILLABTN_NATIVE
+            if (handler_index >= 0 && handler_index < 2) {
+                handler[handler_index]();
+            }
+#else
             handler[handler_index]();
+#endif
             return;
         }
         window_frame_draw_at(&current_frame->otTags[0][OPTIONS_LAYER_START_FRAME], 1, 100, 74, 130, 34);

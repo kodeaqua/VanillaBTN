@@ -132,6 +132,16 @@ static AnimState status_page_sprites[3];
 AnimState status_cursor_sprite;
 AnimState status_mark_sprite;
 
+#ifdef VANILLABTN_NATIVE
+/* The original PS1 layout had status_cursor_sprite and status_mark_sprite adjacent
+ * to status_page_sprites[2] in BSS. Resolve indices 3 and 4 explicitly on x64 host. */
+static AnimState *status_page_sprite_ptr(s32 sprite) {
+    if (sprite == 3) return &status_cursor_sprite;
+    if (sprite == 4) return &status_mark_sprite;
+    return &status_page_sprites[sprite];
+}
+#endif
+
 /* A one-shot latch: set once, drawn while set, cleared to reset. */
 static s32 status_latch = 0;
 
@@ -422,7 +432,11 @@ static void status_load_sprites(void) {
     texture_pack_load(STAGING_BUFFER + sizeof(FarmPack));
     status_pack = *(FarmPack *)STAGING_BUFFER;
     for (i = 0; i < 5; i++) {
+#ifdef VANILLABTN_NATIVE
+        anim_bind_file(status_page_sprite_ptr(i), (AnimFile *)(status_pack.bytes + status_sprite_offsets[i]));
+#else
         anim_bind_file(&status_page_sprites[i], (AnimFile *)(status_pack.bytes + status_sprite_offsets[i]));
+#endif
     }
 }
 
@@ -551,8 +565,13 @@ static void status_draw_summary(void) {
 }
 
 static void status_draw_sprite_label(s32 sprite, s32 anim, u16 *text, s16 x, s16 y) {
+#ifdef VANILLABTN_NATIVE
+    anim_draw_sprt_cursor(&current_frame->otTags[0][26], status_page_sprite_ptr(sprite), anim & 0xFF, 0,
+                  x, y);
+#else
     anim_draw_sprt_cursor(&current_frame->otTags[0][26], &status_page_sprites[sprite], anim & 0xFF, 0,
                   x, y);
+#endif
     text_draw_plain(&current_frame->otTags[0][21], text, x + 24, y + 4);
 }
 
@@ -631,8 +650,13 @@ typedef struct FarmStatusMark {
 } FarmStatusMark;
 
 static void status_draw_entry(s32 value, s32 sprite, s32 animation, s32 frame, u16 *text, s16 x, s16 y) {
+#ifdef VANILLABTN_NATIVE
+    anim_draw_sprt_cursor(&current_frame->otTags[0][26], status_page_sprite_ptr(sprite), animation & 0xFF,
+                  frame & 0xFF, x, y);
+#else
     anim_draw_sprt_cursor(&current_frame->otTags[0][26], &status_page_sprites[sprite], animation & 0xFF,
                   frame & 0xFF, x, y);
+#endif
     text_draw_plain(&current_frame->otTags[0][21], text, x + 24, y + 2);
     status_draw_glyph_run_4(value, x + 96, y + 16);
 }

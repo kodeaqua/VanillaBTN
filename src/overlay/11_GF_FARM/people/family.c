@@ -80,10 +80,33 @@ void family_daily_update(void) {
 /* Per wife index, an address in the overlay's data (family_table_lookup reads it). */
 u32 family_tables[5] = {0x80127F98, 0x80127FA4, 0x80127FAC, 0x80127FB8, 0x80127FC4};
 
+#ifdef VANILLABTN_NATIVE
+static const u16 wife_name_karen[]  = {0x000A, 0x0020, 0x0031, 0x0024, 0x002D, 0xFFFF};
+static const u16 wife_name_ann[]    = {0x0000, 0x002D, 0x002D, 0xFFFF};
+static const u16 wife_name_elli[]   = {0x0004, 0x002B, 0x002B, 0x0028, 0xFFFF};
+static const u16 wife_name_mary[]   = {0x000C, 0x0020, 0x0031, 0x0038, 0xFFFF};
+static const u16 wife_name_popuri[] = {0x000F, 0x002E, 0x002F, 0x0034, 0x0031, 0x0028, 0xFFFF};
+
+static const u16 *const family_native_tables[5] = {
+    wife_name_karen,
+    wife_name_ann,
+    wife_name_elli,
+    wife_name_mary,
+    wife_name_popuri,
+};
+
+uintptr_t family_table_lookup(void) {
+    if (game_state.family.wifeIndex >= 0 && game_state.family.wifeIndex < 5) {
+        return (uintptr_t)family_native_tables[game_state.family.wifeIndex];
+    }
+    return 0;
+}
+#else
 /* The family_tables entry of the current wife. */
 s32 family_table_lookup(void) {
     return family_tables[game_state.family.wifeIndex];
 }
+#endif
 
 /* Count the pregnancy: after FAMILY_PREGNANCY_TICKS ticks the days count up, and the
  * pregnancy starts once the wife's affection is past FAMILY_PREGNANCY_AFFECTION. */

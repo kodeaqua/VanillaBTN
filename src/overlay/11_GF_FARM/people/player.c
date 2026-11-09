@@ -393,6 +393,16 @@ s16 facing_reach[8][2] = {
     {0, 0},
 };
 
+#ifdef VANILLABTN_NATIVE
+/* Probe kind is a PS1 offset across adjacent globals. Resolve the actual rows
+ * explicitly on the host: 0x18 is the 128-unit reach, 0x38 the zero row. */
+static s16 *player_probe_offset(s16 kind, u16 facing) {
+    if (kind == 0x18) return move_steps_large + 8 + facing * 2;
+    if (kind == 0x38) return facing_reach[4 + facing];
+    return move_steps_small + kind + facing * 2;
+}
+#endif
+
 static FarmVelocity facing_velocities[4] = {{0, -180224}, {-180224, 0}, {0, 180224}, {180224, 0}};
 
 u32 step_sound_timer = 0;
@@ -4613,7 +4623,11 @@ static s16 player_probe_target(FarmPlayer *player, VECTOR *pos, s32 kind_arg)
     found = 0;
     target = 0;
     probe.vy = pos->vy;
+#ifdef VANILLABTN_NATIVE
+    offset = player_probe_offset(kind, player->facing38);
+#else
     offset = &move_steps_small[kind + player->facing38 * 2];
+#endif
     probe.vx = pos->vx + offset[0];
     probe.vz = pos->vz + offset[1];
     player->stateFlags &= ~PLAYER_FLAG_BIT18;

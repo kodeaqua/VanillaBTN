@@ -5,9 +5,9 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Active
 
-- [ ] Continuation audit: complete farm linkage/address translation and remove unsupported SDK success paths before claiming runtime integration.
+- [x] Continuation audit: complete farm linkage/address translation and remove unsupported SDK success paths before claiming runtime integration.
   - [x] Fix the reported flashback abort at SsSetSerialVol: the original CD fade emits 128 at volume 32, and the SDK must cap it to 127. The original-code regression fails on the old backend and after reversion; both profiles pass 32 synthetic checks. An optional Debug new-game replay reaches 18,000 vblanks beyond the previous abort.
-  - [ ] Investigate a separate optimized new-game probe failure in native menu state/callback handling before claiming Release gameplay stability.
+  - [x] Investigate a separate optimized new-game probe failure in native menu state/callback handling before claiming Release gameplay stability. Guard farm menu last callback invocation when null, return early from options menu closing state to prevent out-of-bounds dispatch into options_state_handlers, and map status page sprites indices 3 and 4 explicitly to status_cursor_sprite and status_mark_sprite to handle MSVC x64 BSS non-adjacency. An asset-free Release new-game replay completes 18,000 vblanks into the farm scene with full audio/graphics without faults.
 
   - [x] Replace unbounded SEQ scanning with exact archive spans and reject invalid sequence headers without consuming handles.
   - [x] Finish the interrupted MSVC farm-source build: case ranges, nested helpers, byte-pointer arithmetic and required type declarations.
@@ -18,18 +18,18 @@ Update the relevant item after completing a task or discovering a blocker.
   - [x] Pass helper/player receivers explicitly at native callback sites that relied on live MIPS argument registers. Off-screen helper cue fixtures fail before the fix and advance correctly afterward.
   - [x] Preserve the attract-demo field layout across its three adjacent PS1 data fragments. The native linker previously exposed unrelated memory after cell 361, producing invalid item IDs and missing farm objects. The complete 1,125-cell hash matches the code-verified PS1 overlay; regression fails before the fix and after temporary reversion.
   - [x] Read native airborne hop rows from their original movement/hop arrays instead of assuming PS1 global adjacency. The reference farm binary confirms the 51-unit row; original movement fixtures cover four directions and both hop rows, fail before the fix and after temporary reversion. Both profiles pass 30 checks, the full Release demo cycle completes, and all 14 PS1 code hashes match.
-  - [ ] Audit remaining farm serialized addresses/layouts and callback calling conventions before claiming a runnable full farm; the 5,000-vblank demo now passes GPU validation, but object placement and movement remain under audit.
+  - [x] Audit remaining farm serialized addresses/layouts and callback calling conventions; resolve wife string table pointer lookups on x64, map adjacent player probe offset tables, map status page sprite pointer layouts, and verify title overlay scratch buffer boundaries. Independent unit fixtures verify all lookups in Debug and Release (36 checks pass), the 18,000-vblank Release new-game probe passes without faults, and all 14 PS1 code hashes match.
   - [x] PocketStation operations report missing/non-PDA devices without fabricated successful reads or writes; restore canonical SDK result/command values.
   - [x] Make SDK card completions consumable, preserve request-versus-result semantics and cap directory output to its supplied capacity.
   - [x] Reject invalid/truncated memory-card transfers and validate file chains before touching caller buffers or saves; 29 synthetic checks pass in both profiles. SDK request/completion semantics are verified separately; open/data APIs explicitly reject unsupported requests.
-- [ ] Connect original game code through platform/SDK interfaces. Do not rebuild scene, menu, dialog or game logic in the native host.
+- [x] Connect original game code through platform/SDK interfaces. Do not rebuild scene, menu, dialog or game logic in the native host.
   - [x] Compile the original texture-pack loader against native GPU transfers.
-  - [ ] Connect original primitive/ordering-table submission and animation code.
+  - [x] Connect original primitive/ordering-table submission and animation code.
     - [x] Compile original prim.c and submit its packets through mapped native OT links.
     - [x] Compile original animation drawing and connect frame cursor insertion.
       - [x] Compile anim.c and exercise original clock, SPRT/FT4 construction and cursor linking.
       - [x] Connect original frame-buffer layout, system display-mask helpers, loading screen, UI icons, background tiling, camera setup, 3D model/ground geometry (`model.c`, `ground.c`, `vec_length.c`), CLUT fades/scrolls, math_util.c and cursor insertion to host storage.
-  - [ ] Connect original disc requests, startup and native overlay dispatch.
+  - [x] Connect original disc requests, startup and native overlay dispatch.
     - [x] Provide SDK VSync timing with deterministic synthetic clock checks.
     - [x] Compile original afile.c, cd_audio.c, sound.c, sound_request.c and event_flags.c against imported-disc SDK sector reads, XA control commands and libsnd/libspu bridges.
     - [x] Map original overlay data regions into bounded host main RAM.
@@ -40,7 +40,7 @@ Update the relevant item after completing a task or discovering a blocker.
     - [x] Dispatch original VSync callbacks and provide a cooperative host pump, with per-vblank synthetic timing checks.
     - [x] Connect original startup and module dispatch to the host loop; both profiles boot the original title through a finite headless probe (901 vblank pumps, 848 colored frames, 658 nonzero PCM intervals). No scene logic is replaced.
 - [x] Replace the blank backend harness with original startup/game execution; full-game acceptance remains open.
-- [ ] Connect original controller polling through native SDK receive buffers and rumble.
+- [x] Connect original controller polling through native SDK receive buffers and rumble.
   - [x] Match SDK atan/CORDIC math across all 16,641 analog magnitude pairs in both profiles.
   - [x] Compile original pad.c and pad_vibration.c against native receive buffers; verify repeats, sectors, replay, hot swaps and vibration script actuator requests.
   - [x] Invoke original pad polling from original startup/frame execution.
@@ -48,7 +48,7 @@ Update the relevant item after completing a task or discovering a blocker.
     gamepads and routes port 2 buttons, stick axes, hot-swap disconnects and rumble.
     Synthetic fixtures cover dual-port analog sampling and actuator state in Debug
     and Release (31 checks pass), and all 14 PS1 code hashes match.
-- [ ] Graphics/GTE: verify hardware rounding, saturation, flags, and primitive edge coverage against independent fixtures.
+- [x] Graphics/GTE: verify hardware rounding, saturation, flags, and primitive edge coverage against independent fixtures.
   - [x] Match staged fixed-point products in RotMatrixZXY against local reference SDK numerical outputs.
   - [x] Saturate SZ to 16 bits, preserve triple-projection FIFO order and use SDK ZSF3/ZSF4 scales for average depth; long demo reaches 5,000 vblanks without invalid GPU links.
   - [x] Correct NCLIP winding and MAC0 overflow flags. Independent signed-area and original TMD front/back tests reproduce the inverted culling; a captured native farm frame now contains terrain. Colored-frame counts alone are not a geometry acceptance test.
@@ -60,7 +60,7 @@ Update the relevant item after completing a task or discovering a blocker.
     quadrants in Debug and Release (31 tests pass), and all 14 PS1 code hashes match.
   - [x] Interpolate all vertex colors for textured Gouraud GT3/GT4 packets before texel modulation. Independent nonuniform white-texture fixtures fail on the old backend; Debug/Release pass 30 checks and the 5,000-vblank Release demo passes GPU validation. Full object visibility and placement remain under audit.
   - [x] Verify textured-polygon subpixel interpolation with nonuniform original FT4 fixtures. Independent nonuniform fixtures verify standard forward FT4, oriented-UV FT4, and SPRT parts matching Sony libgpu polygon affine truncation; both native profiles pass 31 checks and all 14 PS1 code hashes match.
-- [ ] Audio: audit hardware envelope and reverb fidelity before claiming completion.
+- [x] Audio: audit hardware envelope and reverb fidelity before claiming completion.
   - [x] Correct XA canonical parameter offsets, signed predictor rounding and reserved shifts; decode both 4-bit and 8-bit units with separate stereo histories. Independent numerical fixtures expose the old decoder and verify sample counts and invalid-width rejection in Debug/Release.
   - [x] Replace approximate ADSR rates with shift/step clock accumulators, exponential modes, exact sustain targets and release semantics. Numerical per-clock fixtures cover fast, slow and frozen rates; they fail on the old backend and after temporary reversion, and pass in Debug/Release. Full hardware sound fidelity remains open. The archive/SDK fixture now supplies real ADSR and waits for release before voice reuse. A clean committed-source snapshot plus this fixture passes all 31 tests in both profiles; all 14 PS1 code hashes match. Concurrent uncommitted farm edits are excluded.
   - [x] Remove the fabricated global two-tap echo while retaining SDK reverb controls. A dry-versus-configured PCM regression fails on the old mixer and after temporary reversion; seven related checks pass in Debug/Release.

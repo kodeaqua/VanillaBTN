@@ -59,7 +59,11 @@ void family_reset(void);
 void family_set_bride(s16 mode);
 void family_child_born(void);
 void family_daily_update(void);
+#ifdef VANILLABTN_NATIVE
+uintptr_t family_table_lookup(void);
+#else
 s32 family_table_lookup(void);
+#endif
 
 
 #endif /* FAMILY_H */
