@@ -2,6 +2,11 @@
 
 #include <assert.h>
 #include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#undef assert
+#define assert(c) do { if (!(c)) { fprintf(stderr, "line %d: %s\n", __LINE__, #c); exit(1); } } while (0)
 
 static Ps1Spu spu;
 static uint8_t header[4096];
@@ -16,6 +21,11 @@ static Ps1VabId bank(void) {
     header[32] = 1; header[33] = 127; header[36] = 64;
     header[0x822] = 127; header[0x823] = 64;
     header[0x824] = 60; header[0x827] = 127;
+    /* Fast attack, slow decay to the highest target, frozen sustain and
+     * two-clock release: scheduling fixtures must supply real ADSR registers. */
+    header[0x830] = 0xff;
+    header[0x832] = 0xc0;
+    header[0x833] = 0x1f;
     header[0x836] = 1; header[0xA22] = 2;
     memset(body, 0x11, sizeof(body));
     body[0] = 4; body[1] = 7;
@@ -32,13 +42,15 @@ static void test_sample_boundaries_and_running_status(void) {
         1,60,0,
         0,0xFF,0x2F,0
     };
-    int16_t pcm[883 * 2];
+    int16_t pcm[885 * 2];
     Ps1Seq seq;
     assert(ps1_seq_open(&seq, sequence, sizeof(sequence), bank(), false));
-    ps1_seq_mix(&seq, &spu, pcm, 883);
+    ps1_seq_mix(&seq, &spu, pcm, 885);
     for (unsigned i = 0; i < 441; ++i) assert(pcm[i * 2] == 0);
-    assert(pcm[441 * 2] > 0 && pcm[881 * 2] > 0);
-    assert(pcm[882 * 2] == 0);
+    /* The event starts attack at sample 441; its initial level is zero.
+     * Release begins at 882 and reaches zero two envelope clocks later. */
+    assert(pcm[441 * 2] == 0 && pcm[442 * 2] > 0 && pcm[881 * 2] > 0);
+    assert(pcm[882 * 2] > 0 && pcm[883 * 2] > 0 && pcm[884 * 2] == 0);
     assert(!seq.active && !seq.failed && seq.note_events == 1);
 }
 
@@ -57,7 +69,8 @@ static void test_ps1_tempo_and_loop_commands(void) {
     assert(ps1_seq_open(&seq, sequence, sizeof(sequence), bank(), true));
     ps1_seq_mix(&seq, &spu, pcm, 2000);
     for (unsigned i = 0; i < 221; ++i) assert(pcm[i * 2] == 0);
-    assert(pcm[221 * 2] > 0 && pcm[441 * 2] == 0);
+    assert(pcm[221 * 2] == 0 && pcm[222 * 2] > 0);
+    assert(pcm[441 * 2] > 0 && pcm[442 * 2] > 0 && pcm[443 * 2] == 0);
     assert(seq.active && !seq.failed && seq.loop_count >= 4);
 }
 

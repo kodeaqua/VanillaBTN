@@ -6,6 +6,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#undef assert
+#define assert(c) do { if (!(c)) { fprintf(stderr, "line %d: %s\n", __LINE__, #c); exit(1); } } while (0)
+
 static void test_adpcm_decode_basic(void) {
     /* 16-byte block: shift=4, filter=0, no loop flags */
     uint8_t block[16];
@@ -182,53 +185,82 @@ static void test_spu_raw_playback_and_volume(void) {
 
 static void test_spu_adsr_envelope(void) {
     Ps1Spu spu;
+    uint8_t block[16] = {4, 7};
+    int16_t pcm[64];
     ps1_spu_init(&spu);
-
-    /* Construct a looped ADPCM block with non-zero samples */
-    uint8_t block[16];
-    memset(block, 0, sizeof(block));
-    block[0] = 0x04; /* shift 4, filter 0 */
-    block[1] = PS1_ADPCM_FLAG_LOOP_START | PS1_ADPCM_FLAG_LOOP_END | PS1_ADPCM_FLAG_LOOP_REPEAT;
-    memset(block + 2, 0x33, 14);
-
-    ps1_spu_key_on_raw(&spu, 0, block, sizeof(block), 0x10000, 0x7FFF, 0x7FFF);
-    assert(ps1_spu_voice_is_active(&spu, 0));
-
-    /* Configure ADSR on voice 0:
-     * ADSR1: Attack rate = 64 (linear), Decay rate = 8, Sustain level = 8 (half volume, 0x47FF)
-     * ADSR2: Sustain dir = 1 (decrease), Sustain rate = 0 (hold), Release rate = 16 (linear)
-     */
-    uint16_t adsr1 = (0 << 15) | (64 << 8) | (8 << 4) | 8;
-    uint16_t adsr2 = (0 << 15) | (1 << 14) | (0 << 6) | (0 << 5) | 16;
-    ps1_spu_voice_set_adsr(&spu, 0, adsr1, adsr2);
-
-    assert(spu.voices[0].env_phase == PS1_ADSR_ATTACK);
-    assert(spu.voices[0].env_level == 0);
-
-    /* Mix a few samples: Attack should ramp envelope up */
-    int16_t pcm[256];
-    ps1_spu_mix(&spu, pcm, 128, 0);
-    assert(spu.voices[0].env_level > 0);
-
-    /* Mix enough samples to complete attack and reach decay/sustain */
-    for (int i = 0; i < 50; i++) {
-        ps1_spu_mix(&spu, pcm, 128, 0);
-    }
-    assert(spu.voices[0].env_phase == PS1_ADSR_SUSTAIN);
-    assert(spu.voices[0].env_level <= spu.voices[0].adsr_sustain_level);
-
-    /* Key off: must enter release phase, remaining active while releasing */
+    ps1_spu_key_on_raw(&spu, 0, block, sizeof(block), 0x10000, 32767, 32767);
+    Ps1Voice *v = &spu.voices[0];
+    /* Independent clock values from PS1 shift/step envelope rules. */
+    ps1_spu_voice_set_adsr(&spu, 0, 11 << 10, 0);
+    ps1_spu_mix(&spu, pcm, 1, 0);
+    assert(v->env_level == 7);
+    ps1_spu_mix(&spu, pcm, 1, 0);
+    assert(v->env_level == 14);
+    ps1_spu_voice_set_adsr(&spu, 0, 12 << 10, 0);
+    ps1_spu_mix(&spu, pcm, 1, 0);
+    assert(v->env_level == 0);
+    ps1_spu_mix(&spu, pcm, 1, 0);
+    assert(v->env_level == 7);
+    ps1_spu_voice_set_adsr(&spu, 0, 127 << 8, 0);
+    ps1_spu_mix(&spu, pcm, 32, 0);
+    assert(v->env_level == 0 && v->env_phase == PS1_ADSR_ATTACK);
+    /* Zero registers mean fastest attack, not an envelope bypass. */
+    ps1_spu_voice_set_adsr(&spu, 0, 0, 0);
+    ps1_spu_mix(&spu, pcm, 1, 0);
+    assert(v->env_level == 14336 && v->adsr_sustain_level == 0x800);
+    ps1_spu_mix(&spu, pcm, 2, 0);
+    assert(v->env_level == 32767 && v->env_phase == PS1_ADSR_DECAY);
+    /* Linear release shift zero takes two clocks from full volume. */
     ps1_spu_key_off(&spu, 0);
-    assert(spu.voices[0].env_phase == PS1_ADSR_RELEASE);
-    assert(ps1_spu_voice_is_active(&spu, 0));
+    assert(v->active && v->env_phase == PS1_ADSR_RELEASE);
+    ps1_spu_mix(&spu, pcm, 1, 0);
+    assert(v->env_level == 16383 && v->active);
+    ps1_spu_key_off(&spu, 0);
+    assert(v->active && v->env_level == 16383);
+    ps1_spu_mix(&spu, pcm, 1, 0);
+    assert(v->env_level == 0 && !v->active && v->env_phase == PS1_ADSR_OFF);
 
-    /* Mix until release completes */
-    while (ps1_spu_voice_is_active(&spu, 0)) {
-        ps1_spu_mix(&spu, pcm, 128, 0);
-    }
-    assert(!ps1_spu_voice_is_active(&spu, 0));
-    assert(spu.voices[0].env_level == 0);
-    assert(spu.voices[0].env_phase == PS1_ADSR_OFF);
+    ps1_spu_key_on_raw(&spu, 0, block, sizeof(block), 0x10000, 32767, 32767);
+    ps1_spu_voice_set_adsr(&spu, 0, 0, (1 << 15) | (1 << 14) | (11 << 8));
+    v->env_phase = PS1_ADSR_SUSTAIN;
+    v->env_level = 16384;
+    ps1_spu_mix(&spu, pcm, 1, 0);
+    assert(v->env_level == 16380); /* exponential decrease: -8 * 0.5 */
+    ps1_spu_voice_set_adsr(&spu, 0, 0, 31);
+    v->env_level = 12345;
+    ps1_spu_key_off(&spu, 0);
+    ps1_spu_mix(&spu, pcm, 32, 0);
+    assert(v->env_level == 12345 && v->active); /* all-ones release holds */
+    /* Decay uses exponential -8 steps and changes phase at its target. */
+    ps1_spu_voice_set_adsr(&spu, 0, (11 << 4) | 7, 0);
+    v->env_phase = PS1_ADSR_DECAY;
+    v->env_level = 16388;
+    ps1_spu_mix(&spu, pcm, 1, 0);
+    assert(v->env_level == 16383 && v->env_phase == PS1_ADSR_SUSTAIN);
+    assert(v->adsr_sustain_level == 16384);
+
+    /* Above 0x6000, exponential attack shift 11 ticks once every 4 clocks. */
+    ps1_spu_voice_set_adsr(&spu, 0, (1 << 15) | (11 << 10), 0);
+    v->env_level = 0x6001;
+    ps1_spu_mix(&spu, pcm, 3, 0);
+    assert(v->env_level == 0x6001);
+    ps1_spu_mix(&spu, pcm, 1, 0);
+    assert(v->env_level == 0x6008);
+    /* Shift 10 splits the slowdown between step and counter. */
+    ps1_spu_voice_set_adsr(&spu, 0, (1 << 15) | (10 << 10), 0);
+    v->env_level = 0x6001;
+    ps1_spu_mix(&spu, pcm, 1, 0);
+    assert(v->env_level == 0x6001);
+    ps1_spu_mix(&spu, pcm, 1, 0);
+    assert(v->env_level == 0x6008);
+    /* A slow non-all-ones rate still steps after 32768 clocks. */
+    ps1_spu_voice_set_adsr(&spu, 0, 126 << 8, 0);
+    for (int i = 0; i < 1023; i++) ps1_spu_mix(&spu, pcm, 32, 0);
+    ps1_spu_mix(&spu, pcm, 31, 0);
+    assert(v->env_level == 0);
+    ps1_spu_mix(&spu, pcm, 1, 0);
+    assert(v->env_level == 5);
+
 }
 
 static void test_spu_reverb_processing(void) {

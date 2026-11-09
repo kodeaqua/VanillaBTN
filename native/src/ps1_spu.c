@@ -89,113 +89,89 @@ static int16_t fetch_voice_raw_sample(Ps1Voice *voice) {
 static void voice_init_adsr(Ps1Voice *v, uint16_t adsr1, uint16_t adsr2) {
     v->adsr1 = adsr1;
     v->adsr2 = adsr2;
-    if (adsr1 == 0 && adsr2 == 0) {
-        /* Bypassed ADSR: full volume immediately, instant key-off */
-        v->env_phase = PS1_ADSR_SUSTAIN;
-        v->env_level = 0x7FFF;
-        v->adsr_release_rate = 0;
-        return;
-    }
     v->adsr_attack_mode = (adsr1 >> 15) & 1;
     v->adsr_attack_rate = (adsr1 >> 8) & 0x7F;
     v->adsr_decay_rate = (adsr1 >> 4) & 0x0F;
     int sl_raw = adsr1 & 0x0F;
-    v->adsr_sustain_level = ((sl_raw + 1) * 0x7FFF) / 16;
+    v->adsr_sustain_level = (sl_raw + 1) * 0x800;
     v->adsr_sustain_mode = (adsr2 >> 15) & 1;
     v->adsr_sustain_dir = (adsr2 >> 14) & 1;
     v->adsr_sustain_rate = (adsr2 >> 6) & 0x7F;
     v->adsr_release_mode = (adsr2 >> 5) & 1;
     v->adsr_release_rate = adsr2 & 0x1F;
 
+    v->env_counter = 0;
     v->env_phase = PS1_ADSR_ATTACK;
     v->env_level = 0;
 }
 
+/* PS1 SPU shift/step counters advance at 44.1 kHz, independently of pitch.
+ * https://psx-spx.consoledev.net/soundprocessingunitspu/
+ * All-ones rates deliberately leave the counter stopped. */
 static void voice_step_adsr(Ps1Voice *v) {
     if (!v->active) return;
-
+    int shift, step_value = 0, decrease = 0, exponential = 0, frozen;
     switch (v->env_phase) {
-    case PS1_ADSR_ATTACK: {
-        int Ar = v->adsr_attack_rate;
-        if (Ar >= 124) {
-            v->env_level = 0x7FFF;
-            v->env_phase = PS1_ADSR_DECAY;
-        } else {
-            int32_t step = (1 << (Ar / 8)) + ((Ar & 7) * (1 << (Ar / 8))) / 8;
-            if (step < 1) step = 1;
-            if (v->adsr_attack_mode == 0) {
-                v->env_level += step;
-            } else {
-                v->env_level += step + ((0x7FFF - v->env_level) >> 8);
-            }
-            if (v->env_level >= 0x7FFF) {
-                v->env_level = 0x7FFF;
-                v->env_phase = PS1_ADSR_DECAY;
-            }
-        }
+    case PS1_ADSR_ATTACK:
+        shift = v->adsr_attack_rate >> 2;
+        step_value = v->adsr_attack_rate & 3;
+        exponential = v->adsr_attack_mode;
+        frozen = v->adsr_attack_rate == 127;
         break;
-    }
-    case PS1_ADSR_DECAY: {
-        int Dr = v->adsr_decay_rate;
-        int32_t diff = v->env_level - v->adsr_sustain_level;
-        if (diff <= 0) {
-            v->env_level = v->adsr_sustain_level;
-            v->env_phase = PS1_ADSR_SUSTAIN;
-        } else {
-            int32_t dstep = (diff * (Dr + 1)) / 128 + 1;
-            v->env_level -= dstep;
-            if (v->env_level <= v->adsr_sustain_level) {
-                v->env_level = v->adsr_sustain_level;
-                v->env_phase = PS1_ADSR_SUSTAIN;
-            }
-        }
+    case PS1_ADSR_DECAY:
+        shift = v->adsr_decay_rate;
+        decrease = exponential = 1;
+        frozen = 0;
         break;
-    }
-    case PS1_ADSR_SUSTAIN: {
-        if (v->adsr_sustain_dir == 0) {
-            int32_t sstep = (1 << (v->adsr_sustain_rate / 8));
-            v->env_level += sstep;
-            if (v->env_level > 0x7FFF) v->env_level = 0x7FFF;
-        } else {
-            if (v->adsr_sustain_rate > 0) {
-                int32_t sstep = (v->env_level * (v->adsr_sustain_rate + 1)) / 1024 + 1;
-                v->env_level -= sstep;
-                if (v->env_level <= 0) {
-                    v->env_level = 0;
-                    v->active = 0;
-                    v->env_phase = PS1_ADSR_OFF;
-                }
-            }
-        }
+    case PS1_ADSR_SUSTAIN:
+        shift = v->adsr_sustain_rate >> 2;
+        step_value = v->adsr_sustain_rate & 3;
+        decrease = v->adsr_sustain_dir;
+        exponential = v->adsr_sustain_mode;
+        frozen = v->adsr_sustain_rate == 127;
         break;
-    }
-    case PS1_ADSR_RELEASE: {
-        if (v->adsr_release_rate == 0) {
-            v->env_level = 0;
-            v->active = 0;
-            v->env_phase = PS1_ADSR_OFF;
-        } else {
-            int Rr = v->adsr_release_rate;
-            int32_t rstep;
-            if (v->adsr_release_mode == 0) {
-                rstep = (1 << (Rr / 4)) + 1;
-            } else {
-                rstep = (v->env_level * (Rr + 1)) / 128 + 1;
-            }
-            v->env_level -= rstep;
-            if (v->env_level <= 0) {
-                v->env_level = 0;
-                v->active = 0;
-                v->env_phase = PS1_ADSR_OFF;
-            }
-        }
+    case PS1_ADSR_RELEASE:
+        shift = v->adsr_release_rate;
+        decrease = 1;
+        exponential = v->adsr_release_mode;
+        frozen = v->adsr_release_rate == 31;
         break;
-    }
-    case PS1_ADSR_OFF:
     default:
-        v->env_level = 0;
+        return;
+    }
+
+    int32_t step = 7 - step_value;
+    if (decrease) step = ~step;
+    /* Multiply rather than left-shifting a negative signed value. */
+    if (shift < 11) step *= 1 << (11 - shift);
+    uint32_t increment = 0x8000u >> (shift > 11 ? shift - 11 : 0);
+    if (exponential && !decrease && v->env_level > 0x6000) {
+        if (shift < 10) {
+            step >>= 2;
+        } else if (shift >= 11) {
+            increment >>= 2;
+        } else {
+            step >>= 1;
+            increment >>= 1;
+        }
+    } else if (exponential && decrease) {
+        step = (step * v->env_level) >> 15;
+    }
+    if (!frozen && increment == 0) increment = 1;
+    v->env_counter += increment;
+    if (!(v->env_counter & 0x8000u)) return;
+    v->env_counter = 0;
+    v->env_level += step;
+    if (v->env_level < 0) v->env_level = 0;
+    if (v->env_level > 0x7FFF) v->env_level = 0x7FFF;
+
+    if (v->env_phase == PS1_ADSR_ATTACK && v->env_level == 0x7FFF) {
+        v->env_phase = PS1_ADSR_DECAY;
+    } else if (v->env_phase == PS1_ADSR_DECAY && v->env_level <= v->adsr_sustain_level) {
+        v->env_phase = PS1_ADSR_SUSTAIN;
+    } else if (v->env_phase == PS1_ADSR_RELEASE && v->env_level == 0) {
+        v->env_phase = PS1_ADSR_OFF;
         v->active = 0;
-        break;
     }
 }
 
@@ -317,7 +293,11 @@ void ps1_spu_key_on_raw(Ps1Spu *spu, int voice_idx, const uint8_t *data,
     v->pitch_step = pitch_16_16 ? pitch_16_16 : 0x10000;
     v->vol_left = vol_left;
     v->vol_right = vol_right;
-    voice_init_adsr(v, 0, 0);
+    /* Raw sample playback has no VAB ADSR registers: hold its explicit volume.
+     * VAB voices, including zero-valued registers, always use the envelope. */
+    voice_init_adsr(v, 0, 127 << 6);
+    v->env_phase = PS1_ADSR_SUSTAIN;
+    v->env_level = 0x7FFF;
 
     v->curr_sample = fetch_voice_raw_sample(v);
     v->next_sample = fetch_voice_raw_sample(v);
@@ -389,12 +369,9 @@ void ps1_spu_key_off(Ps1Spu *spu, int voice_idx) {
     if (voice_idx < 0 || voice_idx >= PS1_SPU_VOICES) return;
     Ps1Voice *v = &spu->voices[voice_idx];
     if (!v->active) return;
-    if (v->adsr_release_rate > 0 && v->env_phase != PS1_ADSR_RELEASE) {
+    if (v->env_phase != PS1_ADSR_RELEASE) {
         v->env_phase = PS1_ADSR_RELEASE;
-    } else {
-        v->active = 0;
-        v->env_phase = PS1_ADSR_OFF;
-        v->env_level = 0;
+        v->env_counter = 0;
     }
 }
 

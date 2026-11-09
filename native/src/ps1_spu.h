@@ -62,12 +62,13 @@ typedef struct {
     /* ADSR envelope state */
     Ps1AdsrPhase    env_phase;
     int32_t         env_level;         /* 0..0x7FFF */
+    uint32_t        env_counter;       /* clock accumulator, step at bit 15 */
     uint16_t        adsr1;
     uint16_t        adsr2;
     int             adsr_attack_mode;  /* 0 = Linear, 1 = Exponential */
     int             adsr_attack_rate;  /* 0..127 */
     int             adsr_decay_rate;   /* 0..15 */
-    int32_t         adsr_sustain_level;/* 0..0x7FFF */
+    int32_t         adsr_sustain_level;/* target 0x800..0x8000 */
     int             adsr_sustain_mode; /* 0 = Linear, 1 = Exponential */
     int             adsr_sustain_dir;  /* 0 = Increase, 1 = Decrease */
     int             adsr_sustain_rate; /* 0..127 */
@@ -157,7 +158,7 @@ void ps1_spu_set_master_vol(Ps1Spu *spu, int16_t left, int16_t right);
 /* Set CD (XA) mix volume (0..0x7FFF) */
 void ps1_spu_set_cd_vol(Ps1Spu *spu, int16_t left, int16_t right);
 
-/* Configure voice ADSR parameters directly */
+/* Restart the voice envelope with explicit ADSR registers (raw/test callers). */
 void ps1_spu_voice_set_adsr(Ps1Spu *spu, int voice_idx, uint16_t adsr1, uint16_t adsr2);
 
 /* Enable or disable reverb processing */

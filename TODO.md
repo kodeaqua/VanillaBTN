@@ -59,7 +59,7 @@ Update the relevant item after completing a task or discovering a blocker.
   - [x] Verify textured-polygon subpixel interpolation with nonuniform original FT4 fixtures. Independent nonuniform fixtures verify standard forward FT4, oriented-UV FT4, and SPRT parts matching Sony libgpu polygon affine truncation; both native profiles pass 31 checks and all 14 PS1 code hashes match.
 - [ ] Audio: audit hardware envelope and reverb fidelity before claiming completion.
   - [x] Correct XA canonical parameter offsets, signed predictor rounding and reserved shifts; decode both 4-bit and 8-bit units with separate stereo histories. Independent numerical fixtures expose the old decoder and verify sample counts and invalid-width rejection in Debug/Release.
-  - [ ] Replace approximate ADSR rates with hardware envelope counters and numerical clock fixtures.
+  - [x] Replace approximate ADSR rates with shift/step clock accumulators, exponential modes, exact sustain targets and release semantics. Numerical per-clock fixtures cover fast, slow and frozen rates; they fail on the old backend and after temporary reversion, and pass in Debug/Release. Full hardware sound fidelity remains open.
   - [ ] Replace the generic global echo with PS1 reverb DSP and per-voice sends; the existing delay-tail test does not establish hardware fidelity.
   - [ ] Verify original CD SDK stream integration and hardware XA resampling; standalone decoder tests do not establish in-game streaming.
 - [x] Save/load: verify original save layout before game integration.

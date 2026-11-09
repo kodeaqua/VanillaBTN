@@ -181,8 +181,15 @@ points used by `sound.c` and `sound_request.c`: `SsInit`, `SsSetTableSize`,
 `SpuGetKeyStatus`. VAB headers and chunk-streamed bodies are copied into
 per-slot SPU buffers and loaded into `Ps1Spu`, while opened `pQES` sequences
 and keyed voices drive `Ps1Seq` and `Ps1Spu` directly. `Ps1Spu` implements voice
-ADSR envelope generators (Attack, Decay, Sustain, Release) and a circular delay-line
-reverb DSP, with reverb parameters configured at the SDK boundary. Starting an archive sector read via
+ADSR envelopes use 44.1 kHz shift/step counters, exponential modes, all-ones
+rate holds and the original sustain targets, following the
+[SPU envelope specification](https://psx-spx.consoledev.net/soundprocessingunitspu/).
+A zero-valued VAB ADSR register starts the fastest attack; only the standalone raw
+sample helper explicitly holds full envelope volume. Key-off starts release and
+repeated key-offs do not abruptly silence a releasing voice. Numerical tests
+cover envelope clock values; interpolation and full sound fidelity remain open.
+The current circular delay-line effect is a generic echo, not validated PS1
+reverb DSP; hardware reverb remains an open task. Starting an archive sector read via
 `afile_read_bytes` invokes the real `cd_audio_stop` and switches the drive back
 to data mode (`0x80`). Feeding `cd_audio.c` filter/location/volume state into
 the live `ps1_xa` audio mixer stream remains a separate integration step.
