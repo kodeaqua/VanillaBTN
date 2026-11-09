@@ -5,6 +5,7 @@
 #include "sdk_memory.h"
 #include "scene.h"
 #include "farm_probe.h"
+#include "model.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -62,6 +63,29 @@ int main(void) {
     CHECK(helper->actor.flags & ACTOR_FLAG_CUE_RUNNING);
     harvest_helpers_update();
     CHECK(helper->actor.taskTime == 1);
+    /* No ground objects: isolate original airborne movement from collision.
+     * Row 1 lives 48 bytes past move_steps_large in the PS1 image, after the
+     * riding table; native global adjacency must not select the hop distance. */
+    TmdHeader empty_ground = {0};
+    ModelCenters empty_centers = {0};
+    farm_model = (Model){&empty_ground, &empty_centers};
+    const int dx[4] = {0, -1, 0, 1};
+    const int dz[4] = {-1, 0, 1, 0};
+    for (int crouch = 0; crouch < 2; ++crouch) {
+        int step = crouch ? 73 : 51;
+        for (int facing = 0; facing < 4; ++facing) {
+            FarmPlayer *player = &game_state.player;
+            memset(player, 0, sizeof(*player));
+            player->stateFlags = PLAYER_FLAG_NO_INPUT | PLAYER_FLAG_AIRBORNE;
+            player->facing38 = (u16)facing;
+            player->mode = crouch ? PLAYER_MODE_JUMP_CROUCH : PLAYER_MODE_JUMP_LAUNCH;
+            player->position = (VECTOR){1000, -1000, 2000, 0};
+            player_update_position();
+            CHECK(player->position.vx == 1000 + dx[facing] * step);
+            CHECK(player->position.vz == 2000 + dz[facing] * step);
+        }
+    }
+    farm_model = (Model){0};
     u32 first = 11, buffer[3] = {0};
     sdk_gpu_bind(&video);
     CHECK(ps1_video_upload(&video, 0, 0, 2, 1, (u16 *)&first, 2));

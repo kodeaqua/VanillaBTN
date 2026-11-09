@@ -106,7 +106,13 @@ typedef s32 (*CellFromWorldToolClear)(s32 *, u16 *, u16 *);
 typedef s32 (*WorldToCellHandler)(VECTOR *, s16 *, s16 *);
 
 /* Hop steps indexed [row][facing]: row 0 while the jump crouches, row 1 otherwise. */
+#ifdef VANILLABTN_NATIVE
+/* PS1 row 1 starts after both move_steps_large and move_steps_riding, at
+ * hop_steps. Native linkers need not keep those separate arrays adjacent. */
+#define HOPS ((FarmHopStep *const[2]){(FarmHopStep *)move_steps_large, hop_steps})
+#else
 #define HOPS ((FarmHopStep(*)[12])move_steps_large)
+#endif
 
 /* Tool experience: the base gain, and the gain of a committed move. */
 #define TOOL_EXP_BASE 40
