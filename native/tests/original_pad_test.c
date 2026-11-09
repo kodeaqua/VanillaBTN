@@ -22,9 +22,11 @@ static uint64_t clock_time;
 static uint64_t now(void *context) { (void)context; return clock_time; }
 static void wait_until(uint64_t deadline, void *context) { (void)context; clock_time = deadline; }
 static unsigned small_motor, large_motor;
+static unsigned small_motor2, large_motor2;
 static void rumble(unsigned slot, uint8_t small, uint8_t large, void *context) {
     (void)context;
     if (slot == 0) { small_motor = small; large_motor = large; }
+    if (slot == 1) { small_motor2 = small; large_motor2 = large; }
 }
 
 int main(void) {
@@ -44,7 +46,7 @@ int main(void) {
     for (unsigned i = 1; i <= 14; ++i) {
         pad_poll_ports();
         CHECK(input_pad1->pressed == 0);
-        CHECK(input_pad1->triggered == (i == 14 ? PAD_CROSS : 0));
+        CHECK(input_pad1->triggered == (i == 14u ? (s32)PAD_CROSS : 0));
         CHECK(input_pad1->triggered2 == input_pad1->triggered);
     }
     sdk_pad_sample(0, false, false, 0, 128, 128);
@@ -121,6 +123,25 @@ int main(void) {
     sdk_pad_sample(0, false, true, 0, 128, 128);
     pad_poll_ports();
     CHECK(input_pad1->held == PAD_CROSS && input_pad1->analog == 0);
+    game_state.globalFlags = 0;
+
+    /* Port 2 hot-swap and analog test. */
+    sdk_pad_sample(1, false, false, 0, 128, 128);
+    pad_poll_ports();
+    CHECK(input_pad2->held == 0 && input_pad2->analog == -1);
+    sdk_pad_sample(1, true, true, 0, 255, 128);
+    pad_poll_ports();
+    pad_poll_ports();
+    CHECK(PadGetState(0x10) == PadStateExecCmd);
+    clock_time = 150000000;
+    pad_poll_ports();
+    CHECK(PadGetState(0x10) == PadStateStable);
+    CHECK(input_pad2->held == PAD_RIGHT && input_pad2->analog == 90);
+    sdk_pad_sample(1, true, false, PAD_TRIANGLE, 128, 128);
+    pad_poll_ports();
+    pad_poll_ports();
+    CHECK(input_pad2->held == PAD_TRIANGLE && input_pad2->analog == -1);
+
     PadStopCom();
     CHECK(small_motor == 0 && large_motor == 0);
     sdk_pad_rumble(NULL, NULL);

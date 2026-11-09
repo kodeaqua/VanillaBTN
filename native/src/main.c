@@ -34,11 +34,11 @@ static Ps1CardManager card_mgr;
 #endif
 
 static void send_rumble(unsigned slot, uint8_t small, uint8_t large, void *context) {
-    SDL_Gamepad *gamepad = *(SDL_Gamepad **)context;
-    if (slot == 0 && gamepad != NULL) {
+    SDL_Gamepad **gamepads = context;
+    if (slot < 2 && gamepads[slot] != NULL) {
         /* Refresh while the SDK polls the original actuator buffer. The short
          * timeout also stops motors if host polling unexpectedly stalls. */
-        SDL_RumbleGamepad(gamepad, (Uint16)(large * 257u), small ? 65535 : 0, 100);
+        SDL_RumbleGamepad(gamepads[slot], (Uint16)(large * 257u), small ? 65535 : 0, 100);
     }
 }
 
@@ -110,10 +110,10 @@ typedef struct HostGame {
     SDL_Window *window;
     SDL_Renderer *renderer;
     SDL_Texture *texture;
-    SDL_Gamepad *gamepad;
+    SDL_Gamepad *gamepads[2];
     bool running;
-    uint32_t keyboard_buttons, controller_buttons;
-    int16_t stick_x, stick_y;
+    uint32_t keyboard_buttons, controller_buttons[2];
+    int16_t stick_x[2], stick_y[2];
 #ifdef VANILLABTN_BOOT_TEST
     unsigned vblanks, vblank_limit, colored_frames, audible_frames;
     bool cycle_required, visited_farm, returned_title;
@@ -159,17 +159,28 @@ static void host_game_pump(void *context) {
     while (SDL_PollEvent(&event)) {
         if (event.type == SDL_EVENT_QUIT) {
             host->running = false;
-        } else if (event.type == SDL_EVENT_GAMEPAD_ADDED && host->gamepad == NULL) {
-            host->gamepad = SDL_OpenGamepad(event.gdevice.which);
-        } else if (event.type == SDL_EVENT_GAMEPAD_REMOVED && host->gamepad != NULL
-                   && SDL_GetGamepadID(host->gamepad) == event.gdevice.which) {
-            SDL_CloseGamepad(host->gamepad);
-            host->gamepad = NULL;
-            host->controller_buttons = 0;
-            host->stick_x = host->stick_y = 0;
+        } else if (event.type == SDL_EVENT_GAMEPAD_ADDED) {
+            if (host->gamepads[0] == NULL) {
+                host->gamepads[0] = SDL_OpenGamepad(event.gdevice.which);
+            } else if (host->gamepads[1] == NULL) {
+                host->gamepads[1] = SDL_OpenGamepad(event.gdevice.which);
+            }
+        } else if (event.type == SDL_EVENT_GAMEPAD_REMOVED) {
+            for (int i = 0; i < 2; ++i) {
+                if (host->gamepads[i] != NULL && SDL_GetGamepadID(host->gamepads[i]) == event.gdevice.which) {
+                    SDL_CloseGamepad(host->gamepads[i]);
+                    host->gamepads[i] = NULL;
+                    host->controller_buttons[i] = 0;
+                    host->stick_x[i] = host->stick_y[i] = 0;
+                    break;
+                }
+            }
         } else if (event.type == SDL_EVENT_WINDOW_FOCUS_LOST) {
-            host->keyboard_buttons = host->controller_buttons = 0;
-            host->stick_x = host->stick_y = 0;
+            host->keyboard_buttons = 0;
+            for (int i = 0; i < 2; ++i) {
+                host->controller_buttons[i] = 0;
+                host->stick_x[i] = host->stick_y[i] = 0;
+            }
         } else if (event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP) {
             uint32_t btn = map_key_to_ps1_button(event.key.key);
             if (btn != 0) {
@@ -178,16 +189,32 @@ static void host_game_pump(void *context) {
             }
         } else if (event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN
                    || event.type == SDL_EVENT_GAMEPAD_BUTTON_UP) {
-            uint32_t btn = host->gamepad != NULL && SDL_GetGamepadID(host->gamepad) == event.gbutton.which
-                ? map_gamepad_to_ps1_button(event.gbutton.button) : 0;
-            if (btn != 0) {
-                if (event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN) host->controller_buttons |= btn;
-                else host->controller_buttons &= ~btn;
+            int pad_idx = -1;
+            for (int i = 0; i < 2; ++i) {
+                if (host->gamepads[i] != NULL && SDL_GetGamepadID(host->gamepads[i]) == event.gbutton.which) {
+                    pad_idx = i;
+                    break;
+                }
             }
-        } else if (event.type == SDL_EVENT_GAMEPAD_AXIS_MOTION && host->gamepad != NULL
-                   && SDL_GetGamepadID(host->gamepad) == event.gaxis.which) {
-            if (event.gaxis.axis == SDL_GAMEPAD_AXIS_LEFTX) host->stick_x = event.gaxis.value;
-            if (event.gaxis.axis == SDL_GAMEPAD_AXIS_LEFTY) host->stick_y = event.gaxis.value;
+            if (pad_idx >= 0) {
+                uint32_t btn = map_gamepad_to_ps1_button(event.gbutton.button);
+                if (btn != 0) {
+                    if (event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN) host->controller_buttons[pad_idx] |= btn;
+                    else host->controller_buttons[pad_idx] &= ~btn;
+                }
+            }
+        } else if (event.type == SDL_EVENT_GAMEPAD_AXIS_MOTION) {
+            int pad_idx = -1;
+            for (int i = 0; i < 2; ++i) {
+                if (host->gamepads[i] != NULL && SDL_GetGamepadID(host->gamepads[i]) == event.gaxis.which) {
+                    pad_idx = i;
+                    break;
+                }
+            }
+            if (pad_idx >= 0) {
+                if (event.gaxis.axis == SDL_GAMEPAD_AXIS_LEFTX) host->stick_x[pad_idx] = event.gaxis.value;
+                if (event.gaxis.axis == SDL_GAMEPAD_AXIS_LEFTY) host->stick_y[pad_idx] = event.gaxis.value;
+            }
         } else if (event.type == SDL_EVENT_WINDOW_EXPOSED
                    || event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) {
             if (!host_present_frame(&video, host->renderer, &host->texture)) {
@@ -201,10 +228,15 @@ static void host_game_pump(void *context) {
     if (!host->running) { sdk_sync_stop(); return; }
     /* Supply raw samples only: original pad.c owns the analog/repeat rules
      * in the original game. Do not feed folded stick bits. */
-    sdk_pad_sample(0, true, host->gamepad != NULL,
-        (uint16_t)(host->keyboard_buttons | host->controller_buttons),
-        (uint8_t)(((int)host->stick_x + 32768) / 256),
-        (uint8_t)(((int)host->stick_y + 32768) / 256));
+    sdk_pad_sample(0, true, host->gamepads[0] != NULL,
+        (uint16_t)(host->keyboard_buttons | host->controller_buttons[0]),
+        (uint8_t)(((int)host->stick_x[0] + 32768) / 256),
+        (uint8_t)(((int)host->stick_y[0] + 32768) / 256));
+
+    sdk_pad_sample(1, host->gamepads[1] != NULL, host->gamepads[1] != NULL,
+        (uint16_t)host->controller_buttons[1],
+        (uint8_t)(((int)host->stick_x[1] + 32768) / 256),
+        (uint8_t)(((int)host->stick_y[1] + 32768) / 256));
 
     /* Original game timing owns the cadence. Submit exactly one 60 Hz audio
      * interval from the same SDK SPU used by sound.c, not the smoke mixer. */
@@ -312,7 +344,7 @@ int main(int argc, char **argv) {
     /* This probe must never read, recover, create or flush user save files. */
     sdk_card_bind_manager(NULL);
 #endif
-    sdk_pad_rumble(send_rumble, &host.gamepad);
+    sdk_pad_rumble(send_rumble, host.gamepads);
     host.running = true;
     sdk_sync_pump(host_game_pump, &host);
 #ifdef VANILLABTN_BOOT_TEST
@@ -340,7 +372,9 @@ done:
     sdk_card_bind_manager(NULL);
     sdk_cd_unmount();
     sdk_gpu_bind(NULL);
-    if (host.gamepad) SDL_CloseGamepad(host.gamepad);
+    for (int i = 0; i < 2; ++i) {
+        if (host.gamepads[i]) SDL_CloseGamepad(host.gamepads[i]);
+    }
 #ifndef VANILLABTN_BOOT_TEST
     ps1_card_manager_shutdown(&card_mgr);
 #endif

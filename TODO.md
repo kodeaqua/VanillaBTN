@@ -41,7 +41,10 @@ Update the relevant item after completing a task or discovering a blocker.
   - [x] Match SDK atan/CORDIC math across all 16,641 analog magnitude pairs in both profiles.
   - [x] Compile original pad.c and pad_vibration.c against native receive buffers; verify repeats, sectors, replay, hot swaps and vibration script actuator requests.
   - [x] Invoke original pad polling from original startup/frame execution.
-  - [ ] Assign a second physical host controller.
+  - [x] Assign a second physical host controller; the SDL host tracks dual opened
+    gamepads and routes port 2 buttons, stick axes, hot-swap disconnects and rumble.
+    Synthetic fixtures cover dual-port analog sampling and actuator state in Debug
+    and Release (31 checks pass), and all 14 PS1 code hashes match.
 - [ ] Graphics/GTE: verify hardware rounding, saturation, flags, and primitive edge coverage against independent fixtures.
   - [x] Match staged fixed-point products in RotMatrixZXY against local reference SDK numerical outputs.
   - [x] Saturate SZ to 16 bits, preserve triple-projection FIFO order and use SDK ZSF3/ZSF4 scales for average depth; long demo reaches 5,000 vblanks without invalid GPU links.

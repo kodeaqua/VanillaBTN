@@ -344,12 +344,11 @@ requests are consumed. This models the used SDK protocol, not full serial or
 Multi Tap emulation. `ChangeClearPAD(0)` has no native interrupt to alter;
 unsupported interrupt-clearing modes stop instead of pretending to work.
 
-The SDL host merges keyboard/controller raw bits into port 1 and supplies
-rumble output for its opened gamepad. The smoke harness still uses its old
-input record while original startup is pending; raw SDK samples are ready
-for the original poller. Port 2 is exercised synthetically but has no second
-physical SDL controller assignment yet. Rumble, disconnects and controller
-feel still require developer validation.
+The SDL host merges keyboard/controller raw bits into port 1, assigns a second
+physical SDL gamepad to port 2 when connected, and supplies rumble output for both
+opened gamepads. The smoke harness still uses its old input record while original
+startup is pending; raw SDK samples are ready for the original poller. Rumble,
+disconnects and controller feel still require developer validation.
 
 Fixtures supply the actual original main/farm record types, not replacement
 controller algorithms. They cover both ports, repeated and newly pressed
