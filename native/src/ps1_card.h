@@ -3,7 +3,7 @@
  * Implements:
  *   - Two standard 128 KB (131 072 bytes) virtual memory card slots.
  *   - Standard PS1 Memory Card image layout (compatible with .mcr / .mcd files
- *     from DuckStation, ePSXe, Mednafen, and real hardware DexDrive).
+ *     from emulators or raw hardware exports; container headers are not parsed).
  *   - Frame 0 header validation, directory frame (1..15) block allocation chains,
  *     and XOR frame checksums.
  *   - HM:BTN save file format: 4 blocks (0x8000 = 32 768 bytes), filename
@@ -74,7 +74,7 @@ void ps1_card_init(Ps1Card *card);
 /* Formats card image with valid Frame 0 ("MC") and 15 free directory frames */
 void ps1_card_format(Ps1Card *card);
 
-/* Validates card magic, directory frames, and checksums */
+/* Validate magic, checksums, chain ownership, links and allocation states. */
 Ps1CardStatus ps1_card_validate(const Ps1Card *card);
 
 /* Calculates 1-byte XOR checksum of 127 bytes */
@@ -87,11 +87,18 @@ int ps1_card_get_free_blocks(const Ps1Card *card);
  * If found, returns start block (1..15) and sets *out_size. Returns 0 if not found. */
 int ps1_card_find_file(const Ps1Card *card, const char *filename, uint32_t *out_size);
 
-/* Read file payload from card. Returns PS1_CARD_OK on success. */
+/* Resolve a validated file into physical block numbers (1..15), converting
+ * the on-disk zero-based links. Outputs remain untouched on failure. The
+ * number of output blocks is ceil(*out_size / PS1_CARD_BLOCK_SIZE). */
+Ps1CardStatus ps1_card_file_blocks(const Ps1Card *card, const char *filename,
+    uint8_t blocks[PS1_CARD_DATA_BLOCKS], uint32_t *out_size);
+
+/* Read allocated file bytes (whole blocks, optionally limited by max_size). */
 Ps1CardStatus ps1_card_read_file(const Ps1Card *card, const char *filename,
                                  void *out_buf, size_t max_size, size_t *out_size);
 
 /* Write file payload to card. Allocates contiguous blocks, updates directory frames. */
+/* Allocates whole blocks and zero-pads the supplied payload to that size. */
 Ps1CardStatus ps1_card_write_file(Ps1Card *card, const char *filename,
                                   const void *data, size_t size);
 

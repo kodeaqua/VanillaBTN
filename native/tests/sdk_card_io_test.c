@@ -77,5 +77,32 @@ int main(void) {
     CHECK(MemCardWriteFile(0, "TEST", buffer, 0, 128) == 1);
     completion(McErrCardInvalid, 4);
     CHECK(!card->dirty && memcmp(snapshot, card->data, sizeof(snapshot)) == 0);
+    /* Imported physical block 5 -> block 1, encoded as wire next=0. */
+    ps1_card_format(card);
+    unsigned char *head = card->data + 5 * PS1_CARD_FRAME_SIZE;
+    unsigned char *last = card->data + PS1_CARD_FRAME_SIZE;
+    memset(head, 0, PS1_CARD_FRAME_SIZE);
+    head[0] = 0x51; head[5] = 0x40;
+    memcpy(head + 10, "EXTERNAL", 8);
+    head[127] = ps1_card_checksum(head);
+    memset(last, 0, PS1_CARD_FRAME_SIZE);
+    last[0] = 0x53; last[8] = last[9] = 0xFF;
+    last[127] = ps1_card_checksum(last);
+    memset(card->data + 5 * PS1_CARD_BLOCK_SIZE, 0x12, PS1_CARD_BLOCK_SIZE);
+    memset(card->data + PS1_CARD_BLOCK_SIZE, 0x34, PS1_CARD_BLOCK_SIZE);
+    CHECK(MemCardReadFile(0, "EXTERNAL", buffer, 8128, 128) == 1);
+    completion(McErrNone, McFuncReadFile);
+    const unsigned char *bytes = (const unsigned char *)buffer;
+    for (unsigned i = 0; i < 128; ++i) CHECK(bytes[i] == (i < 64 ? 0x12 : 0x34));
+    memset(buffer, 0xAB, sizeof(buffer));
+    CHECK(MemCardWriteFile(0, "EXTERNAL", buffer, 8128, 128) == 1);
+    completion(McErrNone, McFuncWriteFile);
+    CHECK(card->dirty);
+    for (unsigned i = 0; i < 64; ++i) {
+        CHECK(card->data[5 * PS1_CARD_BLOCK_SIZE + 8128 + i] == 0xAB);
+        CHECK(card->data[PS1_CARD_BLOCK_SIZE + i] == 0xAB);
+    }
+    CHECK(card->data[5 * PS1_CARD_BLOCK_SIZE] == 0x12);
+    CHECK(card->data[PS1_CARD_BLOCK_SIZE + 64] == 0x34);
     return 0;
 }

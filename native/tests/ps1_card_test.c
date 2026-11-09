@@ -334,7 +334,94 @@ static void test_recovery_validates_directory(void) {
     free(good);
 }
 
+static void fixture_directory(Ps1Card *card, unsigned block, uint8_t tag,
+    uint32_t size, uint16_t next, const char *name) {
+    uint8_t *dir = card->data + block * PS1_CARD_FRAME_SIZE;
+    memset(dir, 0, PS1_CARD_FRAME_SIZE);
+    dir[0] = tag;
+    for (unsigned i = 0; i < 4; ++i) dir[4 + i] = (uint8_t)(size >> (8 * i));
+    dir[8] = (uint8_t)next;
+    dir[9] = (uint8_t)(next >> 8);
+    if (name) memcpy(dir + 10, name, strlen(name));
+    dir[127] = ps1_card_checksum(dir);
+}
+
+static void test_external_block_chains(void) {
+    Ps1Card *card = malloc(sizeof(*card)), *valid = malloc(sizeof(*valid));
+    Ps1Card *damaged = malloc(sizeof(*damaged));
+    uint8_t *out = malloc(2 * PS1_CARD_BLOCK_SIZE);
+    assert(card && valid && damaged && out);
+    ps1_card_format(card);
+    /* Literal PS1 directory: physical block 5 -> block 1 uses wire link zero.
+     * This fixture is independent of our file allocator/chain writer. */
+    fixture_directory(card, 5, 0x51, 16384, 0, "EXTERNAL");
+    fixture_directory(card, 1, 0x53, 0, 0xFFFF, NULL);
+    memset(card->data + 5 * PS1_CARD_BLOCK_SIZE, 0x12, PS1_CARD_BLOCK_SIZE);
+    memset(card->data + PS1_CARD_BLOCK_SIZE, 0x34, PS1_CARD_BLOCK_SIZE);
+    card->dirty = false;
+    memcpy(valid, card, sizeof(*valid));
+    memset(out, 0xA5, 2 * PS1_CARD_BLOCK_SIZE);
+    size_t actual = 0;
+    assert(ps1_card_read_file(card, "EXTERNAL", out, 16384, &actual) == PS1_CARD_OK);
+    assert(actual == 16384 && out[8191] == 0x12 && out[8192] == 0x34);
+    for (int kind = 0; kind < 9; ++kind) {
+        memcpy(card, valid, sizeof(*card));
+        if (kind < 3) fixture_directory(card, 5, 0x51, 16384,
+            kind == 0 ? 0xFFFF : kind == 1 ? 4 : 15, "EXTERNAL");
+        if (kind == 3) fixture_directory(card, 1, 0x52, 0, 0xFFFF, NULL);
+        if (kind == 4) fixture_directory(card, 6, 0x51, 16384, 0, "CROSSLINK");
+        if (kind == 5) fixture_directory(card, 2, 0x52, 0, 0xFFFF, NULL);
+        if (kind >= 6) fixture_directory(card, 5, 0x51,
+            kind == 6 ? 0 : kind == 7 ? 16383 : PS1_CARD_SIZE, 0, "EXTERNAL");
+        memcpy(damaged, card, sizeof(*damaged));
+        assert(ps1_card_validate(card) == PS1_CARD_ERR_DAMAGED);
+        memset(out, 0xA5, 16384);
+        actual = 123;
+        assert(ps1_card_read_file(card, "EXTERNAL", out, 128, &actual) == PS1_CARD_ERR_DAMAGED);
+        for (size_t i = 0; i < 16384; ++i) assert(out[i] == 0xA5);
+        assert(actual == 123);
+        assert(ps1_card_delete_file(card, "EXTERNAL") == PS1_CARD_ERR_DAMAGED);
+        assert(ps1_card_write_file(card, "EXTERNAL", out, 8192) == PS1_CARD_ERR_DAMAGED);
+        assert(memcmp(card, damaged, sizeof(*card)) == 0);
+    }
+    memcpy(card, valid, sizeof(*card));
+    assert(ps1_card_delete_file(card, "EXTERNAL") == PS1_CARD_OK);
+    assert(ps1_card_get_free_blocks(card) == 15);
+    assert(ps1_card_write_file(card, "NEW", out, 16384) == PS1_CARD_OK);
+    assert(card->data[PS1_CARD_FRAME_SIZE + 8] == 1); /* block 2 minus one */
+    assert(card->data[2 * PS1_CARD_FRAME_SIZE] == 0x53);
+    ps1_card_format(card);
+    fixture_directory(card, 5, 0x51, 16384, 14, "LAST_BLOCK");
+    fixture_directory(card, 15, 0x53, 0, 0xFFFF, NULL);
+    memset(card->data + 15 * PS1_CARD_BLOCK_SIZE, 0x56, PS1_CARD_BLOCK_SIZE);
+    assert(ps1_card_read_file(card, "LAST_BLOCK", out, 16384, &actual) == PS1_CARD_OK);
+    assert(out[8192] == 0x56 && out[16383] == 0x56);
+    ps1_card_format(card);
+    assert(ps1_card_write_file(card, "PADDED", out, 128) == PS1_CARD_OK);
+    uint32_t allocated_size = 0;
+    assert(ps1_card_find_file(card, "PADDED", &allocated_size) == 1);
+    assert(allocated_size == PS1_CARD_BLOCK_SIZE);
+    assert(card->data[PS1_CARD_BLOCK_SIZE + 128] == 0);
+    ps1_card_format(card);
+    for (unsigned b = 1; b <= 15; ++b)
+        fixture_directory(card, b, 0xA1, 0, 0xFFFF, NULL);
+    assert(ps1_card_get_free_blocks(card) == 15);
+    assert(ps1_card_write_file(card, "REUSED", out, 8192) == PS1_CARD_OK);
+    ps1_card_format(card);
+    for (unsigned f = 16; f < 36; ++f) {
+        const uint8_t *entry = card->data + f * PS1_CARD_FRAME_SIZE;
+        assert(entry[0] == 255 && entry[1] == 255 && entry[2] == 255 && entry[3] == 255);
+        assert(entry[127] == ps1_card_checksum(entry));
+    }
+    assert(memcmp(card->data, card->data + 63 * PS1_CARD_FRAME_SIZE, 128) == 0);
+    free(out);
+    free(damaged);
+    free(valid);
+    free(card);
+}
+
 int main(void) {
+    test_external_block_chains();
     test_invalid_load_preserves_image();
     test_recovery_validates_directory();
     test_failed_replacement_preserves_card();

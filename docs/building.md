@@ -78,6 +78,13 @@ flushes retain their dirty state. Recovery checks the header and directory
 checksums before selecting a replacement. This protects persistence; original
 game save-layout compatibility remains under audit.
 
+Raw card links use the PS1 zero-based directory encoding; core and SDK transfers
+share chain validation. Cyclic, truncated, cross-linked or orphaned allocations
+are rejected before modifying buffers or cards. Early bringup images with
+nonstandard one-based links are not guessed or silently converted: invalid
+images remain preserved. Whole-card containers with extra headers are not raw
+128 KB images and require external conversion.
+
 To build a separate local candidate while a game window is open:
 
 ```powershell

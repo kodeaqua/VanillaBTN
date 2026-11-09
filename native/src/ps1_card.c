@@ -51,8 +51,48 @@ void ps1_card_format(Ps1Card *card) {
         dir[127] = ps1_card_checksum(dir);
     }
 
+    /* No broken sectors: zero would incorrectly designate sector zero.
+     * Frame 63 is the format/write-test copy of the card header. */
+    for (unsigned frame = 16; frame < 36; ++frame) {
+        uint8_t *entry = card->data + frame * PS1_CARD_FRAME_SIZE;
+        memset(entry, 0xFF, 4);
+        entry[8] = entry[9] = 0xFF;
+        entry[127] = ps1_card_checksum(entry);
+    }
+    memcpy(card->data + 63 * PS1_CARD_FRAME_SIZE, card->data, PS1_CARD_FRAME_SIZE);
     card->present = true;
     card->dirty = true;
+}
+
+static bool free_directory(uint8_t tag) {
+    return tag >= 0xA0 && tag <= 0xA3; /* Fresh or deleted blocks. */
+}
+
+/* File links on disk are 0..14; all in-memory block addresses are 1..15.
+ * Validate an entire chain before a caller can modify data or directories.
+ * Format reference: psx-spx, Controllers and Memory Cards / Data Format. */
+static bool walk_file_blocks(const Ps1Card *card, unsigned block, uint32_t size,
+    uint8_t *blocks, unsigned *used) {
+    if (!size || size > PS1_CARD_DATA_BLOCKS * PS1_CARD_BLOCK_SIZE ||
+        size % PS1_CARD_BLOCK_SIZE != 0) return false;
+    unsigned count = (size + PS1_CARD_BLOCK_SIZE - 1) / PS1_CARD_BLOCK_SIZE;
+    unsigned seen = 0;
+    for (unsigned i = 0; i < count; ++i) {
+        if (block < 1 || block > PS1_CARD_DATA_BLOCKS || (seen & (1u << block)))
+            return false;
+        const uint8_t *dir = card->data + block * PS1_CARD_FRAME_SIZE;
+        unsigned tag = i == 0 ? PS1_CARD_BLOCK_FIRST :
+            i + 1 == count ? PS1_CARD_BLOCK_LAST : PS1_CARD_BLOCK_MIDDLE;
+        unsigned next = dir[8] | ((unsigned)dir[9] << 8);
+        if (dir[0] != tag || dir[1] || dir[2] || dir[3]) return false;
+        if (i + 1 == count ? next != 0xFFFF : next >= PS1_CARD_DATA_BLOCKS)
+            return false;
+        if (blocks) blocks[i] = (uint8_t)block;
+        seen |= 1u << block;
+        block = next + 1;
+    }
+    if (used) *used = seen;
+    return true;
 }
 
 Ps1CardStatus ps1_card_validate(const Ps1Card *card) {
@@ -76,7 +116,26 @@ Ps1CardStatus ps1_card_validate(const Ps1Card *card) {
         }
     }
 
-    return PS1_CARD_OK;
+    /* Reject shared tails, orphaned allocated blocks, and unknown states.
+     * A checksum alone cannot make an unsafe allocation graph valid. */
+    unsigned allocated = 0, owned = 0;
+    for (unsigned block = 1; block <= PS1_CARD_DATA_BLOCKS; ++block) {
+        const uint8_t *dir = card->data + block * PS1_CARD_FRAME_SIZE;
+        if (dir[1] || dir[2] || dir[3]) return PS1_CARD_ERR_DAMAGED;
+        if (free_directory(dir[0])) continue;
+        if (dir[0] < PS1_CARD_BLOCK_FIRST || dir[0] > PS1_CARD_BLOCK_LAST)
+            return PS1_CARD_ERR_DAMAGED;
+        allocated |= 1u << block;
+        if (dir[0] == PS1_CARD_BLOCK_FIRST) {
+            uint32_t size;
+            unsigned used;
+            memcpy(&size, dir + 4, sizeof(size));
+            if (!walk_file_blocks(card, block, size, NULL, &used) || (owned & used))
+                return PS1_CARD_ERR_DAMAGED;
+            owned |= used;
+        }
+    }
+    return owned == allocated ? PS1_CARD_OK : PS1_CARD_ERR_DAMAGED;
 }
 
 int ps1_card_get_free_blocks(const Ps1Card *card) {
@@ -85,7 +144,7 @@ int ps1_card_get_free_blocks(const Ps1Card *card) {
     int free_blocks = 0;
     for (uint32_t b = 1; b <= PS1_CARD_DATA_BLOCKS; b++) {
         const uint8_t *dir = card->data + b * PS1_CARD_FRAME_SIZE;
-        if (dir[0] == PS1_CARD_BLOCK_FREE) {
+        if (free_directory(dir[0])) {
             free_blocks++;
         }
     }
@@ -114,61 +173,56 @@ int ps1_card_find_file(const Ps1Card *card, const char *filename, uint32_t *out_
     return 0;
 }
 
+Ps1CardStatus ps1_card_file_blocks(const Ps1Card *card, const char *filename,
+    uint8_t blocks[PS1_CARD_DATA_BLOCKS], uint32_t *out_size) {
+    if (!filename || !blocks) return PS1_CARD_ERR_IO;
+    Ps1CardStatus status = ps1_card_validate(card);
+    if (status != PS1_CARD_OK) return status;
+    uint32_t size;
+    int start = ps1_card_find_file(card, filename, &size);
+    if (!start) return PS1_CARD_ERR_NO_FILE;
+    uint8_t chain[PS1_CARD_DATA_BLOCKS];
+    if (!walk_file_blocks(card, (unsigned)start, size, chain, NULL))
+        return PS1_CARD_ERR_DAMAGED;
+    unsigned count = (size + PS1_CARD_BLOCK_SIZE - 1) / PS1_CARD_BLOCK_SIZE;
+    memcpy(blocks, chain, count);
+    if (out_size) *out_size = size;
+    return PS1_CARD_OK;
+}
+
 Ps1CardStatus ps1_card_read_file(const Ps1Card *card, const char *filename,
-                                 void *out_buf, size_t max_size, size_t *out_size) {
-    if (!card || !filename || !out_buf) return PS1_CARD_ERR_IO;
-
-    uint32_t file_size = 0;
-    int start_block = ps1_card_find_file(card, filename, &file_size);
-    if (start_block == 0) return PS1_CARD_ERR_NO_FILE;
-
-    if (file_size > max_size) file_size = (uint32_t)max_size;
-    if (out_size) *out_size = file_size;
-
-    size_t bytes_left = file_size;
-    uint8_t *dst = (uint8_t *)out_buf;
-    int curr_block = start_block;
-
-    while (bytes_left > 0 && curr_block >= 1 && curr_block <= (int)PS1_CARD_DATA_BLOCKS) {
-        size_t chunk = (bytes_left > PS1_CARD_BLOCK_SIZE) ? PS1_CARD_BLOCK_SIZE : bytes_left;
-        const uint8_t *src = card->data + (size_t)curr_block * PS1_CARD_BLOCK_SIZE;
-        memcpy(dst, src, chunk);
-
-        dst += chunk;
-        bytes_left -= chunk;
-
-        const uint8_t *dir = card->data + curr_block * PS1_CARD_FRAME_SIZE;
-        uint16_t next;
-        memcpy(&next, dir + 8, 2);
-        if (next == 0xFFFF) break;
-        curr_block = (int)next;
+    void *out_buf, size_t max_size, size_t *out_size) {
+    if (!out_buf) return PS1_CARD_ERR_IO;
+    uint8_t chain[PS1_CARD_DATA_BLOCKS];
+    uint32_t size;
+    Ps1CardStatus status = ps1_card_file_blocks(card, filename, chain, &size);
+    if (status != PS1_CARD_OK) return status;
+    size_t length = size < max_size ? size : max_size;
+    size_t done = 0;
+    for (unsigned i = 0; done < length; ++i) {
+        size_t chunk = length - done;
+        if (chunk > PS1_CARD_BLOCK_SIZE) chunk = PS1_CARD_BLOCK_SIZE;
+        memcpy((uint8_t *)out_buf + done,
+            card->data + chain[i] * PS1_CARD_BLOCK_SIZE, chunk);
+        done += chunk;
     }
-
+    if (out_size) *out_size = length;
     return PS1_CARD_OK;
 }
 
 Ps1CardStatus ps1_card_delete_file(Ps1Card *card, const char *filename) {
-    if (!card || !filename) return PS1_CARD_ERR_IO;
-
-    uint32_t sz = 0;
-    int curr_block = ps1_card_find_file(card, filename, &sz);
-    if (curr_block == 0) return PS1_CARD_ERR_NO_FILE;
-
-    while (curr_block >= 1 && curr_block <= (int)PS1_CARD_DATA_BLOCKS) {
-        uint8_t *dir = card->data + curr_block * PS1_CARD_FRAME_SIZE;
-        uint16_t next;
-        memcpy(&next, dir + 8, 2);
-
+    uint8_t chain[PS1_CARD_DATA_BLOCKS];
+    uint32_t size;
+    Ps1CardStatus status = ps1_card_file_blocks(card, filename, chain, &size);
+    if (status != PS1_CARD_OK) return status;
+    unsigned count = (size + PS1_CARD_BLOCK_SIZE - 1) / PS1_CARD_BLOCK_SIZE;
+    for (unsigned i = 0; i < count; ++i) {
+        uint8_t *dir = card->data + chain[i] * PS1_CARD_FRAME_SIZE;
         memset(dir, 0, PS1_CARD_FRAME_SIZE);
         dir[0] = PS1_CARD_BLOCK_FREE;
-        dir[8] = 0xFF;
-        dir[9] = 0xFF;
+        dir[8] = dir[9] = 0xFF;
         dir[127] = ps1_card_checksum(dir);
-
-        if (next == 0xFFFF) break;
-        curr_block = (int)next;
     }
-
     card->dirty = true;
     return PS1_CARD_OK;
 }
@@ -176,7 +230,8 @@ Ps1CardStatus ps1_card_delete_file(Ps1Card *card, const char *filename) {
 static Ps1CardStatus write_file_in_place(Ps1Card *card, const char *filename,
                                   const void *data, size_t size) {
     if (!card || !filename || !data || size == 0) return PS1_CARD_ERR_IO;
-    if (ps1_card_validate(card) != PS1_CARD_OK) return PS1_CARD_ERR_UNFORMATTED;
+    Ps1CardStatus validation = ps1_card_validate(card);
+    if (validation != PS1_CARD_OK) return validation;
 
     uint32_t needed_blocks = (uint32_t)((size + PS1_CARD_BLOCK_SIZE - 1) / PS1_CARD_BLOCK_SIZE);
     if (needed_blocks == 0 || needed_blocks > PS1_CARD_DATA_BLOCKS) return PS1_CARD_ERR_FULL;
@@ -196,7 +251,7 @@ static Ps1CardStatus write_file_in_place(Ps1Card *card, const char *filename,
     uint32_t found = 0;
     for (uint32_t b = 1; b <= PS1_CARD_DATA_BLOCKS && found < needed_blocks; b++) {
         const uint8_t *dir = card->data + b * PS1_CARD_FRAME_SIZE;
-        if (dir[0] == PS1_CARD_BLOCK_FREE) {
+        if (free_directory(dir[0])) {
             allocated_blocks[found++] = (int)b;
         }
     }
@@ -223,7 +278,7 @@ static Ps1CardStatus write_file_in_place(Ps1Card *card, const char *filename,
 
         if (i == 0) {
             dir[0] = PS1_CARD_BLOCK_FIRST;
-            uint32_t sz32 = (uint32_t)size;
+            uint32_t sz32 = needed_blocks * PS1_CARD_BLOCK_SIZE;
             memcpy(dir + 4, &sz32, 4);
             size_t fn_len = strlen(filename);
             if (fn_len > 20) fn_len = 20;
@@ -234,7 +289,7 @@ static Ps1CardStatus write_file_in_place(Ps1Card *card, const char *filename,
             dir[0] = PS1_CARD_BLOCK_MIDDLE;
         }
 
-        uint16_t next = (i + 1 < needed_blocks) ? (uint16_t)allocated_blocks[i + 1] : 0xFFFF;
+        uint16_t next = (i + 1 < needed_blocks) ? (uint16_t)(allocated_blocks[i + 1] - 1) : 0xFFFF;
         memcpy(dir + 8, &next, 2);
         dir[127] = ps1_card_checksum(dir);
     }

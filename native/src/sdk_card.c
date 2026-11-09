@@ -108,14 +108,13 @@ int MemCardReadData(unsigned int *adrs, int ofs, int bytes) {
     return 0;
 }
 
-/* Validate the entire internal 1-based chain before copying anything. This
+/* Resolve the entire on-disk chain before copying anything. This
  * prevents a damaged tail from causing partial reads or corrupting a save. */
 static int transfer_file(int chan, char *file, unsigned int *adrs,
                          int ofs, int bytes, bool write) {
     Ps1Card *card = get_card_for_chan(chan);
     uint32_t size = 0;
-    int chain[PS1_CARD_DATA_BLOCKS];
-    unsigned seen = 0;
+    uint8_t chain[PS1_CARD_DATA_BLOCKS];
     s_last_cmd = write ? McFuncWriteFile : McFuncReadFile;
     s_last_result = McErrCardInvalid;
     if (!card || !file || !adrs || ofs < 0 || bytes < 0) return -1;
@@ -123,27 +122,10 @@ static int transfer_file(int chan, char *file, unsigned int *adrs,
         s_last_result = McErrCardNotExist;
         return -1;
     }
-    if (ps1_card_validate(card) != PS1_CARD_OK) return -1;
-    int block = ps1_card_find_file(card, file, &size);
-    if (!block) {
-        s_last_result = McErrFileNotExist;
-        return -1;
-    }
-    if (!size || size > PS1_CARD_DATA_BLOCKS * PS1_CARD_BLOCK_SIZE ||
-        (unsigned)ofs > size || (unsigned)bytes > size - (unsigned)ofs) return -1;
-    unsigned count = (size + PS1_CARD_BLOCK_SIZE - 1) / PS1_CARD_BLOCK_SIZE;
-    for (unsigned i = 0; i < count; ++i) {
-        if (block < 1 || block > PS1_CARD_DATA_BLOCKS ||
-            (seen & (1u << block))) return -1;
-        seen |= 1u << block;
-        chain[i] = block;
-        const uint8_t *entry = card->data + block * PS1_CARD_FRAME_SIZE;
-        unsigned tag = i == 0 ? PS1_CARD_BLOCK_FIRST :
-            i + 1 == count ? PS1_CARD_BLOCK_LAST : PS1_CARD_BLOCK_MIDDLE;
-        unsigned next = entry[8] | ((unsigned)entry[9] << 8);
-        if (entry[0] != tag || (i + 1 == count && next != 0xFFFF)) return -1;
-        block = (int)next;
-    }
+    Ps1CardStatus status = ps1_card_file_blocks(card, file, chain, &size);
+    if (status == PS1_CARD_ERR_NO_FILE) s_last_result = McErrFileNotExist;
+    if (status != PS1_CARD_OK || (unsigned)ofs > size ||
+        (unsigned)bytes > size - (unsigned)ofs) return -1;
     size_t done = 0;
     while (done < (size_t)bytes) {
         size_t pos = (size_t)ofs + done;
