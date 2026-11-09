@@ -109,4 +109,14 @@ each nominal 30 Hz game tick, retaining 44 100 PCM frames per second.
   backs up the previous card to `<file>.bak`, and replaces the target.
 - Automatically recovers from interrupted writes or sudden power loss if a valid
   `.tmp` or `.bak` file remains.
+- Translates live x64 `game_state` structures (`FarmAnimals`, `FarmPlayer`,
+  `FarmHelper`, `FarmAction`, `FarmPet`, `AnimState`, `ItemCue`) to and from
+  byte-accurate PS1 32-bit wire layouts (`SaveFile`, `SaveImage`, `Ps1AnimalsWire`,
+  `Ps1PlayerWire`, `Ps1HelperWire`) via `save_pack_farm_state()` and
+  `save_unpack_farm_state()`, with compile-time assertions on all wire sizes and offsets.
+- Serializes `game_state.request` pointer relative to PS1 base address `0x800742B0`
+  into a 32-bit address word, deserializing back to the corresponding
+  `FarmRequestSlot` in native memory.
+- Clears transient sprite animation pointers (`source`, `bank`, etc.) and zeroes
+  wire padding bytes to ensure deterministic, console-compatible save images.
 - Stores card files under SDL3's per-user preferences directory (`SDL_GetPrefPath`).

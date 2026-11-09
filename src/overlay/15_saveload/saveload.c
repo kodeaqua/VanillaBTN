@@ -33,6 +33,9 @@
 #include "texture_pack.h"
 #include "ui_icons.h"
 #include "villager.h"
+#ifdef VANILLABTN_NATIVE
+#include "farm_tables.h"
+#endif
 
 /* Memory-card save header: the first block of a save file. */
 typedef struct
@@ -265,6 +268,335 @@ typedef struct
     u32 endingTracks[0xC / 4];
 } Pack8007AFD8;
 
+#ifdef VANILLABTN_NATIVE
+/* Fixed PS1 32-bit wire layouts for SaveFile and SaveImage. */
+typedef struct {
+    u16 status;
+    u16 flags;
+    u8 animation;
+    u8 frame;
+    u16 ticks;
+    s32 scale;
+    s16 pageOffX;
+    s16 pageOffY;
+    s16 clutOffX;
+    s16 clutOffY;
+    u32 source;
+    u32 bank;
+    u32 images;
+    u32 partLists;
+    u32 parts;
+    u32 ranges;
+    u32 frames;
+} Ps1AnimWire;
+
+typedef struct {
+    ItemId kind;
+    u16 targetIndex;
+    u16 name[NAME_LENGTH];
+    s16 affection;
+    s16 waitTimer;
+    FarmDate date;
+    u16 facing;
+    u16 action;
+    s16 taskNo;
+    s16 taskId;
+    s16 taskTime;
+    s16 interruptTime;
+    LimitPair place;
+    u16 unused32;
+    u32 flags;
+    VECTOR position;
+    VECTOR speed;
+    VECTOR destination;
+    VECTOR target;
+    Ps1AnimWire sprite;
+    ItemCue cue;
+} Ps1ActorWire;
+
+typedef struct {
+    Ps1ActorWire actor;
+    u16 grazingTime;
+    u16 daysSick;
+    u16 pregnancy;
+    s16 unusedValue;
+} Ps1ChickenWire;
+
+typedef struct {
+    Ps1ActorWire actor;
+    u16 grazeCount;
+    u16 daysSick;
+    u16 growthDays;
+    u16 pregnancy;
+    u16 daysSinceShearing;
+    s16 helperNumber;
+} Ps1LivestockWire;
+
+typedef struct {
+    Ps1ActorWire actor;
+    s16 training;
+    u8 padAE[0xE0 - 0xAE];
+    VramPlace projectCoords[2];
+} Ps1PetWire;
+
+typedef struct {
+    Ps1ActorWire actor;
+    s16 countdown;
+    u8 padB2[2];
+} Ps1ActionWire;
+
+typedef struct {
+    Ps1ChickenWire chickens[10];
+    Ps1LivestockWire livestock[20];
+    FarmPond pond;
+    u8 pad16F6[2];
+    Ps1PetWire dog;
+    Ps1PetWire horse;
+    Ps1ActionWire actions[6];
+    Ps1ChickenWire extraChickens[3];
+    FarmModeSlot slots[4];
+    u16 spawnGate;
+    s16 moveSpeeds[5];
+    s16 fishCount;
+    s16 pendingTrack;
+} Ps1AnimalsWire;
+
+typedef struct {
+    u8 pad00[4];
+    Ps1AnimWire sprite;
+} Ps1PlayerToyWire;
+
+typedef struct {
+    u16 name[NAME_LENGTH];
+    s16 stamina;
+    s16 maxStamina;
+    s16 fatigue;
+    s16 toolCharge;
+    s16 idleFrames;
+    s16 modeState;
+    s16 rucksackLevel;
+    s16 itemSlots;
+    CharacterId talkVillager;
+    s16 talkAnimal;
+    s16 scriptRunning;
+    s16 currentAction;
+    u16 wokeAt;
+    u16 sleptAt;
+    s16 countdown;
+    s16 facingIndex;
+    s16 chickToy;
+    s16 cowReins;
+    u16 latches;
+    u16 facing38;
+    u16 prevFacing3A;
+    u16 mode;
+    s16 previousMode;
+    u16 toolExp[PLAYER_TOOL_KINDS];
+    u8 pad74[2];
+    u32 scriptSteps;
+    u32 target;
+    s32 targetFlags;
+    s32 happiness;
+    s32 gold;
+    s32 medals;
+    s32 scriptHeld;
+    s32 scriptPressed;
+    u32 stateFlags;
+    s16 counts70[PLAYER_DAY_COUNTS];
+    u8 seq7C[2];
+    FarmBirthday birthday;
+    u8 pad82[2];
+    FarmStoredItem held[2];
+    FarmStoredItem tools[PLAYER_BAG_SLOTS];
+    FarmStoredItem items[PLAYER_BAG_SLOTS];
+    FarmStoredItem shown;
+    u8 padF6[6];
+    LimitPair place;
+    VECTOR position;
+    s32 velocity[3];
+    u8 pad11C[4];
+    VECTOR trail[TRAIL_LENGTH];
+    VECTOR slowTrail[TRAIL_LENGTH];
+    Ps1AnimWire secondSprite;
+    Ps1AnimWire sprite;
+    FarmWedding wedding;
+    ItemCue cue;
+    Ps1PlayerToyWire toys[PLAYER_TOYS];
+    TrailPose poses[TRAIL_LENGTH];
+} Ps1PlayerWire;
+
+typedef struct {
+    Ps1ActorWire actor;
+    u16 number;
+    u16 harvestSkill;
+    u16 waterSkill;
+    u16 animalSkill;
+    u16 jobDays;
+    ItemId item;
+    u16 flags;
+    s16 targetAnimal;
+    s16 idleCount;
+    s16 savedTaskNo;
+    u16 savedTaskId;
+    u16 savedTaskTime;
+    FarmInitPair pairC4;
+    Ps1AnimWire itemSprite;
+} Ps1HelperWire;
+
+typedef struct
+{
+    Ps1AnimalsWire slots;
+    SaveRecord records[37];
+    u8 pad213A[0x213C - 0x213A];
+    BlockF0 run16;
+    Block30 run18;
+    u32 flagWords[6];
+    u32 itemInfo;
+    u32 pictureGrids;
+    u32 tileRules;
+    u32 cropTable;
+    u32 request;
+    u32 pictureCodes;
+    Block94 eventFlags;
+    s32 entryStep;
+    s32 entrySubStep;
+    Block14 entryArgs;
+    Block14 entryArgs2;
+    s32 clock[5];
+    BlockCFC estate;
+    Ps1PlayerWire player;
+    Block2328 fieldTiles;
+    Block188 slots7x7;
+    Block40 requests;
+    Block74 runs;
+    Ps1HelperWire helpers[7];
+    s32 weatherPair;
+    BlockC options;
+    Block3C rivalWeddings;
+    u8 pad60D4[0x6200 - 0x60D4];
+    Block108 days;
+    Block24 drift;
+    Block34 family;
+    BlockC endingHead;
+    BlockC endingTracks;
+} SaveFile;
+
+typedef struct SavedProgress
+{
+    s32 entryStep;
+    s32 entrySubStep;
+    Block14 entryArgs;
+    Block14 entryArgs2;
+    s32 clock[5];
+    BlockCFC estate;
+} SavedProgress;
+
+typedef struct State8007AD00
+{
+    s32 weatherPair;
+    BlockC options;
+    Block3C rivalWeddings;
+} State8007AD00;
+
+typedef struct State8007AFD8
+{
+    BlockC endingHead;
+    BlockC endingTracks;
+} State8007AFD8;
+
+typedef struct SaveImage
+{
+    Ps1AnimalsWire animals;
+    SaveRecord records[37];
+    u8 pad213A[2];
+    BlockF0 run16;
+    Block30 run18;
+    s32 flagWords[6];
+    u8 pad2274[0x2284 - 0x2274];
+    u32 request;
+    u32 pictureCodes;
+    Block94 eventFlags;
+    SavedProgress progress;
+    Ps1PlayerWire player;
+    Block2328 fieldTiles;
+    Block188 slots7x7;
+    Block40 requests;
+    u8 pad594C[0x59C0 - 0x594C];
+    Ps1HelperWire helpers[7];
+    State8007AD00 world;
+    u8 pad60D4[0x6200 - 0x60D4];
+    Block108 days;
+    Block24 drift;
+    Block34 family;
+    State8007AFD8 ending;
+} SaveImage;
+
+_Static_assert(sizeof(Ps1AnimWire) == 0x30, "Ps1AnimWire wire size 0x30");
+_Static_assert(sizeof(Ps1ActorWire) == 0xAC, "Ps1ActorWire wire size 0xAC");
+_Static_assert(sizeof(Ps1ChickenWire) == 0xB4, "Ps1ChickenWire wire size 0xB4");
+_Static_assert(sizeof(Ps1LivestockWire) == 0xB8, "Ps1LivestockWire wire size 0xB8");
+_Static_assert(sizeof(Ps1PetWire) == 0xF0, "Ps1PetWire wire size 0xF0");
+_Static_assert(sizeof(Ps1ActionWire) == 0xB0, "Ps1ActionWire wire size 0xB0");
+_Static_assert(sizeof(Ps1AnimalsWire) == 0x1F34, "Ps1AnimalsWire wire size 0x1F34");
+_Static_assert(sizeof(Ps1PlayerToyWire) == 52, "Ps1PlayerToyWire wire size 52");
+_Static_assert(sizeof(Ps1PlayerWire) == 0x3FC, "Ps1PlayerWire wire size 0x3FC");
+_Static_assert(sizeof(Ps1HelperWire) == 248, "Ps1HelperWire wire size 248");
+_Static_assert(sizeof(SaveFile) == 0x6378, "SaveFile wire size 0x6378");
+_Static_assert(sizeof(SaveImage) == 0x6378, "SaveImage wire size 0x6378");
+
+_Static_assert(offsetof(SaveFile, slots) == 0x0000, "slots at 0x0000");
+_Static_assert(offsetof(SaveFile, records) == 0x1F34, "records at 0x1F34");
+_Static_assert(offsetof(SaveFile, run16) == 0x213C, "run16 at 0x213C");
+_Static_assert(offsetof(SaveFile, run18) == 0x222C, "run18 at 0x222C");
+_Static_assert(offsetof(SaveFile, flagWords) == 0x225C, "flagWords at 0x225C");
+_Static_assert(offsetof(SaveFile, itemInfo) == 0x2274, "itemInfo at 0x2274");
+_Static_assert(offsetof(SaveFile, pictureGrids) == 0x2278, "pictureGrids at 0x2278");
+_Static_assert(offsetof(SaveFile, tileRules) == 0x227C, "tileRules at 0x227C");
+_Static_assert(offsetof(SaveFile, cropTable) == 0x2280, "cropTable at 0x2280");
+_Static_assert(offsetof(SaveFile, request) == 0x2284, "request at 0x2284");
+_Static_assert(offsetof(SaveFile, pictureCodes) == 0x2288, "pictureCodes at 0x2288");
+_Static_assert(offsetof(SaveFile, eventFlags) == 0x228C, "eventFlags at 0x228C");
+_Static_assert(offsetof(SaveFile, entryStep) == 0x2320, "entryStep at 0x2320");
+_Static_assert(offsetof(SaveFile, entrySubStep) == 0x2324, "entrySubStep at 0x2324");
+_Static_assert(offsetof(SaveFile, entryArgs) == 0x2328, "entryArgs at 0x2328");
+_Static_assert(offsetof(SaveFile, entryArgs2) == 0x233C, "entryArgs2 at 0x233C");
+_Static_assert(offsetof(SaveFile, clock) == 0x2350, "clock at 0x2350");
+_Static_assert(offsetof(SaveFile, estate) == 0x2364, "estate at 0x2364");
+_Static_assert(offsetof(SaveFile, player) == 0x3060, "player at 0x3060");
+_Static_assert(offsetof(SaveFile, fieldTiles) == 0x345C, "fieldTiles at 0x345C");
+_Static_assert(offsetof(SaveFile, slots7x7) == 0x5784, "slots7x7 at 0x5784");
+_Static_assert(offsetof(SaveFile, requests) == 0x590C, "requests at 0x590C");
+_Static_assert(offsetof(SaveFile, runs) == 0x594C, "runs at 0x594C");
+_Static_assert(offsetof(SaveFile, helpers) == 0x59C0, "helpers at 0x59C0");
+_Static_assert(offsetof(SaveFile, weatherPair) == 0x6088, "weatherPair at 0x6088");
+_Static_assert(offsetof(SaveFile, options) == 0x608C, "options at 0x608C");
+_Static_assert(offsetof(SaveFile, rivalWeddings) == 0x6098, "rivalWeddings at 0x6098");
+_Static_assert(offsetof(SaveFile, days) == 0x6200, "days at 0x6200");
+_Static_assert(offsetof(SaveFile, drift) == 0x6308, "drift at 0x6308");
+_Static_assert(offsetof(SaveFile, family) == 0x632C, "family at 0x632C");
+_Static_assert(offsetof(SaveFile, endingHead) == 0x6360, "endingHead at 0x6360");
+_Static_assert(offsetof(SaveFile, endingTracks) == 0x636C, "endingTracks at 0x636C");
+
+_Static_assert(offsetof(SaveImage, animals) == 0x0000, "animals at 0x0000");
+_Static_assert(offsetof(SaveImage, records) == 0x1F34, "records at 0x1F34");
+_Static_assert(offsetof(SaveImage, run16) == 0x213C, "run16 at 0x213C");
+_Static_assert(offsetof(SaveImage, run18) == 0x222C, "run18 at 0x222C");
+_Static_assert(offsetof(SaveImage, flagWords) == 0x225C, "flagWords at 0x225C");
+_Static_assert(offsetof(SaveImage, request) == 0x2284, "request at 0x2284");
+_Static_assert(offsetof(SaveImage, pictureCodes) == 0x2288, "pictureCodes at 0x2288");
+_Static_assert(offsetof(SaveImage, eventFlags) == 0x228C, "eventFlags at 0x228C");
+_Static_assert(offsetof(SaveImage, progress) == 0x2320, "progress at 0x2320");
+_Static_assert(offsetof(SaveImage, player) == 0x3060, "player at 0x3060");
+_Static_assert(offsetof(SaveImage, fieldTiles) == 0x345C, "fieldTiles at 0x345C");
+_Static_assert(offsetof(SaveImage, slots7x7) == 0x5784, "slots7x7 at 0x5784");
+_Static_assert(offsetof(SaveImage, requests) == 0x590C, "requests at 0x590C");
+_Static_assert(offsetof(SaveImage, helpers) == 0x59C0, "helpers at 0x59C0");
+_Static_assert(offsetof(SaveImage, world) == 0x6088, "world at 0x6088");
+_Static_assert(offsetof(SaveImage, days) == 0x6200, "days at 0x6200");
+_Static_assert(offsetof(SaveImage, drift) == 0x6308, "drift at 0x6308");
+_Static_assert(offsetof(SaveImage, family) == 0x632C, "family at 0x632C");
+_Static_assert(offsetof(SaveImage, ending) == 0x6360, "ending at 0x6360");
+#else
 typedef struct
 {
     FarmAnimals slots;
@@ -352,6 +684,7 @@ typedef struct SaveImage
     Block34 family;
     State8007AFD8 ending;
 } SaveImage;
+#endif
 
 /* The loaded file image, copied whole into the working buffer. */
 typedef struct
@@ -3612,6 +3945,559 @@ static void save_slot_record_fill(s16 slot)
     memcpy(save_file_header + SAVE_HEADER_OFFSET, &save_slot_records[slot], sizeof(SaveSlotRecord));
 }
 
+#ifdef VANILLABTN_NATIVE
+#define SAVE_FILE ((SaveFile *)save_image)
+#define SAVE_IMAGE ((SaveImage *)save_image)
+
+static void pack_anim_wire(Ps1AnimWire *dest, const AnimState *src)
+{
+    dest->status = src->status;
+    dest->flags = src->flags;
+    dest->animation = src->animation;
+    dest->frame = src->frame;
+    dest->ticks = src->ticks;
+    dest->scale = src->scale;
+    dest->pageOffX = src->pageOffX;
+    dest->pageOffY = src->pageOffY;
+    dest->clutOffX = src->clutOffX;
+    dest->clutOffY = src->clutOffY;
+    dest->source = 0;
+    dest->bank = 0;
+    dest->images = 0;
+    dest->partLists = 0;
+    dest->parts = 0;
+    dest->ranges = 0;
+    dest->frames = 0;
+}
+
+static void unpack_anim_wire(AnimState *dest, const Ps1AnimWire *src)
+{
+    dest->status = src->status;
+    dest->flags = src->flags;
+    dest->animation = src->animation;
+    dest->frame = src->frame;
+    dest->ticks = src->ticks;
+    dest->scale = src->scale;
+    dest->pageOffX = src->pageOffX;
+    dest->pageOffY = src->pageOffY;
+    dest->clutOffX = src->clutOffX;
+    dest->clutOffY = src->clutOffY;
+    dest->source = NULL;
+    dest->bank = NULL;
+    dest->images = NULL;
+    dest->partLists = NULL;
+    dest->parts = NULL;
+    dest->ranges = NULL;
+    dest->frames = NULL;
+}
+
+static void pack_actor_wire(Ps1ActorWire *dest, const FarmActor *src)
+{
+    dest->kind = src->kind;
+    dest->targetIndex = src->targetIndex;
+    memcpy(dest->name, src->name, sizeof(dest->name));
+    dest->affection = src->affection;
+    dest->waitTimer = src->waitTimer;
+    dest->date = src->date;
+    dest->facing = src->facing;
+    dest->action = src->action;
+    dest->taskNo = src->taskNo;
+    dest->taskId = src->taskId;
+    dest->taskTime = src->taskTime;
+    dest->interruptTime = src->interruptTime;
+    dest->place = src->place;
+    dest->unused32 = src->unused32;
+    dest->flags = src->flags;
+    dest->position = src->position;
+    dest->speed = src->speed;
+    dest->destination = src->destination;
+    dest->target = src->target;
+    pack_anim_wire(&dest->sprite, &src->sprite);
+    dest->cue = src->cue;
+}
+
+static void unpack_actor_wire(FarmActor *dest, const Ps1ActorWire *src)
+{
+    dest->kind = src->kind;
+    dest->targetIndex = src->targetIndex;
+    memcpy(dest->name, src->name, sizeof(dest->name));
+    dest->affection = src->affection;
+    dest->waitTimer = src->waitTimer;
+    dest->date = src->date;
+    dest->facing = src->facing;
+    dest->action = src->action;
+    dest->taskNo = src->taskNo;
+    dest->taskId = src->taskId;
+    dest->taskTime = src->taskTime;
+    dest->interruptTime = src->interruptTime;
+    dest->place = src->place;
+    dest->unused32 = src->unused32;
+    dest->flags = src->flags;
+    dest->position = src->position;
+    dest->speed = src->speed;
+    dest->destination = src->destination;
+    dest->target = src->target;
+    unpack_anim_wire(&dest->sprite, &src->sprite);
+    dest->cue = src->cue;
+}
+
+static void pack_chicken_wire(Ps1ChickenWire *dest, const FarmChicken *src)
+{
+    pack_actor_wire(&dest->actor, &src->actor);
+    dest->grazingTime = src->grazingTime;
+    dest->daysSick = src->daysSick;
+    dest->pregnancy = src->pregnancy;
+    dest->unusedValue = src->unusedValue;
+}
+
+static void unpack_chicken_wire(FarmChicken *dest, const Ps1ChickenWire *src)
+{
+    unpack_actor_wire(&dest->actor, &src->actor);
+    dest->grazingTime = src->grazingTime;
+    dest->daysSick = src->daysSick;
+    dest->pregnancy = src->pregnancy;
+    dest->unusedValue = src->unusedValue;
+}
+
+static void pack_livestock_wire(Ps1LivestockWire *dest, const FarmLivestock *src)
+{
+    pack_actor_wire(&dest->actor, &src->actor);
+    dest->grazeCount = src->grazeCount;
+    dest->daysSick = src->daysSick;
+    dest->growthDays = src->growthDays;
+    dest->pregnancy = src->pregnancy;
+    dest->daysSinceShearing = src->daysSinceShearing;
+    dest->helperNumber = src->helperNumber;
+}
+
+static void unpack_livestock_wire(FarmLivestock *dest, const Ps1LivestockWire *src)
+{
+    unpack_actor_wire(&dest->actor, &src->actor);
+    dest->grazeCount = src->grazeCount;
+    dest->daysSick = src->daysSick;
+    dest->growthDays = src->growthDays;
+    dest->pregnancy = src->pregnancy;
+    dest->daysSinceShearing = src->daysSinceShearing;
+    dest->helperNumber = src->helperNumber;
+}
+
+static void pack_pet_wire(Ps1PetWire *dest, const FarmPet *src)
+{
+    pack_actor_wire(&dest->actor, &src->actor);
+    dest->training = src->training;
+    memset(dest->padAE, 0, sizeof(dest->padAE));
+    memcpy(dest->projectCoords, src->projectCoords, sizeof(dest->projectCoords));
+}
+
+static void unpack_pet_wire(FarmPet *dest, const Ps1PetWire *src)
+{
+    unpack_actor_wire(&dest->actor, &src->actor);
+    dest->training = src->training;
+    memcpy(dest->projectCoords, src->projectCoords, sizeof(dest->projectCoords));
+}
+
+static void pack_action_wire(Ps1ActionWire *dest, const FarmAction *src)
+{
+    pack_actor_wire(&dest->actor, &src->actor);
+    dest->countdown = src->countdown;
+    dest->padB2[0] = 0;
+    dest->padB2[1] = 0;
+}
+
+static void unpack_action_wire(FarmAction *dest, const Ps1ActionWire *src)
+{
+    unpack_actor_wire(&dest->actor, &src->actor);
+    dest->countdown = src->countdown;
+}
+
+static void pack_player_wire(Ps1PlayerWire *dest, const FarmPlayer *src)
+{
+    s32 i;
+    memcpy(dest->name, src->name, sizeof(dest->name));
+    dest->stamina = src->stamina;
+    dest->maxStamina = src->maxStamina;
+    dest->fatigue = src->fatigue;
+    dest->toolCharge = src->toolCharge;
+    dest->idleFrames = src->idleFrames;
+    dest->modeState = src->modeState;
+    dest->rucksackLevel = src->rucksackLevel;
+    dest->itemSlots = src->itemSlots;
+    dest->talkVillager = src->talkVillager;
+    dest->talkAnimal = src->talkAnimal;
+    dest->scriptRunning = src->scriptRunning;
+    dest->currentAction = src->currentAction;
+    dest->wokeAt = src->wokeAt;
+    dest->sleptAt = src->sleptAt;
+    dest->countdown = src->countdown;
+    dest->facingIndex = src->facingIndex;
+    dest->chickToy = src->chickToy;
+    dest->cowReins = src->cowReins;
+    dest->latches = src->latches;
+    dest->facing38 = src->facing38;
+    dest->prevFacing3A = src->prevFacing3A;
+    dest->mode = src->mode;
+    dest->previousMode = src->previousMode;
+    memcpy(dest->toolExp, src->toolExp, sizeof(dest->toolExp));
+    memset(dest->pad74, 0, sizeof(dest->pad74));
+    dest->scriptSteps = 0;
+    dest->target = 0;
+    dest->targetFlags = src->targetFlags;
+    dest->happiness = src->happiness;
+    dest->gold = src->gold;
+    dest->medals = src->medals;
+    dest->scriptHeld = src->scriptHeld;
+    dest->scriptPressed = src->scriptPressed;
+    dest->stateFlags = src->stateFlags;
+    memcpy(dest->counts70, src->counts70, sizeof(dest->counts70));
+    memcpy(dest->seq7C, src->seq7C, sizeof(dest->seq7C));
+    dest->birthday = src->birthday;
+    dest->pad82[0] = 0;
+    dest->pad82[1] = 0;
+    memcpy(dest->held, src->held, sizeof(dest->held));
+    memcpy(dest->tools, src->tools, sizeof(dest->tools));
+    memcpy(dest->items, src->items, sizeof(dest->items));
+    dest->shown = src->shown;
+    memset(dest->padF6, 0, sizeof(dest->padF6));
+    dest->place = src->place;
+    dest->position = src->position;
+    memcpy(dest->velocity, src->velocity, sizeof(dest->velocity));
+    memset(dest->pad11C, 0, sizeof(dest->pad11C));
+    memcpy(dest->trail, src->trail, sizeof(dest->trail));
+    memcpy(dest->slowTrail, src->slowTrail, sizeof(dest->slowTrail));
+    pack_anim_wire(&dest->secondSprite, &src->secondSprite);
+    pack_anim_wire(&dest->sprite, &src->sprite);
+    dest->wedding = src->wedding;
+    dest->cue = src->cue;
+    for (i = 0; i < PLAYER_TOYS; i++)
+    {
+        memset(dest->toys[i].pad00, 0, sizeof(dest->toys[i].pad00));
+        pack_anim_wire(&dest->toys[i].sprite, &src->toys[i].sprite);
+    }
+    memcpy(dest->poses, src->poses, sizeof(dest->poses));
+}
+
+static void unpack_player_wire(FarmPlayer *dest, const Ps1PlayerWire *src)
+{
+    s32 i;
+    memcpy(dest->name, src->name, sizeof(dest->name));
+    dest->stamina = src->stamina;
+    dest->maxStamina = src->maxStamina;
+    dest->fatigue = src->fatigue;
+    dest->toolCharge = src->toolCharge;
+    dest->idleFrames = src->idleFrames;
+    dest->modeState = src->modeState;
+    dest->rucksackLevel = src->rucksackLevel;
+    dest->itemSlots = src->itemSlots;
+    dest->talkVillager = src->talkVillager;
+    dest->talkAnimal = src->talkAnimal;
+    dest->scriptRunning = src->scriptRunning;
+    dest->currentAction = src->currentAction;
+    dest->wokeAt = src->wokeAt;
+    dest->sleptAt = src->sleptAt;
+    dest->countdown = src->countdown;
+    dest->facingIndex = src->facingIndex;
+    dest->chickToy = src->chickToy;
+    dest->cowReins = src->cowReins;
+    dest->latches = src->latches;
+    dest->facing38 = src->facing38;
+    dest->prevFacing3A = src->prevFacing3A;
+    dest->mode = src->mode;
+    dest->previousMode = src->previousMode;
+    memcpy(dest->toolExp, src->toolExp, sizeof(dest->toolExp));
+    dest->scriptSteps = NULL;
+    dest->target = NULL;
+    dest->targetFlags = src->targetFlags;
+    dest->happiness = src->happiness;
+    dest->gold = src->gold;
+    dest->medals = src->medals;
+    dest->scriptHeld = src->scriptHeld;
+    dest->scriptPressed = src->scriptPressed;
+    dest->stateFlags = src->stateFlags;
+    memcpy(dest->counts70, src->counts70, sizeof(dest->counts70));
+    memcpy(dest->seq7C, src->seq7C, sizeof(dest->seq7C));
+    dest->birthday = src->birthday;
+    memcpy(dest->held, src->held, sizeof(dest->held));
+    memcpy(dest->tools, src->tools, sizeof(dest->tools));
+    memcpy(dest->items, src->items, sizeof(dest->items));
+    dest->shown = src->shown;
+    dest->place = src->place;
+    dest->position = src->position;
+    memcpy(dest->velocity, src->velocity, sizeof(dest->velocity));
+    memcpy(dest->trail, src->trail, sizeof(dest->trail));
+    memcpy(dest->slowTrail, src->slowTrail, sizeof(dest->slowTrail));
+    unpack_anim_wire(&dest->secondSprite, &src->secondSprite);
+    unpack_anim_wire(&dest->sprite, &src->sprite);
+    dest->wedding = src->wedding;
+    dest->cue = src->cue;
+    for (i = 0; i < PLAYER_TOYS; i++)
+    {
+        unpack_anim_wire(&dest->toys[i].sprite, &src->toys[i].sprite);
+    }
+    memcpy(dest->poses, src->poses, sizeof(dest->poses));
+}
+
+static void pack_helper_wire(Ps1HelperWire *dest, const FarmHelper *src)
+{
+    pack_actor_wire(&dest->actor, &src->actor);
+    dest->number = src->number;
+    dest->harvestSkill = src->harvestSkill;
+    dest->waterSkill = src->waterSkill;
+    dest->animalSkill = src->animalSkill;
+    dest->jobDays = src->jobDays;
+    dest->item = src->item;
+    dest->flags = src->flags;
+    dest->targetAnimal = src->targetAnimal;
+    dest->idleCount = src->idleCount;
+    dest->savedTaskNo = src->savedTaskNo;
+    dest->savedTaskId = src->savedTaskId;
+    dest->savedTaskTime = src->savedTaskTime;
+    dest->pairC4 = src->pairC4;
+    pack_anim_wire(&dest->itemSprite, &src->itemSprite);
+}
+
+static void unpack_helper_wire(FarmHelper *dest, const Ps1HelperWire *src)
+{
+    unpack_actor_wire(&dest->actor, &src->actor);
+    dest->number = src->number;
+    dest->harvestSkill = src->harvestSkill;
+    dest->waterSkill = src->waterSkill;
+    dest->animalSkill = src->animalSkill;
+    dest->jobDays = src->jobDays;
+    dest->item = src->item;
+    dest->flags = src->flags;
+    dest->targetAnimal = src->targetAnimal;
+    dest->idleCount = src->idleCount;
+    dest->savedTaskNo = src->savedTaskNo;
+    dest->savedTaskId = src->savedTaskId;
+    dest->savedTaskTime = src->savedTaskTime;
+    dest->pairC4 = src->pairC4;
+    unpack_anim_wire(&dest->itemSprite, &src->itemSprite);
+}
+
+/* Pack the farm state into the save-file image at save_image_data. */
+static void save_pack_farm_state(void)
+{
+    s32 i;
+
+    save_image = save_image_data;
+    for (i = 0; i < 10; i++)
+    {
+        pack_chicken_wire(&SAVE_FILE->slots.chickens[i], &game_state.animals.chickens[i]);
+        SAVE_FILE->slots.chickens[i].actor.sprite.source = 0;
+    }
+    for (i = 0; i < 20; i++)
+    {
+        pack_livestock_wire(&SAVE_FILE->slots.livestock[i], &game_state.animals.livestock[i]);
+        SAVE_FILE->slots.livestock[i].actor.sprite.source = 0;
+    }
+    SAVE_FILE->slots.pond = game_state.animals.pond;
+    SAVE_FILE->slots.pad16F6[0] = 0;
+    SAVE_FILE->slots.pad16F6[1] = 0;
+    pack_pet_wire(&SAVE_FILE->slots.dog, &game_state.animals.dog);
+    pack_pet_wire(&SAVE_FILE->slots.horse, &game_state.animals.horse);
+    for (i = 0; i < 6; i++)
+    {
+        pack_action_wire(&SAVE_FILE->slots.actions[i], &game_state.animals.actions[i]);
+    }
+    memset(SAVE_FILE->slots.extraChickens, 0, sizeof(SAVE_FILE->slots.extraChickens));
+    memcpy(SAVE_FILE->slots.slots, game_state.animals.slots, sizeof(SAVE_FILE->slots.slots));
+    SAVE_FILE->slots.spawnGate = game_state.animals.spawnGate;
+    memcpy(SAVE_FILE->slots.moveSpeeds, game_state.animals.moveSpeeds, sizeof(SAVE_FILE->slots.moveSpeeds));
+    SAVE_FILE->slots.fishCount = game_state.animals.fishCount;
+    SAVE_FILE->slots.pendingTrack = game_state.animals.pendingTrack;
+
+    SAVE_FILE->flagWords[0] = game_state.unk00;
+    SAVE_FILE->flagWords[1] = game_state.unk04;
+    SAVE_FILE->flagWords[2] = game_state.frameCount;
+    SAVE_FILE->flagWords[3] = game_state.globalFlags;
+    SAVE_FILE->flagWords[4] = game_state.debugFlags;
+    SAVE_FILE->flagWords[5] = game_state.lastCaller;
+
+    SAVE_FILE->itemInfo = 0x80088000;
+    SAVE_FILE->pictureGrids = 0x80088100;
+    SAVE_FILE->tileRules = 0x80088200;
+    SAVE_FILE->cropTable = 0x80088300;
+    SAVE_FILE->request = (game_state.request >= &game_state.requests.items[0] &&
+                          game_state.request < &game_state.requests.items[FARM_REQUEST_SLOTS])
+                             ? (u32)(0x800742B0 + (game_state.request - game_state.requests.items) * sizeof(FarmRequestSlot))
+                             : 0;
+    SAVE_FILE->pictureCodes = game_state.pictureCodes ? 0x80088400 : 0;
+
+    memcpy(&SAVE_FILE->eventFlags, game_state.eventFlags, sizeof(SAVE_FILE->eventFlags));
+
+    SAVE_FILE->entryStep = game_state.progress.entryStep;
+    SAVE_FILE->entrySubStep = game_state.progress.entrySubStep;
+    memcpy(&SAVE_FILE->entryArgs, game_state.progress.entryArgs, sizeof(SAVE_FILE->entryArgs));
+    memcpy(&SAVE_FILE->entryArgs2, game_state.progress.entryArgs2, sizeof(SAVE_FILE->entryArgs2));
+    memcpy(SAVE_FILE->clock, &game_state.progress.clock, sizeof(SAVE_FILE->clock));
+    memcpy(&SAVE_FILE->estate, &game_state.progress.estate, sizeof(FarmEstate));
+
+    pack_player_wire(&SAVE_FILE->player, &game_state.player);
+
+    memcpy(&SAVE_FILE->fieldTiles, game_state.fieldTiles, sizeof(SAVE_FILE->fieldTiles));
+    memcpy(&SAVE_FILE->slots7x7, game_state.slots7x7, sizeof(SAVE_FILE->slots7x7));
+    memcpy(&SAVE_FILE->requests, &game_state.requests, sizeof(SAVE_FILE->requests));
+
+    memset(&SAVE_FILE->runs, 0, sizeof(SAVE_FILE->runs));
+    memcpy((u8 *)&SAVE_FILE->runs + 19 * sizeof(u32), game_state.runs.counts, sizeof(game_state.runs.counts));
+
+    for (i = 0; i < 7; i++)
+    {
+        pack_helper_wire(&SAVE_FILE->helpers[i], &game_state.helpers[i]);
+    }
+
+    SAVE_FILE->weatherPair = *(s32 *)&game_state.world.weather;
+    memcpy(&SAVE_FILE->options, &game_state.world.options, sizeof(SAVE_FILE->options));
+    memcpy(SAVE_FILE->rivalWeddings.words, game_state.world.rivalWeddings, sizeof(SAVE_FILE->rivalWeddings));
+    memset(SAVE_FILE->pad60D4, 0, sizeof(SAVE_FILE->pad60D4));
+    memcpy(&SAVE_FILE->days, &game_state.days, sizeof(SAVE_FILE->days));
+    memcpy(&SAVE_FILE->drift, &game_state.drift, sizeof(SAVE_FILE->drift));
+    memcpy(&SAVE_FILE->family, &game_state.family, sizeof(SAVE_FILE->family));
+    memcpy(&SAVE_FILE->endingHead, &game_state.ending.route, sizeof(SAVE_FILE->endingHead));
+    memcpy(&SAVE_FILE->endingTracks, &game_state.ending.tracks, sizeof(SAVE_FILE->endingTracks));
+
+    for (i = 0; i < CHARACTER_COUNT; i++)
+    {
+        SAVE_FILE->records[i].birthday = game_state.villagers[i].birthday;
+        SAVE_FILE->records[i].friendship = game_state.villagers[i].friendship;
+        SAVE_FILE->records[i].affection = game_state.villagers[i].affection;
+        SAVE_FILE->records[i].flags = game_state.villagers[i].flags;
+        SAVE_FILE->records[i].placeFlags = game_state.villagers[i].placeFlags;
+        SAVE_FILE->records[i].step = game_state.villagers[i].step;
+    }
+
+    if (game_state.runs.records[16] != NULL)
+    {
+        memcpy(&SAVE_FILE->run16, game_state.runs.records[16], sizeof(SAVE_FILE->run16));
+    }
+    else
+    {
+        memset(&SAVE_FILE->run16, 0, sizeof(SAVE_FILE->run16));
+    }
+    if (game_state.runs.records[18] != NULL)
+    {
+        memcpy(&SAVE_FILE->run18, game_state.runs.records[18], sizeof(SAVE_FILE->run18));
+    }
+    else
+    {
+        memset(&SAVE_FILE->run18, 0, sizeof(SAVE_FILE->run18));
+    }
+}
+
+/* Copy the loaded save image into the live game state. */
+static void save_unpack_farm_state(void)
+{
+    s32 i;
+
+    save_image = save_image_data;
+    if (game_state.runs.records[16] == NULL)
+    {
+        farm_tables_register(0);
+    }
+    else
+    {
+        farm_tables_register(1);
+    }
+
+    if (game_state.runs.records[16] != NULL)
+    {
+        memcpy(game_state.runs.records[16], &SAVE_IMAGE->run16, sizeof(SAVE_IMAGE->run16));
+    }
+    if (game_state.runs.records[18] != NULL)
+    {
+        memcpy(game_state.runs.records[18], &SAVE_IMAGE->run18, sizeof(SAVE_IMAGE->run18));
+    }
+
+    for (i = 0; i < CHARACTER_COUNT; i++)
+    {
+        game_state.villagers[i].birthday = SAVE_IMAGE->records[i].birthday;
+        game_state.villagers[i].friendship = SAVE_IMAGE->records[i].friendship;
+        game_state.villagers[i].affection = SAVE_IMAGE->records[i].affection;
+        game_state.villagers[i].flags = SAVE_IMAGE->records[i].flags;
+        game_state.villagers[i].placeFlags = SAVE_IMAGE->records[i].placeFlags;
+        game_state.villagers[i].step = SAVE_IMAGE->records[i].step;
+    }
+
+    for (i = 0; i < 10; i++)
+    {
+        unpack_chicken_wire(&game_state.animals.chickens[i], &SAVE_IMAGE->animals.chickens[i]);
+    }
+    for (i = 0; i < 20; i++)
+    {
+        unpack_livestock_wire(&game_state.animals.livestock[i], &SAVE_IMAGE->animals.livestock[i]);
+    }
+    game_state.animals.pond = SAVE_IMAGE->animals.pond;
+    unpack_pet_wire(&game_state.animals.dog, &SAVE_IMAGE->animals.dog);
+    unpack_pet_wire(&game_state.animals.horse, &SAVE_IMAGE->animals.horse);
+    for (i = 0; i < 6; i++)
+    {
+        unpack_action_wire(&game_state.animals.actions[i], &SAVE_IMAGE->animals.actions[i]);
+    }
+    memset(game_state.animals.extraChickens, 0, sizeof(game_state.animals.extraChickens));
+    memcpy(game_state.animals.slots, SAVE_IMAGE->animals.slots, sizeof(game_state.animals.slots));
+    game_state.animals.spawnGate = SAVE_IMAGE->animals.spawnGate;
+    memcpy(game_state.animals.moveSpeeds, SAVE_IMAGE->animals.moveSpeeds, sizeof(game_state.animals.moveSpeeds));
+    game_state.animals.fishCount = SAVE_IMAGE->animals.fishCount;
+    game_state.animals.pendingTrack = SAVE_IMAGE->animals.pendingTrack;
+
+    game_state.unk00 = SAVE_IMAGE->flagWords[0];
+    game_state.unk04 = SAVE_IMAGE->flagWords[1];
+    game_state.frameCount = SAVE_IMAGE->flagWords[2];
+    game_state.globalFlags = SAVE_IMAGE->flagWords[3];
+    game_state.debugFlags = SAVE_IMAGE->flagWords[4];
+    game_state.lastCaller = SAVE_IMAGE->flagWords[5];
+
+    memcpy(&game_state.requests, &SAVE_IMAGE->requests, sizeof(game_state.requests));
+    if (SAVE_IMAGE->request != 0)
+    {
+        u32 req_addr = SAVE_IMAGE->request;
+        if (req_addr >= 0x800742B0 && req_addr < 0x800742B0 + FARM_REQUEST_SLOTS * sizeof(FarmRequestSlot))
+        {
+            s32 idx = (req_addr - 0x800742B0) / sizeof(FarmRequestSlot);
+            game_state.request = &game_state.requests.items[idx];
+        }
+        else
+        {
+            game_state.request = NULL;
+        }
+    }
+    else
+    {
+        game_state.request = NULL;
+    }
+
+    memcpy(game_state.eventFlags, &SAVE_IMAGE->eventFlags, sizeof(SAVE_IMAGE->eventFlags));
+
+    game_state.progress.entryStep = SAVE_IMAGE->progress.entryStep;
+    game_state.progress.entrySubStep = SAVE_IMAGE->progress.entrySubStep;
+    memcpy(game_state.progress.entryArgs, &SAVE_IMAGE->progress.entryArgs, sizeof(SAVE_IMAGE->progress.entryArgs));
+    memcpy(game_state.progress.entryArgs2, &SAVE_IMAGE->progress.entryArgs2, sizeof(SAVE_IMAGE->progress.entryArgs2));
+    memcpy(&game_state.progress.clock, SAVE_IMAGE->progress.clock, sizeof(game_state.progress.clock));
+    memcpy(&game_state.progress.estate, &SAVE_IMAGE->progress.estate, sizeof(FarmEstate));
+
+    unpack_player_wire(&game_state.player, &SAVE_IMAGE->player);
+
+    memcpy(game_state.fieldTiles, &SAVE_IMAGE->fieldTiles, sizeof(SAVE_IMAGE->fieldTiles));
+    memcpy(game_state.slots7x7, &SAVE_IMAGE->slots7x7, sizeof(SAVE_IMAGE->slots7x7));
+
+    for (i = 0; i < 7; i++)
+    {
+        unpack_helper_wire(&game_state.helpers[i], &SAVE_IMAGE->helpers[i]);
+    }
+
+    *(s32 *)&game_state.world.weather = SAVE_IMAGE->world.weatherPair;
+    memcpy(&game_state.world.options, &SAVE_IMAGE->world.options, sizeof(SAVE_IMAGE->world.options));
+    memcpy(game_state.world.rivalWeddings, &SAVE_IMAGE->world.rivalWeddings, sizeof(game_state.world.rivalWeddings));
+
+    memcpy(&game_state.days, &SAVE_IMAGE->days, sizeof(SAVE_IMAGE->days));
+    memcpy(&game_state.drift, &SAVE_IMAGE->drift, sizeof(SAVE_IMAGE->drift));
+    memcpy(&game_state.family, &SAVE_IMAGE->family, sizeof(SAVE_IMAGE->family));
+    memcpy(&game_state.ending.route, &SAVE_IMAGE->ending.endingHead, sizeof(SAVE_IMAGE->ending.endingHead));
+    memcpy(&game_state.ending.tracks, &SAVE_IMAGE->ending.endingTracks, sizeof(SAVE_IMAGE->ending.endingTracks));
+}
+#undef SAVE_FILE
+#undef SAVE_IMAGE
+#else
 #define SAVE_FILE ((SaveFile *)save_image)
 #define PACK_800742EC (*(Pack800742EC *)&game_state.animals.chickens)
 #define PACK_8006C838 (*(Pack8006C838 *)&game_state)
@@ -3759,6 +4645,7 @@ static void save_unpack_farm_state(void)
 }
 #undef SAVE_IMAGE
 #undef SAVED_PROGRESS
+#endif
 
 /* Shift the save image's 0x80-byte blocks by one byte before a save; save_image_shift_out undoes it. */
 static void save_image_shift_in(void)

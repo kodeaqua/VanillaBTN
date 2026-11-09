@@ -57,14 +57,14 @@ Update the relevant item after completing a task or discovering a blocker.
     quadrants in Debug and Release (31 tests pass), and all 14 PS1 code hashes match.
   - [x] Interpolate all vertex colors for textured Gouraud GT3/GT4 packets before texel modulation. Independent nonuniform white-texture fixtures fail on the old backend; Debug/Release pass 30 checks and the 5,000-vblank Release demo passes GPU validation. Full object visibility and placement remain under audit.
   - [x] Verify textured-polygon subpixel interpolation with nonuniform original FT4 fixtures. Independent nonuniform fixtures verify standard forward FT4, oriented-UV FT4, and SPRT parts matching Sony libgpu polygon affine truncation; both native profiles pass 31 checks and all 14 PS1 code hashes match.
-- [x] Audio: implement ADSR/reverb, XA stereo histories and coding-info sample rates.
-  Independent unit fixtures verify ADSR envelope attack/decay/sustain/release state
-  transitions, delay-line reverb signal processing and tails, CD-XA stereo deinterleaving
-  with distinct Left/Right filter histories, and subheader coding-info sample rate detection
-  (37.8 kHz and 18.9 kHz) in Debug and Release (31 checks pass), and all 14 PS1 code hashes match.
-- [ ] Save/load: verify original save layout before game integration.
+- [ ] Audio: audit hardware envelope and reverb fidelity before claiming completion.
+  - [x] Correct XA canonical parameter offsets, signed predictor rounding and reserved shifts; decode both 4-bit and 8-bit units with separate stereo histories. Independent numerical fixtures expose the old decoder and verify sample counts and invalid-width rejection in Debug/Release.
+  - [ ] Replace approximate ADSR rates with hardware envelope counters and numerical clock fixtures.
+  - [ ] Replace the generic global echo with PS1 reverb DSP and per-voice sends; the existing delay-tail test does not establish hardware fidelity.
+  - [ ] Verify original CD SDK stream integration and hardware XA resampling; standalone decoder tests do not establish in-game streaming.
+- [x] Save/load: verify original save layout before game integration.
   - [x] Give the original save header, icon frames, slot record and payload one aligned native backing image. The original reset, shift/checksum and 4-block SDK transfer are exercised by an asset-free regression that fails before the fix and after temporary reversion; both profiles pass 31 checks and all 14 PS1 code hashes match.
-  - [ ] Translate fixed PS1 SaveFile/SaveImage and state pack/unpack layouts to x64 structures, including serialized pointer fields and expanded animal/player/helper records. The backing-buffer and checksum tests do not establish state-serialization compatibility.
+  - [x] Translate fixed PS1 SaveFile/SaveImage and state pack/unpack layouts to x64 structures, including serialized pointer fields and expanded animal/player/helper records. Exact PS1 wire structs with compile-time assertions and state pack/unpack translations preserve 32-bit save compatibility on x64; both native profiles pass 31 checks and all 14 PS1 code hashes match.
   - [x] Preserve failed card loads instead of autoformatting existing media; reject short/oversized images, validate recovery directory checksums, report creation/flush failures and retain dirty state after failed persistence. Synthetic file regressions fail before the fix and after temporary reversion; Debug/Release pass 30 checks and all 14 PS1 code hashes match.
   - [x] Use zero-based PS1 wire links with shared validated physical-block resolution in core and SDK reads/writes. Reject cyclic, truncated, cross-linked and orphaned chains before mutation; reuse deleted blocks, round file allocations, initialize broken-sector sentinels and the write-test frame. Independent raw-directory regressions fail before the fix and after reversion; both profiles pass 30 checks and all 14 PS1 code hashes match.
 - [x] Trace the reported large attract-demo displacement to the original `scene_enter` area transition, rather than a large velocity; temporary write-watch instrumentation was removed. This does not establish console-equivalent demo behavior.
