@@ -291,13 +291,16 @@ int main(int argc, char **argv) {
     HostGame host = {0};
     int result = 1;
     const char *disc = "build/game-data/disc";
+    const char *card_directory = NULL;
 #ifdef VANILLABTN_BOOT_TEST
+    (void)card_directory;
     boot_fault_install(boot_fault_state);
     host.vblank_limit = 900;
 #endif
     if (argc == 2 && strcmp(argv[1], "--check-build") == 0) return 0;
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--data") == 0 && i + 1 < argc) disc = argv[++i];
+        else if (strcmp(argv[i], "--card-dir") == 0 && i + 1 < argc) card_directory = argv[++i];
 #ifdef VANILLABTN_BOOT_TEST
         else if (strcmp(argv[i], "--demo") == 0) host.vblank_limit = 5000;
         else if (strcmp(argv[i], "--cycle") == 0) {
@@ -338,7 +341,16 @@ int main(int argc, char **argv) {
     if (!host.texture || !SDL_SetTextureScaleMode(host.texture, SDL_SCALEMODE_NEAREST)) goto done;
     ps1_audio_init(&audio);
 #ifndef VANILLABTN_BOOT_TEST
-    ps1_card_manager_init(&card_mgr, NULL);
+    if (card_directory) {
+        SDL_PathInfo info;
+        if (!*card_directory || strlen(card_directory) >= sizeof(card_mgr.base_dir)
+            || !SDL_GetPathInfo(card_directory, &info) || info.type != SDL_PATHTYPE_DIRECTORY) {
+            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "VanillaBTN",
+                "Choose an existing folder for --card-dir.", host.window);
+            goto done;
+        }
+    }
+    ps1_card_manager_init(&card_mgr, card_directory);
     sdk_card_bind_manager(&card_mgr);
 #else
     /* This probe must never read, recover, create or flush user save files. */

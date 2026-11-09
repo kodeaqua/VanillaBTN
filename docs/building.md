@@ -72,6 +72,21 @@ a missed transition fails the probe. This checks scene execution, not whether
 the recording matches the original console's visuals or movement.
 
 The game stores virtual cards through SDL's application preference directory.
+To test with separate cards while retaining existing images, create a folder
+and select it explicitly from the repository root:
+
+```powershell
+New-Item -ItemType Directory -Force .\build\playtest-cards | Out-Null
+& .\build\native\Debug\vanillabtn.exe --card-dir .\build\playtest-cards
+```
+
+This creates missing card images only inside the selected existing folder.
+Empty cards correctly report no loadable game until the original game saves a
+farm. Older experimental images with one-based allocation links are preserved
+as damaged; fixing those links alone does not validate their game payload.
+The option does not migrate, reset or overwrite the default preference cards.
+
+
 Existing invalid cards are kept unchanged; loading them does not format or mark
 them for saving. Unreadable or wrong-size images are unavailable, and failed
 flushes retain their dirty state. Recovery checks the header and directory
