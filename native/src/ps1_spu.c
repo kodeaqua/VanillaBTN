@@ -84,6 +84,122 @@ static int16_t fetch_voice_raw_sample(Ps1Voice *voice) {
 }
 
 /* -------------------------------------------------------------------------
+ * ADSR Envelope Generator
+ * ---------------------------------------------------------------------- */
+static void voice_init_adsr(Ps1Voice *v, uint16_t adsr1, uint16_t adsr2) {
+    v->adsr1 = adsr1;
+    v->adsr2 = adsr2;
+    if (adsr1 == 0 && adsr2 == 0) {
+        /* Bypassed ADSR: full volume immediately, instant key-off */
+        v->env_phase = PS1_ADSR_SUSTAIN;
+        v->env_level = 0x7FFF;
+        v->adsr_release_rate = 0;
+        return;
+    }
+    v->adsr_attack_mode = (adsr1 >> 15) & 1;
+    v->adsr_attack_rate = (adsr1 >> 8) & 0x7F;
+    v->adsr_decay_rate = (adsr1 >> 4) & 0x0F;
+    int sl_raw = adsr1 & 0x0F;
+    v->adsr_sustain_level = ((sl_raw + 1) * 0x7FFF) / 16;
+    v->adsr_sustain_mode = (adsr2 >> 15) & 1;
+    v->adsr_sustain_dir = (adsr2 >> 14) & 1;
+    v->adsr_sustain_rate = (adsr2 >> 6) & 0x7F;
+    v->adsr_release_mode = (adsr2 >> 5) & 1;
+    v->adsr_release_rate = adsr2 & 0x1F;
+
+    v->env_phase = PS1_ADSR_ATTACK;
+    v->env_level = 0;
+}
+
+static void voice_step_adsr(Ps1Voice *v) {
+    if (!v->active) return;
+
+    switch (v->env_phase) {
+    case PS1_ADSR_ATTACK: {
+        int Ar = v->adsr_attack_rate;
+        if (Ar >= 124) {
+            v->env_level = 0x7FFF;
+            v->env_phase = PS1_ADSR_DECAY;
+        } else {
+            int32_t step = (1 << (Ar / 8)) + ((Ar & 7) * (1 << (Ar / 8))) / 8;
+            if (step < 1) step = 1;
+            if (v->adsr_attack_mode == 0) {
+                v->env_level += step;
+            } else {
+                v->env_level += step + ((0x7FFF - v->env_level) >> 8);
+            }
+            if (v->env_level >= 0x7FFF) {
+                v->env_level = 0x7FFF;
+                v->env_phase = PS1_ADSR_DECAY;
+            }
+        }
+        break;
+    }
+    case PS1_ADSR_DECAY: {
+        int Dr = v->adsr_decay_rate;
+        int32_t diff = v->env_level - v->adsr_sustain_level;
+        if (diff <= 0) {
+            v->env_level = v->adsr_sustain_level;
+            v->env_phase = PS1_ADSR_SUSTAIN;
+        } else {
+            int32_t dstep = (diff * (Dr + 1)) / 128 + 1;
+            v->env_level -= dstep;
+            if (v->env_level <= v->adsr_sustain_level) {
+                v->env_level = v->adsr_sustain_level;
+                v->env_phase = PS1_ADSR_SUSTAIN;
+            }
+        }
+        break;
+    }
+    case PS1_ADSR_SUSTAIN: {
+        if (v->adsr_sustain_dir == 0) {
+            int32_t sstep = (1 << (v->adsr_sustain_rate / 8));
+            v->env_level += sstep;
+            if (v->env_level > 0x7FFF) v->env_level = 0x7FFF;
+        } else {
+            if (v->adsr_sustain_rate > 0) {
+                int32_t sstep = (v->env_level * (v->adsr_sustain_rate + 1)) / 1024 + 1;
+                v->env_level -= sstep;
+                if (v->env_level <= 0) {
+                    v->env_level = 0;
+                    v->active = 0;
+                    v->env_phase = PS1_ADSR_OFF;
+                }
+            }
+        }
+        break;
+    }
+    case PS1_ADSR_RELEASE: {
+        if (v->adsr_release_rate == 0) {
+            v->env_level = 0;
+            v->active = 0;
+            v->env_phase = PS1_ADSR_OFF;
+        } else {
+            int Rr = v->adsr_release_rate;
+            int32_t rstep;
+            if (v->adsr_release_mode == 0) {
+                rstep = (1 << (Rr / 4)) + 1;
+            } else {
+                rstep = (v->env_level * (Rr + 1)) / 128 + 1;
+            }
+            v->env_level -= rstep;
+            if (v->env_level <= 0) {
+                v->env_level = 0;
+                v->active = 0;
+                v->env_phase = PS1_ADSR_OFF;
+            }
+        }
+        break;
+    }
+    case PS1_ADSR_OFF:
+    default:
+        v->env_level = 0;
+        v->active = 0;
+        break;
+    }
+}
+
+/* -------------------------------------------------------------------------
  * SPU Lifecycle
  * ---------------------------------------------------------------------- */
 void ps1_spu_init(Ps1Spu *spu) {
@@ -92,6 +208,10 @@ void ps1_spu_init(Ps1Spu *spu) {
     spu->master_vol_right = 0x3FFF;
     spu->cd_vol_left = 0x1FFF;
     spu->cd_vol_right = 0x1FFF;
+    spu->reverb_enabled = 0;
+    spu->reverb_feedback = 64;
+    spu->reverb_depth_left = 64;
+    spu->reverb_depth_right = 64;
 }
 
 Ps1VabId ps1_spu_load_vab(Ps1Spu *spu, const uint8_t *header, uint32_t header_size,
@@ -197,6 +317,7 @@ void ps1_spu_key_on_raw(Ps1Spu *spu, int voice_idx, const uint8_t *data,
     v->pitch_step = pitch_16_16 ? pitch_16_16 : 0x10000;
     v->vol_left = vol_left;
     v->vol_right = vol_right;
+    voice_init_adsr(v, 0, 0);
 
     v->curr_sample = fetch_voice_raw_sample(v);
     v->next_sample = fetch_voice_raw_sample(v);
@@ -249,18 +370,39 @@ void ps1_spu_key_on_vab(Ps1Spu *spu, int voice_idx, Ps1VabId vab_id,
     v->vol_left = (int16_t)vl;
     v->vol_right = (int16_t)vr;
 
+    uint16_t adsr1 = 0;
+    uint16_t adsr2 = 0;
+    memcpy(&adsr1, atr + 16, 2);
+    memcpy(&adsr2, atr + 18, 2);
+    voice_init_adsr(v, adsr1, adsr2);
+
     v->curr_sample = fetch_voice_raw_sample(v);
     v->next_sample = fetch_voice_raw_sample(v);
 }
 
+void ps1_spu_voice_set_adsr(Ps1Spu *spu, int voice_idx, uint16_t adsr1, uint16_t adsr2) {
+    if (voice_idx < 0 || voice_idx >= PS1_SPU_VOICES) return;
+    voice_init_adsr(&spu->voices[voice_idx], adsr1, adsr2);
+}
+
 void ps1_spu_key_off(Ps1Spu *spu, int voice_idx) {
     if (voice_idx < 0 || voice_idx >= PS1_SPU_VOICES) return;
-    spu->voices[voice_idx].active = 0;
+    Ps1Voice *v = &spu->voices[voice_idx];
+    if (!v->active) return;
+    if (v->adsr_release_rate > 0 && v->env_phase != PS1_ADSR_RELEASE) {
+        v->env_phase = PS1_ADSR_RELEASE;
+    } else {
+        v->active = 0;
+        v->env_phase = PS1_ADSR_OFF;
+        v->env_level = 0;
+    }
 }
 
 void ps1_spu_key_off_all(Ps1Spu *spu) {
     for (int v = 0; v < PS1_SPU_VOICES; v++) {
         spu->voices[v].active = 0;
+        spu->voices[v].env_phase = PS1_ADSR_OFF;
+        spu->voices[v].env_level = 0;
     }
 }
 
@@ -277,6 +419,23 @@ void ps1_spu_set_master_vol(Ps1Spu *spu, int16_t left, int16_t right) {
 void ps1_spu_set_cd_vol(Ps1Spu *spu, int16_t left, int16_t right) {
     spu->cd_vol_left = left;
     spu->cd_vol_right = right;
+}
+
+void ps1_spu_set_reverb_enabled(Ps1Spu *spu, int enabled) {
+    if (!spu) return;
+    spu->reverb_enabled = enabled ? 1 : 0;
+}
+
+void ps1_spu_set_reverb_params(Ps1Spu *spu, int type, int depth_l, int depth_r,
+                               int vol_l, int vol_r, int feedback, int delay) {
+    if (!spu) return;
+    spu->reverb_type = (int16_t)type;
+    spu->reverb_depth_left = (int16_t)depth_l;
+    spu->reverb_depth_right = (int16_t)depth_r;
+    spu->reverb_vol_left = (int16_t)vol_l;
+    spu->reverb_vol_right = (int16_t)vol_r;
+    spu->reverb_feedback = (int16_t)feedback;
+    spu->reverb_delay = (int16_t)delay;
 }
 
 /* -------------------------------------------------------------------------
@@ -301,18 +460,57 @@ void ps1_spu_mix(Ps1Spu *spu, int16_t *out, int frames, int accumulate) {
             int32_t diff = (int32_t)voice->next_sample - (int32_t)voice->curr_sample;
             int32_t samp = (int32_t)voice->curr_sample + (int32_t)(((int64_t)diff * frac) >> 16);
 
+            /* ADSR envelope scaling */
+            samp = (int32_t)(((int64_t)samp * voice->env_level) >> 15);
+
             mix_l += (samp * (int32_t)voice->vol_left) >> 15;
             mix_r += (samp * (int32_t)voice->vol_right) >> 15;
+
+            voice_step_adsr(voice);
 
             voice->frac_pos += voice->pitch_step;
             while (voice->frac_pos >= 0x10000 && voice->active) {
                 voice->curr_sample = voice->next_sample;
                 if (voice->source_ended) {
                     voice->active = 0;
+                    voice->env_phase = PS1_ADSR_OFF;
+                    voice->env_level = 0;
                     voice->next_sample = 0;
                 } else voice->next_sample = fetch_voice_raw_sample(voice);
                 voice->frac_pos -= 0x10000;
             }
+        }
+
+        /* Reverb DSP */
+        if (spu->reverb_enabled) {
+            uint32_t rpos = spu->reverb_pos;
+            uint32_t delay_base = spu->reverb_delay ? ((uint32_t)spu->reverb_delay * 32u) : 2048u;
+            if (delay_base > 4000u) delay_base = 4000u;
+            uint32_t tap1 = (rpos + PS1_SPU_REVERB_BUF_SIZE - delay_base) % PS1_SPU_REVERB_BUF_SIZE;
+            uint32_t tap2 = (rpos + PS1_SPU_REVERB_BUF_SIZE - (delay_base * 3u / 2u)) % PS1_SPU_REVERB_BUF_SIZE;
+
+            int32_t delayed_l = ((int32_t)spu->reverb_ring[tap1][0] * 3 + (int32_t)spu->reverb_ring[tap2][0] * 2) / 5;
+            int32_t delayed_r = ((int32_t)spu->reverb_ring[tap1][1] * 3 + (int32_t)spu->reverb_ring[tap2][1] * 2) / 5;
+
+            int32_t fb = spu->reverb_feedback;
+            if (fb < 0) fb = 0;
+            if (fb > 127) fb = 127;
+
+            int32_t in_l = mix_l + ((delayed_l * fb) / 128);
+            int32_t in_r = mix_r + ((delayed_r * fb) / 128);
+            if (in_l > 32767) in_l = 32767;
+            if (in_l < -32768) in_l = -32768;
+            if (in_r > 32767) in_r = 32767;
+            if (in_r < -32768) in_r = -32768;
+
+            spu->reverb_ring[rpos][0] = (int16_t)in_l;
+            spu->reverb_ring[rpos][1] = (int16_t)in_r;
+            spu->reverb_pos = (rpos + 1) % PS1_SPU_REVERB_BUF_SIZE;
+
+            int32_t rdepth_l = spu->reverb_depth_left;
+            int32_t rdepth_r = spu->reverb_depth_right;
+            mix_l += (delayed_l * rdepth_l) / 128;
+            mix_r += (delayed_r * rdepth_r) / 128;
         }
 
         /* The sum of 24 voices can exceed 16-bit range before master scaling. */

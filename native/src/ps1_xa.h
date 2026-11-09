@@ -55,14 +55,22 @@ typedef struct {
     int16_t         sector_pcm[PS1_XA_MAX_SECTOR_SAMPLES];
     int             sector_sample_count;
     int             sector_sample_idx;
+    int             is_stereo;
+    uint32_t        sample_rate;
     int16_t         curr_sample;
     int16_t         next_sample;
+    int16_t         curr_sample_r;
+    int16_t         next_sample_r;
     uint32_t        frac_pos;         /* 16.16 */
     uint32_t        resample_step;    /* 16.16 */
 
     /* ADPCM filter history across sound groups */
     int16_t         hist1;
     int16_t         hist2;
+    int16_t         hist1_l;
+    int16_t         hist2_l;
+    int16_t         hist1_r;
+    int16_t         hist2_r;
 } Ps1XaPlayer;
 
 /* Initialize player */
@@ -83,10 +91,17 @@ void ps1_xa_fade_tick(Ps1XaPlayer *player, int speed_mode);
 /* Get current playback state */
 Ps1XaState ps1_xa_get_state(const Ps1XaPlayer *player);
 
-/* Decode a single 2336-byte Form 2 sector.
+/* Decode a single 2336-byte Form 2 sector in mono.
  * Returns number of decoded mono samples (up to 4032), or 0 on error/invalid. */
 int ps1_xa_decode_sector(const uint8_t *sector, int16_t *out_samples,
                          int16_t *hist1, int16_t *hist2);
+
+/* Decode a single 2336-byte Form 2 sector with stereo channel deinterleaving
+ * and separate left/right filter histories.
+ * Returns number of decoded interleaved samples (up to 4032, or 2016 stereo pairs). */
+int ps1_xa_decode_sector_stereo(const uint8_t *sector, int16_t *out_samples,
+                                int16_t *hist1_l, int16_t *hist2_l,
+                                int16_t *hist1_r, int16_t *hist2_r);
 
 /* Mix frames stereo 16-bit PCM at 44.1 kHz into out.
  * cd_vol_left/right are SPU CD-in volumes (0..0x7FFF). */

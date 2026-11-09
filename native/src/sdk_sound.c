@@ -522,29 +522,39 @@ void SsVoKeyOff(long vab_pro, long pitch) {
 
 void SsUtReverbOn(void) {
     reverb_enabled = true;
+    ps1_spu_set_reverb_enabled(&spu, 1);
 }
 
 void SsUtReverbOff(void) {
     reverb_enabled = false;
+    ps1_spu_set_reverb_enabled(&spu, 0);
 }
 
 short SsUtSetReverbType(short type) {
     if (type < 0) return -1;
     reverb_type_val = type;
+    ps1_spu_set_reverb_params(&spu, reverb_type_val, reverb_depth_l, reverb_depth_r,
+                              reverb_vol_l, reverb_vol_r, reverb_feedback_val, reverb_delay_val);
     return type;
 }
 
 void SsUtSetReverbDepth(short ldepth, short rdepth) {
     reverb_depth_l = ldepth;
     reverb_depth_r = rdepth;
+    ps1_spu_set_reverb_params(&spu, reverb_type_val, reverb_depth_l, reverb_depth_r,
+                              reverb_vol_l, reverb_vol_r, reverb_feedback_val, reverb_delay_val);
 }
 
 void SsUtSetReverbFeedback(short feedback) {
     reverb_feedback_val = feedback;
+    ps1_spu_set_reverb_params(&spu, reverb_type_val, reverb_depth_l, reverb_depth_r,
+                              reverb_vol_l, reverb_vol_r, reverb_feedback_val, reverb_delay_val);
 }
 
 void SsUtSetReverbDelay(short delay) {
     reverb_delay_val = delay;
+    ps1_spu_set_reverb_params(&spu, reverb_type_val, reverb_depth_l, reverb_depth_r,
+                              reverb_vol_l, reverb_vol_r, reverb_feedback_val, reverb_delay_val);
 }
 
 void SpuSetCommonAttr(SpuCommonAttr *attr) {

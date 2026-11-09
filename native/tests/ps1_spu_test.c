@@ -180,12 +180,112 @@ static void test_spu_raw_playback_and_volume(void) {
     assert(!ps1_spu_voice_is_active(&spu, 3));
 }
 
+static void test_spu_adsr_envelope(void) {
+    Ps1Spu spu;
+    ps1_spu_init(&spu);
+
+    /* Construct a looped ADPCM block with non-zero samples */
+    uint8_t block[16];
+    memset(block, 0, sizeof(block));
+    block[0] = 0x04; /* shift 4, filter 0 */
+    block[1] = PS1_ADPCM_FLAG_LOOP_START | PS1_ADPCM_FLAG_LOOP_END | PS1_ADPCM_FLAG_LOOP_REPEAT;
+    memset(block + 2, 0x33, 14);
+
+    ps1_spu_key_on_raw(&spu, 0, block, sizeof(block), 0x10000, 0x7FFF, 0x7FFF);
+    assert(ps1_spu_voice_is_active(&spu, 0));
+
+    /* Configure ADSR on voice 0:
+     * ADSR1: Attack rate = 64 (linear), Decay rate = 8, Sustain level = 8 (half volume, 0x47FF)
+     * ADSR2: Sustain dir = 1 (decrease), Sustain rate = 0 (hold), Release rate = 16 (linear)
+     */
+    uint16_t adsr1 = (0 << 15) | (64 << 8) | (8 << 4) | 8;
+    uint16_t adsr2 = (0 << 15) | (1 << 14) | (0 << 6) | (0 << 5) | 16;
+    ps1_spu_voice_set_adsr(&spu, 0, adsr1, adsr2);
+
+    assert(spu.voices[0].env_phase == PS1_ADSR_ATTACK);
+    assert(spu.voices[0].env_level == 0);
+
+    /* Mix a few samples: Attack should ramp envelope up */
+    int16_t pcm[256];
+    ps1_spu_mix(&spu, pcm, 128, 0);
+    assert(spu.voices[0].env_level > 0);
+
+    /* Mix enough samples to complete attack and reach decay/sustain */
+    for (int i = 0; i < 50; i++) {
+        ps1_spu_mix(&spu, pcm, 128, 0);
+    }
+    assert(spu.voices[0].env_phase == PS1_ADSR_SUSTAIN);
+    assert(spu.voices[0].env_level <= spu.voices[0].adsr_sustain_level);
+
+    /* Key off: must enter release phase, remaining active while releasing */
+    ps1_spu_key_off(&spu, 0);
+    assert(spu.voices[0].env_phase == PS1_ADSR_RELEASE);
+    assert(ps1_spu_voice_is_active(&spu, 0));
+
+    /* Mix until release completes */
+    while (ps1_spu_voice_is_active(&spu, 0)) {
+        ps1_spu_mix(&spu, pcm, 128, 0);
+    }
+    assert(!ps1_spu_voice_is_active(&spu, 0));
+    assert(spu.voices[0].env_level == 0);
+    assert(spu.voices[0].env_phase == PS1_ADSR_OFF);
+}
+
+static void test_spu_reverb_processing(void) {
+    Ps1Spu spu;
+    ps1_spu_init(&spu);
+    ps1_spu_set_reverb_enabled(&spu, 1);
+    ps1_spu_set_reverb_params(&spu, 5, 64, 64, 0x4000, 0x4000, 60, 64);
+
+    /* Non-looping single block pulse */
+    uint8_t block[16];
+    memset(block, 0, sizeof(block));
+    block[0] = 0x04;
+    block[1] = PS1_ADPCM_FLAG_LOOP_END;
+    memset(block + 2, 0x77, 14);
+
+    ps1_spu_key_on_raw(&spu, 0, block, sizeof(block), 0x10000, 0x7FFF, 0x7FFF);
+
+    /* Mix initial frames: voice produces audio and feeds into reverb */
+    int16_t pcm[1024];
+    ps1_spu_mix(&spu, pcm, 512, 0);
+
+    /* Wait until voice has ended */
+    while (ps1_spu_voice_is_active(&spu, 0)) {
+        ps1_spu_mix(&spu, pcm, 512, 0);
+    }
+    assert(!ps1_spu_voice_is_active(&spu, 0));
+
+    /* Mix further frames: even though voice is dead, reverb ring buffer produces tail echo! */
+    int has_reverb_tail = 0;
+    for (int step = 0; step < 10; step++) {
+        ps1_spu_mix(&spu, pcm, 512, 0);
+        for (int i = 0; i < 1024; i++) {
+            if (pcm[i] != 0) {
+                has_reverb_tail = 1;
+                break;
+            }
+        }
+        if (has_reverb_tail) break;
+    }
+    assert(has_reverb_tail);
+
+    /* Disable reverb: output drops to silence */
+    ps1_spu_set_reverb_enabled(&spu, 0);
+    ps1_spu_mix(&spu, pcm, 512, 0);
+    for (int i = 0; i < 1024; i++) {
+        assert(pcm[i] == 0);
+    }
+}
+
 int main(void) {
     test_final_adpcm_block_is_not_discarded();
     test_adpcm_decode_basic();
     test_adpcm_filter_prediction();
     test_spu_synthetic_vab_and_mix();
     test_spu_raw_playback_and_volume();
+    test_spu_adsr_envelope();
+    test_spu_reverb_processing();
     printf("ps1_spu tests passed.\n");
     return 0;
 }

@@ -180,9 +180,9 @@ points used by `sound.c` and `sound_request.c`: `SsInit`, `SsSetTableSize`,
 `SsUtSetReverbDelay`, `SpuSetCommonAttr`, `SpuGetAllKeysStatus` and
 `SpuGetKeyStatus`. VAB headers and chunk-streamed bodies are copied into
 per-slot SPU buffers and loaded into `Ps1Spu`, while opened `pQES` sequences
-and keyed voices drive `Ps1Seq` and `Ps1Spu` directly. SPU hardware ADSR
-envelopes and reverb signal processing remain open; reverb parameters are
-recorded at the SDK boundary. Starting an archive sector read via
+and keyed voices drive `Ps1Seq` and `Ps1Spu` directly. `Ps1Spu` implements voice
+ADSR envelope generators (Attack, Decay, Sustain, Release) and a circular delay-line
+reverb DSP, with reverb parameters configured at the SDK boundary. Starting an archive sector read via
 `afile_read_bytes` invokes the real `cd_audio_stop` and switches the drive back
 to data mode (`0x80`). Feeding `cd_audio.c` filter/location/volume state into
 the live `ps1_xa` audio mixer stream remains a separate integration step.
@@ -499,8 +499,8 @@ remains available to isolated tests without duplicate symbols.
 SDK bootstrap supports the current NTSC, non-interlaced graph setup, 2 MB RAM,
 GS work cursor, parallel lighting and the missing translation/ZXY matrix calls.
 Unsupported initialization/light modes fail explicitly. Numerical SDK rounding,
-remaining farm pointer conversions, complete XA streaming, SPU ADSR/reverb and
-original save serialization remain open. This is not full-game acceptance.
+remaining farm pointer conversions, complete XA streaming, and original save
+serialization remain open. This is not full-game acceptance.
 
 The optional original_boot_test executable uses dummy SDL devices and a fake
 clock against locally imported assets. Both profiles reach the original title

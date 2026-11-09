@@ -72,6 +72,90 @@ int ps1_xa_decode_sector(const uint8_t *sector, int16_t *out_samples,
     return total_samples;
 }
 
+int ps1_xa_decode_sector_stereo(const uint8_t *sector, int16_t *out_samples,
+                                int16_t *hist1_l, int16_t *hist2_l,
+                                int16_t *hist1_r, int16_t *hist2_r) {
+    if (!sector || !out_samples) return 0;
+
+    /* Verify submode has audio flag (bit 2) */
+    uint8_t submode = sector[2];
+    if (!(submode & 0x04)) return 0;
+
+    int total_samples = 0;
+    int16_t h1_l = hist1_l ? *hist1_l : 0;
+    int16_t h2_l = hist2_l ? *hist2_l : 0;
+    int16_t h1_r = hist1_r ? *hist1_r : 0;
+    int16_t h2_r = hist2_r ? *hist2_r : 0;
+
+    for (int g = 0; g < PS1_XA_SOUND_GROUPS; g++) {
+        const uint8_t *sg = sector + 8 + g * 128;
+        int16_t group_l[112];
+        int16_t group_r[112];
+
+        /* Sound units 0, 2, 4, 6 are Left channel (4 * 28 = 112 samples) */
+        for (int u = 0; u < 4; u++) {
+            int b = u * 2; /* 0, 2, 4, 6 */
+            uint8_t param = (b < 4) ? sg[b] : sg[8 + (b - 4)];
+            int shift = param & 0x0F;
+            int filter = (param >> 4) & 0x03;
+            int f0 = K0[filter];
+            int f1 = K1[filter];
+
+            for (int s = 0; s < 28; s++) {
+                uint8_t w = sg[16 + s * 4 + b / 2];
+                uint8_t nib = w & 0x0F;
+                int16_t sn = (int16_t)(nib << 12) >> shift;
+                int32_t pred = (f0 * h1_l + f1 * h2_l + 32) / 64;
+                int32_t sample = sn + pred;
+
+                if (sample > 32767)  sample = 32767;
+                if (sample < -32768) sample = -32768;
+
+                h2_l = h1_l;
+                h1_l = (int16_t)sample;
+                group_l[u * 28 + s] = (int16_t)sample;
+            }
+        }
+
+        /* Sound units 1, 3, 5, 7 are Right channel (4 * 28 = 112 samples) */
+        for (int u = 0; u < 4; u++) {
+            int b = u * 2 + 1; /* 1, 3, 5, 7 */
+            uint8_t param = (b < 4) ? sg[b] : sg[8 + (b - 4)];
+            int shift = param & 0x0F;
+            int filter = (param >> 4) & 0x03;
+            int f0 = K0[filter];
+            int f1 = K1[filter];
+
+            for (int s = 0; s < 28; s++) {
+                uint8_t w = sg[16 + s * 4 + b / 2];
+                uint8_t nib = (w >> 4) & 0x0F;
+                int16_t sn = (int16_t)(nib << 12) >> shift;
+                int32_t pred = (f0 * h1_r + f1 * h2_r + 32) / 64;
+                int32_t sample = sn + pred;
+
+                if (sample > 32767)  sample = 32767;
+                if (sample < -32768) sample = -32768;
+
+                h2_r = h1_r;
+                h1_r = (int16_t)sample;
+                group_r[u * 28 + s] = (int16_t)sample;
+            }
+        }
+
+        /* Interleave Left and Right for this sound group */
+        for (int i = 0; i < 112; i++) {
+            out_samples[total_samples++] = group_l[i];
+            out_samples[total_samples++] = group_r[i];
+        }
+    }
+
+    if (hist1_l) *hist1_l = h1_l;
+    if (hist2_l) *hist2_l = h2_l;
+    if (hist1_r) *hist1_r = h1_r;
+    if (hist2_r) *hist2_r = h2_r;
+    return total_samples;
+}
+
 /* -------------------------------------------------------------------------
  * Player Lifecycle
  * ---------------------------------------------------------------------- */
@@ -82,6 +166,7 @@ void ps1_xa_init(Ps1XaPlayer *player) {
     player->file = -1;
     player->channel = -1;
     player->serial_volume = 45;
+    player->sample_rate = 18900;
     /* 18900 Hz source -> 44100 Hz output */
     player->resample_step = (18900u * 65536u) / 44100u; /* 28087 */
 }
@@ -106,8 +191,24 @@ static int fetch_next_sector(Ps1XaPlayer *player) {
 
         /* Check channel filter */
         if (sec[1] == (uint8_t)player->channel) {
-            int n = ps1_xa_decode_sector(sec, player->sector_pcm,
-                                         &player->hist1, &player->hist2);
+            uint8_t coding_info = sec[3];
+            player->is_stereo = (coding_info & 0x01) != 0;
+            player->sample_rate = ((coding_info >> 2) & 0x01) ? 18900u : 37800u;
+            player->resample_step = (player->sample_rate * 65536u) / 44100u;
+
+            int n;
+            if (player->is_stereo) {
+                n = ps1_xa_decode_sector_stereo(sec, player->sector_pcm,
+                                               &player->hist1_l, &player->hist2_l,
+                                               &player->hist1_r, &player->hist2_r);
+                player->hist1 = player->hist1_l;
+                player->hist2 = player->hist2_l;
+            } else {
+                n = ps1_xa_decode_sector(sec, player->sector_pcm,
+                                         &player->hist1_l, &player->hist2_l);
+                player->hist1 = player->hist1_l;
+                player->hist2 = player->hist2_l;
+            }
             if (n > 0) {
                 player->sector_sample_count = n;
                 player->sector_sample_idx = 0;
@@ -145,13 +246,26 @@ void ps1_xa_play_track(Ps1XaPlayer *player, int track) {
     player->sector_index = 0;
     player->sector_sample_count = 0;
     player->sector_sample_idx = 0;
+    player->is_stereo = 0;
+    player->sample_rate = 18900;
+    player->resample_step = (18900u * 65536u) / 44100u;
     player->hist1 = 0;
     player->hist2 = 0;
+    player->hist1_l = 0;
+    player->hist2_l = 0;
+    player->hist1_r = 0;
+    player->hist2_r = 0;
     player->frac_pos = 0;
     player->state = PS1_XA_PLAYING;
 
     player->curr_sample = fetch_xa_raw_sample(player);
-    player->next_sample = fetch_xa_raw_sample(player);
+    if (player->is_stereo) {
+        player->curr_sample_r = fetch_xa_raw_sample(player);
+        player->next_sample = fetch_xa_raw_sample(player);
+        player->next_sample_r = fetch_xa_raw_sample(player);
+    } else {
+        player->next_sample = fetch_xa_raw_sample(player);
+    }
 }
 
 void ps1_xa_stop(Ps1XaPlayer *player) {
@@ -213,22 +327,43 @@ void ps1_xa_mix(Ps1XaPlayer *player, int16_t *out, int frames,
             continue;
         }
 
-        /* Resample with linear interpolation */
-        int32_t frac = (int32_t)(player->frac_pos & 0xFFFF);
-        int32_t diff = (int32_t)player->next_sample - (int32_t)player->curr_sample;
-        int32_t samp = (int32_t)player->curr_sample + (int32_t)(((int64_t)diff * frac) >> 16);
+        int32_t samp_l = 0;
+        int32_t samp_r = 0;
 
-        player->frac_pos += player->resample_step;
-        while (player->frac_pos >= 0x10000 && player->state != PS1_XA_IDLE) {
-            player->curr_sample = player->next_sample;
-            player->next_sample = fetch_xa_raw_sample(player);
-            player->frac_pos -= 0x10000;
+        if (player->is_stereo) {
+            int32_t frac = (int32_t)(player->frac_pos & 0xFFFF);
+            int32_t diff_l = (int32_t)player->next_sample - (int32_t)player->curr_sample;
+            samp_l = (int32_t)player->curr_sample + (int32_t)(((int64_t)diff_l * frac) >> 16);
+            int32_t diff_r = (int32_t)player->next_sample_r - (int32_t)player->curr_sample_r;
+            samp_r = (int32_t)player->curr_sample_r + (int32_t)(((int64_t)diff_r * frac) >> 16);
+
+            player->frac_pos += player->resample_step;
+            while (player->frac_pos >= 0x10000 && player->state != PS1_XA_IDLE) {
+                player->curr_sample = player->next_sample;
+                player->curr_sample_r = player->next_sample_r;
+                player->next_sample = fetch_xa_raw_sample(player);
+                player->next_sample_r = fetch_xa_raw_sample(player);
+                player->frac_pos -= 0x10000;
+            }
+        } else {
+            /* Mono resampling */
+            int32_t frac = (int32_t)(player->frac_pos & 0xFFFF);
+            int32_t diff = (int32_t)player->next_sample - (int32_t)player->curr_sample;
+            int32_t samp = (int32_t)player->curr_sample + (int32_t)(((int64_t)diff * frac) >> 16);
+            samp_l = samp;
+            samp_r = samp;
+
+            player->frac_pos += player->resample_step;
+            while (player->frac_pos >= 0x10000 && player->state != PS1_XA_IDLE) {
+                player->curr_sample = player->next_sample;
+                player->next_sample = fetch_xa_raw_sample(player);
+                player->frac_pos -= 0x10000;
+            }
         }
 
         /* Volume scaling: sample * serial_vol (out of 128) * cd_vol (out of 32767) */
-        /* Full-scale PCM and mixer volumes exceed a signed 32-bit product. */
-        int32_t out_l = (int32_t)(((int64_t)samp * svol * cvol_l) / (128 * 32767));
-        int32_t out_r = (int32_t)(((int64_t)samp * svol * cvol_r) / (128 * 32767));
+        int32_t out_l = (int32_t)(((int64_t)samp_l * svol * cvol_l) / (128 * 32767));
+        int32_t out_r = (int32_t)(((int64_t)samp_r * svol * cvol_r) / (128 * 32767));
 
         if (accumulate) {
             out_l += out[f * 2 + 0];

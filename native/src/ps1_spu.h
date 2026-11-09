@@ -24,7 +24,18 @@
 #define PS1_ADPCM_FLAG_LOOP_REPEAT 0x02
 #define PS1_ADPCM_FLAG_LOOP_START  0x04
 
+#define PS1_SPU_REVERB_BUF_SIZE 8192
+
 typedef int Ps1VabId;
+
+/* ADSR envelope phases */
+typedef enum {
+    PS1_ADSR_OFF = 0,
+    PS1_ADSR_ATTACK = 1,
+    PS1_ADSR_DECAY = 2,
+    PS1_ADSR_SUSTAIN = 3,
+    PS1_ADSR_RELEASE = 4
+} Ps1AdsrPhase;
 
 /* Single voice state */
 typedef struct {
@@ -47,6 +58,21 @@ typedef struct {
     uint32_t        pitch_step;       /* 16.16 pitch increment per 44.1kHz sample */
     int16_t         vol_left;         /* 0..0x7FFF */
     int16_t         vol_right;        /* 0..0x7FFF */
+
+    /* ADSR envelope state */
+    Ps1AdsrPhase    env_phase;
+    int32_t         env_level;         /* 0..0x7FFF */
+    uint16_t        adsr1;
+    uint16_t        adsr2;
+    int             adsr_attack_mode;  /* 0 = Linear, 1 = Exponential */
+    int             adsr_attack_rate;  /* 0..127 */
+    int             adsr_decay_rate;   /* 0..15 */
+    int32_t         adsr_sustain_level;/* 0..0x7FFF */
+    int             adsr_sustain_mode; /* 0 = Linear, 1 = Exponential */
+    int             adsr_sustain_dir;  /* 0 = Increase, 1 = Decrease */
+    int             adsr_sustain_rate; /* 0..127 */
+    int             adsr_release_mode; /* 0 = Linear, 1 = Exponential */
+    int             adsr_release_rate; /* 0..31 */
 } Ps1Voice;
 
 /* Parsed VAB slot */
@@ -73,6 +99,18 @@ typedef struct {
     int16_t         master_vol_right;
     int16_t         cd_vol_left;      /* 0..0x7FFF */
     int16_t         cd_vol_right;
+
+    /* Reverb configuration and state */
+    int             reverb_enabled;
+    int16_t         reverb_type;
+    int16_t         reverb_depth_left;   /* 0..127 */
+    int16_t         reverb_depth_right;  /* 0..127 */
+    int16_t         reverb_vol_left;     /* 0..0x7FFF */
+    int16_t         reverb_vol_right;    /* 0..0x7FFF */
+    int16_t         reverb_feedback;     /* 0..127 */
+    int16_t         reverb_delay;        /* delay parameter */
+    int16_t         reverb_ring[PS1_SPU_REVERB_BUF_SIZE][2];
+    uint32_t        reverb_pos;
 } Ps1Spu;
 
 /* Initialize SPU state */
@@ -118,6 +156,16 @@ void ps1_spu_set_master_vol(Ps1Spu *spu, int16_t left, int16_t right);
 
 /* Set CD (XA) mix volume (0..0x7FFF) */
 void ps1_spu_set_cd_vol(Ps1Spu *spu, int16_t left, int16_t right);
+
+/* Configure voice ADSR parameters directly */
+void ps1_spu_voice_set_adsr(Ps1Spu *spu, int voice_idx, uint16_t adsr1, uint16_t adsr2);
+
+/* Enable or disable reverb processing */
+void ps1_spu_set_reverb_enabled(Ps1Spu *spu, int enabled);
+
+/* Set reverb parameters */
+void ps1_spu_set_reverb_params(Ps1Spu *spu, int type, int depth_l, int depth_r,
+                               int vol_l, int vol_r, int feedback, int delay);
 
 /* Mix frames stereo 16-bit PCM samples into out (interleaved L/R).
  * If accumulate is non-zero, samples are added to existing contents of out.
