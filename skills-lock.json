@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "engineering-advanced-skills": {
+      "source": "alirezarezvani/claude-skills",
+      "sourceType": "github",
+      "skillPath": "engineering/skills/engineering-advanced-skills/SKILL.md",
+      "computedHash": "78e664e4e2f7dd7ff6b253337c69437d4f32ed80cc88759fc47490acdd867d9f"
+    },
+    "engineering-skills": {
+      "source": "alirezarezvani/claude-skills",
+      "sourceType": "github",
+      "skillPath": "engineering-team/skills/engineering-skills/SKILL.md",
+      "computedHash": "e0e29ad8ac4483fe04bd0563f2ef1cacf6bede6aeb77383660858e53784beba9"
+    }
+  }
+}
