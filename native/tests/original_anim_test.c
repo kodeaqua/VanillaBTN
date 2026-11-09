@@ -49,10 +49,12 @@ static void prepare(Fixture *fixture, AnimState *state) {
     anim_bind_file(state, &fixture->file);
     video.vram[0][64] = 0x4321;
     video.vram[1][17] = 0x001F;
-    /* Uniform texels isolate original packet generation from the backend's
-     * still-incomplete subpixel interpolation. UV orientation is checked in
-     * the actual packet fields below, without inventing a hardware oracle. */
-    video.vram[1][18] = video.vram[1][19] = video.vram[1][20] = 0x001F;
+    /* Nonuniform texels verify textured-polygon subpixel interpolation:
+     * index 1 = Red (0x001F), index 2 = Green (0x03E0),
+     * index 3 = Blue (0x7C00), index 4 = Yellow (0x03FF). */
+    video.vram[1][18] = 0x03E0;
+    video.vram[1][19] = 0x7C00;
+    video.vram[1][20] = 0x03FF;
 }
 
 int main(void) {
@@ -79,7 +81,8 @@ int main(void) {
     anim_draw_ft4(ot, (POLY_FT4 *)packets, &state, 0, 0, 10, 10, 4096, 0, 0, -1, -1);
     DrawOTag(ot + 3);
     assert(sdk_gpu_ok());
-    assert(video.vram[10][10] == 0x001F && video.vram[10][13] == 0x001F);
+    assert(video.vram[10][10] == 0x001F && video.vram[10][11] == 0x001F);
+    assert(video.vram[10][12] == 0x03E0 && video.vram[10][13] == 0x7C00);
     assert(((POLY_FT4 *)packets)->u0 == 0 && ((POLY_FT4 *)packets)->u1 == 3);
     fixture.parts[0].attr = 1; /* Original oriented-UV path. */
     ClearOTagR(ot, 4);
@@ -88,7 +91,8 @@ int main(void) {
                       4096, 4096, 0, ANIM_DRAW_CURSOR, -1, -1, -1, -1);
     DrawOTag(ot + 3);
     assert(sdk_gpu_ok() && frame.primCursor.ft4 == (POLY_FT4 *)packets + 1);
-    assert(video.vram[20][20] == 0x001F && video.vram[20][23] == 0x001F);
+    assert(video.vram[20][20] == 0x03FF && video.vram[20][21] == 0x7C00
+           && video.vram[20][22] == 0x03E0 && video.vram[20][23] == 0x001F);
     assert(((POLY_FT4 *)packets)->u0 == 3 && ((POLY_FT4 *)packets)->u1 == 0);
     ClearOTagR(ot, 4);
     SPRT *sprites = (SPRT *)packets;
@@ -96,7 +100,8 @@ int main(void) {
     anim_draw_sprt_parts(ot, &sprites, &modes, &state, 0, 0, 30, 30);
     DrawOTag(ot + 3);
     assert(sdk_gpu_ok());
-    assert(video.vram[30][30] == 0x001F && video.vram[30][33] == 0x001F);
+    assert(video.vram[30][30] == 0x001F && video.vram[30][31] == 0x03E0
+           && video.vram[30][32] == 0x7C00 && video.vram[30][33] == 0x03FF);
     sdk_gpu_bind(NULL);
     assert(sdk_work_bind(NULL, 0));
     return 0;

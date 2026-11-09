@@ -85,9 +85,9 @@ fake implementations for unported scratchpad or other CPU operations.
 
 Synthetic fixtures invoke the actual original duration/hold/pause logic and
 SPRT/FT4 generation, including UV orientation and primitive-cursor advancement.
-They supply the main module's frame pointer as fixture state. Uniform texels
-isolate packet generation from the backend's incomplete polygon interpolation;
-independent nonuniform hardware fixtures remain required for texel fidelity.
+They supply the main module's frame pointer as fixture state. Nonuniform texel
+fixtures verify standard forward FT4, oriented-UV FT4, and SPRT subpixel
+interpolation against console affine polygon rasterization behavior.
 
 `game_frame_buffers` compiles the original frame layout, cursor insertion,
 `src/main/geometry/math_util.c`, `src/main/geometry/camera.c`,

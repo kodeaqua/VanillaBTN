@@ -56,7 +56,7 @@ Update the relevant item after completing a task or discovering a blocker.
     Independent numerical fixtures verify csincos, csin, and ccos across all four
     quadrants in Debug and Release (31 tests pass), and all 14 PS1 code hashes match.
   - [x] Interpolate all vertex colors for textured Gouraud GT3/GT4 packets before texel modulation. Independent nonuniform white-texture fixtures fail on the old backend; Debug/Release pass 30 checks and the 5,000-vblank Release demo passes GPU validation. Full object visibility and placement remain under audit.
-  - [ ] Verify textured-polygon subpixel interpolation with nonuniform original FT4 fixtures; packet-generation tests do not establish texel fidelity.
+  - [x] Verify textured-polygon subpixel interpolation with nonuniform original FT4 fixtures. Independent nonuniform fixtures verify standard forward FT4, oriented-UV FT4, and SPRT parts matching Sony libgpu polygon affine truncation; both native profiles pass 31 checks and all 14 PS1 code hashes match.
 - [ ] Audio: implement ADSR/reverb, XA stereo histories and coding-info sample rates.
 - [ ] Save/load: verify original save layout before game integration.
   - [x] Give the original save header, icon frames, slot record and payload one aligned native backing image. The original reset, shift/checksum and 4-block SDK transfer are exercised by an asset-free regression that fails before the fix and after temporary reversion; both profiles pass 31 checks and all 14 PS1 code hashes match.
