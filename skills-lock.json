@@ -1,6 +1,18 @@
 {
   "version": 1,
   "skills": {
+    "code-reviewer": {
+      "source": "alirezarezvani/claude-skills",
+      "sourceType": "github",
+      "skillPath": "engineering-team/skills/code-reviewer/SKILL.md",
+      "computedHash": "bbd1c6216d1dac36fe20d82e4c2c13f81d416f3e2aa333ab3c00d952d50747aa"
+    },
+    "commit-craft": {
+      "source": "alirezarezvani/claude-skills",
+      "sourceType": "github",
+      "skillPath": "engineering/skills/commit-craft/SKILL.md",
+      "computedHash": "d6b7ed66405465475e7973ada9ba8273d90fc8c35976b97eb481b69652e5579b"
+    },
     "engineering-advanced-skills": {
       "source": "alirezarezvani/claude-skills",
       "sourceType": "github",
@@ -12,6 +24,36 @@
       "sourceType": "github",
       "skillPath": "engineering-team/skills/engineering-skills/SKILL.md",
       "computedHash": "e0e29ad8ac4483fe04bd0563f2ef1cacf6bede6aeb77383660858e53784beba9"
+    },
+    "focused-fix": {
+      "source": "alirezarezvani/claude-skills",
+      "sourceType": "github",
+      "skillPath": "engineering/skills/focused-fix/SKILL.md",
+      "computedHash": "8fa8f307681dff32a689b4f98a92b306cb637099ea81988c71c9337419ad899d"
+    },
+    "performance-profiler": {
+      "source": "alirezarezvani/claude-skills",
+      "sourceType": "github",
+      "skillPath": "engineering/skills/performance-profiler/SKILL.md",
+      "computedHash": "10dbf4d6418f5fa7ee53a996ef34caa7ee5d9a2205a15df8dcdfa8aedcee43f1"
+    },
+    "pr-review-expert": {
+      "source": "alirezarezvani/claude-skills",
+      "sourceType": "github",
+      "skillPath": "engineering/skills/pr-review-expert/SKILL.md",
+      "computedHash": "a9e70d24158c8cbc5270fdd1f4ed852a48bb1ccba683b3428f59ed277d51a41b"
+    },
+    "red-green-proof": {
+      "source": "alirezarezvani/claude-skills",
+      "sourceType": "github",
+      "skillPath": "engineering-team/skills/red-green-proof/SKILL.md",
+      "computedHash": "ca90568d05af683e4ef1aab207be1a255e7eb6ed1bc1714932b5d47ac54ead31"
+    },
+    "tdd-guide": {
+      "source": "alirezarezvani/claude-skills",
+      "sourceType": "github",
+      "skillPath": "engineering-team/skills/tdd-guide/SKILL.md",
+      "computedHash": "3f502d8cc4e40332cb41e9f183c4f8935d451e5398a6c6b4f59b4f201479ae9d"
     }
   }
 }
