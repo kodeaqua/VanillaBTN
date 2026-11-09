@@ -62,12 +62,75 @@ int rcos(int angle) {
     return rsin_quadrant(a - 3072u);
 }
 
-int csin(int angle) {
-    return rsin(angle);
+/* Numerical SDK CORDIC angle constants (H_cor_tbl in LIBGTE COR_01.OBJ). */
+static const int g_cor_tbl[6] = {511, 302, 159, 81, 41, 20};
+
+void csincos(int angle, int *s, int *c) {
+    int x = 2487;
+    int y = 0;
+    int z = angle;
+
+    for (int i = 0; i < 6; ++i) {
+        int x_next, y_next, z_next;
+        if (z >= 0) {
+            x_next = x - (y >> i);
+            y_next = y + (x >> i);
+            z_next = z - g_cor_tbl[i];
+        } else {
+            x_next = x + (y >> i);
+            y_next = y - (x >> i);
+            z_next = z + g_cor_tbl[i];
+        }
+        x = x_next;
+        y = y_next;
+        z = z_next;
+    }
+
+    if (c) {
+        *c = x - (int)(((int64_t)z * y) >> 12);
+    }
+    if (s) {
+        *s = y + (int)(((int64_t)z * x) >> 12);
+    }
 }
 
 int ccos(int angle) {
-    return rcos(angle);
+    uint32_t a = (uint32_t)(angle < 0 ? -(int64_t)angle : angle) & 0xFFFu;
+    int s, c;
+    if (a < 1024u) {
+        csincos((int)a, &s, &c);
+        return c;
+    }
+    if (a < 2048u) {
+        csincos(2047 - (int)a, &s, &c);
+        return -c;
+    }
+    if (a < 3072u) {
+        csincos((int)a - 2048, &s, &c);
+        return -c;
+    }
+    csincos(4095 - (int)a, &s, &c);
+    return c;
+}
+
+int csin(int angle) {
+    int negative = angle < 0;
+    uint32_t a = (uint32_t)(negative ? -(int64_t)angle : angle) & 0xFFFu;
+    int s, c;
+    if (a < 1024u) {
+        csincos((int)a, &s, &c);
+        return negative ? -s : s;
+    }
+    if (a < 2048u) {
+        csincos(2047 - (int)a, &s, &c);
+        return negative ? -s : s;
+    }
+    if (a < 3072u) {
+        csincos((int)a - 2048, &s, &c);
+        return negative ? s : -s;
+    }
+    csincos(4095 - (int)a, &s, &c);
+    return negative ? s : -s;
 }
 
 /* Numerical SDK-function results, generated/checked by the optional reference

@@ -21,6 +21,16 @@ int main(int argc, char **argv) {
         || rsin(2048) != 0 || rsin(3072) != -4096 || rsin(-512) != -2896) return 5;
     if (rcos(0) != 4096 || rcos(512) != 2896 || rcos(1024) != 0
         || rcos(2048) != -4096 || rcos(3072) != 0 || rcos(-512) != 2896) return 6;
+    /* csin/ccos/csincos use CORDIC quantization from LIBGTE COR_01/02/03. */
+    int s_val = 0, c_val = 0;
+    csincos(0, &s_val, &c_val);
+    if (s_val != -56 || c_val != 4095) return 14;
+    csincos(512, &s_val, &c_val);
+    if (s_val != 2898 || c_val != 2892) return 15;
+    if (csin(0) != -56 || csin(512) != 2898 || csin(1024) != 4094
+        || csin(2048) != 56 || csin(3072) != -4094 || csin(-512) != -2898) return 16;
+    if (ccos(0) != 4095 || ccos(512) != 2892 || ccos(1024) != 56
+        || ccos(2048) != -4095 || ccos(3072) != -56 || ccos(-512) != 2892) return 17;
     MATRIX matrix = {0};
     VECTOR translation = {123, -456, 789, 0};
     SVECTOR angles = {1024, 1024, 0, 0};

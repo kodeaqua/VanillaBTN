@@ -49,7 +49,9 @@ Update the relevant item after completing a task or discovering a blocker.
   - [x] Preserve translation in SDK matrix snapshots and distinguish saturated IR stores from wide MAC stores; register loads truncate like hardware. Two regressions fail before the fix; Debug/Release pass 30 checks and all 14 PS1 code hashes match.
   - [x] Saturate projected SXY coordinates to the hardware signed 11-bit range and set axis overflow flags; RTPS/RTPT regressions fail before the fix and after temporary reversion. Both native profiles pass 30 tests and the 14-file PS1 code check passes.
   - [x] Replace ideal projection division with the GTE UNR reciprocal, near-plane overflow, signed fixed-point shifts, IR saturation and the hardware summary-bit mask. Independent numerical fixtures fail before the fix and after temporary reversion; both native profiles pass 30 checks, the Release demo cycle completes 10,000 vblanks, and all 14 PS1 code hashes match. Full MAC overflow and depth-cue behavior remain open.
-  - [ ] Replace csin/ccos aliases with the distinct SDK function quantization.
+  - [x] Replace csin/ccos aliases with the distinct SDK function quantization.
+    Independent numerical fixtures verify csincos, csin, and ccos across all four
+    quadrants in Debug and Release (31 tests pass), and all 14 PS1 code hashes match.
   - [x] Interpolate all vertex colors for textured Gouraud GT3/GT4 packets before texel modulation. Independent nonuniform white-texture fixtures fail on the old backend; Debug/Release pass 30 checks and the 5,000-vblank Release demo passes GPU validation. Full object visibility and placement remain under audit.
   - [ ] Verify textured-polygon subpixel interpolation with nonuniform original FT4 fixtures; packet-generation tests do not establish texel fidelity.
 - [ ] Audio: implement ADSR/reverb, XA stereo histories and coding-info sample rates.

@@ -541,9 +541,16 @@ failed transfers preserving buffers/saves, and directory-buffer sentinels.
 RotMatrixZXY rounds each 1.12 product before combining terms; generic matrix
 composition differs by one unit for some rotations. Three local reference SDK
 microcalls, including mixed positive/negative angles, supply independent
-numerical fixtures. Translation fields remain unchanged. This does not establish
-all GTE precision or fix the separate csin/ccos alias discrepancy found during
-the audit.
+numerical fixtures. Translation fields remain unchanged.
+
+### CORDIC trigonometric quantization
+
+`csin`, `ccos` and `csincos` in `LIBGTE` (`COR_01.OBJ`, `COR_02.OBJ`, `COR_03.OBJ`)
+implement fixed-point trigonometric functions using a 6-stage integer CORDIC
+iteration followed by first-order residual scaling. The native SDK bridge replaces
+previous ideal `rsin`/`rcos` table aliases with this exact quantization, matching
+the reference SDK behavior across positive and negative inputs in all four quadrants.
+Synthetic checks verify `csincos`, `csin`, and `ccos` boundary outputs.
 
 ### Estate queue layout
 

@@ -17,6 +17,7 @@ int rsin(int angle);
 int rcos(int angle);
 int csin(int angle);
 int ccos(int angle);
+void csincos(int angle, int *s, int *c);
 long ratan2(long y, long x);
 
 void SetGeomOffset(long ofx, long ofy);
