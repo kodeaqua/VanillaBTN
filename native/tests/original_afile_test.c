@@ -89,6 +89,11 @@ static void build_test_vab_entry9(uint8_t *entry9) {
     atr[4] = 60;  /* center note */
     atr[6] = 0;   /* min note */
     atr[7] = 127; /* max note */
+    /* Use actual ADSR: fast attack, highest decay target, frozen sustain,
+     * and the fastest linear release (two clocks from near-full volume). */
+    atr[16] = 0xff;
+    atr[18] = 0xc0;
+    atr[19] = 0x1f;
     uint16_t vag_idx = 1;
     memcpy(atr + 22, &vag_idx, 2);
 
@@ -273,7 +278,7 @@ int main(void) {
     uint8_t short_seq[15] = {'p','Q','E','S',0,0,0,1,0,100,0x0F,0x42,0x40,4,2};
     sdk_sound_sequence_source(short_seq, sizeof(short_seq));
     CHECK(SsSeqOpen((u_long *)short_seq, 0) == -1);
-    uint8_t sequence[] = {'p','Q','E','S',0,0,0,1,255,255,0,0,1,4,2,
+    uint8_t sequence[] = {'p','Q','E','S',0,0,0,1,255,255,0x07,0xA1,0x20,4,2,
                           0,0x90,60,127, 0xFF,0x2F,0xFF,0x2F};
     CHECK(SsSeqOpen((u_long *)sequence, 0) == -1);
     sdk_sound_sequence_source(sequence, sizeof(sequence));
@@ -285,6 +290,10 @@ int main(void) {
     CHECK(sdk_sound_spu()->voices[0].active);
     SsSeqClose(handle);
     CHECK(sdk_sound_status().open_seq_count == 0);
+    /* Closing requests key-off; let the real envelope release before reusing
+     * voice zero in the following independent SDK effect fixture. */
+    sdk_sound_mix(fast_pcm, 2);
+    CHECK(!sdk_sound_spu()->voices[0].active);
 
     /* Trigger SOUND_MENU_CONFIRM (VAB 0, prog 0, tone 0, note 60) and verify SPU voice + PCM mix. */
     VSync(0); /* Advance VSync counter so voice_stamps[0] != now. */
@@ -302,6 +311,9 @@ int main(void) {
     sound_voice_set_volume((s16)voice, 30, 90);
     CHECK(sdk_sound_spu()->voices[0].vol_left < sdk_sound_spu()->voices[0].vol_right);
     sound_release_voice(voice);
+    CHECK(sdk_sound_spu()->voices[0].active == 1);
+    CHECK(sdk_sound_spu()->voices[0].env_phase == PS1_ADSR_RELEASE);
+    sdk_sound_mix(pcm, 2);
     CHECK(sdk_sound_spu()->voices[0].active == 0);
 
     /* Load and play the pQES sequence at offset 24576 via sound_queue_seq_pair(4, 0) + sound_update. */
