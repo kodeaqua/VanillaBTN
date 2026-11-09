@@ -92,13 +92,14 @@ void ps1_xa_fade_tick(Ps1XaPlayer *player, int speed_mode);
 Ps1XaState ps1_xa_get_state(const Ps1XaPlayer *player);
 
 /* Decode a single 2336-byte Form 2 sector in mono.
- * Returns number of decoded mono samples (up to 4032), or 0 on error/invalid. */
+ * Returns 4032 samples for 4-bit or 2016 for 8-bit coding, or 0 on error. */
 int ps1_xa_decode_sector(const uint8_t *sector, int16_t *out_samples,
                          int16_t *hist1, int16_t *hist2);
 
 /* Decode a single 2336-byte Form 2 sector with stereo channel deinterleaving
  * and separate left/right filter histories.
- * Returns number of decoded interleaved samples (up to 4032, or 2016 stereo pairs). */
+ * Returns 4032 interleaved samples for 4-bit or 2016 for 8-bit coding.
+ * Reserved sample widths return 0 without changing output or histories. */
 int ps1_xa_decode_sector_stereo(const uint8_t *sector, int16_t *out_samples,
                                 int16_t *hist1_l, int16_t *hist2_l,
                                 int16_t *hist1_r, int16_t *hist2_r);

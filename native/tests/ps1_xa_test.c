@@ -6,6 +6,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Keep regression failures headless on Windows. */
+#undef assert
+#define assert(c) do { if (!(c)) { fprintf(stderr, "line %d: %s\n", __LINE__, #c); exit(1); } } while (0)
+
 static void test_xa_synthetic_decode(void) {
     uint8_t sector[PS1_XA_SECTOR_SIZE];
     memset(sector, 0, sizeof(sector));
@@ -117,16 +121,11 @@ static void test_xa_stereo_decode_and_histories(void) {
     /* Configure all sound groups with filter 1 for Left and filter 2 for Right */
     for (int g = 0; g < PS1_XA_SOUND_GROUPS; g++) {
         uint8_t *sg = sector + 8 + g * 128;
-        /* Left sound units (0, 2, 4, 6): filter 1 (0x10) */
-        sg[0] = 0x10;
-        sg[2] = 0x10;
-        sg[8 + 0] = 0x10;
-        sg[8 + 2] = 0x10;
-        /* Right sound units (1, 3, 5, 7): filter 2 (0x20) */
-        sg[1] = 0x20;
-        sg[3] = 0x20;
-        sg[8 + 1] = 0x20;
-        sg[8 + 3] = 0x20;
+        for (int unit = 0; unit < 8; unit++) {
+            sg[4 + unit] = (unit & 1) ? 0x20 : 0x10;
+        }
+        memcpy(sg, sg + 4, 4);
+        memcpy(sg + 12, sg + 8, 4);
         /* Non-zero nibbles: w0 = 0x21 (Left=1, Right=2) */
         sg[16] = 0x21;
     }
@@ -197,7 +196,57 @@ static void test_xa_coding_info_rates_and_stereo(void) {
     assert(non_zero);
 }
 
+static void test_xa_hardware_units(void) {
+    uint8_t sector[PS1_XA_SECTOR_SIZE] = {0};
+    int16_t samples[PS1_XA_MAX_SECTOR_SAMPLES];
+    sector[2] = 0x64;
+    sector[3] = 1;
+    uint8_t *group = sector + 8;
+    /* Canonical parameters differ deliberately from their repair copies. */
+    for (int unit = 0; unit < 8; unit++) group[4 + unit] = 4;
+    for (int i = 0; i < 28; i++) {
+        group[16 + i * 4] = 0x21;
+        group[17 + i * 4] = 0x43;
+        group[18 + i * 4] = 0x65;
+        group[19 + i * 4] = 0x87;
+    }
+    assert(ps1_xa_decode_sector_stereo(sector, samples, NULL, NULL, NULL, NULL) == 4032);
+    for (int pair = 0; pair < 4; pair++) {
+        for (int i = 0; i < 28; i++) {
+            assert(samples[(pair * 28 + i) * 2] == (pair * 2 + 1) * 256);
+            assert(samples[(pair * 28 + i) * 2 + 1] == (pair == 3 ? -2048 : (pair * 2 + 2) * 256));
+        }
+    }
+    memset(group, 15, 16);
+    assert(ps1_xa_decode_sector_stereo(sector, samples, NULL, NULL, NULL, NULL) == 4032);
+    assert(samples[0] == 8 && samples[1] == 16);
+
+    memset(sector + 8, 0, sizeof(sector) - 8);
+    for (int g = 0; g < PS1_XA_SOUND_GROUPS; g++) memset(sector + 8 + g * 128, 0x1c, 16);
+    int16_t left = -1, right = 1, previous_l = 0, previous_r = 0;
+    assert(ps1_xa_decode_sector_stereo(sector, samples, &left, &previous_l, &right, &previous_r) == 4032);
+    assert(samples[0] == -1 && samples[1] == 1 && left == -1 && right == 1);
+
+    memset(sector + 8, 0, sizeof(sector) - 8);
+    sector[3] = 0x11;
+    memset(group + 4, 8, 4);
+    for (int i = 0; i < 28; i++) {
+        group[16 + i * 4] = 1;
+        group[17 + i * 4] = 255;
+        group[18 + i * 4] = 2;
+        group[19 + i * 4] = 254;
+    }
+    assert(ps1_xa_decode_sector_stereo(sector, samples, NULL, NULL, NULL, NULL) == 2016);
+    assert(samples[0] == 1 && samples[1] == -1 && samples[56] == 2 && samples[57] == -2);
+    sector[3] = 0x21;
+    left = -7;
+    samples[0] = 1234;
+    assert(ps1_xa_decode_sector_stereo(sector, samples, &left, NULL, NULL, NULL) == 0);
+    assert(left == -7 && samples[0] == 1234);
+}
+
 int main(void) {
+    test_xa_hardware_units();
     Ps1XaPlayer player;
     int16_t pcm[2];
     ps1_xa_init(&player);

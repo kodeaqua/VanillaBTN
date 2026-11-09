@@ -27,133 +27,64 @@ const Ps1XaTrackEntry *ps1_xa_get_track_entry(int track) {
 /* -------------------------------------------------------------------------
  * Low-level sector decoding
  * ---------------------------------------------------------------------- */
-int ps1_xa_decode_sector(const uint8_t *sector, int16_t *out_samples,
-                         int16_t *hist1, int16_t *hist2) {
-    if (!sector || !out_samples) return 0;
-
-    /* Verify submode has audio flag (bit 2) */
-    uint8_t submode = sector[2];
-    if (!(submode & 0x04)) return 0;
-
-    int total_samples = 0;
-    int16_t h1 = hist1 ? *hist1 : 0;
-    int16_t h2 = hist2 ? *hist2 : 0;
+/* Parameters live at bytes 4..11; the surrounding bytes are repair copies.
+ * Keep independent channel predictors and round negative predictions with SAR,
+ * as specified by the CD-XA ADPCM format. Reserved shifts behave as shift 9. */
+static int decode_sector(const uint8_t *sector, int16_t *out_samples,
+                         int16_t *hist1_l, int16_t *hist2_l,
+                         int16_t *hist1_r, int16_t *hist2_r, int stereo) {
+    if (!sector || !out_samples || !(sector[2] & 0x04)) return 0;
+    int width = (sector[3] >> 4) & 3;
+    if (width > 1) return 0;
+    int units = width ? 4 : 8;
+    int16_t h1[2] = {hist1_l ? *hist1_l : 0, hist1_r ? *hist1_r : 0};
+    int16_t h2[2] = {hist2_l ? *hist2_l : 0, hist2_r ? *hist2_r : 0};
 
     for (int g = 0; g < PS1_XA_SOUND_GROUPS; g++) {
         const uint8_t *sg = sector + 8 + g * 128;
-
-        for (int b = 0; b < 8; b++) {
-            uint8_t param = (b < 4) ? sg[b] : sg[8 + (b - 4)];
-            int shift = param & 0x0F;
-            int filter = (param >> 4) & 0x03;
-            int f0 = K0[filter];
-            int f1 = K1[filter];
-
-            for (int s = 0; s < 28; s++) {
-                uint8_t w = sg[16 + s * 4 + b / 2];
-                uint8_t nib = (b % 2 == 0) ? (w & 0x0F) : ((w >> 4) & 0x0F);
-                int16_t sn = (int16_t)(nib << 12) >> shift;
-                int32_t pred = (f0 * h1 + f1 * h2 + 32) / 64;
-                int32_t sample = sn + pred;
-
-                if (sample > 32767)  sample = 32767;
-                if (sample < -32768) sample = -32768;
-
-                h2 = h1;
-                h1 = (int16_t)sample;
-
-                out_samples[total_samples++] = (int16_t)sample;
+        for (int unit = 0; unit < units; unit++) {
+            int param = sg[4 + unit];
+            int shift = param & 15;
+            if (shift > 12) shift = 9;
+            int filter = (param >> 4) & 3;
+            int channel = stereo ? unit & 1 : 0;
+            for (int sample = 0; sample < 28; sample++) {
+                int byte = sg[16 + sample * 4 + (width ? unit : unit / 2)];
+                int raw;
+                if (width) {
+                    raw = (int8_t)byte * 256;
+                } else {
+                    int nibble = (byte >> ((unit & 1) * 4)) & 15;
+                    raw = (nibble >= 8 ? nibble - 16 : nibble) * 4096;
+                }
+                int value = (raw >> shift) +
+                    ((K0[filter] * h1[channel] + K1[filter] * h2[channel] + 32) >> 6);
+                if (value > 32767) value = 32767;
+                if (value < -32768) value = -32768;
+                h2[channel] = h1[channel];
+                h1[channel] = (int16_t)value;
+                int index = stereo ? ((unit / 2 * 28 + sample) * 2 + channel)
+                                   : unit * 28 + sample;
+                out_samples[g * units * 28 + index] = (int16_t)value;
             }
         }
     }
+    if (hist1_l) *hist1_l = h1[0];
+    if (hist2_l) *hist2_l = h2[0];
+    if (hist1_r) *hist1_r = h1[1];
+    if (hist2_r) *hist2_r = h2[1];
+    return PS1_XA_SOUND_GROUPS * units * 28;
+}
 
-    if (hist1) *hist1 = h1;
-    if (hist2) *hist2 = h2;
-    return total_samples;
+int ps1_xa_decode_sector(const uint8_t *sector, int16_t *out_samples,
+                         int16_t *hist1, int16_t *hist2) {
+    return decode_sector(sector, out_samples, hist1, hist2, NULL, NULL, 0);
 }
 
 int ps1_xa_decode_sector_stereo(const uint8_t *sector, int16_t *out_samples,
                                 int16_t *hist1_l, int16_t *hist2_l,
                                 int16_t *hist1_r, int16_t *hist2_r) {
-    if (!sector || !out_samples) return 0;
-
-    /* Verify submode has audio flag (bit 2) */
-    uint8_t submode = sector[2];
-    if (!(submode & 0x04)) return 0;
-
-    int total_samples = 0;
-    int16_t h1_l = hist1_l ? *hist1_l : 0;
-    int16_t h2_l = hist2_l ? *hist2_l : 0;
-    int16_t h1_r = hist1_r ? *hist1_r : 0;
-    int16_t h2_r = hist2_r ? *hist2_r : 0;
-
-    for (int g = 0; g < PS1_XA_SOUND_GROUPS; g++) {
-        const uint8_t *sg = sector + 8 + g * 128;
-        int16_t group_l[112];
-        int16_t group_r[112];
-
-        /* Sound units 0, 2, 4, 6 are Left channel (4 * 28 = 112 samples) */
-        for (int u = 0; u < 4; u++) {
-            int b = u * 2; /* 0, 2, 4, 6 */
-            uint8_t param = (b < 4) ? sg[b] : sg[8 + (b - 4)];
-            int shift = param & 0x0F;
-            int filter = (param >> 4) & 0x03;
-            int f0 = K0[filter];
-            int f1 = K1[filter];
-
-            for (int s = 0; s < 28; s++) {
-                uint8_t w = sg[16 + s * 4 + b / 2];
-                uint8_t nib = w & 0x0F;
-                int16_t sn = (int16_t)(nib << 12) >> shift;
-                int32_t pred = (f0 * h1_l + f1 * h2_l + 32) / 64;
-                int32_t sample = sn + pred;
-
-                if (sample > 32767)  sample = 32767;
-                if (sample < -32768) sample = -32768;
-
-                h2_l = h1_l;
-                h1_l = (int16_t)sample;
-                group_l[u * 28 + s] = (int16_t)sample;
-            }
-        }
-
-        /* Sound units 1, 3, 5, 7 are Right channel (4 * 28 = 112 samples) */
-        for (int u = 0; u < 4; u++) {
-            int b = u * 2 + 1; /* 1, 3, 5, 7 */
-            uint8_t param = (b < 4) ? sg[b] : sg[8 + (b - 4)];
-            int shift = param & 0x0F;
-            int filter = (param >> 4) & 0x03;
-            int f0 = K0[filter];
-            int f1 = K1[filter];
-
-            for (int s = 0; s < 28; s++) {
-                uint8_t w = sg[16 + s * 4 + b / 2];
-                uint8_t nib = (w >> 4) & 0x0F;
-                int16_t sn = (int16_t)(nib << 12) >> shift;
-                int32_t pred = (f0 * h1_r + f1 * h2_r + 32) / 64;
-                int32_t sample = sn + pred;
-
-                if (sample > 32767)  sample = 32767;
-                if (sample < -32768) sample = -32768;
-
-                h2_r = h1_r;
-                h1_r = (int16_t)sample;
-                group_r[u * 28 + s] = (int16_t)sample;
-            }
-        }
-
-        /* Interleave Left and Right for this sound group */
-        for (int i = 0; i < 112; i++) {
-            out_samples[total_samples++] = group_l[i];
-            out_samples[total_samples++] = group_r[i];
-        }
-    }
-
-    if (hist1_l) *hist1_l = h1_l;
-    if (hist2_l) *hist2_l = h2_l;
-    if (hist1_r) *hist1_r = h1_r;
-    if (hist2_r) *hist2_r = h2_r;
-    return total_samples;
+    return decode_sector(sector, out_samples, hist1_l, hist2_l, hist1_r, hist2_r, 1);
 }
 
 /* -------------------------------------------------------------------------
