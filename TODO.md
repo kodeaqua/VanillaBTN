@@ -53,7 +53,8 @@ Update the relevant item after completing a task or discovering a blocker.
   - [x] Interpolate all vertex colors for textured Gouraud GT3/GT4 packets before texel modulation. Independent nonuniform white-texture fixtures fail on the old backend; Debug/Release pass 30 checks and the 5,000-vblank Release demo passes GPU validation. Full object visibility and placement remain under audit.
   - [ ] Verify textured-polygon subpixel interpolation with nonuniform original FT4 fixtures; packet-generation tests do not establish texel fidelity.
 - [ ] Audio: implement ADSR/reverb, XA stereo histories and coding-info sample rates.
-- [ ] Save/load: verify external card chain encoding, corruption handling, and original save layout before game integration.
+- [ ] Save/load: verify external card chain encoding and original save layout before game integration.
+  - [x] Preserve failed card loads instead of autoformatting existing media; reject short/oversized images, validate recovery directory checksums, report creation/flush failures and retain dirty state after failed persistence. Synthetic file regressions fail before the fix and after temporary reversion; Debug/Release pass 30 checks and all 14 PS1 code hashes match.
 - [x] Trace the reported large attract-demo displacement to the original `scene_enter` area transition, rather than a large velocity; temporary write-watch instrumentation was removed. This does not establish console-equivalent demo behavior.
 - [ ] Developer: check controller feel and simulation pacing in native window.
 - [ ] Developer: compare music, effects, speech/streams, and timing by ear.

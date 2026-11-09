@@ -119,7 +119,9 @@ Ps1CardStatus ps1_card_read_slot_header(const Ps1Card *card, int slot_idx,
 /* -------------------------------------------------------------------------
  * File persistence, atomic write, and crash recovery
  * ---------------------------------------------------------------------- */
-/* Loads .mcr file from disk. If missing, formats a fresh card. */
+/* Load an exact raw card image. Only a missing file creates a fresh card.
+ * Invalid existing images remain unchanged and clean; unreadable/wrong-size
+ * images are unavailable. Creation failure is reported, never fabricated. */
 bool ps1_card_load_from_file(Ps1Card *card, const char *filepath);
 
 /* Atomically saves card to disk:

@@ -3,6 +3,7 @@
 #include "ps1_card.h"
 #include <SDL3/SDL.h>
 #include <stdio.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -310,28 +311,22 @@ Ps1CardStatus ps1_card_read_slot_header(const Ps1Card *card, int slot_idx,
 /* -------------------------------------------------------------------------
  * Persistence, Atomic Save, and Crash Recovery
  * ---------------------------------------------------------------------- */
+/* A raw image must contain exactly one card, not just a plausible header. */
+static bool read_card_image(FILE *file, Ps1Card *card) {
+    size_t count = fread(card->data, 1, PS1_CARD_SIZE, file);
+    int extra = fgetc(file);
+    return count == PS1_CARD_SIZE && extra == EOF && !ferror(file);
+}
+
 static bool is_valid_mcr_file(const char *filepath) {
-    FILE *f = fopen(filepath, "rb");
-    if (!f) return false;
-
-    fseek(f, 0, SEEK_END);
-    long len = ftell(f);
-    fseek(f, 0, SEEK_SET);
-
-    if (len != (long)PS1_CARD_SIZE) {
-        fclose(f);
-        return false;
-    }
-
-    uint8_t hdr[128];
-    if (fread(hdr, 1, 128, f) != 128) {
-        fclose(f);
-        return false;
-    }
-    fclose(f);
-
-    if (hdr[0] != 'M' || hdr[1] != 'C') return false;
-    return ps1_card_checksum(hdr) == hdr[127];
+    FILE *file = fopen(filepath, "rb");
+    if (!file) return false;
+    Ps1Card *card = malloc(sizeof(*card));
+    bool valid = card && read_card_image(file, card) &&
+        ps1_card_validate(card) == PS1_CARD_OK;
+    if (fclose(file) != 0) valid = false;
+    free(card);
+    return valid;
 }
 
 bool ps1_card_recover_file(const char *filepath) {
@@ -367,37 +362,36 @@ bool ps1_card_load_from_file(Ps1Card *card, const char *filepath) {
     if (!card || !filepath) return false;
 
     ps1_card_init(card);
-    snprintf(card->filepath, sizeof(card->filepath), "%s", filepath);
+    int length = snprintf(card->filepath, sizeof(card->filepath), "%s", filepath);
+    if (length < 0 || (size_t)length >= sizeof(card->filepath)) return false;
 
-    /* Check for crash recovery */
     ps1_card_recover_file(filepath);
-
-    FILE *f = fopen(filepath, "rb");
-    if (!f) {
-        /* File doesn't exist yet: format a fresh card */
+    FILE *file = fopen(filepath, "rb");
+    if (!file) {
+        /* An access error is not an empty slot. Create only a genuinely missing
+         * image, and expose no usable card if its initial persistence fails. */
+        if (errno != ENOENT) return false;
         ps1_card_format(card);
-        card->dirty = true;
-        ps1_card_save_to_file(card, filepath);
-        return true;
+        bool saved = ps1_card_save_to_file(card, filepath);
+        card->present = saved;
+        card->dirty = false;
+        return saved;
     }
 
-    size_t n = fread(card->data, 1, PS1_CARD_SIZE, f);
-    fclose(f);
+    bool complete = read_card_image(file, card);
+    if (fclose(file) != 0) complete = false;
+    if (!complete) return false;
 
-    if (n != PS1_CARD_SIZE || ps1_card_validate(card) != PS1_CARD_OK) {
-        /* Corrupt: format fresh */
-        ps1_card_format(card);
-        card->dirty = true;
-        return false;
-    }
-
+    /* Preserve full-size invalid/unformatted media for the SDK error path.
+     * Only an explicit format request may replace it; shutdown must not. */
     card->present = true;
     card->dirty = false;
-    return true;
+    return ps1_card_validate(card) == PS1_CARD_OK;
 }
 
 bool ps1_card_save_to_file(const Ps1Card *card, const char *filepath) {
-    if (!card || !filepath || !card->present) return false;
+    if (!card || !filepath || !card->present ||
+        ps1_card_validate(card) != PS1_CARD_OK) return false;
 
     char tmp_path[540];
     char bak_path[540];
@@ -409,10 +403,11 @@ bool ps1_card_save_to_file(const Ps1Card *card, const char *filepath) {
     if (!f) return false;
 
     size_t written = fwrite(card->data, 1, PS1_CARD_SIZE, f);
-    fflush(f);
-    fclose(f);
+    bool complete = written == PS1_CARD_SIZE;
+    if (fflush(f) != 0) complete = false;
+    if (fclose(f) != 0) complete = false;
 
-    if (written != PS1_CARD_SIZE || !is_valid_mcr_file(tmp_path)) {
+    if (!complete || !is_valid_mcr_file(tmp_path)) {
         remove(tmp_path);
         return false;
     }
@@ -467,8 +462,8 @@ void ps1_card_manager_shutdown(Ps1CardManager *mgr) {
 
     for (int i = 0; i < 2; i++) {
         if (mgr->cards[i].present && mgr->cards[i].dirty) {
-            ps1_card_save_to_file(&mgr->cards[i], mgr->cards[i].filepath);
-            mgr->cards[i].dirty = false;
+            if (ps1_card_save_to_file(&mgr->cards[i], mgr->cards[i].filepath))
+                mgr->cards[i].dirty = false;
         }
     }
 }

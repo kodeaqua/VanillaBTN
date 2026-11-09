@@ -13,6 +13,12 @@
 #include <unistd.h>
 #endif
 
+/* Fail headless tests directly instead of opening the Windows CRT dialog. */
+#undef assert
+#define assert(condition) do { if (!(condition)) { \
+    fprintf(stderr, "line %d: %s\n", __LINE__, #condition); exit(1); \
+} } while (0)
+
 static void test_card_format_and_validate(void) {
     Ps1Card card;
     ps1_card_init(&card);
@@ -244,7 +250,93 @@ static void test_failed_replacement_preserves_card(void) {
     free(card);
 }
 
+/* Fixtures are raw bytes, independent of the persistence writer under test. */
+static void write_image_fixture(const char *path, const void *bytes, size_t size) {
+    FILE *file = fopen(path, "wb");
+    assert(file);
+    assert(fwrite(bytes, 1, size, file) == size);
+    assert(fclose(file) == 0);
+}
+
+static void check_image_fixture(const char *path, const uint8_t *bytes, size_t size) {
+    FILE *file = fopen(path, "rb");
+    assert(file);
+    for (size_t i = 0; i < size; ++i) assert(fgetc(file) == bytes[i]);
+    assert(fgetc(file) == EOF && !ferror(file));
+    assert(fclose(file) == 0);
+}
+
+static void test_invalid_load_preserves_image(void) {
+    const char *path = "test_invalid_card.mcr";
+    Ps1Card *source = malloc(sizeof(*source));
+    Ps1CardManager *manager = calloc(1, sizeof(*manager));
+    uint8_t *bytes = malloc(PS1_CARD_SIZE + 1);
+    assert(source && manager && bytes);
+    remove(path);
+    remove("test_invalid_card.mcr.tmp");
+    remove("test_invalid_card.mcr.bak");
+    for (int kind = 0; kind < 4; ++kind) {
+        ps1_card_format(source);
+        memcpy(bytes, source->data, PS1_CARD_SIZE);
+        size_t size = PS1_CARD_SIZE;
+        if (kind == 0) bytes[0] = 'X';
+        if (kind == 1) bytes[PS1_CARD_FRAME_SIZE + 127] ^= 1;
+        if (kind == 2) size = PS1_CARD_FRAME_SIZE;
+        if (kind == 3) bytes[size++] = 0x5A;
+        write_image_fixture(path, bytes, size);
+        Ps1Card *loaded = &manager->cards[0];
+        assert(!ps1_card_load_from_file(loaded, path));
+        assert(!loaded->dirty);
+        if (size == PS1_CARD_SIZE) {
+            assert(loaded->present);
+            assert(memcmp(loaded->data, bytes, size) == 0);
+        } else {
+            assert(!loaded->present);
+        }
+        /* Shutdown must never turn a failed load into an empty replacement. */
+        ps1_card_manager_shutdown(manager);
+        check_image_fixture(path, bytes, size);
+        remove(path);
+    }
+    /* Missing parent makes creation fail; never report a persisted card. */
+    assert(!ps1_card_load_from_file(&manager->cards[0],
+        "test_card_absent_parent/card.mcr"));
+    assert(!manager->cards[0].present && !manager->cards[0].dirty);
+    ps1_card_format(&manager->cards[0]);
+    snprintf(manager->cards[0].filepath, sizeof(manager->cards[0].filepath),
+        "%s", "test_card_absent_parent/card.mcr");
+    ps1_card_manager_shutdown(manager);
+    assert(manager->cards[0].dirty);
+    assert(ps1_card_validate(&manager->cards[0]) == PS1_CARD_OK);
+    free(bytes);
+    free(manager);
+    free(source);
+}
+
+static void test_recovery_validates_directory(void) {
+    const char *path = "test_directory_recovery.mcr";
+    const char *temp = "test_directory_recovery.mcr.tmp";
+    Ps1Card *good = malloc(sizeof(*good));
+    Ps1Card *bad = malloc(sizeof(*bad));
+    assert(good && bad);
+    ps1_card_format(good);
+    memcpy(bad, good, sizeof(*bad));
+    bad->data[PS1_CARD_FRAME_SIZE + 127] ^= 1;
+    remove(path);
+    remove(temp);
+    remove("test_directory_recovery.mcr.bak");
+    write_image_fixture(path, bad->data, PS1_CARD_SIZE);
+    write_image_fixture(temp, good->data, PS1_CARD_SIZE);
+    assert(ps1_card_recover_file(path));
+    check_image_fixture(path, good->data, PS1_CARD_SIZE);
+    remove(path);
+    free(bad);
+    free(good);
+}
+
 int main(void) {
+    test_invalid_load_preserves_image();
+    test_recovery_validates_directory();
     test_failed_replacement_preserves_card();
     test_card_format_and_validate();
     test_card_file_roundtrip_and_delete();

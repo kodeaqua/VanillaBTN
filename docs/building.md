@@ -71,6 +71,13 @@ requires the original input replay to reach the farm and return to title;
 a missed transition fails the probe. This checks scene execution, not whether
 the recording matches the original console's visuals or movement.
 
+The game stores virtual cards through SDL's application preference directory.
+Existing invalid cards are kept unchanged; loading them does not format or mark
+them for saving. Unreadable or wrong-size images are unavailable, and failed
+flushes retain their dirty state. Recovery checks the header and directory
+checksums before selecting a replacement. This protects persistence; original
+game save-layout compatibility remains under audit.
+
 To build a separate local candidate while a game window is open:
 
 ```powershell
