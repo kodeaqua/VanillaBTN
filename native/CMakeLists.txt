@@ -517,6 +517,15 @@ target_compile_options(original_farm_memory_test PRIVATE /W4)
 target_link_libraries(original_farm_memory_test PRIVATE game_main)
 add_test(NAME original_farm_event_memory COMMAND original_farm_memory_test)
 
+# Include the private save module in this fixture to test its byte-image views
+# without exporting test hooks from original game code.
+add_executable(original_save_memory_test tests/original_save_memory_test.c)
+set_target_properties(original_save_memory_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_compile_options(original_save_memory_test PRIVATE /W4 /Gy)
+target_link_libraries(original_save_memory_test PRIVATE game_main)
+add_test(NAME original_save_buffer_memory COMMAND original_save_memory_test)
+
+
 # The real runtime uses main.c's allocator. Isolated graphics fixtures provide
 # their own bounded arena without exporting a second allocator into game_main.
 add_library(sdk_test_work STATIC src/sdk_work.c)

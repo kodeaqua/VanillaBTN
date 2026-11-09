@@ -715,12 +715,30 @@ static SaveSlotRecord save_slot_records[3];
 static u8 saveload_unused_801377A0[128];
 static s16 save_slot_status[4];
 static u8 *save_icon_base;
+#ifdef VANILLABTN_NATIVE
+/* The PS1 declarations below form one byte image in linker order. Native
+ * linking cannot supply that contract; reset and SDK transfers require one
+ * complete object. Keep the original offsets and align native struct views. */
+static union {
+    void *alignment;
+    u8 bytes[SAVE_FILE_BYTES];
+} save_native_file;
+#define save_file_header (save_native_file.bytes)
+#define save_icon_frame_0 (*(IconFrame *)(save_native_file.bytes + 0x80))
+#define save_icon_frame_1 (*(IconFrame *)(save_native_file.bytes + 0x100))
+#define save_icon_frame_2 (*(IconFrame *)(save_native_file.bytes + 0x180))
+#define save_slot_record (save_native_file.bytes + SAVE_HEADER_OFFSET)
+#define save_image_data (save_native_file.bytes + 0x280)
+_Static_assert(sizeof(IconFrame) == 0x80, "Save icon frames retain PS1 byte offsets");
+_Static_assert(sizeof(save_native_file) == SAVE_FILE_BYTES, "One complete save image");
+#else
 static u8 save_file_header[0x80];
 static IconFrame save_icon_frame_0;
 static IconFrame save_icon_frame_1;
 static IconFrame save_icon_frame_2;
 static u8 save_slot_record[0x80];
 static u8 save_image_data[0x9690 - 0x280];
+#endif
 static char save_file_name_buf[32];
 static u16 save_name_line[24];
 static SaveHeader save_header;
