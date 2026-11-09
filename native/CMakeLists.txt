@@ -56,7 +56,7 @@ set_target_properties(ps1_spu PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_include_directories(ps1_spu PUBLIC src)
 target_compile_options(ps1_spu PRIVATE /W4)
 
-add_library(ps1_xa STATIC src/ps1_xa.c)
+add_library(ps1_xa STATIC src/ps1_xa.c src/ps1_xa_filter.c)
 set_target_properties(ps1_xa PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_include_directories(ps1_xa PUBLIC src)
 target_compile_options(ps1_xa PRIVATE /W4)

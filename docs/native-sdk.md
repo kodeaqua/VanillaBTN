@@ -202,10 +202,13 @@ clock in mode C8, independently of decoder lookahead. Serial A volume writes
 the SPU CD-input gain (258 times the 0..127 SDK value, checked against the local
 reference function); it is not a second multiplier. Muted CD input still
 advances, and libsnd voice mono mode does not fold CD channels together.
-Hardware zigzag resampling, exact interleave/seek timing and listening acceptance
-remain open; the current backend interpolation is linear. Its source/output
-clock ratio is exact, and buffered final frames survive lookahead EOF; duration
-fixtures cover both sample rates, sample widths and channel layouts.
+XA uses the documented seven-phase zigzag FIR with persistent per-channel
+history, per-product signed truncation, output saturation and 18.9 kHz input
+duplication. Impulse fixtures verify numerical output; mix-call and sector
+boundaries do not reset the filter. Its startup phase is deterministic because
+hardware power-on phase is unspecified; the published coefficient model also
+notes small rounding discrepancies. Physical sector arrival/seek timing and
+listening acceptance remain separate checks.
 File lookup failure is real failure: the host must validate the data tree before
 entering original retry loops. Mount/unmount invalidates all pending requests.
 

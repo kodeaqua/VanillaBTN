@@ -12,6 +12,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include "ps1_xa_filter.h"
 
 #define PS1_XA_SECTOR_SIZE 2336
 #define PS1_XA_SOUND_GROUPS 18
@@ -66,12 +67,11 @@ typedef struct {
     int             sector_sample_idx;
     int             is_stereo;
     uint32_t        sample_rate;
-    int16_t         curr_sample;
-    int16_t         next_sample;
-    int16_t         curr_sample_r;
-    int16_t         next_sample_r;
-    uint32_t        frac_pos;         /* source clock remainder, denominator 44100 */
-    int             next_valid;       /* lookahead has another decoded frame */
+    Ps1XaFilter     filter;
+    int16_t         output[7][2];
+    unsigned        output_index, output_count;
+    int16_t         held_left, held_right;
+    int             repeat_input; /* duplicate 18.9 kHz input before FIR */
 
     /* ADPCM filter history across sound groups */
     int16_t         hist1;

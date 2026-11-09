@@ -249,6 +249,23 @@ static int read_one_sector(void *context, uint32_t index, uint8_t *sector) {
     return 1;
 }
 
+static void test_xa_hardware_impulse(void) {
+    static const int16_t expected[35] = {
+        -1, 1, -3, 2, 5, 13, -34, 4, 153, -463, 1244, -3008,
+        10736, 10736, -3008, 1244, -463, 153, 4, -34, 13,
+        5, 2, -3, 1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    };
+    uint8_t sector[PS1_XA_SECTOR_SIZE] = {1, 0, 0x64, 1};
+    sector[24] = 4; /* First left sample is 0x4000, remaining samples zero. */
+    Ps1XaPlayer player;
+    ps1_xa_play_source(&player, read_one_sector, sector, 0, 1, 1, 0);
+    for (int i = 0; i < 35; i++) {
+        int16_t pcm[2];
+        ps1_xa_mix(&player, pcm, 1, 32767, 32767, 0);
+        assert(pcm[0] == expected[i] && pcm[1] == 0);
+    }
+}
+
 static void test_xa_exact_stream_duration(void) {
     for (int width = 0; width < 2; width++) {
         for (int slow = 0; slow < 2; slow++) {
@@ -265,12 +282,11 @@ static void test_xa_exact_stream_duration(void) {
                 int source_frames = 4032 / (width ? 2 : 1) / (stereo ? 2 : 1);
                 int expected_frames = source_frames * 7 / (slow ? 3 : 6);
                 int16_t pcm[2];
-                /* Every source sample is exactly one. The last decoded frame
-                 * must survive lookahead EOF; duration follows the exact 7:6
-                 * or 7:3 clock ratio, not a truncated 16.16 increment. */
+                /* FIR startup/history changes amplitude, but must preserve
+                 * the exact 7:6 or 7:3 frame count through the final batch. */
                 for (int i = 0; i < expected_frames; i++) {
                     ps1_xa_mix(&player, pcm, 1, 32767, 32767, 0);
-                    assert(pcm[0] == 1 && pcm[1] == 1);
+                    assert(player.state != PS1_XA_IDLE);
                 }
                 ps1_xa_mix(&player, pcm, 1, 32767, 32767, 0);
                 assert(pcm[0] == 0 && pcm[1] == 0);
@@ -281,16 +297,15 @@ static void test_xa_exact_stream_duration(void) {
 }
 
 int main(void) {
+    test_xa_hardware_impulse();
     test_xa_exact_stream_duration();
     test_xa_hardware_units();
     Ps1XaPlayer player;
     int16_t pcm[2];
     ps1_xa_init(&player);
     player.state = PS1_XA_PLAYING;
-    player.curr_sample = 32767;
-    player.next_sample = 32767;
-    player.curr_sample_r = player.next_sample_r = 32767;
-    player.sample_rate = 0;
+    player.output[0][0] = player.output[0][1] = 32767;
+    player.output_count = 1;
     player.serial_volume = 128;
     ps1_xa_mix(&player, pcm, 1, 32767, 32767, 0);
     assert(pcm[0] == 32767 && pcm[1] == 32767);

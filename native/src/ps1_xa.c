@@ -170,14 +170,23 @@ static int fetch_xa_frame(Ps1XaPlayer *player, int16_t *left, int16_t *right) {
 }
 
 static void prime_stream(Ps1XaPlayer *player) {
-    if (!fetch_xa_frame(player, &player->curr_sample, &player->curr_sample_r)) {
-        player->state = PS1_XA_IDLE;
-        return;
-    }
-    player->next_valid = fetch_xa_frame(player, &player->next_sample, &player->next_sample_r);
-    if (!player->next_valid) {
-        player->next_sample = player->curr_sample;
-        player->next_sample_r = player->curr_sample_r;
+    if (!fetch_next_sector(player)) player->state = PS1_XA_IDLE;
+}
+
+static int fill_output(Ps1XaPlayer *player) {
+    while (1) {
+        if (player->repeat_input) {
+            player->repeat_input = 0;
+        } else {
+            if (!fetch_xa_frame(player, &player->held_left, &player->held_right)) return 0;
+            player->repeat_input = player->sample_rate == 18900;
+        }
+        if (ps1_xa_filter_push(&player->filter, player->held_left,
+                player->held_right, player->output)) {
+            player->output_index = 0;
+            player->output_count = 7;
+            return 1;
+        }
     }
 }
 
@@ -221,7 +230,9 @@ void ps1_xa_play_track(Ps1XaPlayer *player, int track) {
     player->hist2_l = 0;
     player->hist1_r = 0;
     player->hist2_r = 0;
-    player->frac_pos = 0;
+    memset(&player->filter, 0, sizeof(player->filter));
+    player->output_index = player->output_count = 0;
+    player->repeat_input = 0;
     player->state = PS1_XA_PLAYING;
 
     prime_stream(player);
@@ -286,28 +297,13 @@ void ps1_xa_mix(Ps1XaPlayer *player, int16_t *out, int frames,
             continue;
         }
 
-        /* Integer source/output clocks retain the exact 7:6 or 7:3 ratio.
-         * Interpolation remains linear until the hardware zigzag FIR is added. */
-        int32_t frac = (int32_t)(((uint64_t)player->frac_pos << 16) / 44100u);
-        int32_t diff_l = (int32_t)player->next_sample - player->curr_sample;
-        int32_t diff_r = (int32_t)player->next_sample_r - player->curr_sample_r;
-        int32_t samp_l = player->curr_sample + (int32_t)(((int64_t)diff_l * frac) >> 16);
-        int32_t samp_r = player->curr_sample_r + (int32_t)(((int64_t)diff_r * frac) >> 16);
-        player->frac_pos += player->sample_rate;
-        while (player->frac_pos >= 44100u && player->state != PS1_XA_IDLE) {
-            player->frac_pos -= 44100u;
-            if (!player->next_valid) {
-                player->state = PS1_XA_IDLE;
-                break;
-            }
-            player->curr_sample = player->next_sample;
-            player->curr_sample_r = player->next_sample_r;
-            player->next_valid = fetch_xa_frame(player, &player->next_sample, &player->next_sample_r);
-            if (!player->next_valid) {
-                player->next_sample = player->curr_sample;
-                player->next_sample_r = player->curr_sample_r;
-            }
+        if (player->output_index == player->output_count && !fill_output(player)) {
+            player->state = PS1_XA_IDLE;
+            if (!accumulate) out[f * 2] = out[f * 2 + 1] = 0;
+            continue;
         }
+        int32_t samp_l = player->output[player->output_index][0];
+        int32_t samp_r = player->output[player->output_index++][1];
 
         /* Volume scaling: sample * serial_vol (out of 128) * cd_vol (out of 32767) */
         int32_t out_l = (int32_t)(((int64_t)samp_l * svol * cvol_l) / (128 * 32767));

@@ -194,11 +194,16 @@ static void test_xa_sdk_stream(void) {
     sdk_sound_mix(pcm, 735);
     /* Decode the selected file/channel only. The first two sectors contain
      * deliberately different samples under a different file/channel filter. */
-    int left = ((256 * (127 * 258)) >> 15) * 32767 >> 15;
-    int right = ((-512 * (64 * 258)) >> 15) * 32767 >> 15;
+    /* Independent hardware FIR startup values for constant 256/-512 input. */
+    const int raw_left[10] = {-1,-1,-3,-2,-3,-2,-4,-3,-2,-10};
+    const int raw_right[10] = {0,-1,-1,-3,-3,-4,-2,-4,-6,5};
     for (int i = 0; i < 10; i++) {
-        CHECK(pcm[i * 2] == left && pcm[i * 2 + 1] == right);
+        int l = ((raw_left[i] * (127 * 258)) >> 15) * 32767 >> 15;
+        int r = ((raw_right[i] * (64 * 258)) >> 15) * 32767 >> 15;
+        CHECK(pcm[i * 2] == l && pcm[i * 2 + 1] == r);
     }
+    int left = ((221 * (127 * 258)) >> 15) * 32767 >> 15;
+    int right = ((-476 * (64 * 258)) >> 15) * 32767 >> 15;
     uint8_t location[8];
     CHECK(CdControl(CdlGetlocP, NULL, location));
     CHECK(CdPosToInt((CdlLOC *)(location + 5)) == CdPosToInt(&start) + 2);
@@ -216,7 +221,7 @@ static void test_xa_sdk_stream(void) {
     CHECK(CdControl(CdlSetloc, (uint8_t *)&offset, NULL));
     CHECK(CdControl(CdlReadS, NULL, NULL));
     sdk_sound_mix(pcm, 10);
-    CHECK(pcm[0] == left && pcm[1] == right);
+    CHECK(pcm[0] == -1 && pcm[1] == 0);
 
     CHECK(CdControl(CdlReadS, (uint8_t *)&start, NULL));
     SsSetSerialAttr(0, SS_MIX, SS_OFF);
@@ -232,7 +237,7 @@ static void test_xa_sdk_stream(void) {
     CHECK(CdControl(CdlReadS, (uint8_t *)&start, NULL));
     SsSetMono(); /* libsnd mono mode affects voices, not the CD input. */
     sdk_sound_mix(pcm, 10);
-    CHECK(pcm[0] == left && pcm[1] == right);
+    CHECK(pcm[0] == -1 && pcm[1] == 0);
     SsSetStereo();
     /* Normal data reads cancel the XA drive stream. */
     CdlFILE archive;
