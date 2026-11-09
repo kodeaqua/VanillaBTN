@@ -2,6 +2,7 @@
 #define VANILLABTN_SDK_CD_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
 /* Mount the imported disc tree, not a MIPS overlay executable. File positions
  * are virtual LBAs; original callers may seek/read them through the SDK API.
@@ -18,5 +19,9 @@ typedef struct SdkCdXaStatus {
 } SdkCdXaStatus;
 
 SdkCdXaStatus sdk_cd_xa_status(void);
+
+/* Decode the mounted drive stream to unscaled stereo PCM. This advances the
+ * drive even while the SPU CD input is muted; no user files are written. */
+void sdk_cd_mix(int16_t *out, int frames);
 
 #endif

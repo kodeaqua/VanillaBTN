@@ -11,6 +11,7 @@
 #include <libcd.h>
 #include <libetc.h>
 #include <libsnd.h>
+#include <libspu.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -151,9 +152,97 @@ static void fixtures(void) {
     for (unsigned i = 0; i < 4; ++i) {
         file = fopen(xa_paths[i], "wb");
         CHECK(file != NULL);
-        for (unsigned j = 0; j < 2336; ++j) CHECK(fputc((int)((i + j) & 0xFF), file) != EOF);
+        for (unsigned sector = 0; sector < 16; sector++) {
+            uint8_t xa[2336] = {0};
+            xa[0] = sector == 0 ? 2 : 1;
+            xa[1] = sector == 1 ? 1 : 0;
+            xa[2] = 0x64;
+            xa[3] = 1; /* stereo, 37.8 kHz, 4-bit */
+            memcpy(xa + 4, xa, 4);
+            for (unsigned group = 0; group < 18; group++) {
+                uint8_t *sg = xa + 8 + group * 128;
+                memset(sg, 4, 16);
+                memset(sg + 16, sector < 2 ? 0x77 : 0xe1, 112);
+            }
+            CHECK(fwrite(xa, 1, sizeof(xa), file) == sizeof(xa));
+        }
         CHECK(fclose(file) == 0);
     }
+}
+
+static void test_xa_sdk_stream(void) {
+    SpuCommonAttr common = {0};
+    common.mask = SPU_COMMON_MVOLL | SPU_COMMON_MVOLR | SPU_COMMON_CDMIX;
+    common.mvol.left = common.mvol.right = 32767;
+    common.cd.mix = 1;
+    SpuSetCommonAttr(&common);
+    SsSetSerialAttr(0, SS_MIX, SS_ON);
+    SsSetSerialVol(0, 127, 64);
+    uint8_t mode = 0xc8, filter[2] = {1, 0};
+    CHECK(CdControl(CdlSetmode, &mode, NULL));
+    CHECK(CdControl(CdlSetfilter, filter, NULL));
+    CdlFILE xa_file;
+    CHECK(CdSearchFile(&xa_file, "\\STR\\01.XA;1"));
+    CHECK(xa_file.size == 16 * 2048);
+    CdlFILE next_xa;
+    CHECK(CdSearchFile(&next_xa, "\\STR\\02.XA;1"));
+    CHECK(CdPosToInt(&next_xa.pos) - CdPosToInt(&xa_file.pos) == 16);
+    CdlLOC start = xa_file.pos;
+    CHECK(CdControl(CdlSetloc, (uint8_t *)&start, NULL));
+    CHECK(CdControl(CdlReadS, NULL, NULL));
+    int16_t pcm[735 * 2];
+    sdk_sound_mix(pcm, 735);
+    /* Decode the selected file/channel only. The first two sectors contain
+     * deliberately different samples under a different file/channel filter. */
+    int left = ((256 * (127 * 258)) >> 15) * 32767 >> 15;
+    int right = ((-512 * (64 * 258)) >> 15) * 32767 >> 15;
+    for (int i = 0; i < 10; i++) {
+        CHECK(pcm[i * 2] == left && pcm[i * 2 + 1] == right);
+    }
+    uint8_t location[8];
+    CHECK(CdControl(CdlGetlocP, NULL, location));
+    CHECK(CdPosToInt((CdlLOC *)(location + 5)) == CdPosToInt(&start) + 2);
+    CHECK(CdControl(CdlPause, NULL, NULL));
+    sdk_sound_mix(pcm, 735);
+    for (int i = 0; i < 1470; i++) CHECK(pcm[i] == 0);
+    CHECK(sdk_cd_xa_status().sector == (unsigned long)CdPosToInt(&start) + 2);
+    CHECK(CdControl(CdlReadS, NULL, NULL)); /* Resume buffered audio. */
+    sdk_sound_mix(pcm, 735);
+    CHECK(pcm[0] == left && pcm[1] == right);
+    CHECK(sdk_cd_xa_status().sector == (unsigned long)CdPosToInt(&start) + 5);
+    CHECK(CdControl(CdlPause, NULL, NULL));
+    CdlLOC offset;
+    CHECK(CdIntToPos(CdPosToInt(&start) + 3, &offset));
+    CHECK(CdControl(CdlSetloc, (uint8_t *)&offset, NULL));
+    CHECK(CdControl(CdlReadS, NULL, NULL));
+    sdk_sound_mix(pcm, 10);
+    CHECK(pcm[0] == left && pcm[1] == right);
+
+    CHECK(CdControl(CdlReadS, (uint8_t *)&start, NULL));
+    SsSetSerialAttr(0, SS_MIX, SS_OFF);
+    sdk_sound_mix(pcm, 10);
+    for (int i = 0; i < 20; i++) CHECK(pcm[i] == 0);
+    SsSetSerialAttr(0, SS_MIX, SS_ON);
+    SsSetSerialVol(0, 0, 0);
+    sdk_sound_mix(pcm, 10);
+    for (int i = 0; i < 20; i++) CHECK(pcm[i] == 0);
+    CHECK(CdControl(CdlStandby, NULL, NULL));
+    CHECK(!sdk_cd_xa_status().streaming);
+    SsSetSerialVol(0, 127, 64);
+    CHECK(CdControl(CdlReadS, (uint8_t *)&start, NULL));
+    SsSetMono(); /* libsnd mono mode affects voices, not the CD input. */
+    sdk_sound_mix(pcm, 10);
+    CHECK(pcm[0] == left && pcm[1] == right);
+    SsSetStereo();
+    /* Normal data reads cancel the XA drive stream. */
+    CdlFILE archive;
+    CHECK(CdSearchFile(&archive, "\\A_FILE.HDT;1"));
+    CHECK(CdControl(CdlSetloc, (uint8_t *)&archive.pos, NULL));
+    CHECK(CdRead(1, buffer, 0x80));
+    CHECK(CdReadSync(0, NULL) == 0 && !sdk_cd_xa_status().streaming);
+    sdk_sound_mix(pcm, 10);
+    for (int i = 0; i < 20; i++) CHECK(pcm[i] == 0);
+    sdk_sound_reset();
 }
 
 int main(void) {
@@ -172,6 +261,7 @@ int main(void) {
     CHECK(CdPosToInt(&location) == -1);
     CHECK(afile_init() == 0);
     xa_search_files();
+    test_xa_sdk_stream();
     memset(buffer, 0xAA, sizeof(buffer));
     CHECK(afile_read_range(0, 1, (u8 *)buffer, (u8 *)buffer) == 0);
     for (unsigned i = 0; i < 2048; ++i) CHECK(((u8 *)buffer)[i] == i % 251);
@@ -237,7 +327,7 @@ int main(void) {
     SdkSoundStatus st = sdk_sound_status();
     CHECK(st.initialized && st.running && st.stereo && st.cd_mix);
     CHECK(st.tick_mode == 1 && st.reserved_voices == 0x16);
-    CHECK(sdk_sound_spu()->master_vol_left == 0x3FFF && sdk_sound_spu()->cd_vol_left == 0x1FFF);
+    CHECK(sdk_sound_spu()->master_vol_left == 0x3FFF && sdk_sound_spu()->cd_vol_left == 0);
     CHECK(sound_fader_ready() == 1 && sound_fader_mode() == SOUND_FADER_IDLE);
 
     sound_set_mono();

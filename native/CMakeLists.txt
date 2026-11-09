@@ -196,6 +196,8 @@ set_target_properties(sdk_cd PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_include_directories(sdk_cd PUBLIC compat src)
 target_compile_definitions(sdk_cd PRIVATE _CRT_SECURE_NO_WARNINGS)
 target_compile_options(sdk_cd PRIVATE /W4)
+target_link_libraries(sdk_cd PUBLIC ps1_xa)
+target_link_libraries(sdk_sound PUBLIC sdk_cd)
 add_library(game_afile STATIC
     ../src/main/cd/afile.c
     ../src/main/game/event_flags.c

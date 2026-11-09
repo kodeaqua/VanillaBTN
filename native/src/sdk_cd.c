@@ -1,4 +1,5 @@
 #include "sdk_cd.h"
+#include "ps1_xa.h"
 #include <libcd.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -10,14 +11,47 @@
 typedef struct DiscFile {
     FILE *handle;
     char name[256];
-    u_long size, first, sectors;
+    u_long size, first, sectors, stride;
 } DiscFile;
 static char root[1024];
 static DiscFile files[CD_FILES];
 static unsigned file_count;
 static u_long next_sector, seek_sector;
 static u_char last_command, drive_mode, filter_file, filter_channel;
-static bool filter_set, xa_streaming;
+static bool filter_set, xa_streaming, xa_paused;
+static Ps1XaPlayer xa_player;
+static DiscFile *stream_file;
+static u_long stream_first;
+static uint64_t stream_clock;
+
+static void stop_xa(void) {
+    xa_streaming = xa_paused = false;
+    stream_file = NULL;
+    ps1_xa_stop(&xa_player);
+}
+
+static int read_xa_sector(void *context, uint32_t index, uint8_t *sector) {
+    DiscFile *file = context;
+    return index < file->sectors
+        && fseek(file->handle, (long)(index * PS1_XA_SECTOR_SIZE), SEEK_SET) == 0
+        && fread(sector, 1, PS1_XA_SECTOR_SIZE, file->handle) == PS1_XA_SECTOR_SIZE;
+}
+
+void sdk_cd_mix(int16_t *out, int frames) {
+    if (!out || frames <= 0) return;
+    if (!xa_streaming) {
+        memset(out, 0, (size_t)frames * 2 * sizeof(*out));
+        return;
+    }
+    ps1_xa_mix(&xa_player, out, frames, 32767, 32767, 0);
+    /* Mode C8 uses double-speed CD sectors. Report the playback clock, not
+     * the decoder's lookahead cursor across interleaved file/channel data. */
+    stream_clock += (uint64_t)frames * 150;
+    uint64_t position = stream_first + stream_clock / 44100;
+    u_long end = stream_file->first + stream_file->sectors;
+    seek_sector = position < end ? (u_long)position : end;
+    if (xa_player.state == PS1_XA_IDLE) stop_xa();
+}
 static struct {
     DiscFile *file;
     unsigned char *destination;
@@ -30,6 +64,7 @@ SdkCdXaStatus sdk_cd_xa_status(void) {
 }
 
 void sdk_cd_unmount(void) {
+    stop_xa();
     for (unsigned i = 0; i < file_count; ++i) fclose(files[i].handle);
     memset(files, 0, sizeof(files));
     memset(&read_job, 0, sizeof(read_job));
@@ -106,16 +141,23 @@ CdlFILE *CdSearchFile(CdlFILE *result, char *name) {
         if (!handle) return NULL;
         long bytes;
         if (fseek(handle, 0, SEEK_END) || (bytes = ftell(handle)) < 0) { fclose(handle); return NULL; }
-        u_long sectors = ((u_long)bytes + CD_SECTOR - 1) / CD_SECTOR;
+        size_t name_length = strlen(relative);
+        u_long stride = name_length >= 3 && _stricmp(relative + name_length - 3, ".XA") == 0
+            ? PS1_XA_SECTOR_SIZE : CD_SECTOR;
+        if (stride == PS1_XA_SECTOR_SIZE && (u_long)bytes % stride) { fclose(handle); return NULL; }
+        u_long sectors = ((u_long)bytes + stride - 1) / stride;
         if (sectors == 0 || sectors > 449850 - next_sector) { fclose(handle); return NULL; }
         file = files + file_count++;
-        *file = (DiscFile){handle, "", (u_long)bytes, next_sector, sectors};
+        *file = (DiscFile){handle, "", (u_long)bytes, next_sector, sectors, stride};
         strcpy(file->name, relative);
         next_sector += sectors;
     }
     memset(result, 0, sizeof(*result));
     if (!CdIntToPos((int)file->first, &result->pos)) return NULL;
-    result->size = file->size;
+    /* Imported XA stores 2336 bytes per sector; ISO file sizes/LBAs describe
+     * 2048 logical bytes per physical sector. Never allocate virtual LBAs by
+     * dividing an imported XA byte count by the data-sector size. */
+    result->size = file->stride == PS1_XA_SECTOR_SIZE ? file->sectors * CD_SECTOR : file->size;
     strncpy(result->name, relative, sizeof(result->name) - 1);
     return result;
 }
@@ -130,7 +172,10 @@ static DiscFile *find_sector_file(u_long sector) {
 
 int CdControl(u_char command, u_char *parameter, u_char *result) {
     if (command == CdlStandby || command == CdlPause) {
-        xa_streaming = false;
+        if (command == CdlPause && xa_streaming) {
+            xa_paused = true;
+            xa_streaming = false;
+        } else if (command == CdlStandby) stop_xa();
         last_command = command;
         if (result) result[0] = 2;
         return 1;
@@ -139,18 +184,21 @@ int CdControl(u_char command, u_char *parameter, u_char *result) {
     if (command == CdlSetloc) {
         int sector = CdPosToInt((CdlLOC *)parameter);
         if (sector < 0) return 0;
+        stop_xa();
         seek_sector = (u_long)sector;
     } else if (command == CdlSetfilter) {
         if (!parameter || parameter[0] == 0 || parameter[1] > 31) return 0;
         filter_file = parameter[0];
         filter_channel = parameter[1];
         filter_set = true;
+        xa_player.filter_file = filter_file;
+        xa_player.channel = filter_channel;
     } else if (command == CdlSetmode) {
         /* Support 2048-byte data modes (0x00/0x80) and the 0xC8 real-time
          * filtered XA-ADPCM mode configured by cd_audio.c. */
         if (!parameter || (*parameter != 0 && *parameter != 0x80 && *parameter != 0xC8)) return 0;
         drive_mode = *parameter;
-        if (drive_mode != 0xC8) xa_streaming = false;
+        if (drive_mode != 0xC8) stop_xa();
     } else if (command == CdlReadS) {
         if (drive_mode != 0xC8 || !filter_set) return 0;
         if (parameter) {
@@ -158,7 +206,16 @@ int CdControl(u_char command, u_char *parameter, u_char *result) {
             if (sector < 0) return 0;
             seek_sector = (u_long)sector;
         }
-        if (!find_sector_file(seek_sector)) return 0;
+        DiscFile *file = find_sector_file(seek_sector);
+        if (!file || file->stride != PS1_XA_SECTOR_SIZE) return 0;
+        if (!(xa_paused && !parameter && stream_file == file)) {
+            stream_file = file;
+            stream_first = seek_sector;
+            stream_clock = 0;
+            ps1_xa_play_source(&xa_player, read_xa_sector, file,
+                seek_sector - file->first, file->sectors, filter_file, filter_channel);
+        }
+        xa_paused = false;
         xa_streaming = true;
     } else if (command == CdlGetlocP) {
         if (result) {
@@ -208,10 +265,10 @@ int CdSync(int mode, u_char *result) {
 int CdRead(int sectors, u_long *buffer, int mode) {
     if (!buffer || sectors <= 0 || read_job.status > 0 || (mode & ~0x80)) return 0;
     drive_mode = (u_char)mode;
-    xa_streaming = false;
+    stop_xa();
     for (unsigned i = 0; i < file_count; ++i) {
         DiscFile *file = files + i;
-        if (seek_sector >= file->first && seek_sector - file->first < file->sectors
+        if (file->stride == CD_SECTOR && seek_sector >= file->first && seek_sector - file->first < file->sectors
             && (u_long)sectors <= file->sectors - (seek_sector - file->first)) {
             read_job.file = file;
             read_job.destination = (unsigned char *)buffer;
@@ -251,6 +308,6 @@ void CdFlush(void) { /* No unread controller response FIFO exists on the host. *
 int CdInit(void) {
     /* Drive initialization must preserve the host-mounted disc. */
     memset(&read_job, 0, sizeof(read_job));
-    xa_streaming = false;
+    stop_xa();
     return 1;
 }

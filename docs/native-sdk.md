@@ -163,10 +163,8 @@ For `cd_audio.c`, `sdk_cd` additionally handles `CdlSetloc`, `CdlStandby`,
 `CdlPause`, `CdlSetfilter`, `CdlSetmode` (`0xC8` for filtered real-time XA
 ADPCM streaming in addition to `0x00`/`0x80` 2048-byte data modes), `CdlReadS`,
 `CdlGetlocP`, `CdControlB`, `CdControlF` and `CdLastCom`. During active XA
-streaming, `CdlGetlocP` advances the subheader Q position by 8 sectors per
-query (one channel-interleaved cycle) across the selected track's sector extent
-so `cd_audio_fade_tick` observes track progress, end-of-track stop and loop
-seek behavior. `sdk_sound` provides `SsSetSerialVol` to record the CD serial
+streaming, `CdlGetlocP` reports the sample-driven playback position without
+advancing it merely because the game polls the drive. `sdk_sound` provides `SsSetSerialVol` to apply the CD serial
 input left/right volume (`0..127`) adjusted by `cd_audio_play_track`,
 `cd_audio_fade_tick` and `cd_audio_stop`, plus the `libsnd`/`libspu` entry
 points used by `sound.c` and `sound_request.c`: `SsInit`, `SsSetTableSize`,
@@ -194,8 +192,18 @@ The generic global echo was removed because it applied an invented effect to
 all voices. Hardware reverb remains an open task; an enabled setting alone does
 not prove reverb implementation. Starting an archive sector read via
 `afile_read_bytes` invokes the real `cd_audio_stop` and switches the drive back
-to data mode (`0x80`). Feeding `cd_audio.c` filter/location/volume state into
-the live `ps1_xa` audio mixer stream remains a separate integration step.
+to data mode (`0x80`). `sdk_cd` now feeds original filter/location/ReadS controls through a bounded
+2336-byte sector reader into `ps1_xa`; the SDK sound mixer combines this PCM with
+the same SPU output sent to SDL. Imported XA sizes use 2336 physical bytes per
+sector, while SDK file sizes and virtual LBA allocation use 2048 logical bytes.
+Pause retains decoded buffers, a new seek resets playback, and data reads,
+standby or unmount cancel the stream. GetlocP reports a 150-sector/s playback
+clock in mode C8, independently of decoder lookahead. Serial A volume writes
+the SPU CD-input gain (258 times the 0..127 SDK value, checked against the local
+reference function); it is not a second multiplier. Muted CD input still
+advances, and libsnd voice mono mode does not fold CD channels together.
+Hardware zigzag resampling, exact interleave/seek timing and listening acceptance
+remain open; the current backend interpolation is linear.
 File lookup failure is real failure: the host must validate the data tree before
 entering original retry loops. Mount/unmount invalidates all pending requests.
 

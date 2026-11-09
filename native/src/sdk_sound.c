@@ -1,4 +1,5 @@
 #include "sdk_sound.h"
+#include "sdk_cd.h"
 #include <libsnd.h>
 #include <libspu.h>
 #include <stdlib.h>
@@ -215,6 +216,28 @@ void sdk_sound_mix(int16_t *out, int frames) {
             out[f * 2 + 1] = (int16_t)mono;
         }
     }
+    /* CD input has its own SPU gain and then shares master gain. Serial volume
+     * writes that same CD gain; applying both would attenuate it twice.
+     * Drain muted input too so unmuting cannot replay old decoded audio. */
+    int16_t cd[256 * 2];
+    for (int first = 0; first < frames; first += 256) {
+        int count = frames - first;
+        if (count > 256) count = 256;
+        sdk_cd_mix(cd, count);
+        if (!cd_mix_enabled) continue;
+        for (int f = 0; f < count; f++) {
+            for (int channel = 0; channel < 2; channel++) {
+                int volume = channel ? spu.cd_vol_right : spu.cd_vol_left;
+                int master = channel ? spu.master_vol_right : spu.master_vol_left;
+                int sample = ((cd[f * 2 + channel] * volume) >> 15) * master >> 15;
+                int index = (first + f) * 2 + channel;
+                sample += out[index];
+                if (sample > 32767) sample = 32767;
+                if (sample < -32768) sample = -32768;
+                out[index] = (int16_t)sample;
+            }
+        }
+    }
 }
 
 void SsInit(void) {
@@ -274,6 +297,7 @@ void SsSetSerialAttr(char s_num, char attr, char mode) {
     if (s_num < 0 || s_num > 1 || attr < 0 || attr > 1 || mode < 0 || mode > 1) abort();
     serial_attr[(int)s_num] = (uint8_t)attr;
     serial_mode[(int)s_num] = (uint8_t)mode;
+    if (s_num == SS_SERIAL_A && attr == SS_MIX) cd_mix_enabled = mode != 0;
 }
 
 void SsSetSerialVol(short s_num, short voll, short volr) {
@@ -281,6 +305,8 @@ void SsSetSerialVol(short s_num, short voll, short volr) {
         abort();
     }
     serial_vol[s_num] = (SdkSerialVol){voll, volr};
+    /* Reference SDK scales serial A by 2 * 129 into the SPU CD registers. */
+    if (s_num == SS_SERIAL_A) ps1_spu_set_cd_vol(&spu, voll * 258, volr * 258);
 }
 
 short SsVabOpenHead(u_char *addr, int vabid) {

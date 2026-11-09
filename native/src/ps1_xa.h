@@ -36,6 +36,10 @@ typedef struct {
     int16_t  channel;
 } Ps1XaTrackEntry;
 
+/* Supply one complete imported 2336-byte sector; return zero on read failure.
+ * The caller owns the source for the duration of playback. */
+typedef int (*Ps1XaSectorReader)(void *context, uint32_t index, uint8_t *sector);
+
 /* CD-XA Player state */
 typedef struct {
     Ps1XaState      state;
@@ -49,6 +53,11 @@ typedef struct {
     /* Data pointers for the 4 XA files (\\STR\\01.XA .. 04.XA) */
     const uint8_t  *files[PS1_XA_FILES_COUNT];
     uint32_t        file_sizes[PS1_XA_FILES_COUNT];
+
+    Ps1XaSectorReader reader;
+    void           *reader_context;
+    uint32_t        reader_sectors;
+    int             filter_file; /* -1 disables file-number filtering */
 
     /* Sector streaming state */
     uint32_t        sector_index;
@@ -81,6 +90,12 @@ void ps1_xa_set_file(Ps1XaPlayer *player, int file_idx, const uint8_t *data, uin
 
 /* Start playing track (0..25) */
 void ps1_xa_play_track(Ps1XaPlayer *player, int track);
+
+/* Start a bounded file-backed stream without loading an entire XA into RAM.
+ * Indices are relative to the reader source; file_number is the XA subheader
+ * file filter, independent of the host file selected by the reader. */
+void ps1_xa_play_source(Ps1XaPlayer *player, Ps1XaSectorReader reader, void *context,
+                        uint32_t first, uint32_t count, int file_number, int channel);
 
 /* Stop playback */
 void ps1_xa_stop(Ps1XaPlayer *player);

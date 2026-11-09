@@ -96,6 +96,7 @@ void ps1_xa_init(Ps1XaPlayer *player) {
     player->track = -1;
     player->file = -1;
     player->channel = -1;
+    player->filter_file = -1;
     player->serial_volume = 45;
     player->sample_rate = 18900;
     /* 18900 Hz source -> 44100 Hz output */
@@ -109,19 +110,28 @@ void ps1_xa_set_file(Ps1XaPlayer *player, int file_idx, const uint8_t *data, uin
 }
 
 static int fetch_next_sector(Ps1XaPlayer *player) {
-    if (player->file < 0 || player->file >= PS1_XA_FILES_COUNT) return 0;
-    const uint8_t *file_data = player->files[player->file];
-    uint32_t file_size = player->file_sizes[player->file];
-    if (!file_data) return 0;
-
-    uint32_t num_sectors = file_size / PS1_XA_SECTOR_SIZE;
-
+    const uint8_t *file_data = NULL;
+    uint32_t num_sectors = player->reader_sectors;
+    if (!player->reader) {
+        if (player->file < 0 || player->file >= PS1_XA_FILES_COUNT) return 0;
+        file_data = player->files[player->file];
+        if (!file_data) return 0;
+        num_sectors = player->file_sizes[player->file] / PS1_XA_SECTOR_SIZE;
+    }
+    uint8_t sector[PS1_XA_SECTOR_SIZE];
     while (player->sector_index < num_sectors) {
-        const uint8_t *sec = file_data + player->sector_index * PS1_XA_SECTOR_SIZE;
-        player->sector_index++;
-
-        /* Check channel filter */
-        if (sec[1] == (uint8_t)player->channel) {
+        uint32_t index = player->sector_index++;
+        const uint8_t *sec;
+        if (player->reader) {
+            if (!player->reader(player->reader_context, index, sector)) return 0;
+            sec = sector;
+        } else {
+            sec = file_data + index * PS1_XA_SECTOR_SIZE;
+        }
+        /* Invalid/non-audio subheaders must not change the current format. */
+        if (sec[1] == (uint8_t)player->channel && (sec[2] & 0x64) == 0x64
+            && (player->filter_file < 0 || sec[0] == player->filter_file)
+            && (sec[3] & 0x22) == 0 && ((sec[3] >> 4) & 3) <= 1) {
             uint8_t coding_info = sec[3];
             player->is_stereo = (coding_info & 0x01) != 0;
             player->sample_rate = ((coding_info >> 2) & 0x01) ? 18900u : 37800u;
@@ -164,10 +174,40 @@ static int16_t fetch_xa_raw_sample(Ps1XaPlayer *player) {
     return player->sector_pcm[player->sector_sample_idx++];
 }
 
+static void prime_stream(Ps1XaPlayer *player) {
+    player->curr_sample = fetch_xa_raw_sample(player);
+    if (player->is_stereo) {
+        player->curr_sample_r = fetch_xa_raw_sample(player);
+        player->next_sample = fetch_xa_raw_sample(player);
+        player->next_sample_r = fetch_xa_raw_sample(player);
+    } else {
+        player->next_sample = fetch_xa_raw_sample(player);
+    }
+}
+
+void ps1_xa_play_source(Ps1XaPlayer *player, Ps1XaSectorReader reader, void *context,
+                        uint32_t first, uint32_t count, int file_number, int channel) {
+    ps1_xa_init(player);
+    if (!reader || first >= count || file_number < 0 || file_number > 255
+        || channel < 0 || channel > 31) return;
+    player->reader = reader;
+    player->reader_context = context;
+    player->reader_sectors = count;
+    player->filter_file = file_number;
+    player->channel = channel;
+    player->sector_index = first;
+    player->serial_volume = 128; /* SDK applies the actual SPU CD-input volume. */
+    player->state = PS1_XA_PLAYING;
+    prime_stream(player);
+}
+
 void ps1_xa_play_track(Ps1XaPlayer *player, int track) {
     if (track < 0 || track >= PS1_XA_TRACK_COUNT) return;
 
     const Ps1XaTrackEntry *entry = &s_tracks[track];
+    player->reader = NULL;
+    player->reader_context = NULL;
+    player->filter_file = -1;
     player->track = track;
     player->file = entry->file;
     player->channel = entry->channel;
@@ -189,14 +229,7 @@ void ps1_xa_play_track(Ps1XaPlayer *player, int track) {
     player->frac_pos = 0;
     player->state = PS1_XA_PLAYING;
 
-    player->curr_sample = fetch_xa_raw_sample(player);
-    if (player->is_stereo) {
-        player->curr_sample_r = fetch_xa_raw_sample(player);
-        player->next_sample = fetch_xa_raw_sample(player);
-        player->next_sample_r = fetch_xa_raw_sample(player);
-    } else {
-        player->next_sample = fetch_xa_raw_sample(player);
-    }
+    prime_stream(player);
 }
 
 void ps1_xa_stop(Ps1XaPlayer *player) {
