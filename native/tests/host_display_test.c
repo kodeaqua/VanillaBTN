@@ -52,6 +52,12 @@ int main(void) {
     CHECK(SDL_GetTextureSize(texture, &width, &height));
     CHECK(width == 640 && height == 480);
     color(surface, 0, 0, 255);
+    CHECK(SetDefDispEnv(&display, 0, 240, 320, 240));
+    CHECK(PutDispEnv(&display));
+    CHECK(host_present_frame(&video, renderer, &texture));
+    CHECK(SDL_GetTextureSize(texture, &width, &height));
+    CHECK(width == 320 && height == 240);
+    color(surface, 255, 0, 0);
     sdk_gpu_bind(NULL);
     SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);

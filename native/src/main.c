@@ -249,10 +249,10 @@ static void host_game_pump(void *context) {
             }
         } else if (event.type == SDL_EVENT_WINDOW_EXPOSED
                    || event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) {
-            if (!host_present_frame(&video, host->renderer, &host->texture)) {
-                host->running = false;
-                sdk_sync_stop();
-                return;
+            bool minimized = host->window != NULL &&
+                (SDL_GetWindowFlags(host->window) & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) != 0;
+            if (!minimized) {
+                host_present_frame(&video, host->renderer, &host->texture);
             }
         }
     }
@@ -306,9 +306,10 @@ static void host_game_pump(void *context) {
         (int)(sizeof(samples) * 4)) {
         SDL_PutAudioStreamData(audio.stream, samples, sizeof(samples));
     }
-    if (!host_present_frame(&video, host->renderer, &host->texture)) {
-        host->running = false;
-        sdk_sync_stop();
+    bool minimized = host->window != NULL &&
+        (SDL_GetWindowFlags(host->window) & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) != 0;
+    if (!minimized) {
+        host_present_frame(&video, host->renderer, &host->texture);
     }
 }
 

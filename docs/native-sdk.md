@@ -280,8 +280,13 @@ hardware overlap ordering still needs independent fixtures.
 `SetDispMask` controls visibility. SDL presents that rectangle and recreates
 its nearest-neighbor texture when the original internal display size changes.
 This supports original 320x240 and 640x480 buffers without a resolution upgrade.
-The memory-only SDL software-renderer test verifies flips, masking and resize;
-it opens no window and performs no gameplay or visual acceptance test.
+The memory-only SDL software-renderer test verifies flips, masking, resize and
+scale-down; it opens no window and performs no gameplay or visual acceptance test.
+`host_present_frame` validates display dimensions against VRAM boundaries,
+clearing to black when the display is disabled or invalid without allocating
+zero-sized textures. The host pump skips presentation when the window is
+minimized or hidden so background simulation and audio continue without
+terminating the game.
 
 RGB24 display and nonzero texture windows are explicitly rejected at this
 boundary. Dithering, scanline/interlace timing, screen overscan placement and
