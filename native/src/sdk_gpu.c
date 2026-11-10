@@ -318,6 +318,8 @@ u_long *GsGetWorkBase(void) { return gs_work; }
 void GsInitGraph(unsigned short x, unsigned short y, unsigned short mode,
                  unsigned short dith, unsigned short vrammode) {
     if (!x || !y || mode || vrammode) abort();
+    /* The reference initializes GTE here, before GsInit3D sets its center. */
+    InitGeom();
     HWD0 = (short)x;
     VWD0 = (short)y;
     gs_origin_x = (short)(x / 2);
@@ -351,7 +353,6 @@ void GsSetDrawBuffOffset(void) {
 }
 
 void GsInit3D(void) {
-    InitGeom();
     gs_origin_x = (short)(HWD0 / 2);
     gs_origin_y = (short)(VWD0 / 2);
     GsSetDrawBuffOffset();

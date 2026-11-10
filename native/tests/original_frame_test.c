@@ -323,6 +323,13 @@ int main(void) {
     assert(ground_height_at() == 50);
     assert(ground_hit_primitive() == (void *)tmd_file.f3_packet);
 
+    MATRIX prior_rotation = {0};
+    MATRIX reset_rotation = {0};
+    prior_rotation.m[0][0] = 2048;
+    SetRotMatrix(&prior_rotation);
+    GsInitGraph(320, 240, 0, 0, 0);
+    gte_ReadRotMatrix(&reset_rotation);
+    assert(reset_rotation.m[0][0] == 4096);
     camera_init_projection();
     /* Keep all fixture vertices beyond H/2; the old H=1000 setup crossed
      * the real near plane and only drew because divide overflow was missing. */
@@ -338,6 +345,12 @@ int main(void) {
      * Truncating the negative dot product previously hid this quantization. */
     assert(otz > 0 && proj_xy.x == 160 && proj_xy.y == 119);
 
+    /* GsInit3D restores the offset but must preserve the camera and screen. */
+    GsDefDispBuff(0, 0, 0, 0);
+    GsInit3D();
+    otz = gte_project_vertex(&proj_xy, &center_v);
+    assert(otz > 0 && proj_xy.x == 160 && proj_xy.y == 119);
+
     /* Verify that GsSetOffset can select temporary offsets and GsSetDrawBuffOffset
      * restores the persistent 3D projection center origin (160, 120), matching
      * Sony libgs behavior across scene resets and farm re-entry after saving. */
@@ -350,7 +363,6 @@ int main(void) {
     assert(otz > 0 && proj_xy.x == 160 && proj_xy.y == 119);
 
     /* With mode 0 and active buffer 0, libgs adds buffer 1's VRAM origin. */
-    GsInitGraph(320, 240, 0, 0, 0);
     GsDefDispBuff(10, 20, 300, 240);
     otz = gte_project_vertex(&proj_xy, &center_v);
     assert(otz > 0 && proj_xy.x == 460 && proj_xy.y == 359);

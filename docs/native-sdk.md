@@ -320,7 +320,8 @@ For the supported GS graph mode, projection offsets include the inactive GS
 buffer's VRAM origin, as in the reference SDK. The game does not swap GS
 buffers and initializes both origins to zero; other GS modes and buffer
 swapping are not implemented. The game's own frame draw environments remain
-authoritative for GPU drawing.
+authoritative for GPU drawing. `GsInitGraph` initializes the GTE; `GsInit3D`
+sets the projection center without resetting the existing camera matrices.
 Its actual packets exposed missing flat-line and Gouraud-polygon dispatch in
 the software GPU. The backend now draws inclusive flat-line endpoints and
 untextured Gouraud triangles/quads, retaining clipping, masks and blending.
