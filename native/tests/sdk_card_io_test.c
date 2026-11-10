@@ -98,6 +98,17 @@ static void test_metadata_persistence(void) {
     check_disk_matches(card, path);
     CHECK(MemCardCreateFile(0, "KEEP", 1) == McErrNone);
     check_disk_matches(card, path);
+    CHECK(MemCardCreateFile(0, "OTHER", 1) == McErrNone);
+    check_disk_matches(card, path);
+    /* Rename validation: same name succeeds, duplicate/empty/oversized fail. */
+    CHECK(sdk_card_rename("bu0:KEEP", "bu0:KEEP") == 1);
+    CHECK(sdk_card_rename("bu0:KEEP", "bu0:OTHER") == -1);
+    CHECK(sdk_card_rename("bu0:KEEP", "bu0:") == -1);
+    CHECK(sdk_card_rename("bu0:KEEP", "bu0:NAME_EXCEEDING_TWENTY_CHARS") == -1);
+    CHECK(MemCardDeleteFile(0, "OTHER") == 0);
+    check_disk_matches(card, path);
+    CHECK(MemCardFormat(5) == McErrCardInvalid); /* invalid channel */
+    CHECK(MemCardCreateFile(5, "BADCHAN", 1) == McErrCardInvalid);
     CHECK(MemCardUnformat(0) == -1);
     check_disk_matches(card, path);
     FILE *blocked = fopen(temp, "wb");

@@ -200,30 +200,60 @@ static bool commit_card(Ps1Card *card, Ps1Card *staged) {
 
 int MemCardCreateFile(int chan, char *file, int blocks) {
     Ps1Card *card = get_card_for_chan(chan);
-    if (card == NULL || file == NULL || !file[0] || strlen(file) > 20 ||
-        blocks <= 0 || blocks > (int)PS1_CARD_DATA_BLOCKS) return -1;
-    if (!card->present) return McErrCardNotExist;
+    if (file == NULL || !file[0] || strlen(file) > 20 ||
+        blocks <= 0 || blocks > (int)PS1_CARD_DATA_BLOCKS) {
+        s_last_result = McErrCardInvalid;
+        return -1;
+    }
+    if (card == NULL) {
+        s_last_result = McErrCardInvalid;
+        return McErrCardInvalid;
+    }
+    if (!card->present) {
+        s_last_result = McErrCardNotExist;
+        return McErrCardNotExist;
+    }
     Ps1CardStatus validation = ps1_card_validate(card);
-    if (validation == PS1_CARD_ERR_UNFORMATTED) return McErrNotFormat;
-    if (validation != PS1_CARD_OK) return McErrCardInvalid;
+    if (validation == PS1_CARD_ERR_UNFORMATTED) {
+        s_last_result = McErrNotFormat;
+        return McErrNotFormat;
+    }
+    if (validation != PS1_CARD_OK) {
+        s_last_result = McErrCardInvalid;
+        return McErrCardInvalid;
+    }
     /* SDK creation is exclusive. The core replacement API is deliberately
      * stronger and must not erase an existing diary for a create request. */
-    if (ps1_card_find_file(card, file, NULL)) return McErrAlreadyExist;
-    if (ps1_card_get_free_blocks(card) < blocks) return McErrBlockFull;
+    if (ps1_card_find_file(card, file, NULL)) {
+        s_last_result = McErrAlreadyExist;
+        return McErrAlreadyExist;
+    }
+    if (ps1_card_get_free_blocks(card) < blocks) {
+        s_last_result = McErrBlockFull;
+        return McErrBlockFull;
+    }
     size_t total_size = (size_t)blocks * PS1_CARD_BLOCK_SIZE;
     void *zero_buf = calloc(1, total_size);
     if (!zero_buf) {
+        s_last_result = McErrCardInvalid;
         return -1;
     }
     Ps1Card *staged = stage_card(card);
-    if (!staged) { free(zero_buf); return McErrCardInvalid; }
+    if (!staged) {
+        free(zero_buf);
+        s_last_result = McErrCardInvalid;
+        return McErrCardInvalid;
+    }
     Ps1CardStatus status = ps1_card_write_file(staged, file, zero_buf, total_size);
     free(zero_buf);
     if (status != PS1_CARD_OK) {
         if (staged != card) free(staged);
+        s_last_result = McErrCardInvalid;
         return -1;
     }
-    return commit_card(card, staged) ? McErrNone : McErrCardInvalid;
+    bool ok = commit_card(card, staged);
+    s_last_result = ok ? McErrNone : McErrCardInvalid;
+    return s_last_result;
 }
 
 int MemCardDeleteFile(int chan, char *file) {
@@ -243,18 +273,28 @@ int MemCardDeleteFile(int chan, char *file) {
 
 int MemCardFormat(int chan) {
     Ps1Card *card = get_card_for_chan(chan);
+    s_last_cmd = 0x07;
     if (card == NULL) {
-        return -1;
+        s_last_result = McErrCardInvalid;
+        return McErrCardInvalid;
     }
     /* Formatting cannot insert a card, even if its old bytes remain in RAM. */
-    if (!card->present) return McErrCardNotExist;
+    if (!card->present) {
+        s_last_result = McErrCardNotExist;
+        return McErrCardNotExist;
+    }
     Ps1Card *staged = stage_card(card);
-    if (!staged) return McErrCardInvalid;
+    if (!staged) {
+        s_last_result = McErrCardInvalid;
+        return McErrCardInvalid;
+    }
     ps1_card_format(staged);
-    if (!commit_card(card, staged)) return McErrCardInvalid;
-    s_last_cmd = 0x07;
+    if (!commit_card(card, staged)) {
+        s_last_result = McErrCardInvalid;
+        return McErrCardInvalid;
+    }
     s_last_result = McErrNone;
-    return 0;
+    return McErrNone;
 }
 
 int MemCardUnformat(int chan) {
@@ -475,11 +515,23 @@ int sdk_card_rename(const char *oldpath, const char *newpath) {
     const char *oldname = (colon_old != NULL) ? colon_old + 1 : oldpath;
     const char *newname = (colon_new != NULL) ? colon_new + 1 : newpath;
 
+    if (!newname[0] || strlen(newname) > 20) {
+        return -1;
+    }
+    if (strcmp(oldname, newname) == 0) {
+        return 1;
+    }
+
     if (oldpath[0] == 'b' && oldpath[1] == 'u') {
         port = oldpath[2] - '0';
     }
     Ps1Card *card = sdk_card_get(port);
     if (card == NULL || !card->present || ps1_card_validate(card) != PS1_CARD_OK) {
+        return -1;
+    }
+
+    /* Reject rename if the target filename already exists on this card. */
+    if (ps1_card_find_file(card, newname, NULL) > 0) {
         return -1;
     }
 
