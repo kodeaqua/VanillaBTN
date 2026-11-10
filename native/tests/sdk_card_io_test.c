@@ -64,6 +64,10 @@ int main(void) {
     CHECK(MemCardSync(0, &command, &result) == 1);
     CHECK(command == 1 && result == 0);
     card->present = false;
+    /* Formatting an absent card must not manufacture media or erase bytes. */
+    CHECK(MemCardFormat(0) == McErrCardNotExist);
+    CHECK(!card->present && !card->dirty);
+    CHECK(memcmp(snapshot, card->data, sizeof(snapshot)) == 0);
     CHECK(MemCardCreateFile(0, "MISSING", 1) == McErrCardNotExist);
     CHECK(!card->dirty && memcmp(snapshot, card->data, sizeof(snapshot)) == 0);
     CHECK(MemCardReadFile(0, "TEST", buffer, 0, 128) == 1);
@@ -121,5 +125,7 @@ int main(void) {
     card->data[0] = 'M';
     card->data[127] ^= 1;
     CHECK(MemCardCreateFile(0, "DAMAGED", 1) == McErrCardInvalid);
+    CHECK(MemCardFormat(0) == McErrNone);
+    CHECK(card->present && card->dirty && ps1_card_validate(card) == PS1_CARD_OK);
     return 0;
 }

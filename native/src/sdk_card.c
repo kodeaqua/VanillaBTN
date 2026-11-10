@@ -206,6 +206,8 @@ int MemCardFormat(int chan) {
     if (card == NULL) {
         return -1;
     }
+    /* Formatting cannot insert a card, even if its old bytes remain in RAM. */
+    if (!card->present) return McErrCardNotExist;
     ps1_card_format(card);
     s_last_cmd = 0x07;
     s_last_result = McErrNone;

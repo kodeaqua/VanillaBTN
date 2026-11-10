@@ -444,6 +444,8 @@ system (`ps1_card`). Channels 0 and 0x10 map to virtual slots 0 and 1. Card prob
 requests distinguish between unformatted cards, damaged/invalid headers, standard
 PS1 cards, and missing cards, reporting `McxErrInvalid` for standard PS1 memory
 cards (indicating non-PDA cards).
+Formatting requires a present card; an unavailable slot reports
+`McErrCardNotExist` without changing the retained image.
 
 Card save file renames (`CARD_RENAME` in `mcard.c`) route through `sdk_card_rename`
 via `native/compat/libapi.h`. This updates the card's directory frame filename and
