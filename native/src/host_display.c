@@ -230,6 +230,7 @@ bool host_present_frame(const Ps1Video *video, SDL_Renderer *renderer, SDL_Textu
     copied = ps1_video_copy_argb(video, display.x, display.y, display.width, display.height, pixels,
                                  (size_t)pitch / sizeof(uint32_t));
     SDL_UnlockTexture(*texture);
+    SDL_SetTextureScaleMode(*texture, SDL_SCALEMODE_NEAREST);
     return copied && SDL_RenderClear(renderer)
         && SDL_RenderTexture(renderer, *texture, NULL, NULL)
         && SDL_RenderPresent(renderer);

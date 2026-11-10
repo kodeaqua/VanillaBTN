@@ -550,7 +550,10 @@ disc_ready:
         }
         host_pacing_init(&host.pacing, &host.config.display, monitor_hz);
         sdk_sync_subtick_hook(NULL, NULL);
-        SDL_SetRenderVSync(host.renderer, host.config.display.vsync ? 1 : 0);
+        int vsync_val = host.config.display.vsync ? SDL_RENDERER_VSYNC_ADAPTIVE : SDL_RENDERER_VSYNC_DISABLED;
+        if (!SDL_SetRenderVSync(host.renderer, vsync_val)) {
+            SDL_SetRenderVSync(host.renderer, SDL_RENDERER_VSYNC_DISABLED);
+        }
     }
     ps1_audio_init(&audio);
     ps1_spu_set_polyphony_expansion(&audio.spu, expand_poly);

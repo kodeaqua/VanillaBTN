@@ -338,7 +338,7 @@ static bool sample_texel_advanced(const Ps1Video *video, unsigned tpage, unsigne
         if (vf > v_max) vf = v_max;
     }
 
-    if (s_texture_filter == PS1_FILTER_NEAREST && (!s_mipmapping || lod <= 1.25f)) {
+    if (s_texture_filter == PS1_FILTER_NEAREST && (!s_mipmapping || lod <= 2.0f)) {
         int iu = (int)(uf + 0.5f);
         int iv = (int)(vf + 0.5f);
         if (s_texture_bleeding_fix) {
@@ -357,7 +357,7 @@ static bool sample_texel_advanced(const Ps1Video *video, unsigned tpage, unsigne
     }
 
     /* Mipmapping box-sampling or bilinear sampling */
-    if (s_mipmapping && lod > 1.25f) {
+    if (s_mipmapping && lod > 2.0f) {
         float offset = 0.25f * fminf(lod, 3.0f);
         float samples_u[4] = { uf - offset, uf + offset, uf - offset, uf + offset };
         float samples_v[4] = { vf - offset, vf - offset, vf + offset, vf + offset };
@@ -1422,7 +1422,7 @@ bool ps1_video_copy_argb(const Ps1Video *video, int x, int y, int width, int hei
             }
         }
     }
-    if (s_anti_aliasing != PS1_AA_OFF) {
+    if (s_anti_aliasing == PS1_AA_SMAA) {
         apply_subpixel_anti_aliasing(target, width, height, target_stride);
     }
     return true;

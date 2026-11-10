@@ -116,7 +116,9 @@ int VSync(int mode) {
     /* Round upward so an integral-nanosecond deadline never falls before the
      * nominal vblank boundary; preserve phase rather than accumulating drift. */
     uint64_t deadline = tick_deadline(tick);
+    bool waited = false;
     while (now < deadline) {
+        waited = true;
         /* Service each intervening vblank, so VSync(2/3) does not batch the
          * original loading-screen and draw callbacks at the final deadline. */
         uint64_t elapsed_now = now >= epoch ? now - epoch : 0;
@@ -128,8 +130,10 @@ int VSync(int mode) {
     }
     /* Late work delivers the current boundary once, without replaying stale
      * rendering callbacks or adding another frame delay. Queries stay pure. */
-    uint64_t elapsed_final = now >= epoch ? now - epoch : 0;
-    dispatch_vblank(units(elapsed_final, 60));
+    if (!waited) {
+        uint64_t elapsed_final = now >= epoch ? now - epoch : 0;
+        dispatch_vblank(units(elapsed_final, 60));
+    }
     int elapsed = result_units(now >= last_wait ? now - last_wait : 0, 15750);
     last_wait = now;
     return elapsed;
