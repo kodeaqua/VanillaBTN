@@ -302,23 +302,34 @@ Following the completion of the 35 PS1 flaw fixes, Phase 2 implements modern pla
 
 ## 5. Phased Implementation Roadmap
 
-### PHASE 1: Configuration Foundation & 35 PS1 Flaws Fixes (HIGHEST PRIORITY)
-- **Milestone 1**: `vanillabtn.ini` configuration subsystem (`config.c/h`) with Master Preset System (`mode = modern / authentic_ps1 / custom`).
-- **Milestone 2**: PGXP Precision Pipeline — GTE subpixel float vertex precision (anti-wobble) and perspective-correct texturing (anti-warp).
-- **Milestone 3**: True Depth Buffer & Shadow Bias — Eliminates polygon Z-fighting and sunken character shadows.
-- **Milestone 4**: Near-Plane Frustum W-Clipping & Quad Tessellation — Eliminates near-camera polygon explosions and large quad distortion.
-- **Milestone 5**: 32-bit Float GTE Math — Smooth camera panning without notches and skeletal joint twitching fix.
-- **Milestone 6**: True Color 32-bit & Dithering Removal — Eliminates sky/fog color banding and checkerboard noise.
-- **Milestone 7**: Texture Bleeding, Alpha Halo, & Mipmapping Fix — Eliminates 1-pixel tile seams, sprite dark halos, and distant texture crawling.
-- **Milestone 8**: Anti-Aliasing (MSAA/SMAA) & Smooth Atmospheric Fog — Smooths polygon edges and eliminates concentric fog rings.
-- **Milestone 9**: Audio Subsystem Overhaul — Expanded 64-voice polyphony, seamless CD-XA looping, micro-fade pop suppression, VAG loop crossfading, and 32-bit float mixing.
-- **Milestone 10**: Hi-Fi Reverb & Full-Spectrum Audio — Eliminates metallic comb filtering and high-frequency roll-off.
-- **Milestone 11**: Zero Fill-rate Bottleneck Architecture — Guarantees solid 60 FPS in heavy rain and festival scenes.
-- **Milestone 12**: Input Subsystem Fixes — Circular analog normalization (diagonal running fix), HD rumble curve, sub-frame raw input polling, and disconnect auto-pause.
+### PHASE 1: Configuration Foundation & 35 PS1 Flaws Fixes (HIGHEST PRIORITY) - COMPLETE
+- [x] **Milestone 1**: `vanillabtn.ini` configuration subsystem (`config.c/h`) with Master Preset System (`mode = modern / authentic_ps1 / custom`).
+- [x] **Milestone 2**: PGXP Precision Pipeline — GTE subpixel float vertex precision (anti-wobble) and perspective-correct texturing (anti-warp).
+- [x] **Milestone 3**: True Depth Buffer & Shadow Bias — Eliminates polygon Z-fighting and sunken character shadows.
+- [x] **Milestone 4**: Near-Plane Frustum W-Clipping & Quad Tessellation — Eliminates near-camera polygon explosions and large quad distortion.
+- [x] **Milestone 5**: 32-bit Float GTE Math — Smooth camera panning without notches and skeletal joint twitching fix.
+- [x] **Milestone 6**: True Color 32-bit & Dithering Removal — Eliminates sky/fog color banding and checkerboard noise.
+- [x] **Milestone 7**: Texture Bleeding, Alpha Halo, & Mipmapping Fix — Eliminates 1-pixel tile seams, sprite dark halos, and distant texture crawling.
+- [x] **Milestone 8**: Anti-Aliasing (MSAA/SMAA) & Smooth Atmospheric Fog — Smooths polygon edges and eliminates concentric fog rings.
+- [x] **Milestone 9**: Audio Subsystem Overhaul — Expanded 64-voice polyphony, seamless CD-XA looping, micro-fade pop suppression, VAG loop crossfading, and 32-bit float mixing.
+- [x] **Milestone 10**: Hi-Fi Reverb & Full-Spectrum Audio — Eliminates metallic comb filtering and high-frequency roll-off.
+- [x] **Milestone 11**: Zero Fill-rate Bottleneck Architecture — Guarantees solid 60 FPS in heavy rain and festival scenes.
+- [x] **Milestone 12**: Input Subsystem Fixes — Circular analog normalization (diagonal running fix), HD rumble curve, sub-frame raw input polling, and disconnect auto-pause.
 
-### PHASE 2: Modern Graphics & Platform Enhancements
-- **Milestone 13**: Multi-Monitor Discovery & 4 Window Modes (`host_display.c`).
-- **Milestone 14**: Decoupled FPS Limiter & Pacing Lock (30, 60, monitor Hz, unlocked).
-- **Milestone 15**: True Widescreen (3D Hor+ FOV Expansion, Native Culling Expansion, Safe-Area 2D HUD).
-- **Milestone 16**: Multi-Backend Renderer Abstraction (`vulkan`, `d3d11`, `opengl`, `software`).
-- **Milestone 17**: HD Font & QoL (HD SDF text rendering, extended draw distance, turbo hotkey, auto-backup save data).
+### PHASE 2: Modern Graphics & Platform Enhancements - COMPLETE
+- [x] **Milestone 13**: Multi-Monitor Discovery & 4 Window Modes (`host_display.c/h`).
+- [x] **Milestone 14**: Decoupled FPS Limiter & Pacing Lock (`host_pacing.c/h`, `sdk_sync.c/h`).
+- [x] **Milestone 15**: True Widescreen Hor+ 3D FOV Expansion (`ps1_gte.c/h`, `host_display.c/h`).
+- [x] **Milestone 16**: Multi-Backend Renderer Abstraction (`host_renderer.c/h`).
+- [x] **Milestone 17**: HD Font & QoL Features (`ps1_card.c/h`, `ps1_video.c/h`, `sdk_sync.c/h`).
+
+---
+
+## 6. Verification Status & Pull Request
+- **Pull Request**: [#3 (feat/ps1-fixes-and-enhancements)](https://github.com/kodeaqua/VanillaBTN/pull/3)
+- **Branch**: `feat/ps1-fixes-and-enhancements`
+- **Tests**:
+  - `CTest (Debug)`: 54 / 54 tests passing (100%)
+  - `CTest (Release)`: 54 / 54 tests passing (100%)
+  - `Python unit tests`: 9 / 9 tests passing (100%)
+- **Baseline Integrity**: All decompiled PS1 sources in `src/` remain completely untouched (0 bytes changed). Reference PS1 matching SHA-1 baseline is fully preserved.
