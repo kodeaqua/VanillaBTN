@@ -53,7 +53,7 @@ void ps1_gte_set_matrix(Ps1Gte *gte, const Ps1Matrix *matrix) {
  */
 static uint32_t perspective_quotient(uint16_t h, uint16_t sz, uint32_t *flags) {
     if ((uint32_t)h >= (uint32_t)sz * 2u) {
-        *flags |= 1u << 17;
+        if (flags) *flags |= 1u << 17;
         return 0x1FFFFu;
     }
     unsigned shift = 0;
@@ -71,7 +71,7 @@ static uint32_t perspective_quotient(uint16_t h, uint16_t sz, uint32_t *flags) {
 }
 
 static int32_t projection_ir(int64_t value, unsigned bit, uint32_t *flags) {
-    if (value < -32768 || value > 32767) *flags |= 1u << bit;
+    if (flags && (value < -32768 || value > 32767)) *flags |= 1u << bit;
     return value < -32768 ? -32768 : value > 32767 ? 32767 : (int32_t)value;
 }
 

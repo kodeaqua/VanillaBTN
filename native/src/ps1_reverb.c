@@ -125,7 +125,7 @@ void ps1_reverb_set_echo(Ps1Reverb *r, int type, int delay, int feedback) {
 }
 
 int16_t ps1_reverb_step(Ps1Reverb *r, unsigned c, int16_t input, int write_enable) {
-    if (!r) return 0;
+    if (!r || c > 1) return 0;
     const uint16_t *v = r->registers;
     /* IIR reflections read the previous halfword, not the previous frame. */
     if (write_enable) {

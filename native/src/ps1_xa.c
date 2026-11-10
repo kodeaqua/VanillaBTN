@@ -306,7 +306,7 @@ void ps1_xa_mix(Ps1XaPlayer *player, int16_t *out, int frames,
             continue;
         }
 
-        if (player->output_index == player->output_count) {
+        if (player->output_index >= player->output_count) {
             int status = fill_output(player);
             if (status <= 0) {
                 if (status == 0) player->state = PS1_XA_IDLE;

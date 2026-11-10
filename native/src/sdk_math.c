@@ -346,19 +346,19 @@ void gte_OuterProduct12(VECTOR *v0, VECTOR *v1, VECTOR *v2) {
 
 long VectorNormal(VECTOR *v0, VECTOR *v1) {
     if (!v0 || !v1) return 0;
-    int64_t x = v0->vx, y = v0->vy, z = v0->vz;
-    int64_t sq = x * x + y * y + z * z;
-    if (sq <= 0) {
+    double dx = (double)v0->vx, dy = (double)v0->vy, dz = (double)v0->vz;
+    double dsq = dx * dx + dy * dy + dz * dz;
+    if (dsq <= 0.0) {
         v1->vx = 0;
         v1->vy = 0;
         v1->vz = 0;
         return 0;
     }
-    double len = sqrt((double)sq);
-    v1->vx = (long)((x * 4096.0) / len);
-    v1->vy = (long)((y * 4096.0) / len);
-    v1->vz = (long)((z * 4096.0) / len);
-    return (long)sq;
+    double len = sqrt(dsq);
+    v1->vx = (long)((dx * 4096.0) / len);
+    v1->vy = (long)((dy * 4096.0) / len);
+    v1->vz = (long)((dz * 4096.0) / len);
+    return dsq > (double)LONG_MAX ? LONG_MAX : (long)dsq;
 }
 
 long VectorNormalS(VECTOR *v0, SVECTOR *v1) {

@@ -162,6 +162,10 @@ static void test_reverb_null_and_bounds_safety(void) {
     memset(&r, 0, sizeof(r));
     r.base = PS1_REVERB_WORDS; /* length = 0 */
     ps1_reverb_clock(&r, 1000, 1000, 1, out);
+
+    /* Out of bounds channel index protection (c > 1) */
+    CHECK(ps1_reverb_step(&r, 2, 1000, 1) == 0);
+    CHECK(ps1_reverb_step(&r, 999, 1000, 1) == 0);
 }
 
 int main(void) {

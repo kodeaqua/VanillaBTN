@@ -6,6 +6,15 @@ Update the relevant item after completing a task or discovering a blocker.
 ## Active
 
 - [x] Continuation audit: complete farm linkage/address translation and remove unsupported SDK success paths before claiming runtime integration.
+  - [x] Fourth subsystem hardening and edge-case audit: guard reverb channel bounds against out-of-bounds register reads, harden SPU VAB loading and key-on routines against NULL pointers, clamp XA mixer output index comparisons, eliminate 64-bit integer overflow in vector normalization with double-precision accumulation, add defensive NULL checks for CdReadSync file handles and card entry pattern matching, and guard GTE perspective quotient and projection IR against NULL flags pointers.
+    - [x] Guard `ps1_reverb_step` (`ps1_reverb.c`): added `c > 1` protection to prevent out-of-bounds reads into registers beyond `RV_VLIN + 1`.
+    - [x] Guard `ps1_spu_load_vab` and `ps1_spu_key_on_vab` (`ps1_spu.c`): validate `spu` non-null before dereferencing `spu->vabs`.
+    - [x] Guard `ps1_xa_mix` (`ps1_xa.c`): changed `player->output_index == player->output_count` to `>=` to prevent potential out-of-bounds indexing of `player->output`.
+    - [x] Protect `VectorNormal` (`sdk_math.c`): switch 64-bit coordinate squaring to `double` accumulation and clamp return value to `LONG_MAX`, eliminating signed 64-bit integer overflow when vector coordinates exceed ~1.75 billion.
+    - [x] Guard `CdReadSync` (`sdk_cd.c`): reject read job when `file` or `file->handle` is NULL without attempting to calculate sector offsets.
+    - [x] Guard `pattern_matches` (`sdk_card.c`): return false on NULL `name` before calling `strcmp` or `strncmp`.
+    - [x] Guard `perspective_quotient` and `projection_ir` (`ps1_gte.c`): check `if (flags)` before setting overflow bits.
+    - [x] Expand synthetic tests in `ps1_reverb_test.c`, `ps1_spu_test.c`, `sdk_card_io_test.c`, and `sdk_math_test.c` (38/38 CTests, 9/9 Python tests passing in Debug and Release).
   - [x] Third subsystem hardening and edge-case audit: eliminate potential size underflow in CD read sector clamping, prevent out-of-bounds node indexing during ordering table traversal, guard against 64-bit integer overflow in fixed simulation clock accumulation, add defensive null pointer safety across XA filter, XA player, SPU, and debug printing, clamp pad actuator ready frame calculation to prevent signed integer overflow, gracefully handle NULL attributes in SPU control functions without aborting, and guard memory card file replacement and recovery against oversized payloads and NULL paths.
     - [x] Guard `bytes` subtraction in `CdReadSync` (`sdk_cd.c`): replaced `file->size - read_job.offset` with `file->size > read_job.offset ? (size_t)(file->size - read_job.offset) : 0` to prevent unsigned size_t underflow into massive read requests when read offset equals or exceeds file size.
     - [x] Add node bounds validation in `ps1_ot_walk` (`ps1_ot.c`): checked `node >= ot->count` during bucket list iteration to prevent out-of-bounds memory reads on corrupted table structures.

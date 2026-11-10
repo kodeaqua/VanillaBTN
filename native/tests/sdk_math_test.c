@@ -87,5 +87,9 @@ int main(int argc, char **argv) {
     gte_stsxy3_gt4(NULL);
     gte_stsxy(NULL);
     gte_stsxy2(NULL);
+    if (VectorNormal(NULL, NULL) != 0) return 18;
+    VECTOR big_v = {2000000000, 2000000000, 2000000000, 0};
+    VECTOR norm_out = {0};
+    if (VectorNormal(&big_v, &norm_out) <= 0) return 19;
     return 0;
 }

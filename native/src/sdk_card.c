@@ -322,6 +322,7 @@ int MemCardSync(int mode, long *cmds, long *rslt) {
 }
 
 static bool pattern_matches(const char *name, const char *pattern) {
+    if (name == NULL) return false;
     if (pattern == NULL || pattern[0] == '\0' || strcmp(pattern, "*") == 0) {
         return true;
     }

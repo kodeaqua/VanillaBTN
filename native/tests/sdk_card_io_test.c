@@ -252,6 +252,7 @@ int main(void) {
     card->present = true;
     CHECK(MemCardFormat(0) == McErrNone);
     CHECK(card->present && card->dirty && ps1_card_validate(card) == PS1_CARD_OK);
+    CHECK(MemCardGetDirentry(0, NULL, entries, &files, 0, 1) == 0);
     test_write_persists_before_completion();
     test_metadata_persistence();
     return 0;

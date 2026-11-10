@@ -323,6 +323,11 @@ int CdReadSync(int mode, u_char *result) {
     if (!root[0] || (mode != 0 && mode != 1)) return -1;
     if (read_job.status > 0) {
         DiscFile *file = read_job.file;
+        if (!file || !file->handle) {
+            read_job.status = -1;
+            if (result) result[0] = 1;
+            return -1;
+        }
         size_t size = (size_t)read_job.sectors * CD_SECTOR;
         size_t bytes = file->size > read_job.offset ? (size_t)(file->size - read_job.offset) : 0;
         if (bytes > size) bytes = size;

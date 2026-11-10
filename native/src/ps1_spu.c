@@ -194,7 +194,7 @@ void ps1_spu_init(Ps1Spu *spu) {
 
 Ps1VabId ps1_spu_load_vab(Ps1Spu *spu, const uint8_t *header, uint32_t header_size,
                           const uint8_t *body, uint32_t body_size) {
-    if (!header || header_size < 32) return PS1_VAB_NONE;
+    if (!spu || !header || header_size < 32) return PS1_VAB_NONE;
 
     uint32_t magic;
     memcpy(&magic, header, 4);
@@ -311,7 +311,7 @@ void ps1_spu_key_on_raw(Ps1Spu *spu, int voice_idx, const uint8_t *data,
 void ps1_spu_key_on_vab(Ps1Spu *spu, int voice_idx, Ps1VabId vab_id,
                         int prog, int tone, int note, int fine,
                         int voll, int volr) {
-    if (voice_idx < 0 || voice_idx >= PS1_SPU_VOICES) return;
+    if (!spu || voice_idx < 0 || voice_idx >= PS1_SPU_VOICES) return;
     if (vab_id < 0 || vab_id >= PS1_SPU_VAB_SLOTS || !spu->vabs[vab_id].loaded) return;
 
     Ps1VabSlot *slot = &spu->vabs[vab_id];
