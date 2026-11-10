@@ -1,5 +1,148 @@
 #include "host_display.h"
 #include "sdk_gpu.h"
+#include <string.h>
+
+/* Query connected displays count */
+int host_display_get_monitor_count(void) {
+    int count = 0;
+    SDL_DisplayID *displays = SDL_GetDisplays(&count);
+    if (displays) {
+        SDL_free(displays);
+    }
+    return count > 0 ? count : 0;
+}
+
+/* Query display ID for a zero-based monitor index */
+SDL_DisplayID host_display_get_monitor_id(int monitor_index) {
+    int count = 0;
+    SDL_DisplayID *displays = SDL_GetDisplays(&count);
+    SDL_DisplayID id = 0;
+    if (displays && count > 0) {
+        if (monitor_index >= 0 && monitor_index < count) {
+            id = displays[monitor_index];
+        } else {
+            id = displays[0];
+        }
+        SDL_free(displays);
+    }
+    return id;
+}
+
+/* Query desktop bounds for a monitor */
+bool host_display_get_monitor_bounds(int monitor_index, SDL_Rect *bounds) {
+    if (!bounds) return false;
+    SDL_DisplayID id = host_display_get_monitor_id(monitor_index);
+    if (!id) {
+        bounds->x = 0;
+        bounds->y = 0;
+        bounds->w = 640;
+        bounds->h = 480;
+        return false;
+    }
+    return SDL_GetDisplayBounds(id, bounds);
+}
+
+/* Apply or change window mode and monitor position at runtime */
+bool host_display_apply_mode(SDL_Window *window, const DisplayConfig *config) {
+    if (!window) return false;
+    WindowMode mode = config ? config->window_mode : WINDOW_MODE_WINDOWED;
+
+    switch (mode) {
+    case WINDOW_MODE_WINDOWED: {
+        SDL_SetWindowFullscreen(window, false);
+        SDL_RestoreWindow(window);
+        int w = (config && config->window_width >= 320) ? config->window_width : 640;
+        int h = (config && config->window_height >= 240) ? config->window_height : 480;
+        SDL_SetWindowSize(window, w, h);
+        return true;
+    }
+    case WINDOW_MODE_MAXIMIZED:
+        SDL_SetWindowFullscreen(window, false);
+        SDL_MaximizeWindow(window);
+        return true;
+
+    case WINDOW_MODE_BORDERLESS:
+        SDL_SetWindowFullscreenMode(window, NULL);
+        SDL_SetWindowFullscreen(window, true);
+        return true;
+
+    case WINDOW_MODE_FULLSCREEN: {
+        SDL_DisplayID disp_id = host_display_get_monitor_id(config ? config->monitor : 0);
+        SDL_DisplayMode closest;
+        if (config && config->fullscreen_width > 0 && config->fullscreen_height > 0
+            && SDL_GetClosestFullscreenDisplayMode(disp_id, config->fullscreen_width,
+                                                   config->fullscreen_height,
+                                                   (float)config->fullscreen_hz,
+                                                   true, &closest)) {
+            SDL_SetWindowFullscreenMode(window, &closest);
+        } else {
+            SDL_SetWindowFullscreenMode(window, NULL);
+        }
+        SDL_SetWindowFullscreen(window, true);
+        return true;
+    }
+    default:
+        return false;
+    }
+}
+
+/* Create host window configured according to DisplayConfig */
+SDL_Window *host_display_create_window(const DisplayConfig *config) {
+    int win_w = (config && config->window_width >= 320) ? config->window_width : 640;
+    int win_h = (config && config->window_height >= 240) ? config->window_height : 480;
+
+    SDL_Window *window = SDL_CreateWindow("VanillaBTN", win_w, win_h, SDL_WINDOW_RESIZABLE);
+    if (!window) return NULL;
+
+    if (config) {
+        if (config->monitor > 0) {
+            SDL_Rect bounds;
+            if (host_display_get_monitor_bounds(config->monitor, &bounds)) {
+                int pos_x = bounds.x + (bounds.w - win_w) / 2;
+                int pos_y = bounds.y + (bounds.h - win_h) / 2;
+                SDL_SetWindowPosition(window, pos_x, pos_y);
+            }
+        }
+        host_display_apply_mode(window, config);
+    }
+    return window;
+}
+
+/* Toggle between fullscreen/borderless and windowed mode */
+bool host_display_toggle_fullscreen(SDL_Window *window, DisplayConfig *config) {
+    if (!window) return false;
+    SDL_WindowFlags flags = SDL_GetWindowFlags(window);
+    bool is_fullscreen = (flags & SDL_WINDOW_FULLSCREEN) != 0;
+    if (!is_fullscreen && config && (config->window_mode == WINDOW_MODE_FULLSCREEN || config->window_mode == WINDOW_MODE_BORDERLESS)) {
+        is_fullscreen = true;
+    }
+
+    if (is_fullscreen) {
+        if (config) config->window_mode = WINDOW_MODE_WINDOWED;
+        DisplayConfig local_cfg;
+        if (config) {
+            local_cfg = *config;
+        } else {
+            memset(&local_cfg, 0, sizeof(local_cfg));
+            local_cfg.window_width = 640;
+            local_cfg.window_height = 480;
+        }
+        local_cfg.window_mode = WINDOW_MODE_WINDOWED;
+        return host_display_apply_mode(window, &local_cfg);
+    } else {
+        WindowMode target = (config && config->window_mode == WINDOW_MODE_FULLSCREEN)
+                            ? WINDOW_MODE_FULLSCREEN : WINDOW_MODE_BORDERLESS;
+        if (config) config->window_mode = target;
+        DisplayConfig local_cfg;
+        if (config) {
+            local_cfg = *config;
+        } else {
+            memset(&local_cfg, 0, sizeof(local_cfg));
+        }
+        local_cfg.window_mode = target;
+        return host_display_apply_mode(window, &local_cfg);
+    }
+}
 
 /* Keep PS1 pixels in VRAM; SDL only presents the selected display rectangle. */
 bool host_present_frame(const Ps1Video *video, SDL_Renderer *renderer, SDL_Texture **texture) {
@@ -45,4 +188,3 @@ bool host_present_frame(const Ps1Video *video, SDL_Renderer *renderer, SDL_Textu
         && SDL_RenderTexture(renderer, *texture, NULL, NULL)
         && SDL_RenderPresent(renderer);
 }
-

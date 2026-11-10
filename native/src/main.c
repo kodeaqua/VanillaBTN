@@ -229,6 +229,13 @@ static void host_game_pump(void *context) {
                 host->trigger_right[i] = state.right_trigger;
             }
         } else if (event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP) {
+            if (event.type == SDL_EVENT_KEY_DOWN) {
+                if (((event.key.mod & SDL_KMOD_ALT) && (event.key.key == SDLK_RETURN || event.key.key == SDLK_KP_ENTER))
+                    || event.key.key == SDLK_F11) {
+                    host_display_toggle_fullscreen(host->window, &host->config.display);
+                    continue;
+                }
+            }
             uint32_t btn = map_key_to_ps1_button(event.key.key);
             if (event.key.scancode > SDL_SCANCODE_UNKNOWN &&
                 event.key.scancode < SDL_SCANCODE_COUNT) {
@@ -493,11 +500,7 @@ int main(int argc, char **argv) {
         goto done;
     }
 disc_ready:
-    {
-        int win_w = host.config.display.window_width >= 320 ? host.config.display.window_width : 640;
-        int win_h = host.config.display.window_height >= 240 ? host.config.display.window_height : 480;
-        host.window = SDL_CreateWindow("VanillaBTN", win_w, win_h, SDL_WINDOW_RESIZABLE);
-    }
+    host.window = host_display_create_window(&host.config.display);
     if (!host.window) goto done;
     host.renderer = SDL_CreateRenderer(host.window, NULL);
     if (!host.renderer || !SDL_SetRenderLogicalPresentation(host.renderer,

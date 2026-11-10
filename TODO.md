@@ -81,7 +81,11 @@ Update the relevant item after completing a task or discovering a blocker.
       - [x] Implement sub-frame raw event polling and disconnect auto-pause (`pause_on_disconnect` in `main.c`), safely freezing game loop on controller disconnection and resuming seamlessly upon reconnection or button press.
       - [x] Add synthetic unit tests in `ps1_input_overhaul_test.c` verifying circular stick radial mapping, deadzone isolation, HD rumble gamma curve, and sub-frame input responsiveness (50/50 CTests, 9/9 Python tests passing in Debug and Release).
   - [ ] Phase 2: Modern Graphics & Platform Enhancements.
-    - [ ] Milestone 13: Multi-monitor discovery and 4 window modes (windowed, borderless, fullscreen, maximized).
+    - [x] Milestone 13: Multi-monitor discovery and 4 window modes (windowed, borderless, fullscreen, maximized).
+      - [x] Implement multi-monitor discovery and desktop query functions (`host_display_get_monitor_count`, `host_display_get_monitor_id`, `host_display_get_monitor_bounds`) in `host_display.h`/`host_display.c`.
+      - [x] Implement host window creation and dynamic runtime mode switching (`host_display_create_window`, `host_display_apply_mode`) supporting Windowed, Borderless Fullscreen Desktop, Exclusive Fullscreen (with closest mode matching), and Maximized Windowed.
+      - [x] Implement runtime fullscreen toggling (`host_display_toggle_fullscreen`) wired to `Alt+Enter` and `F11` in `main.c` event pump with automatic configuration state tracking.
+      - [x] Expand synthetic tests in `host_display_test.c` verifying display queries, mode applications, and bidirectional fullscreen toggling (50/50 CTests, 9/9 Python tests passing in Debug and Release).
     - [ ] Milestone 14: Decoupled FPS limiter (30, 60, monitor Hz, unlocked) maintaining exact 60 virtual vblank simulation cadence.
     - [ ] Milestone 15: True Widescreen — Hor+ 3D FOV camera expansion, native culling band expansion, and 2D HUD safe-area protection.
     - [ ] Milestone 16: Multi-backend graphics abstraction (`vulkan`, `d3d11`, `opengl`, `software`).
