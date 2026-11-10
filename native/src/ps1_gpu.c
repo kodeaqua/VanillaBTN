@@ -1,4 +1,5 @@
 #include "ps1_gpu.h"
+#include "ps1_pgxp.h"
 
 #include <stdint.h>
 
@@ -152,6 +153,33 @@ static void exec_sprite(Ps1Video *video, const Ps1DrawState *state,
     ps1_video_draw_sprite(video, state, &sprite);
 }
 
+/* Helper to initialize vertex with PGXP subpixel float precision if available. */
+static Ps1Vertex make_poly_vertex(int x, int y, unsigned u, unsigned v, const uint32_t *word_addr) {
+    Ps1Vertex vert;
+    vert.x = x;
+    vert.y = y;
+    vert.u = u;
+    vert.v = v;
+    vert.sub_x = (float)x;
+    vert.sub_y = (float)y;
+    vert.z = 1.0f;
+    vert.w = 1.0f;
+    vert.has_subpixel = false;
+
+    if (ps1_pgxp_is_vertex_precision_enabled() && word_addr != NULL) {
+        uint32_t raw_sxy = *word_addr;
+        const Ps1PgxpVertex *pgxp = ps1_pgxp_lookup(word_addr, raw_sxy);
+        if (pgxp != NULL && pgxp->valid) {
+            vert.sub_x = pgxp->x;
+            vert.sub_y = pgxp->y;
+            vert.z = pgxp->z;
+            vert.w = pgxp->w;
+            vert.has_subpixel = true;
+        }
+    }
+    return vert;
+}
+
 /* Dispatch an untextured 3-point polygon.
  * Layout: [0] cmd+rgb, [1] x0/y0, [2] x1/y1, [3] x2/y2. */
 static void exec_poly_f3(Ps1Video *video, const Ps1DrawState *state,
@@ -159,9 +187,9 @@ static void exec_poly_f3(Ps1Video *video, const Ps1DrawState *state,
                          bool semi_transparent) {
     if (count < 4) return;
     uint32_t rgb24 = gp0_rgb24(words[0]);
-    Ps1Vertex v0 = { gp0_x(words[1]), gp0_y(words[1]), 0, 0 };
-    Ps1Vertex v1 = { gp0_x(words[2]), gp0_y(words[2]), 0, 0 };
-    Ps1Vertex v2 = { gp0_x(words[3]), gp0_y(words[3]), 0, 0 };
+    Ps1Vertex v0 = make_poly_vertex(gp0_x(words[1]), gp0_y(words[1]), 0, 0, &words[1]);
+    Ps1Vertex v1 = make_poly_vertex(gp0_x(words[2]), gp0_y(words[2]), 0, 0, &words[2]);
+    Ps1Vertex v2 = make_poly_vertex(gp0_x(words[3]), gp0_y(words[3]), 0, 0, &words[3]);
     ps1_video_draw_triangle(video, state, &v0, &v1, &v2,
                             rgb24, 0, 0, false, false, semi_transparent);
 }
@@ -174,11 +202,11 @@ static void exec_poly_ft3(Ps1Video *video, Ps1DrawState *state,
                           bool raw_texture, bool semi_transparent) {
     if (count < 7) return;
     uint32_t rgb24 = gp0_rgb24(words[0]);
-    Ps1Vertex v0 = { gp0_x(words[1]), gp0_y(words[1]), words[2] & 0xFFu, (words[2] >> 8) & 0xFFu };
+    Ps1Vertex v0 = make_poly_vertex(gp0_x(words[1]), gp0_y(words[1]), words[2] & 0xFFu, (words[2] >> 8) & 0xFFu, &words[1]);
     unsigned clut = (words[2] >> 16) & 0xFFFFu;
-    Ps1Vertex v1 = { gp0_x(words[3]), gp0_y(words[3]), words[4] & 0xFFu, (words[4] >> 8) & 0xFFu };
+    Ps1Vertex v1 = make_poly_vertex(gp0_x(words[3]), gp0_y(words[3]), words[4] & 0xFFu, (words[4] >> 8) & 0xFFu, &words[3]);
     unsigned tpage_word = (words[4] >> 16) & 0xFFFFu;
-    Ps1Vertex v2 = { gp0_x(words[5]), gp0_y(words[5]), words[6] & 0xFFu, (words[6] >> 8) & 0xFFu };
+    Ps1Vertex v2 = make_poly_vertex(gp0_x(words[5]), gp0_y(words[5]), words[6] & 0xFFu, (words[6] >> 8) & 0xFFu, &words[5]);
 
     state->tpage = tpage_word & 0x1FFu;
     state->blend_mode = (tpage_word >> 5) & 3u;
@@ -195,10 +223,10 @@ static void exec_poly_f4(Ps1Video *video, const Ps1DrawState *state,
                          bool semi_transparent) {
     if (count < 5) return;
     uint32_t rgb24 = gp0_rgb24(words[0]);
-    Ps1Vertex v0 = { gp0_x(words[1]), gp0_y(words[1]), 0, 0 };
-    Ps1Vertex v1 = { gp0_x(words[2]), gp0_y(words[2]), 0, 0 };
-    Ps1Vertex v2 = { gp0_x(words[3]), gp0_y(words[3]), 0, 0 };
-    Ps1Vertex v3 = { gp0_x(words[4]), gp0_y(words[4]), 0, 0 };
+    Ps1Vertex v0 = make_poly_vertex(gp0_x(words[1]), gp0_y(words[1]), 0, 0, &words[1]);
+    Ps1Vertex v1 = make_poly_vertex(gp0_x(words[2]), gp0_y(words[2]), 0, 0, &words[2]);
+    Ps1Vertex v2 = make_poly_vertex(gp0_x(words[3]), gp0_y(words[3]), 0, 0, &words[3]);
+    Ps1Vertex v3 = make_poly_vertex(gp0_x(words[4]), gp0_y(words[4]), 0, 0, &words[4]);
     ps1_video_draw_quad(video, state, &v0, &v1, &v2, &v3,
                         rgb24, 0, 0, false, false, semi_transparent);
 }
@@ -211,12 +239,12 @@ static void exec_poly_ft4(Ps1Video *video, Ps1DrawState *state,
                           bool raw_texture, bool semi_transparent) {
     if (count < 9) return;
     uint32_t rgb24 = gp0_rgb24(words[0]);
-    Ps1Vertex v0 = { gp0_x(words[1]), gp0_y(words[1]), words[2] & 0xFFu, (words[2] >> 8) & 0xFFu };
+    Ps1Vertex v0 = make_poly_vertex(gp0_x(words[1]), gp0_y(words[1]), words[2] & 0xFFu, (words[2] >> 8) & 0xFFu, &words[1]);
     unsigned clut = (words[2] >> 16) & 0xFFFFu;
-    Ps1Vertex v1 = { gp0_x(words[3]), gp0_y(words[3]), words[4] & 0xFFu, (words[4] >> 8) & 0xFFu };
+    Ps1Vertex v1 = make_poly_vertex(gp0_x(words[3]), gp0_y(words[3]), words[4] & 0xFFu, (words[4] >> 8) & 0xFFu, &words[3]);
     unsigned tpage_word = (words[4] >> 16) & 0xFFFFu;
-    Ps1Vertex v2 = { gp0_x(words[5]), gp0_y(words[5]), words[6] & 0xFFu, (words[6] >> 8) & 0xFFu };
-    Ps1Vertex v3 = { gp0_x(words[7]), gp0_y(words[7]), words[8] & 0xFFu, (words[8] >> 8) & 0xFFu };
+    Ps1Vertex v2 = make_poly_vertex(gp0_x(words[5]), gp0_y(words[5]), words[6] & 0xFFu, (words[6] >> 8) & 0xFFu, &words[5]);
+    Ps1Vertex v3 = make_poly_vertex(gp0_x(words[7]), gp0_y(words[7]), words[8] & 0xFFu, (words[8] >> 8) & 0xFFu, &words[7]);
 
     state->tpage = tpage_word & 0x1FFu;
     state->blend_mode = (tpage_word >> 5) & 3u;
@@ -289,7 +317,7 @@ bool ps1_gpu_exec(Ps1Video *video, Ps1DrawState *state,
         Ps1Vertex points[4];
         uint32_t colors[4];
         for (unsigned i = 0; i < vertices; ++i) {
-            points[i] = (Ps1Vertex){gp0_x(words[i * 2 + 1]), gp0_y(words[i * 2 + 1]), 0, 0};
+            points[i] = make_poly_vertex(gp0_x(words[i * 2 + 1]), gp0_y(words[i * 2 + 1]), 0, 0, &words[i * 2 + 1]);
             colors[i] = gp0_rgb24(words[i * 2]);
         }
         if (!ps1_video_draw_gouraud_triangle(video, state, points, points + 1, points + 2,
@@ -307,12 +335,13 @@ bool ps1_gpu_exec(Ps1Video *video, Ps1DrawState *state,
         if (count < vertices * 3) break;
         Ps1Vertex points[4];
         for (unsigned i = 0; i < vertices; ++i) {
-            points[i] = (Ps1Vertex){
+            points[i] = make_poly_vertex(
                 gp0_x(words[i * 3 + 1]),
                 gp0_y(words[i * 3 + 1]),
                 words[i * 3 + 2] & 0xFFu,
-                (words[i * 3 + 2] >> 8) & 0xFFu
-            };
+                (words[i * 3 + 2] >> 8) & 0xFFu,
+                &words[i * 3 + 1]
+            );
         }
         unsigned clut = (words[2] >> 16) & 0xFFFFu;
         unsigned tpage_word = (words[5] >> 16) & 0xFFFFu;

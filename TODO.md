@@ -13,7 +13,14 @@ Update the relevant item after completing a task or discovering a blocker.
       - [x] Generate self-documented `vanillabtn.ini` automatically when run without a configuration file.
       - [x] Wire `--config <path>` command line argument and integration into `main.c` and `original_boot_test`.
       - [x] Verify configuration serialization, preset resolution, and corrupt input fallbacks across 39/39 CTests in Debug and Release.
-    - [ ] Milestone 2: PGXP Precision Pipeline — GTE 16-bit subpixel float vertex precision (anti-wobble) and perspective-correct texture mapping (anti-warp).
+    - [x] Milestone 2: PGXP Precision Pipeline — GTE 16-bit subpixel float vertex precision (anti-wobble) and perspective-correct texture mapping (anti-warp).
+      - [x] Preserve 16-bit GTE fractional precision in `ps1_gte.c` and track camera depth ($Z$) and reciprocal depth ($W = 1/Z$) in `Ps1Gte`.
+      - [x] Implement PGXP registration and cache validation subsystem (`ps1_pgxp.h`/`ps1_pgxp.c`) mapping packet memory addresses to subpixel coordinates with CPU overwrite detection.
+      - [x] Wire GTE coordinate storage (`gte_stsxy*` in `sdk_math.c`) to register subpixel vertices across all polygon types (`POLY_F3`, `POLY_FT3`, `POLY_G3`, `POLY_GT3`, `POLY_F4`, `POLY_FT4`, `POLY_G4`, `POLY_GT4`).
+      - [x] Connect `ps1_gpu.c` packet decoding to look up PGXP precision data directly from original packet word addresses.
+      - [x] Implement subpixel rasterization and top-left fill rules in `ps1_video.c`, eliminating polygon jitter/wobble on camera motion.
+      - [x] Implement perspective-correct texture interpolation ($U/W, V/W, 1/W$) in `ps1_video.c`, eliminating affine texture warping on terrain, roofs, and oblique paths.
+      - [x] Add synthetic unit tests in `ps1_pgxp_test.c` verifying subpixel coordinate accuracy, CPU overwrite invalidation, edge shifting, and perspective texturing (40/40 CTests, 9/9 Python tests passing in Debug and Release).
     - [ ] Milestone 3: True Floating-Point Z-Buffer and polygon shadow bias (eliminating Z-fighting and sunken shadows).
     - [ ] Milestone 4: 3D Frustum W-Clipping (preventing near-plane division-by-zero polygon spikes) and dynamic quad subdivision.
     - [ ] Milestone 5: 32-bit Float GTE Math (smooth camera rotation angles and skeletal joint precision).

@@ -1,4 +1,5 @@
 #include "ps1_gte.h"
+#include "ps1_pgxp.h"
 #include <libgte.h>
 #include <libgs.h>
 #include <stdlib.h>
@@ -535,44 +536,98 @@ void gte_stszotz(void *out) {
 
 void gte_stsxy(void *out) {
     if (!out) return;
-    *(uint32_t *)out = pack_sxy(g_sdk_gte.sxy[2]);
+    uint32_t val = pack_sxy(g_sdk_gte.sxy[2]);
+    *(uint32_t *)out = val;
+    if (ps1_pgxp_is_vertex_precision_enabled()) {
+        const Ps1SubpixelCoord *c = &g_sdk_gte.sub_sxy[2];
+        ps1_pgxp_register(out, c->x, c->y, c->z, c->w, val);
+    }
 }
 
 void gte_stsxy2(void *out) {
     if (!out) return;
-    *(uint32_t *)out = pack_sxy(g_sdk_gte.sxy[2]);
+    uint32_t val = pack_sxy(g_sdk_gte.sxy[2]);
+    *(uint32_t *)out = val;
+    if (ps1_pgxp_is_vertex_precision_enabled()) {
+        const Ps1SubpixelCoord *c = &g_sdk_gte.sub_sxy[2];
+        ps1_pgxp_register(out, c->x, c->y, c->z, c->w, val);
+    }
 }
 
 void gte_stsxy3_f3(void *packet) {
     if (!packet) return;
     uint8_t *p = (uint8_t *)packet;
-    *(uint32_t *)(p + 0x08) = pack_sxy(g_sdk_gte.sxy[0]);
-    *(uint32_t *)(p + 0x0C) = pack_sxy(g_sdk_gte.sxy[1]);
-    *(uint32_t *)(p + 0x10) = pack_sxy(g_sdk_gte.sxy[2]);
+    uint32_t s0 = pack_sxy(g_sdk_gte.sxy[0]);
+    uint32_t s1 = pack_sxy(g_sdk_gte.sxy[1]);
+    uint32_t s2 = pack_sxy(g_sdk_gte.sxy[2]);
+    *(uint32_t *)(p + 0x08) = s0;
+    *(uint32_t *)(p + 0x0C) = s1;
+    *(uint32_t *)(p + 0x10) = s2;
+    if (ps1_pgxp_is_vertex_precision_enabled()) {
+        const Ps1SubpixelCoord *c0 = &g_sdk_gte.sub_sxy[0];
+        const Ps1SubpixelCoord *c1 = &g_sdk_gte.sub_sxy[1];
+        const Ps1SubpixelCoord *c2 = &g_sdk_gte.sub_sxy[2];
+        ps1_pgxp_register(p + 0x08, c0->x, c0->y, c0->z, c0->w, s0);
+        ps1_pgxp_register(p + 0x0C, c1->x, c1->y, c1->z, c1->w, s1);
+        ps1_pgxp_register(p + 0x10, c2->x, c2->y, c2->z, c2->w, s2);
+    }
 }
 
 void gte_stsxy3_g3(void *packet) {
     if (!packet) return;
     uint8_t *p = (uint8_t *)packet;
-    *(uint32_t *)(p + 0x08) = pack_sxy(g_sdk_gte.sxy[0]);
-    *(uint32_t *)(p + 0x10) = pack_sxy(g_sdk_gte.sxy[1]);
-    *(uint32_t *)(p + 0x18) = pack_sxy(g_sdk_gte.sxy[2]);
+    uint32_t s0 = pack_sxy(g_sdk_gte.sxy[0]);
+    uint32_t s1 = pack_sxy(g_sdk_gte.sxy[1]);
+    uint32_t s2 = pack_sxy(g_sdk_gte.sxy[2]);
+    *(uint32_t *)(p + 0x08) = s0;
+    *(uint32_t *)(p + 0x10) = s1;
+    *(uint32_t *)(p + 0x18) = s2;
+    if (ps1_pgxp_is_vertex_precision_enabled()) {
+        const Ps1SubpixelCoord *c0 = &g_sdk_gte.sub_sxy[0];
+        const Ps1SubpixelCoord *c1 = &g_sdk_gte.sub_sxy[1];
+        const Ps1SubpixelCoord *c2 = &g_sdk_gte.sub_sxy[2];
+        ps1_pgxp_register(p + 0x08, c0->x, c0->y, c0->z, c0->w, s0);
+        ps1_pgxp_register(p + 0x10, c1->x, c1->y, c1->z, c1->w, s1);
+        ps1_pgxp_register(p + 0x18, c2->x, c2->y, c2->z, c2->w, s2);
+    }
 }
 
 void gte_stsxy3_ft3(void *packet) {
     if (!packet) return;
     uint8_t *p = (uint8_t *)packet;
-    *(uint32_t *)(p + 0x08) = pack_sxy(g_sdk_gte.sxy[0]);
-    *(uint32_t *)(p + 0x10) = pack_sxy(g_sdk_gte.sxy[1]);
-    *(uint32_t *)(p + 0x18) = pack_sxy(g_sdk_gte.sxy[2]);
+    uint32_t s0 = pack_sxy(g_sdk_gte.sxy[0]);
+    uint32_t s1 = pack_sxy(g_sdk_gte.sxy[1]);
+    uint32_t s2 = pack_sxy(g_sdk_gte.sxy[2]);
+    *(uint32_t *)(p + 0x08) = s0;
+    *(uint32_t *)(p + 0x10) = s1;
+    *(uint32_t *)(p + 0x18) = s2;
+    if (ps1_pgxp_is_vertex_precision_enabled()) {
+        const Ps1SubpixelCoord *c0 = &g_sdk_gte.sub_sxy[0];
+        const Ps1SubpixelCoord *c1 = &g_sdk_gte.sub_sxy[1];
+        const Ps1SubpixelCoord *c2 = &g_sdk_gte.sub_sxy[2];
+        ps1_pgxp_register(p + 0x08, c0->x, c0->y, c0->z, c0->w, s0);
+        ps1_pgxp_register(p + 0x10, c1->x, c1->y, c1->z, c1->w, s1);
+        ps1_pgxp_register(p + 0x18, c2->x, c2->y, c2->z, c2->w, s2);
+    }
 }
 
 void gte_stsxy3_gt3(void *packet) {
     if (!packet) return;
     uint8_t *p = (uint8_t *)packet;
-    *(uint32_t *)(p + 0x08) = pack_sxy(g_sdk_gte.sxy[0]);
-    *(uint32_t *)(p + 0x14) = pack_sxy(g_sdk_gte.sxy[1]);
-    *(uint32_t *)(p + 0x20) = pack_sxy(g_sdk_gte.sxy[2]);
+    uint32_t s0 = pack_sxy(g_sdk_gte.sxy[0]);
+    uint32_t s1 = pack_sxy(g_sdk_gte.sxy[1]);
+    uint32_t s2 = pack_sxy(g_sdk_gte.sxy[2]);
+    *(uint32_t *)(p + 0x08) = s0;
+    *(uint32_t *)(p + 0x14) = s1;
+    *(uint32_t *)(p + 0x20) = s2;
+    if (ps1_pgxp_is_vertex_precision_enabled()) {
+        const Ps1SubpixelCoord *c0 = &g_sdk_gte.sub_sxy[0];
+        const Ps1SubpixelCoord *c1 = &g_sdk_gte.sub_sxy[1];
+        const Ps1SubpixelCoord *c2 = &g_sdk_gte.sub_sxy[2];
+        ps1_pgxp_register(p + 0x08, c0->x, c0->y, c0->z, c0->w, s0);
+        ps1_pgxp_register(p + 0x14, c1->x, c1->y, c1->z, c1->w, s1);
+        ps1_pgxp_register(p + 0x20, c2->x, c2->y, c2->z, c2->w, s2);
+    }
 }
 
 void gte_stsxy3_f4(void *packet) {
@@ -629,6 +684,7 @@ void InitGeom(void) {
     memset(g_gte_back_color, 0, sizeof(g_gte_back_color));
     memset(g_gte_far_color, 0, sizeof(g_gte_far_color));
     g_matrix_sp = 0;
+    ps1_pgxp_clear();
 }
 
 MATRIX *TransMatrix(MATRIX *m, VECTOR *v) {

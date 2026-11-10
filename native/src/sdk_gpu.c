@@ -1,5 +1,6 @@
 #include "sdk_gpu.h"
 #include "ps1_gpu.h"
+#include "ps1_pgxp.h"
 #include <libgpu.h>
 #include <libgte.h>
 #include <libgs.h>
@@ -36,6 +37,7 @@ void sdk_gpu_reset_packets(void) {
     map_count = 0;
     next_id = 4;
     packet_error = false;
+    ps1_pgxp_clear();
 }
 
 bool sdk_gpu_ok(void) { return !packet_error; }
@@ -113,11 +115,7 @@ void DrawOTag(u_long *ot) {
         unsigned words = *packet >> 24;
         if (!resolve_id(id, (size_t)(words + 1) * 4)) { packet_error = true; return; }
         if (words) {
-            /* long and uint32_t have the same representation on Windows, but
-             * copy into the dispatcher's type instead of aliasing them. */
-            uint32_t commands[255];
-            memcpy(commands, packet + 1, (size_t)words * 4);
-            if (!ps1_gpu_exec(vram, &draw, commands, words)) { packet_error = true; return; }
+            if (!ps1_gpu_exec(vram, &draw, (const uint32_t *)(packet + 1), words)) { packet_error = true; return; }
         }
         id = *packet & SDK_END;
     }

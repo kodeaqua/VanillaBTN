@@ -36,6 +36,14 @@ typedef struct Ps1ScreenCoord {
     int16_t x, y;
 } Ps1ScreenCoord;
 
+typedef struct Ps1SubpixelCoord {
+    float x;
+    float y;
+    float z;
+    float w;
+    bool valid;
+} Ps1SubpixelCoord;
+
 typedef struct Ps1Gte {
     int16_t rot[3][3];     /* Current rotation matrix */
     int32_t trans[3];      /* Current translation vector */
@@ -49,6 +57,10 @@ typedef struct Ps1Gte {
     int32_t opz;           /* 2D cross-product result from NCLIP */
     int32_t flag;          /* Hardware status flags; bit 31 summarizes selected errors. */
     int32_t otz;           /* Average depth from AVSZ3 / AVSZ4 */
+
+    /* PGXP subpixel and depth FIFOs */
+    Ps1SubpixelCoord sub_sxy[3]; /* High-precision subpixel coords for SXY0..2 */
+    float sub_sz[4];             /* Camera space depth for SZ0..3 */
 } Ps1Gte;
 
 void ps1_gte_init(Ps1Gte *gte);
@@ -57,6 +69,7 @@ void ps1_gte_set_geom_screen(Ps1Gte *gte, int32_t h);
 void ps1_gte_set_rot_matrix(Ps1Gte *gte, const int16_t m[3][3]);
 void ps1_gte_set_trans_matrix(Ps1Gte *gte, const int32_t t[3]);
 void ps1_gte_set_matrix(Ps1Gte *gte, const Ps1Matrix *matrix);
+void ps1_gte_get_sub_sxy(const Ps1Gte *gte, int index, Ps1SubpixelCoord *out);
 
 /* RTPS: Rotate, translate, and perspective-project 1 vector into SXY2 and SZ3.
  * Returns false when a hardware summary error occurs (near-plane overflow,

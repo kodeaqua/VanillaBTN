@@ -1,7 +1,9 @@
 #include "ps1_video.h"
+#include "ps1_pgxp.h"
 
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
 
 _Static_assert(sizeof(uint16_t) == 2, "PS1 VRAM words must be 16 bits");
 _Static_assert(sizeof(uint32_t) == 4, "ARGB pixels must be 32 bits");
@@ -193,6 +195,148 @@ static bool draw_triangle(Ps1Video *video, const Ps1DrawState *state,
     if (textured && ((tpage >> 7) & 3u) == 3u) {
         return false;
     }
+
+    bool use_subpixel = ps1_pgxp_is_vertex_precision_enabled()
+                     && v0->has_subpixel && v1->has_subpixel && v2->has_subpixel;
+
+    if (use_subpixel) {
+        float ox = (float)signed11(state->offset_x);
+        float oy = (float)signed11(state->offset_y);
+        float fx0 = v0->sub_x + ox;
+        float fy0 = v0->sub_y + oy;
+        float fx1 = v1->sub_x + ox;
+        float fy1 = v1->sub_y + oy;
+        float fx2 = v2->sub_x + ox;
+        float fy2 = v2->sub_y + oy;
+
+        float fu0 = (float)v0->u, fv0 = (float)v0->v;
+        float fu1 = (float)v1->u, fv1 = (float)v1->v;
+        float fu2 = (float)v2->u, fv2 = (float)v2->v;
+        float fw0 = (v0->w > 0.0f) ? v0->w : 1.0f;
+        float fw1 = (v1->w > 0.0f) ? v1->w : 1.0f;
+        float fw2 = (v2->w > 0.0f) ? v2->w : 1.0f;
+        uint32_t c0 = colors ? colors[0] : rgb24;
+        uint32_t c1 = colors ? colors[1] : rgb24;
+        uint32_t c2 = colors ? colors[2] : rgb24;
+
+        double fdet = (double)(fx1 - fx0) * (double)(fy2 - fy0) - (double)(fy1 - fy0) * (double)(fx2 - fx0);
+        if (fabs(fdet) < 1e-5) {
+            return true;
+        }
+        if (fdet < 0.0) {
+            float tx = fx1; fx1 = fx2; fx2 = tx;
+            float ty = fy1; fy1 = fy2; fy2 = ty;
+            float tu = fu1; fu1 = fu2; fu2 = tu;
+            float tv = fv1; fv1 = fv2; fv2 = tv;
+            float tw = fw1; fw1 = fw2; fw2 = tw;
+            uint32_t tc = c1; c1 = c2; c2 = tc;
+            fdet = -fdet;
+        }
+
+        int left = (int)floor(fmin(fx0, fmin(fx1, fx2)));
+        int top = (int)floor(fmin(fy0, fmin(fy1, fy2)));
+        int right = (int)ceil(fmax(fx0, fmax(fx1, fx2))) + 1;
+        int bottom = (int)ceil(fmax(fy0, fmax(fy1, fy2))) + 1;
+
+        if (left < state->left) left = state->left;
+        if (top < state->top) top = state->top;
+        if (right > state->right + 1) right = state->right + 1;
+        if (bottom > state->bottom + 1) bottom = state->bottom + 1;
+
+        bool use_perspective = textured && ps1_pgxp_is_perspective_texture_enabled()
+                            && (v0->w > 0.0f && v1->w > 0.0f && v2->w > 0.0f);
+
+        float pu0 = fu0 * fw0, pv0 = fv0 * fw0;
+        float pu1 = fu1 * fw1, pv1 = fv1 * fw1;
+        float pu2 = fu2 * fw2, pv2 = fv2 * fw2;
+
+        uint16_t flat_color = rgb15(rgb24);
+        double inv_det = 1.0 / fdet;
+
+        bool edge0 = (fy2 < fy1) || (fy2 == fy1 && fx2 > fx1);
+        bool edge1 = (fy0 < fy2) || (fy0 == fy2 && fx0 > fx2);
+        bool edge2 = (fy1 < fy0) || (fy1 == fy0 && fx1 > fx0);
+
+        for (int row = top; row < bottom; ++row) {
+            for (int col = left; col < right; ++col) {
+                double px = (double)col + 0.5;
+                double py = (double)row + 0.5;
+
+                double w0 = (double)(fx2 - fx1) * (py - (double)fy1) - (double)(fy2 - fy1) * (px - (double)fx1);
+                double w1 = (double)(fx0 - fx2) * (py - (double)fy2) - (double)(fy0 - fy2) * (px - (double)fx2);
+                double w2 = (double)(fx1 - fx0) * (py - (double)fy0) - (double)(fy1 - fy0) * (px - (double)fx0);
+
+                if ((w0 > 0.0 || (w0 >= -1e-6 && edge0))
+                    && (w1 > 0.0 || (w1 >= -1e-6 && edge1))
+                    && (w2 > 0.0 || (w2 >= -1e-6 && edge2))) {
+                    uint16_t *pixel = &video->vram[row][col];
+                    if (state->check_mask && (*pixel & 0x8000u)) continue;
+
+                    double l0 = w0 * inv_det;
+                    double l1 = w1 * inv_det;
+                    double l2 = w2 * inv_det;
+
+                    uint32_t shade = rgb24;
+                    if (colors) {
+                        shade = 0;
+                        for (unsigned shift = 0; shift < 24; shift += 8) {
+                            uint32_t ch = (uint32_t)(l0 * (double)((c0 >> shift) & 255)
+                                                   + l1 * (double)((c1 >> shift) & 255)
+                                                   + l2 * (double)((c2 >> shift) & 255) + 0.5);
+                            if (ch > 255) ch = 255;
+                            shade |= ch << shift;
+                        }
+                    }
+
+                    uint16_t front;
+                    if (!textured) {
+                        uint16_t color = colors ? rgb15(shade) : flat_color;
+                        front = semi_transparent
+                            ? blend_pixel(*pixel, color, state->blend_mode)
+                            : color;
+                    } else {
+                        unsigned u, v;
+                        if (use_perspective) {
+                            double interp_w = l0 * (double)fw0 + l1 * (double)fw1 + l2 * (double)fw2;
+                            if (interp_w > 1e-9) {
+                                double inv_w = 1.0 / interp_w;
+                                double u_p = (l0 * (double)pu0 + l1 * (double)pu1 + l2 * (double)pu2) * inv_w;
+                                double v_p = (l0 * (double)pv0 + l1 * (double)pv1 + l2 * (double)pv2) * inv_w;
+                                int iu = (int)(u_p + 0.5);
+                                int iv = (int)(v_p + 0.5);
+                                u = (iu < 0) ? 0 : (iu > 255) ? 255 : (unsigned)iu;
+                                v = (iv < 0) ? 0 : (iv > 255) ? 255 : (unsigned)iv;
+                            } else {
+                                int iu = (int)(l0 * (double)fu0 + l1 * (double)fu1 + l2 * (double)fu2 + 0.5);
+                                int iv = (int)(l0 * (double)fv0 + l1 * (double)fv1 + l2 * (double)fv2 + 0.5);
+                                u = (iu < 0) ? 0 : (iu > 255) ? 255 : (unsigned)iu;
+                                v = (iv < 0) ? 0 : (iv > 255) ? 255 : (unsigned)iv;
+                            }
+                        } else {
+                            int iu = (int)(l0 * (double)fu0 + l1 * (double)fu1 + l2 * (double)fu2 + 0.5);
+                            int iv = (int)(l0 * (double)fv0 + l1 * (double)fv1 + l2 * (double)fv2 + 0.5);
+                            u = (iu < 0) ? 0 : (iu > 255) ? 255 : (unsigned)iu;
+                            v = (iv < 0) ? 0 : (iv > 255) ? 255 : (unsigned)iv;
+                        }
+
+                        uint16_t texel;
+                        if (!ps1_video_sample_texel(video, tpage, clut, u, v, &texel)) {
+                            continue;
+                        }
+                        if (texel == 0) continue;
+
+                        front = raw_texture ? texel : modulate_texel(texel, shade);
+                        if (semi_transparent && (texel & 0x8000u)) {
+                            front = blend_pixel(*pixel, front, state->blend_mode) | 0x8000u;
+                        }
+                    }
+                    *pixel = front | (state->force_mask ? 0x8000u : 0);
+                }
+            }
+        }
+        return true;
+    }
+
     int x0 = signed11(v0->x) + signed11(state->offset_x);
     int y0 = signed11(v0->y) + signed11(state->offset_y);
     int x1 = signed11(v1->x) + signed11(state->offset_x);
@@ -286,6 +430,22 @@ static bool draw_triangle(Ps1Video *video, const Ps1DrawState *state,
         }
     }
     return true;
+}
+
+void ps1_video_set_pgxp_vertex_precision(bool enabled) {
+    ps1_pgxp_set_enabled(enabled, ps1_pgxp_is_perspective_texture_enabled());
+}
+
+void ps1_video_set_pgxp_perspective_texture(bool enabled) {
+    ps1_pgxp_set_enabled(ps1_pgxp_is_vertex_precision_enabled(), enabled);
+}
+
+bool ps1_video_get_pgxp_vertex_precision(void) {
+    return ps1_pgxp_is_vertex_precision_enabled();
+}
+
+bool ps1_video_get_pgxp_perspective_texture(void) {
+    return ps1_pgxp_is_perspective_texture_enabled();
 }
 
 bool ps1_video_draw_triangle(Ps1Video *video, const Ps1DrawState *state,

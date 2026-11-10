@@ -30,7 +30,15 @@ typedef struct Ps1Sprite {
 typedef struct Ps1Vertex {
     int x, y;
     unsigned u, v;
+    float sub_x, sub_y;
+    float z, w;
+    bool has_subpixel;
 } Ps1Vertex;
+
+void ps1_video_set_pgxp_vertex_precision(bool enabled);
+void ps1_video_set_pgxp_perspective_texture(bool enabled);
+bool ps1_video_get_pgxp_vertex_precision(void);
+bool ps1_video_get_pgxp_perspective_texture(void);
 
 /* Preserve raw PS1 BGR555 words, including the high mask/semitransparency bit. */
 bool ps1_video_upload(Ps1Video *video, int x, int y, int width, int height,

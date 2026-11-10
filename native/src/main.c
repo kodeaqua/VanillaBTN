@@ -13,6 +13,7 @@ extern int main_scene;
 #include "ps1_card.h"
 #include "ps1_input.h"
 #include "ps1_video.h"
+#include "ps1_pgxp.h"
 #include "config.h"
 #include "sdk_gpu.h"
 #include "host_display.h"
@@ -375,6 +376,8 @@ int main(int argc, char **argv) {
         else return 1;
     }
     config_load(&host.config, config_path);
+    ps1_pgxp_set_enabled(host.config.fixes.pgxp_vertex_precision,
+                         host.config.fixes.pgxp_perspective_texture);
 #ifdef VANILLABTN_BOOT_TEST
     SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "dummy");
     SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "dummy");

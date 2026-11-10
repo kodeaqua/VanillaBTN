@@ -24,9 +24,15 @@ FetchContent_Declare(SDL3
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
 FetchContent_MakeAvailable(SDL3)
 
+add_library(ps1_pgxp STATIC src/ps1_pgxp.c)
+set_target_properties(ps1_pgxp PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_include_directories(ps1_pgxp PUBLIC src)
+target_compile_options(ps1_pgxp PRIVATE /W4)
+
 add_library(ps1_video STATIC src/ps1_video.c)
 set_target_properties(ps1_video PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_include_directories(ps1_video PUBLIC src)
+target_link_libraries(ps1_video PUBLIC ps1_pgxp)
 target_compile_options(ps1_video PRIVATE /W4)
 
 add_library(game_graphics STATIC src/game_graphics.c)
@@ -43,7 +49,7 @@ target_compile_options(ps1_ot PRIVATE /W4)
 add_library(ps1_gpu STATIC src/ps1_gpu.c)
 set_target_properties(ps1_gpu PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_include_directories(ps1_gpu PUBLIC src)
-target_link_libraries(ps1_gpu PUBLIC ps1_video ps1_ot)
+target_link_libraries(ps1_gpu PUBLIC ps1_video ps1_ot ps1_pgxp)
 target_compile_options(ps1_gpu PRIVATE /W4)
 
 add_library(ps1_clock STATIC src/ps1_clock.c)
@@ -94,7 +100,7 @@ add_executable(vanillabtn WIN32 src/main.c res/vanillabtn.rc res/vanillabtn.mani
 set_target_properties(vanillabtn PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES
     OUTPUT_NAME "${VANILLABTN_EXECUTABLE_NAME}")
 target_include_directories(vanillabtn PRIVATE res)
-target_link_libraries(vanillabtn PRIVATE SDL3::SDL3 ps1_video ps1_input ps1_clock ps1_audio ps1_card app_config)
+target_link_libraries(vanillabtn PRIVATE SDL3::SDL3 ps1_video ps1_input ps1_clock ps1_audio ps1_card app_config ps1_pgxp)
 target_compile_options(vanillabtn PRIVATE /W4 $<$<CONFIG:Release>:/O2 /Oi /Gy /GF>)
 target_link_options(vanillabtn PRIVATE $<$<CONFIG:Release>:/OPT:REF /OPT:ICF>)
 
@@ -152,7 +158,7 @@ target_compile_options(ps1_gte PRIVATE /W4)
 add_library(sdk_math STATIC src/sdk_math.c)
 set_target_properties(sdk_math PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_include_directories(sdk_math PUBLIC compat src)
-target_link_libraries(sdk_math PUBLIC ps1_gte)
+target_link_libraries(sdk_math PUBLIC ps1_gte ps1_pgxp)
 target_compile_options(sdk_math PRIVATE /W4)
 add_executable(sdk_math_test tests/sdk_math_test.c)
 set_target_properties(sdk_math_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
@@ -497,10 +503,16 @@ target_link_libraries(ps1_card_test PRIVATE ps1_card SDL3::SDL3)
 target_compile_options(ps1_card_test PRIVATE /W4)
 add_test(NAME ps1_card_storage COMMAND ps1_card_test)
 
+add_executable(ps1_pgxp_test tests/ps1_pgxp_test.c)
+set_target_properties(ps1_pgxp_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_link_libraries(ps1_pgxp_test PRIVATE ps1_video ps1_gpu ps1_gte ps1_pgxp sdk_math)
+target_compile_options(ps1_pgxp_test PRIVATE /W4)
+add_test(NAME ps1_pgxp_precision COMMAND ps1_pgxp_test)
+
 # Synthetic assertions remain active when testing optimized Release libraries.
 foreach(test_target ps1_video_test ps1_sprite_test ps1_ot_test ps1_gpu_test
         ps1_gte_test ps1_input_test ps1_clock_test ps1_spu_test ps1_xa_test
-        ps1_audio_test ps1_card_test)
+        ps1_audio_test ps1_card_test ps1_pgxp_test)
     target_compile_options(${test_target} PRIVATE /UNDEBUG)
 endforeach()
 
@@ -521,7 +533,7 @@ target_link_libraries(game_main PUBLIC game_farm game_saveload game_window_frame
     game_afile game_pad sdk_card)
 
 target_link_libraries(vanillabtn PRIVATE game_main)
-target_link_libraries(sdk_gpu PUBLIC sdk_math)
+target_link_libraries(sdk_gpu PUBLIC sdk_math ps1_pgxp)
 
 # Optional integration probe uses locally imported assets and dummy SDL devices.
 # It is deliberately outside CTest: normal builds must not require game data.
@@ -532,7 +544,7 @@ target_link_libraries(original_boot_test PRIVATE Dbghelp)
 target_link_options(original_boot_test PRIVATE /MAP)
 target_compile_options(original_boot_test PRIVATE /W4)
 target_link_libraries(original_boot_test PRIVATE game_main host_display SDL3::SDL3
-    ps1_input ps1_audio ps1_card app_config)
+    ps1_input ps1_audio ps1_card app_config ps1_pgxp)
 
 add_executable(original_farm_memory_test tests/original_farm_memory_test.c)
 set_target_properties(original_farm_memory_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
