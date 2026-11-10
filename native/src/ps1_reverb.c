@@ -164,6 +164,12 @@ int16_t ps1_reverb_step(Ps1Reverb *r, unsigned c, int16_t input, int write_enabl
 void ps1_reverb_clock(Ps1Reverb *r, int32_t left, int32_t right,
                        int write_enable, int16_t output[2]) {
     if (!r || !output) return;
+    if (r->hifi_mode) {
+        /* Hi-Fi 44.1 kHz full-spectrum reverb: process both stereo channels every clock */
+        output[0] = ps1_reverb_step(r, 0, saturate(left), write_enable);
+        output[1] = ps1_reverb_step(r, 1, saturate(right), write_enable);
+        return;
+    }
     unsigned p = r->history_position;
     unsigned c = r->phase; /* left/right alternate on successive clocks */
     r->input_history[p][0] = saturate(left);
@@ -183,4 +189,13 @@ void ps1_reverb_clock(Ps1Reverb *r, int32_t left, int32_t right,
     }
     r->history_position = (p + 1) & 63;
     r->phase ^= 1;
+}
+
+void ps1_reverb_set_hifi(Ps1Reverb *r, int enabled) {
+    if (!r) return;
+    r->hifi_mode = enabled ? 1 : 0;
+}
+
+int ps1_reverb_get_hifi(const Ps1Reverb *r) {
+    return r ? r->hifi_mode : 0;
 }

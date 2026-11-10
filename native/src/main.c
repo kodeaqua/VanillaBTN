@@ -403,6 +403,7 @@ int main(int argc, char **argv) {
     bool pop_suppress = config_resolve_bool(host.config.fixes.audio_pop_suppression, host.config.preset, true);
     bool vag_cross = config_resolve_bool(host.config.fixes.vag_loop_crossfade, host.config.preset, true);
     bool float_mix = config_resolve_bool(host.config.fixes.float_audio_mixing, host.config.preset, true);
+    bool hifi_rev = config_resolve_bool(host.config.fixes.hifi_reverb, host.config.preset, true);
 
     ps1_pgxp_set_enabled(pgxp_v, pgxp_t);
     ps1_video_set_true_depth_buffer(zbuff);
@@ -423,6 +424,8 @@ int main(int argc, char **argv) {
     sdk_sound_set_vag_crossfade(vag_cross);
     sdk_sound_set_float_mixing(float_mix);
     sdk_cd_set_seamless_loop(seamless_cd);
+    sdk_sound_set_hifi_reverb(hifi_rev);
+    sdk_sound_set_equal_power_panning(hifi_rev);
 #ifdef VANILLABTN_BOOT_TEST
     SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "dummy");
     SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "dummy");
@@ -472,6 +475,8 @@ disc_ready:
     ps1_spu_set_vag_crossfade(&audio.spu, vag_cross);
     ps1_spu_set_float_mixing(&audio.spu, float_mix);
     ps1_xa_set_seamless_loop(&audio.xa, seamless_cd);
+    ps1_reverb_set_hifi(&audio.spu.reverb, hifi_rev);
+    ps1_seq_set_equal_power_panning(&audio.sequence, hifi_rev);
 #ifndef VANILLABTN_BOOT_TEST
     if (card_directory) {
         SDL_PathInfo info;

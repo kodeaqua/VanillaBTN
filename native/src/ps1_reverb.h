@@ -17,12 +17,15 @@ typedef struct {
     int16_t ram[PS1_REVERB_WORDS];
     unsigned base, cursor, history_position, phase;
     int16_t input_history[64][2], output_history[64][2];
+    int hifi_mode; /* 0 = authentic 22.05kHz alternating, 1 = hi-fi 44.1kHz stereo */
 } Ps1Reverb;
 
 int ps1_reverb_set_registers(Ps1Reverb *reverb, const uint16_t registers[32],
                             unsigned bytes, int clear);
 int ps1_reverb_set_preset(Ps1Reverb *reverb, int type, int clear);
 void ps1_reverb_set_echo(Ps1Reverb *reverb, int type, int delay, int feedback);
+void ps1_reverb_set_hifi(Ps1Reverb *reverb, int enabled);
+int  ps1_reverb_get_hifi(const Ps1Reverb *reverb);
 /* One channel per 44.1 kHz clock, each at 22.05 kHz. Writes may be disabled
  * independently of RAM reads/output, matching the SPU master reverb bit. */
 int16_t ps1_reverb_step(Ps1Reverb *reverb, unsigned channel, int16_t input, int write_enable);

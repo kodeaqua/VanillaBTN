@@ -49,6 +49,8 @@ static bool sound_polyphony_expanded = false;
 static bool sound_pop_suppression = false;
 static bool sound_vag_crossfade = false;
 static bool sound_float_mixing = false;
+static bool sound_hifi_reverb = false;
+static bool sound_equal_power_panning = false;
 static int32_t tick_mode_val;
 static int32_t reserved_voices_val = PS1_SPU_VOICES;
 static int32_t table_s_max = SDK_MAX_SEQS;
@@ -141,6 +143,7 @@ void sdk_sound_reset(void) {
     if (sound_pop_suppression) ps1_spu_set_pop_suppression(&spu, 1);
     if (sound_vag_crossfade) ps1_spu_set_vag_crossfade(&spu, 1);
     if (sound_float_mixing) ps1_spu_set_float_mixing(&spu, 1);
+    if (sound_hifi_reverb) ps1_reverb_set_hifi(&spu.reverb, 1);
     serial_vol[0] = (SdkSerialVol){0, 0};
     serial_vol[1] = (SdkSerialVol){0, 0};
     serial_attr[0] = serial_attr[1] = 0;
@@ -434,6 +437,7 @@ short SsSeqOpen(u_long *addr, int vab_id) {
     rec->data = bytes;
     rec->data_size = size;
     rec->seq = sequence;
+    rec->seq.equal_power_panning = sound_equal_power_panning;
     return (short)slot;
 }
 
@@ -447,6 +451,7 @@ void SsSeqPlay(int seq_access_num, char play_mode, short l_count) {
         return;
     }
     ps1_seq_open(&rec->seq, rec->data, rec->data_size, rec->vab_id, l_count == SSPLAY_INFINITY);
+    ps1_seq_set_equal_power_panning(&rec->seq, sound_equal_power_panning);
     ps1_seq_set_vol(&rec->seq, &spu, (unsigned)rec->vol_left, (unsigned)rec->vol_right);
     rec->playing = true;
     rec->paused = false;
@@ -697,4 +702,26 @@ void sdk_sound_set_float_mixing(bool enabled) {
 
 bool sdk_sound_get_float_mixing(void) {
     return sound_float_mixing;
+}
+
+void sdk_sound_set_hifi_reverb(bool enabled) {
+    sound_hifi_reverb = enabled;
+    ps1_reverb_set_hifi(&spu.reverb, enabled ? 1 : 0);
+}
+
+bool sdk_sound_get_hifi_reverb(void) {
+    return sound_hifi_reverb;
+}
+
+void sdk_sound_set_equal_power_panning(bool enabled) {
+    sound_equal_power_panning = enabled;
+    for (int i = 0; i < SDK_MAX_SEQS; ++i) {
+        if (seq_records[i].open) {
+            seq_records[i].seq.equal_power_panning = enabled;
+        }
+    }
+}
+
+bool sdk_sound_get_equal_power_panning(void) {
+    return sound_equal_power_panning;
 }

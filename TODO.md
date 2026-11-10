@@ -64,7 +64,11 @@ Update the relevant item after completing a task or discovering a blocker.
       - [x] Implement VAG sample loop boundary crossfading (`vag_loop_crossfade`), smoothing ADPCM predictor discontinuities across loop seam wraps.
       - [x] Implement 32-bit floating-point audio accumulator with transparent soft-knee limiter (`tanh` compression above 28000), eliminating harsh digital clipping and integer overflow while preserving linear fidelity.
       - [x] Add synthetic unit tests in `ps1_audio_overhaul_test.c` verifying 64-voice allocation, pop suppression, gapless CD-XA looping, VAG loop smoothing, and float soft limiting (47/47 CTests, 9/9 Python tests passing in Debug and Release).
-    - [ ] Milestone 10: Hi-Fi 44.1/48 kHz 32-bit float reverb DSP and full-spectrum audio output.
+    - [x] Milestone 10: Hi-Fi 44.1/48 kHz 32-bit float reverb DSP, full-spectrum audio output, and equal-power stereo panning.
+      - [x] Implement Hi-Fi 44.1 kHz reverb DSP mode (`ps1_reverb_set_hifi`, `hifi_mode`) in `ps1_reverb.c`, processing both stereo channels directly at full 44.1 kHz every clock, eliminating the 22.05 kHz decimation comb filtering, Nyquist cutoff, and aliasing artifacts.
+      - [x] Implement constant-energy equal-power stereo panning law (`ps1_seq_set_equal_power_panning`, `equal_power_panning`) in `ps1_seq.c`, using $\cos(\theta) / \sin(\theta)$ gains to preserve $1.0$ total acoustic energy across all stereo angles $[0, 127]$, eliminating the PS1 3 dB center-channel volume drop.
+      - [x] Integrate Hi-Fi reverb and equal-power panning controls into `sdk_sound.h`/`sdk_sound.c` (`sdk_sound_set_hifi_reverb`, `sdk_sound_set_equal_power_panning`, `SsSeqPlay`) and wire through `fixes.hifi_reverb` in `main.c`.
+      - [x] Add synthetic unit tests in `ps1_hifi_audio_test.c` verifying Hi-Fi full-bandwidth reverb processing, equal-power acoustic energy preservation, and SDK sound integration (48/48 CTests, 9/9 Python tests passing in Debug and Release).
     - [ ] Milestone 11: Zero fill-rate bottleneck architecture (smooth 60 FPS in heavy rain and festival scenes).
     - [ ] Milestone 12: Input Subsystem Fixes — circular analog normalization (fix diagonal running bug), HD rumble motor curve, sub-frame raw input polling, and disconnect auto-pause.
   - [ ] Phase 2: Modern Graphics & Platform Enhancements.
