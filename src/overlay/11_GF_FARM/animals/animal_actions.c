@@ -672,12 +672,20 @@ static s32 farm_pick_random_slot(u16 mode)
         large_offset = 0;
         do {
             if (mode == 0) {
+#ifdef VANILLABTN_NATIVE
+                record = (FarmRecordHead *)((u8 *)large + large_offset);
+#else
                 record = (FarmRecordHead *)(large_offset + (s32)large);
+#endif
                 if ((record->flags & mask) != 0 || record->location != wanted) {
                     goto next;
                 }
             } else {
+#ifdef VANILLABTN_NATIVE
+                record = (FarmRecordHead *)((u8 *)small + small_offset);
+#else
                 record = (FarmRecordHead *)(small_offset + (s32)small);
+#endif
                 if ((record->flags & mask) != 0 || record->location != wanted) {
                     goto next;
                 }

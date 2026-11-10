@@ -13,7 +13,11 @@
 #include "text.h"
 #include "window_frame.h"
 
+#ifdef VANILLABTN_NATIVE
+typedef s32 (*Handler)(void);
+#else
 typedef s32 (*Handler)();
+#endif
 
 /* The menu box: where it opens and closes, and its size. */
 #define MENU_BOX_X 26
@@ -64,7 +68,11 @@ int menu_run_state(void) {
     if (index == MENU_STATE_IDLE) {
         return 1;
     }
+#ifdef VANILLABTN_NATIVE
+    return menu_handlers[index]();
+#else
     return menu_handlers[index](&game_state);
+#endif
 }
 
 /* Open menu `id` with its data at `dataIndex`. Returns 0 when it starts, or when it is

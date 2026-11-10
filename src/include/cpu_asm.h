@@ -10,6 +10,14 @@
 /* Its last word: the saved main stack pointer; the scratchpad stack grows down from it. */
 #define SCRATCHPAD_STACK_TOP (SCRATCHPAD + SCRATCHPAD_SIZE - 4)
 
+#ifdef VANILLABTN_NATIVE
+#include <stdlib.h>
+
+#define SCRATCHPAD_STACK_ENTER() ((void)0)
+#define SCRATCHPAD_STACK_LEAVE() ((void)0)
+#define SAVE_RETURN_ADDRESS(where) ((void)0)
+#define pollhost() do { abort(); return 0; } while (0)
+#else
 /* Run code on the scratchpad stack, so the hottest call-heavy paths keep their
  * stack frames in fast RAM. */
 #define SCRATCHPAD_STACK_ENTER()                                        \
@@ -34,5 +42,6 @@
 
 /* The SN Systems host-debugger poll; a no-op trap under no debugger. */
 #define pollhost() __asm__ volatile("break 1024")
+#endif
 
 #endif

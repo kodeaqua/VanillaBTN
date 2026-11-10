@@ -383,8 +383,23 @@ static s32 swind_stub_1(void) {
 static void swind_stub_2(void) {
 }
 
+#ifdef VANILLABTN_NATIVE
+/* Save (0) or restore (1) the screen area behind the window. */
+static void swind_screen_area_copy(s32 restore) {
+    u_long *buffer = (u_long *)STAGING_BUFFER;
+
+    if (restore == 0) {
+        StoreImage(&swind_save_rect, buffer);
+    } else {
+        LoadImage(&swind_save_rect, buffer);
+    }
+    DrawSync(0);
+}
+#endif
+
 /* One frame of the window, dispatched on swind_state. */
 void swind_window_tick(void) {
+#ifndef VANILLABTN_NATIVE
     /* Save (0) or restore (1) the screen area behind the window. */
     void swind_screen_area_copy(s32 restore) {
         u_long *buffer = (u_long *)STAGING_BUFFER;
@@ -396,6 +411,7 @@ void swind_window_tick(void) {
         }
         DrawSync(0);
     }
+#endif
 
     switch (swind_state) {
     case SWIND_STATE_OPEN:

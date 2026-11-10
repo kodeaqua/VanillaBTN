@@ -93,6 +93,17 @@ static void estate_record18_bounce_step(void);
 static void estate_trigger_disarm(void);
 static void estate_item_enable(s32 index, s32 mode, s16 value);
 static void estate_records_kind_refresh(s16 mode);
+#ifdef VANILLABTN_NATIVE
+/* MSVC has no nested functions; this helper captures no outer locals. */
+static s32 estate_kind_value_for_flags(u16 flags, s16 valueWhenBit13, s16 valueWhenBit11, s16 valueWhenBit12)
+{
+    if (flags & 0x2000) return valueWhenBit13;
+    if (flags & 0x800) return valueWhenBit11;
+    if (flags & 0x1000) return valueWhenBit12;
+    return 0;
+}
+#endif
+
 static void estate_record_ids_update(s16 kind, s16 count, FarmEstateRecord *records);
 static void estate_items_enable_by_flags(s16 unused0);
 static void estate_record_table_enable(s16 count, FarmEstateRecord *records);
@@ -200,6 +211,15 @@ s32 estate_pending_op_start(void) {
 
 /* Clear the message queues and forget the notices seen. */
 void estate_queues_clear(void) {
+#ifdef VANILLABTN_NATIVE
+    /* Runtime pointer growth moves FarmProgress; PS1 byte offsets no longer
+     * identify these queues in the native object. Only clear the kind byte. */
+    s32 i;
+    for (i = 0; i < MESSAGE_QUEUE_LEN; ++i) {
+        game_state.progress.estate.queues[0][i].kind = -1;
+        game_state.progress.estate.queues[1][i].kind = -1;
+    }
+#else
     s32 empty = -1;
     u8 *p = (u8 *)&game_state;
     s32 i;
@@ -208,6 +228,7 @@ void estate_queues_clear(void) {
         p[0x4A36] = empty;
         p += 4;
     }
+#endif
     game_state.progress.estate.noticesSeen = 0;
 }
 
@@ -1521,6 +1542,7 @@ static KindValues estate_kind_values[4] = {
 /* Set the item of each record from its state flags, using the kind's three values. */
 static void estate_record_ids_update(s16 kind, s16 count, FarmEstateRecord *records) {
     /* Pick the item value for the record's state flags, or 0 when none is set. */
+#ifndef VANILLABTN_NATIVE
     s32 estate_kind_value_for_flags(u16 flags, s16 valueWhenBit13, s16 valueWhenBit11, s16 valueWhenBit12)
     {
         if (flags & 0x2000) return valueWhenBit13;
@@ -1528,6 +1550,7 @@ static void estate_record_ids_update(s16 kind, s16 count, FarmEstateRecord *reco
         if (flags & 0x1000) return valueWhenBit12;
         return 0;
     }
+#endif
 
     s32 i;
     s32 itemId;
@@ -2242,7 +2265,13 @@ s32 estate_code_value_4(s32 code, s32 *result, s32 *value) {
     case ITEM_GOLDEN_EGG:
         *value = 0x1E;
         break;
+#ifdef VANILLABTN_NATIVE
+    case ITEM_NORMAL_EGG:
+    case ITEM_NORMAL_EGG + 1:
+    case ITEM_NORMAL_EGG + 2:
+#else
     case ITEM_NORMAL_EGG ... ITEM_EXCELLENT_EGG:
+#endif
         *value = 0x1D;
         break;
     default:

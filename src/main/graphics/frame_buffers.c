@@ -26,8 +26,12 @@ void *ot_insert_prim(s32 index, s32 advance) {
     }
     entry = &state->ot[index];
     current = state->primCursor.tag;
+#ifdef VANILLABTN_NATIVE
+    addPrim(entry, current);
+#else
     *current = (*current & OT_TAG_MASK) | (*entry & OT_ADDRESS_MASK);
     *entry = (u_long)current & OT_ADDRESS_MASK;
+#endif
     state->primCursor.bytes += advance;
     return current;
 }

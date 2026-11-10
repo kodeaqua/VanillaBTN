@@ -49,13 +49,15 @@ def load_members(path: Path) -> list[Member]:
 
 def unpack(members: list[Member], bin_path: Path, hdt_path: Path, out: Path) -> None:
     data, directory = bin_path.read_bytes(), hdt_path.read_bytes()
+    if len(directory) != 4 * (len(members) + 1):
+        raise SystemExit(f"{hdt_path}: expected {len(members) + 1} offsets")
     offsets = struct.unpack(f"<{len(directory) // 4}I", directory)
-    if len(offsets) != len(members) + 1:
-        raise SystemExit(f"{hdt_path}: {len(offsets) - 1} members, the list has {len(members)}")
     if offsets[0] != 0 or offsets[-1] != len(data):
         raise SystemExit(f"{hdt_path}: the offsets do not span {bin_path}")
     if any(offset % SECTOR for offset in offsets):
         raise SystemExit(f"{hdt_path}: an offset is not sector-aligned")
+    if any(start > end for start, end in zip(offsets, offsets[1:])):
+        raise SystemExit(f"{hdt_path}: offsets are not in order")
     out.mkdir(parents=True, exist_ok=True)
     for member, start, end in zip(members, offsets, offsets[1:]):
         (out / member.file).write_bytes(data[start:end])

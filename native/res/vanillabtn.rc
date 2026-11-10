@@ -1,0 +1,37 @@
+#include <winresrc.h>
+
+// 1 is standard application icon ID (IDI_APPLICATION)
+1 ICON "vanillabtn.ico"
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION     0,6,0,0
+PRODUCTVERSION  0,6,0,0
+FILEFLAGSMASK   VS_FFI_FILEFLAGSMASK
+#ifdef _DEBUG
+FILEFLAGS       VS_FF_DEBUG
+#else
+FILEFLAGS       0x0L
+#endif
+FILEOS          VOS_NT_WINDOWS32
+FILETYPE        VFT_APP
+FILESUBTYPE     VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName",      "VanillaBTN Project\0"
+            VALUE "FileDescription",  "VanillaBTN - Native Windows Bringup of Harvest Moon: Back to Nature\0"
+            VALUE "FileVersion",      "0.6.0.0\0"
+            VALUE "InternalName",     "vanillabtn\0"
+            VALUE "LegalCopyright",   "Copyright (C) 2024-2026 VanillaBTN Contributors. MIT License.\0"
+            VALUE "OriginalFilename", "vanillabtn.exe\0"
+            VALUE "ProductName",      "VanillaBTN\0"
+            VALUE "ProductVersion",   "0.6.0.0\0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 1200
+    END
+END

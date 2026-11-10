@@ -403,7 +403,12 @@ void cooking_menu_tick(void)
                 text_set_spacing(1, 2);
                 item_picture_slots_unmark();
                 farm_menu_handler_last = farm_menu_handler;
+#ifdef VANILLABTN_NATIVE
+                if (farm_menu_handler_last)
+                    farm_menu_handler_last();
+#else
                 farm_menu_handler_last();
+#endif
                 text_set_palette(saved_mode);
                 text_set_spacing(0, 2);
             }

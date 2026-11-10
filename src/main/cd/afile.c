@@ -8,7 +8,9 @@
 #include "types.h"
 #include "afile.h"
 #include "cd_audio.h"
+#ifndef VANILLABTN_NATIVE
 #include "farm_state.h"
+#endif
 
 /* Read the whole CD file `name` into `destination`, waiting until the read has drained. */
 static s32 cd_read_file(char *name, u_long *destination) {
@@ -155,16 +157,40 @@ s32 afile_init(void) {
     char *hdtName;
     char *binName;
     s32 i;
+#ifdef VANILLABTN_NATIVE
+    /* Original code borrows the farm block as sector scratch. Keep the native
+     * platform read independent of a host-sized game-state layout. */
+    u_long native_hdt[DISC_SECTOR_SIZE / sizeof(u_long)];
+#endif
 
     hdtName = "\\A_FILE.HDT;1";
     binName = "\\A_FILE.BIN;1";
+#ifdef VANILLABTN_NATIVE
+    src = native_hdt;
+    if (!CdSearchFile(&file, hdtName) || file.size != 33 * sizeof(u_long)) {
+        return -1;
+    }
+#else
     src = (u_long *)&game_state;
+#endif
     cd_read_file(hdtName, src);
     for (i = 0; i <= 32; i++) {
+#ifdef VANILLABTN_NATIVE
+        if ((src[i] & DISC_SECTOR_MASK) || (i == 0 && src[i] != 0)
+            || (i > 0 && src[i] < src[i - 1])) {
+            return -1;
+        }
+#endif
         afile_members[i].pos = src[i];
     }
+#ifdef VANILLABTN_NATIVE
+    if (!CdSearchFile(&file, binName) || file.size != src[32]) {
+        return -1;
+    }
+#else
     while (CdSearchFile(&file, binName) == 0) {
     }
+#endif
     afile_base_sector = afile_sector = CdPosToInt(&file.pos);
     return 0;
 }

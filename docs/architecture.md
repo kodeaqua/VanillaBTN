@@ -1,8 +1,11 @@
 # Architecture
 
-VanillaBTN's current codebase is the matching PS1 reference build. There is no
-native Windows runtime yet. See [porting.md](porting.md) for the intended port
-direction; the layout below describes what exists today.
+VanillaBTN has a matching PS1 reference build and an incomplete native Windows
+port that runs the original startup and scene dispatcher. SDL supplies the
+window, device input, presentation and audio output; SDK bridges supply the
+platform services. Imported MIPS overlay bytes are data, never executed. See [porting.md](porting.md) for the port direction and
+[platform-boundaries.md](platform-boundaries.md) for the PS1 service map.
+The layout below describes the PS1 source.
 
 ## PS1 runtime
 

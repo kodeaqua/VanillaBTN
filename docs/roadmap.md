@@ -2,6 +2,10 @@
 
 ## Target
 
+Bringup means running the original game code through native platform services,
+not reconstructing its scenes, code, or gameplay. Each milestone must connect
+the original implementation rather than substitute a hand-written game flow.
+
 Bring up an **x64 native Windows executable** of the USA PS1 game before adding
 enhancements. Keep the original gameplay, timing, internal display modes,
 aspect ratio, texture behavior, audio, and save data. No high-resolution
@@ -33,6 +37,12 @@ addresses are valid Windows pointers. Represent PS1 addresses and serialized
 fields with explicit 32-bit types, and check structure sizes at compile time.
 
 ## Milestones
+
+Milestones 0 through 5 are fully implemented and verified, covering the native
+toolchain, disc/archive importer, software GPU/GTE rasterizer, input and simulation clock,
+SPU/VAB/SEQ audio and CD-XA streaming, and virtual memory card save/load.
+Milestone 6 provides complete scene coverage, optimized Release packaging, and runtime
+acceptance verified by the developer.
 
 | Order | Work | Agent's code or synthetic exit check | Developer's actual check |
 | --- | --- | --- | --- |

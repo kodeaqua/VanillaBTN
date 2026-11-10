@@ -1,5 +1,8 @@
 /* The greenhouse: a 7 x 7 grid of cells, each drawn as a quad of the farm's quad table. */
 #include "types.h"
+#ifdef VANILLABTN_NATIVE
+#include "sdk_memory.h"
+#endif
 #include "farm_probe.h"
 #include "farm_state.h"
 #include "field.h"
@@ -64,7 +67,12 @@ s32 greenhouse_probe_sweep(s16 restart) {
         do {
             farm_settle_on_ground(&greenhouse_probe_point, 0xC000);
             hit = ground_hit_primitive();
-            if (hit->header & FARM_QUAD_CELL_BIT) {
+#ifdef VANILLABTN_NATIVE
+            if (*(u32 *)sdk_memory_field(hit, 0, 0, sizeof(u32)) & FARM_QUAD_CELL_BIT)
+#else
+            if (hit->header & FARM_QUAD_CELL_BIT)
+#endif
+            {
                 grid->quads[greenhouse_row][greenhouse_column] = hit;
             }
             greenhouse_column++;

@@ -396,7 +396,11 @@ s32 item_villager_reaction(s16 id, s16 slot) {
     if (flags & ITEM_FLAG_TOOL) {
         return -2;
     }
+#ifdef VANILLABTN_NATIVE
+    codes = (s32 *)((u8 *)game_state.pictureCodes + picture * 16) + (slot / 10);
+#else
     codes = (s32 *)(picture * 16 + (s32)game_state.pictureCodes) + (slot / 10);
+#endif
     reaction = *codes >> ((slot % 10) * 3);
     reaction &= 7;
     if (flags & 0x180) {

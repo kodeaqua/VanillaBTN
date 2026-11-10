@@ -3,6 +3,14 @@
 
 /* GTE (geometry engine) command macros. Each command is its raw coprocessor encoding. */
 
+#ifdef VANILLABTN_NATIVE
+#include <gtemac.h>
+#define gte_rtpt_b()  gte_rtpt()
+#define gte_nclip_b() gte_nclip()
+#define gte_avsz3_b() gte_avsz3()
+#define gte_avsz4_b() gte_avsz4()
+#define gte_sqr0_b()  gte_sqr0()
+#else
 #include <inline_c.h>
 
 #define SDK_GTE_COMMAND(word) __asm__ volatile("nop;" "nop;" ".word " #word)
@@ -37,5 +45,6 @@
 #define gte_rtv0()  SDK_GTE_COMMAND(0x4A480012)
 #undef gte_rtir
 #define gte_rtir()  SDK_GTE_COMMAND(0x4A49E012)
+#endif
 
 #endif

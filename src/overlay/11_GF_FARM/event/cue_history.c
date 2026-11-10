@@ -1418,7 +1418,11 @@ void cue_history_reset(u8 *base)
             if (source == 0)
                 item->scriptOffset = 0;
             else
+#ifdef VANILLABTN_NATIVE
+                item->scriptOffset = (s32)((u8 *)source - base);
+#else
                 item->scriptOffset = (s32)source - (s32)base;
+#endif
             if (source != 0)
             {
                 count = 0;

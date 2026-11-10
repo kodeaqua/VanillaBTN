@@ -7,8 +7,12 @@
 
 #include "types.h"
 
+#ifdef VANILLABTN_NATIVE
+#include <stddef.h>
+#else
 /* The PsyQ stddef.h has no offsetof. */
 #define offsetof(type, member) ((u32) & ((type *)0)->member)
+#endif
 
 typedef struct TextMessages {
     u16 prompt_yes_no[9];
@@ -394,6 +398,11 @@ typedef struct TextBankStarts {
 } TextBankStarts;
 extern TextBankStarts text_bank_starts;
 
+#ifdef VANILLABTN_NATIVE
+#define LOCALIZED(message) ((u16 *)((u8 *)(message) + text_bank_starts.messages))
+#define NAME_OFFSET(name) ((ptrdiff_t)((u8 *)(name) - (u8 *)&text_bank.names))
+#define LOCALIZED_NAME(name) ((u16 *)((u8 *)&text_bank + text_bank_starts.names + NAME_OFFSET(name)))
+#else
 /* A message, at its offset from the start of the messages. */
 #define LOCALIZED(message) ((u16 *)(text_bank_starts.messages + (u32)(message)))
 
@@ -401,6 +410,7 @@ extern TextBankStarts text_bank_starts;
 #define NAME_OFFSET(name) ((s32)(name) - (s32)offsetof(TextBank, names))
 
 #define LOCALIZED_NAME(name) ((u16 *)(text_bank_starts.names + NAME_OFFSET(name)))
+#endif
 
 /* The text `offset` bytes from the bank's start, for the tables that hold the offset
  * itself (the recipes' dish names, the helpers' and chickens' names, the ledger's grades). */

@@ -48,6 +48,20 @@ static s32 event_command_eval(s32 command, s32 value);
 static s32 villager_not_in_area(s32 idx, s32 val);
 static s32 villager_affection_grade(s32 slot, u32 mode);
 static s32 event_time_check(s32 command);
+#ifdef VANILLABTN_NATIVE
+/* MSVC has no nested functions; this helper captures no outer locals. */
+static s32 winter_23_single_check(s32 which)
+{
+    if (game_state.progress.clock.date.season == SEASON_WINTER &&
+        game_state.progress.clock.date.day == 23 &&
+        event_flag_get(EVENT_FLAG_SINGLE) == 1 &&
+        event_flag_get(EVENT_FLAG_KAREN_RICK_MARRIED + which) == 0) {
+        return 1;
+    }
+    return 0;
+}
+#endif
+
 static s32 event_condition_test(s32 id);
 static s32 hour_outside_range(s32 start, s32 stop);
 static s32 event_day_item_check(s32 item);
@@ -574,6 +588,7 @@ static s32 event_time_check(s32 command) {
 static s32 event_condition_test(s32 id)
 {
     /* Winter 23rd, while the player is single and the marriage flag `which` is not set. */
+#ifndef VANILLABTN_NATIVE
     s32 winter_23_single_check(s32 which)
     {
         if (game_state.progress.clock.date.season == SEASON_WINTER &&
@@ -584,6 +599,7 @@ static s32 event_condition_test(s32 id)
         }
         return 0;
     }
+#endif
 
     s32 result;
     s32 limit;

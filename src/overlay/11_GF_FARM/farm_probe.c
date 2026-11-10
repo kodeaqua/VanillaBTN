@@ -6,6 +6,9 @@
 #include <libgte.h>
 #include <libgpu.h>
 #include "types.h"
+#ifdef VANILLABTN_NATIVE
+#include "sdk_memory.h"
+#endif
 #include "actor.h"
 #include "animal_actions.h"
 #include "chicken.h"
@@ -917,7 +920,11 @@ s32 farm_record_find_key(ZonePoint *point, LimitPair *place) {
 
 /* The top bit of the first byte of the ground hit primitive. The caller passes a primitive. */
 unsigned int farm_status_upper_bits(void) {
+#ifdef VANILLABTN_NATIVE
+    return *(u8 *)sdk_memory_field(ground_hit_primitive(), 0, 0, sizeof(u8)) >> 7;
+#else
     return *(u8 *)ground_hit_primitive() >> 7;
+#endif
 }
 
 /* The kind of the ground hit primitive's flags: 2 for 0x4, 3 for 0x40, 1 for 0x2, else 0;
@@ -1053,9 +1060,27 @@ static s32 farm_tile_is_special(FarmTileQuery *query) {
         record = &game_state.fieldTiles[row].rows[column];
     }
     switch (record->value) {
+#ifdef VANILLABTN_NATIVE
+    case ITEM_BIG_STONE:
+    case ITEM_BIG_STONE + 1:
+    case ITEM_BIG_STONE + 2:
+#else
     case ITEM_BIG_STONE ... ITEM_STUMP:
+#endif
     case ITEM_LUMBER:
+#ifdef VANILLABTN_NATIVE
+    case FIELD_TILE_BIG_STONE_1:
+    case FIELD_TILE_BIG_STONE_1 + 1:
+    case FIELD_TILE_BIG_STONE_1 + 2:
+    case FIELD_TILE_BIG_STONE_1 + 3:
+    case FIELD_TILE_BIG_STONE_1 + 4:
+    case FIELD_TILE_BIG_STONE_1 + 5:
+    case FIELD_TILE_BIG_STONE_1 + 6:
+    case FIELD_TILE_BIG_STONE_1 + 7:
+    case FIELD_TILE_BIG_STONE_1 + 8:
+#else
     case FIELD_TILE_BIG_STONE_1 ... FIELD_TILE_STUMP_3:
+#endif
         return 1;
     }
     return 0;

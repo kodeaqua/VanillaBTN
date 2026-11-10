@@ -16,7 +16,13 @@ typedef struct BankImage {
     u32 sizeFlags;      /* data bytes (low 24 bits) | flags << 24 */
     u16 x, y;
     u16 w, h;           /* w in halfwords */
+#ifdef VANILLABTN_NATIVE
+    /* A one-byte trailing placeholder is required for arrays of BankImage on
+     * MSVC. BANK_NEXT uses the explicit 12-byte file header, not sizeof. */
+    u8 data[1];
+#else
     u8 data[0];
+#endif
 } BankImage;
 
 /* An image bank: a header, then `count` BankImages. The images differ in
@@ -25,7 +31,13 @@ typedef struct ImageBank {
     u8 type;            /* 0xD */
     u8 pad01;
     u16 count;
+#ifdef VANILLABTN_NATIVE
+    /* MSVC rejects zero-length arrays whose element also has a trailing array.
+     * Only the first image's offset is used; never sizeof(ImageBank) on disk. */
+    BankImage images[1];
+#else
     BankImage images[0];
+#endif
 } ImageBank;
 
 /* The image after `image`, of `size` data bytes: the data padded to a word, then the

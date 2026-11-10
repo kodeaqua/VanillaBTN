@@ -263,6 +263,15 @@ void scene_daily_announce(void)
  * BARN_SCENE_BASE) move with their upgrade level and the season. The mine entrances
  * (MINE_43_SCENE_BASE, MINE_37_SCENE_BASE) override them while the layer below is not
  * open at that entrance, or while the player is returning from it. */
+#ifdef VANILLABTN_NATIVE
+#include "sdk_memory.h"
+/* The first scene query reads physical RAM zero before this runtime alias is
+ * installed. Preserve that PS1 read without changing the stored null sentinel. */
+#define SCENE_PRIOR_DATA (farm_area.mode.data ? farm_area.mode.data : \
+    (FarmModeScript *)sdk_memory_resolve(0, sizeof(FarmModeScript)))
+#else
+#define SCENE_PRIOR_DATA farm_area.mode.data
+#endif
 s32 scene_resolve_selection(s32 selection)
 {
     s32 offset;
@@ -288,9 +297,9 @@ s32 scene_resolve_selection(s32 selection)
     {
         selection = game_state.progress.estate.barnLevel * 4 + game_state.progress.clock.date.season + BARN_SCENE_BASE;
     }
-    if (farm_area.mode.data->head.place.value == PLACE_MINE_43)
+    if (SCENE_PRIOR_DATA->head.place.value == PLACE_MINE_43)
     {
-        if (event_flag_get(EVENT_FLAG_MINE_NEXT_LAYER) == 0 && farm_area.mode.data->head.place.location == PLACE_44)
+        if (event_flag_get(EVENT_FLAG_MINE_NEXT_LAYER) == 0 && SCENE_PRIOR_DATA->head.place.location == PLACE_44)
         {
             selection = game_state.progress.clock.date.season + MINE_43_SCENE_BASE;
         }
@@ -299,9 +308,9 @@ s32 scene_resolve_selection(s32 selection)
             selection = game_state.progress.clock.date.season + MINE_43_SCENE_BASE;
         }
     }
-    if (farm_area.mode.data->head.place.value == PLACE_MINE)
+    if (SCENE_PRIOR_DATA->head.place.value == PLACE_MINE)
     {
-        if (event_flag_get(EVENT_FLAG_MINE_NEXT_LAYER) == 0 && farm_area.mode.data->head.place.location == PLACE_38)
+        if (event_flag_get(EVENT_FLAG_MINE_NEXT_LAYER) == 0 && SCENE_PRIOR_DATA->head.place.location == PLACE_38)
         {
             selection = game_state.progress.clock.date.season + MINE_37_SCENE_BASE;
         }
@@ -312,6 +321,8 @@ s32 scene_resolve_selection(s32 selection)
     }
     return clock_remap_selection((s16)selection);
 }
+
+#undef SCENE_PRIOR_DATA
 
 /* Enter the picked scene: place the player at the scene's entry (when `enter` is set;
  * the mine return points override it), record the scene as entered or, when the entry
@@ -856,11 +867,33 @@ static void scene_assign_slots(void)
 /* Pass the hidden flag around the three slot entries. The first stage waits until
  * the item is shipped; then each slot counts up to its limit and hands the flag on.
  * The last stage clears the shipped flag when it completes. */
+#ifdef VANILLABTN_NATIVE
+/* MSVC helper: all state comes from explicit parameters and file globals. */
+static s32 scene_slot_handoff_step(FarmSceneModel * owner, FarmSceneModel * other, s32 nextStage)
+{
+    FarmMorph *counter;
+
+    owner->morph->step++;
+    counter = owner->morph;
+    if (counter->step < counter->steps)
+    {
+        return 0;
+    }
+    other->morph->step = 0;
+    counter->step = 0;
+    owner->flags |= SCENE_ENTRY_HIDDEN;
+    other->flags &= ~SCENE_ENTRY_HIDDEN;
+    scene_flag_stage = nextStage;
+    return 1;
+}
+#endif
+
 static void scene_flag_stage_tick(void)
 {
     /* Count one step on `owner`'s counter; when it reaches its limit, reset both
      * counters, hide `owner`, show `other`, record `nextStage` as the next stage and
      * return 1. */
+#ifndef VANILLABTN_NATIVE
     s32 scene_slot_handoff_step(FarmSceneModel * owner, FarmSceneModel * other, s32 nextStage)
     {
         FarmMorph *counter;
@@ -878,6 +911,7 @@ static void scene_flag_stage_tick(void)
         scene_flag_stage = nextStage;
         return 1;
     }
+#endif
 
     FarmSceneModel *slot0 = scene_slot_entries[0];
     u32 stage;
@@ -1238,6 +1272,15 @@ static void scene_interp_step(void)
     }
 }
 
+#ifdef VANILLABTN_NATIVE
+/* Absent scene pointers still address PS1 physical RAM zero. Its serialized
+ * flags live at 0x28, whereas host Model pointers move the native field. */
+#define SCENE_MARKED_FLAGS(index) (*(u16 *)sdk_memory_field( \
+    scene_marked_entries[index], offsetof(FarmSceneModel, flags), 0x28, sizeof(u16)))
+#else
+#define SCENE_MARKED_FLAGS(index) (scene_marked_entries[index]->flags)
+#endif
+
 /* Find the marked entries. The low bit of an entry's flags says which of the two it
  * is; stop at the first slot 1 entry. Show the first and hide the second. */
 static void scene_slot_flag_move(void)
@@ -1262,8 +1305,8 @@ static void scene_slot_flag_move(void)
             }
         }
     }
-    scene_marked_entries[0]->flags &= ~SCENE_ENTRY_HIDDEN;
-    scene_marked_entries[1]->flags |= SCENE_ENTRY_HIDDEN;
+    SCENE_MARKED_FLAGS(0) &= ~SCENE_ENTRY_HIDDEN;
+    SCENE_MARKED_FLAGS(1) |= SCENE_ENTRY_HIDDEN;
 }
 
 /* Show the marked entry for the spouse's place: entry 1 when the spouse is at home,
@@ -1274,13 +1317,15 @@ static void scene_spouse_marker_update(void)
     {
         if (event_flag_get(EVENT_FLAG_SPOUSE_AT_HOME) == 1)
         {
-            scene_marked_entries[1]->flags &= ~SCENE_ENTRY_HIDDEN;
-            scene_marked_entries[0]->flags |= SCENE_ENTRY_HIDDEN;
+            SCENE_MARKED_FLAGS(1) &= ~SCENE_ENTRY_HIDDEN;
+            SCENE_MARKED_FLAGS(0) |= SCENE_ENTRY_HIDDEN;
         }
         else
         {
-            scene_marked_entries[0]->flags &= ~SCENE_ENTRY_HIDDEN;
-            scene_marked_entries[1]->flags |= SCENE_ENTRY_HIDDEN;
+            SCENE_MARKED_FLAGS(0) &= ~SCENE_ENTRY_HIDDEN;
+            SCENE_MARKED_FLAGS(1) |= SCENE_ENTRY_HIDDEN;
         }
     }
 }
+
+#undef SCENE_MARKED_FLAGS

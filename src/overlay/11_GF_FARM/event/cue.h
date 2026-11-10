@@ -51,11 +51,26 @@ enum CueStep {
     CUE_STEP_STOP = -1,
 };
 
+/* Preserve one body for the reference compiler's named variadic arguments and
+ * the native compiler's standard spelling. Parentheses carry initializer
+ * commas through the shared body macro without changing generated game code. */
+#ifdef VANILLABTN_NATIVE
+#define FARM_CUE_VALUES(...) __VA_ARGS__
+#define FARM_CUE_RUNNER(name, ...) FARM_CUE_RUNNER_BODY(name, (__VA_ARGS__))
+#define FARM_CUE_RUNNER_NO_TIMER(name, ...) FARM_CUE_RUNNER_NO_TIMER_BODY(name, (__VA_ARGS__))
+#define FARM_CUE_RUNNER_SHARED_STORE(name, ...) FARM_CUE_RUNNER_SHARED_STORE_BODY(name, (__VA_ARGS__))
+#else
+#define FARM_CUE_VALUES(init...) init
+#define FARM_CUE_RUNNER(name, init...) FARM_CUE_RUNNER_BODY(name, (init))
+#define FARM_CUE_RUNNER_NO_TIMER(name, init...) FARM_CUE_RUNNER_NO_TIMER_BODY(name, (init))
+#define FARM_CUE_RUNNER_SHARED_STORE(name, init...) FARM_CUE_RUNNER_SHARED_STORE_BODY(name, (init))
+#endif
+
 /* A cue runner: steps an actor through a cue table. Step 0 starts the table, positive
  * steps play it, and -1 stops it and reports the cue as finished. */
-#define FARM_CUE_RUNNER(name, init...)                                      \
+#define FARM_CUE_RUNNER_BODY(name, init)                                    \
     s32 name(FarmActor *self) {                                             \
-        static FarmCueStep steps[] = { init };                              \
+        static FarmCueStep steps[] = { FARM_CUE_VALUES init };              \
         s32 finished = 0;                                                   \
         s16 step = self->taskId;                                            \
                                                                             \
@@ -80,9 +95,9 @@ enum CueStep {
     }
 
 /* FARM_CUE_RUNNER without the interruptTime write when the cue finishes. */
-#define FARM_CUE_RUNNER_NO_TIMER(name, init...)                             \
+#define FARM_CUE_RUNNER_NO_TIMER_BODY(name, init)                           \
     s32 name(FarmActor *self) {                                             \
-        static FarmCueStep steps[] = { init };                              \
+        static FarmCueStep steps[] = { FARM_CUE_VALUES init };              \
         s32 finished = 0;                                                   \
         s16 step = self->taskId;                                            \
                                                                             \
@@ -106,9 +121,9 @@ enum CueStep {
     }
 
 /* A cue runner variant: its start path does not set the cue-running flag. */
-#define FARM_CUE_RUNNER_SHARED_STORE(name, init...)                         \
+#define FARM_CUE_RUNNER_SHARED_STORE_BODY(name, init)                       \
     s32 name(FarmActor *self) {                                             \
-        static FarmCueStep steps[] = { init };                              \
+        static FarmCueStep steps[] = { FARM_CUE_VALUES init };              \
         s32 finished = 0;                                                   \
         s16 step = self->taskId;                                            \
                                                                             \

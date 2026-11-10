@@ -5,6 +5,9 @@
 #include <memory.h>
 #include <libgte.h>
 #include "types.h"
+#ifdef VANILLABTN_NATIVE
+#include "sdk_memory.h"
+#endif
 #include "actor.h"
 #include "anim.h"
 #include "animal_actions.h"
@@ -103,7 +106,13 @@ typedef s32 (*CellFromWorldToolClear)(s32 *, u16 *, u16 *);
 typedef s32 (*WorldToCellHandler)(VECTOR *, s16 *, s16 *);
 
 /* Hop steps indexed [row][facing]: row 0 while the jump crouches, row 1 otherwise. */
+#ifdef VANILLABTN_NATIVE
+/* PS1 row 1 starts after both move_steps_large and move_steps_riding, at
+ * hop_steps. Native linkers need not keep those separate arrays adjacent. */
+#define HOPS ((FarmHopStep *const[2]){(FarmHopStep *)move_steps_large, hop_steps})
+#else
 #define HOPS ((FarmHopStep(*)[12])move_steps_large)
+#endif
 
 /* Tool experience: the base gain, and the gain of a committed move. */
 #define TOOL_EXP_BASE 40
@@ -383,6 +392,16 @@ s16 facing_reach[8][2] = {
     {0, 0},
     {0, 0},
 };
+
+#ifdef VANILLABTN_NATIVE
+/* Probe kind is a PS1 offset across adjacent globals. Resolve the actual rows
+ * explicitly on the host: 0x18 is the 128-unit reach, 0x38 the zero row. */
+static s16 *player_probe_offset(s16 kind, u16 facing) {
+    if (kind == 0x18) return move_steps_large + 8 + facing * 2;
+    if (kind == 0x38) return facing_reach[4 + facing];
+    return move_steps_small + kind + facing * 2;
+}
+#endif
 
 static FarmVelocity facing_velocities[4] = {{0, -180224}, {-180224, 0}, {0, 180224}, {180224, 0}};
 
@@ -739,7 +758,11 @@ static void player_build_result(FarmPlayer *player)
     values.vz += table[1];
     farm_settle_on_ground(&values, 0);
     status_word = &player_status_word;
+#ifdef VANILLABTN_NATIVE
+    result_value = *(s32 *)sdk_memory_field(ground_hit_primitive(), 0, 0, sizeof(s32));
+#else
     result_value = *(s32 *)ground_hit_primitive();
+#endif
     *status_word = result_value;
     if (!(result_value & 0xFFFF0000))
     {
@@ -3403,7 +3426,11 @@ static s32 player_confirm_action(FarmPlayer *player, s32 buttons)
     {
         return 0;
     }
+#ifdef VANILLABTN_NATIVE
+    if (player_advance_state(player))
+#else
     if (((s32 (*)())player_advance_state)())
+#endif
     {
         return 1;
     }
@@ -4377,7 +4404,11 @@ void player_update_position(void)
     {
         player_slide_on_bump();
     }
+#ifdef VANILLABTN_NATIVE
+    player_status_word = *(u32 *)sdk_memory_field(ground_hit_primitive(), 0, 0, sizeof(u32));
+#else
     player_status_word = *(u32 *)ground_hit_primitive();
+#endif
     pos = player->position;
     if (player->stateFlags & PLAYER_FLAG_AIRBORNE)
     {
@@ -4592,7 +4623,11 @@ static s16 player_probe_target(FarmPlayer *player, VECTOR *pos, s32 kind_arg)
     found = 0;
     target = 0;
     probe.vy = pos->vy;
+#ifdef VANILLABTN_NATIVE
+    offset = player_probe_offset(kind, player->facing38);
+#else
     offset = &move_steps_small[kind + player->facing38 * 2];
+#endif
     probe.vx = pos->vx + offset[0];
     probe.vz = pos->vz + offset[1];
     player->stateFlags &= ~PLAYER_FLAG_BIT18;
@@ -6285,7 +6320,11 @@ s32 player_init_toys(FarmPlayer *player)
     file_offset = ANIM_PACK_START(entry, 0);
     do
     {
+#ifdef VANILLABTN_NATIVE
+        anim_bind_file(&player->toys[i].sprite, file_base + file_offset);
+#else
         anim_bind_file(&player->toys[i].sprite, (void *)(file_offset + (s32)file_base));
+#endif
         i++;
     } while (i < PLAYER_TOYS);
 
