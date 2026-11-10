@@ -11,12 +11,13 @@ static unsigned big24(const uint8_t *p) {
 }
 
 static bool byte(Ps1Seq *seq, unsigned *value) {
-    if (seq->cursor >= seq->size) return false;
+    if (seq == NULL || value == NULL || seq->data == NULL || seq->cursor >= seq->size) return false;
     *value = seq->data[seq->cursor++];
     return true;
 }
 
 static bool delta(Ps1Seq *seq) {
+    if (seq == NULL || seq->data == NULL) return false;
     uint32_t ticks = 0;
     for (unsigned i = 0; i < 4; ++i) {
         unsigned part;
@@ -57,6 +58,7 @@ bool ps1_seq_open(Ps1Seq *seq, const uint8_t *data, size_t size, Ps1VabId bank, 
 }
 
 static void note_off(Ps1Seq *seq, Ps1Spu *spu, unsigned channel, unsigned note) {
+    if (seq == NULL || spu == NULL || channel >= 16) return;
     for (int v = 0; v < 24; ++v) {
         if (spu->voices[v].vab_id == seq->bank
             && seq->voices[v].channel == channel && seq->voices[v].note == note) {
@@ -66,16 +68,30 @@ static void note_off(Ps1Seq *seq, Ps1Spu *spu, unsigned channel, unsigned note) 
 }
 
 static void sequence_key_off_all(Ps1Seq *seq, Ps1Spu *spu) {
+    if (seq == NULL || spu == NULL) return;
     for (unsigned v = 0; v < 24; ++v)
         if (spu->voices[v].vab_id == seq->bank) ps1_spu_key_off(spu, (int)v);
 }
 
 static void voice_volume(Ps1Seq *seq, Ps1Spu *spu, unsigned voice) {
-    Ps1SeqVoice *record = &seq->voices[voice];
-    Ps1SeqChannel *channel = &seq->channels[record->channel];
+    if (seq == NULL || spu == NULL || voice >= 24) return;
+    if (seq->bank < 0 || seq->bank >= PS1_SPU_VAB_SLOTS) return;
     Ps1VabSlot *bank = &spu->vabs[seq->bank];
-    const uint8_t *program = bank->header + 32u + record->program * 16u;
-    const uint8_t *tone = bank->header + bank->program_tone_offsets[record->program] + record->tone * 32u;
+    if (!bank->loaded || bank->header == NULL) return;
+
+    Ps1SeqVoice *record = &seq->voices[voice];
+    if (record->channel >= 16 || record->program >= 128) return;
+    if (record->tone >= bank->program_tone_counts[record->program]) return;
+
+    uint32_t prog_off = 32u + record->program * 16u;
+    if (prog_off + 16u > bank->header_size) return;
+
+    uint32_t tone_off = bank->program_tone_offsets[record->program] + record->tone * 32u;
+    if (tone_off + 32u > bank->header_size) return;
+
+    Ps1SeqChannel *channel = &seq->channels[record->channel];
+    const uint8_t *program = bank->header + prog_off;
+    const uint8_t *tone = bank->header + tone_off;
     unsigned volume = record->velocity * channel->volume * channel->expression / (127u * 127u);
     int pan = (int)channel->pan + program[4] + tone[3] - 128;
     if (pan < 0) pan = 0;
@@ -106,11 +122,19 @@ void ps1_seq_set_vol(Ps1Seq *seq, Ps1Spu *spu, unsigned voll, unsigned volr) {
 }
 
 static void note_on(Ps1Seq *seq, Ps1Spu *spu, unsigned channel, unsigned note, unsigned velocity) {
+    if (seq == NULL || spu == NULL || channel >= 16) return;
+    if (seq->bank < 0 || seq->bank >= PS1_SPU_VAB_SLOTS) return;
     Ps1VabSlot *bank = &spu->vabs[seq->bank];
+    if (!bank->loaded || bank->header == NULL) return;
+
     unsigned program = seq->channels[channel].program;
+    if (program >= 128) return;
+
     ++seq->note_events;
     for (unsigned t = 0; t < bank->program_tone_counts[program]; ++t) {
-        const uint8_t *tone = bank->header + bank->program_tone_offsets[program] + t * 32u;
+        uint32_t tone_off = bank->program_tone_offsets[program] + t * 32u;
+        if (tone_off + 32u > bank->header_size) continue;
+        const uint8_t *tone = bank->header + tone_off;
         unsigned voice = 24;
         if (note < tone[6] || note > tone[7]) continue;
         for (unsigned v = 0; v < 24; ++v) {
@@ -126,6 +150,7 @@ static void note_on(Ps1Seq *seq, Ps1Spu *spu, unsigned channel, unsigned note, u
 }
 
 static bool event(Ps1Seq *seq, Ps1Spu *spu) {
+    if (seq == NULL || spu == NULL) return false;
     unsigned status, a, b, channel;
     if (!byte(seq, &status)) return false;
     if (status < 128) {

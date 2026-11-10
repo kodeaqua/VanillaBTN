@@ -80,6 +80,9 @@ int main(void) {
     test_transfers();
     test_original_loader();
     test_environments();
+    assert(ResetGraph(0) == 0);
+    assert(ResetGraph(1) == 0);
+    GsInitGraph(0, 0, 0, 0, 0);
     sdk_gpu_bind(NULL);
     return 0;
 }

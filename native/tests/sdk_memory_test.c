@@ -31,5 +31,7 @@ int main(void) {
     CHECK(sdk_memory_field((void *)(uintptr_t)UINT32_MAX, 0, 1, 2) == NULL);
     struct { void *pointer; unsigned value; } runtime = {0};
     CHECK(sdk_memory_field(&runtime, sizeof(void *), 4, sizeof(unsigned)) == &runtime.value);
+    SetMem(2);
+    SetMem(8);
     return 0;
 }

@@ -62,9 +62,9 @@ void ps1_audio_tick(Ps1Audio *audio, int speed_mode) {
     ps1_audio_mix(audio, buffer, FRAMES_PER_GAME_TICK);
     if (!audio->has_output || !audio->stream) return;
 
-    /* Check if audio queue is getting too full to avoid latency build-up */
+    /* Check if audio queue is getting too full or has errored to avoid latency build-up */
     int queued = SDL_GetAudioStreamQueued(audio->stream);
-    if (queued >= MAX_QUEUED_BYTES) return;
+    if (queued < 0 || queued >= MAX_QUEUED_BYTES) return;
 
     SDL_PutAudioStreamData(audio->stream, buffer, (int)sizeof(buffer));
 }

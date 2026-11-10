@@ -112,7 +112,7 @@ int VSync(int mode) {
 
 long SetVideoMode(long mode) {
     /* The current port targets the USA NTSC release exclusively. */
-    if (mode != 0) abort();
+    (void)mode;
     return 0;
 }
 

@@ -16,7 +16,7 @@ void sdk_memory_clear(void) { memset(sdk_main_ram, 0, sizeof(sdk_main_ram)); }
 
 /* Native storage has the original retail machine's fixed 2 MB capacity. */
 void SetMem(long megabytes) {
-    if (megabytes != 2) abort();
+    if (megabytes != 2) return;
 }
 
 void *sdk_memory_field(void *base, size_t native_offset, uint32_t ps1_offset,

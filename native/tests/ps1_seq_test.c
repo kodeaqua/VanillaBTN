@@ -187,5 +187,13 @@ int main(void) {
     Ps1Seq empty_seq = {0};
     ps1_seq_mix(&empty_seq, &spu, pcm, 1);
     ps1_seq_mix(NULL, NULL, NULL, 0);
+    ps1_seq_set_vol(NULL, NULL, 0, 0);
+    assert(!ps1_seq_open(NULL, NULL, 0, 0, false));
+    empty_seq.bank = 999;
+    ps1_seq_mix(&empty_seq, &spu, pcm, 1);
+    empty_seq.bank = 0;
+    empty_seq.voices[0].program = 250;
+    empty_seq.voices[0].channel = 99;
+    ps1_seq_set_vol(&empty_seq, &spu, 100, 100);
     return 0;
 }

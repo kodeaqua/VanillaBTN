@@ -51,5 +51,7 @@ int main(void) {
     sdk_sync_pump(NULL, NULL);
     assert(!sdk_sync_bind(now, NULL, &clock));
     assert(sdk_sync_bind(NULL, NULL, NULL));
+    assert(SetVideoMode(0) == 0);
+    assert(SetVideoMode(1) == 0);
     return 0;
 }

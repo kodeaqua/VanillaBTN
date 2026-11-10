@@ -33,7 +33,7 @@ static void stop_xa(void) {
 
 static int read_xa_sector(void *context, uint32_t index, uint8_t *sector) {
     DiscFile *file = context;
-    if (index >= file->sectors) return 0;
+    if (!file || !file->handle || !sector || index >= file->sectors) return 0;
     /* One sector arrives per 294 output samples at double speed. The reader
      * cannot skip ahead through interleaved sectors that have not arrived. */
     uint64_t arrived = stream_clock / 44100;
@@ -49,14 +49,14 @@ void sdk_cd_mix(int16_t *out, int frames) {
         return;
     }
     for (int frame = 0; frame < frames; frame++) {
-        if (!xa_streaming) {
+        if (!xa_streaming || !stream_file) {
             out[frame * 2] = out[frame * 2 + 1] = 0;
             continue;
         }
         stream_clock += 150;
         ps1_xa_mix(&xa_player, out + frame * 2, 1, 32767, 32767, 0);
         uint64_t position = stream_first + stream_clock / 44100;
-        u_long end = stream_file->first + stream_file->sectors;
+        u_long end = stream_file ? (stream_file->first + stream_file->sectors) : 0;
         seek_sector = position < end ? (u_long)position : end;
         if (xa_player.state == PS1_XA_IDLE) {
             stream_ended = true;

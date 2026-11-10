@@ -6,6 +6,15 @@ Update the relevant item after completing a task or discovering a blocker.
 ## Active
 
 - [x] Continuation audit: complete farm linkage/address translation and remove unsupported SDK success paths before claiming runtime integration.
+  - [x] Fifth subsystem hardening and edge-case audit: eliminate latent abort crash points across sound, graphics, memory, input, and video sync SDK calls, harden sequence parser against out-of-bounds program and tone offsets, guard CD-XA mixing and sector streaming against NULL file contexts and output buffer indexing, prevent NULL sample dereferences in SPU voice fetching, and guard audio stream buffer queuing on device error.
+    - [x] Eliminate SDK `abort()` crash points in `SsSetTableSize`, `SsSetTickMode`, `SsSetSerialAttr`, `SsSetSerialVol` (`sdk_sound.c`), `ResetGraph`, `GsInitGraph`, `GsDefDispBuff` (`sdk_gpu.c`), `SetMem` (`sdk_memory.c`), `ChangeClearPAD` (`sdk_pad.c`), and `SetVideoMode` (`sdk_sync.c`), ensuring resilient execution when games or scenes pass out-of-range parameters.
+    - [x] Guard sequence event handling (`ps1_seq.c`): validate bank loaded state, header presence, program bounds (`< 128`), and tone offset boundaries (`< bank->header_size`) in `voice_volume`, `note_on`, and `note_off`, and add NULL guards in `byte`, `delta`, and `event`.
+    - [x] Guard CD-XA sector reading and mixing (`sdk_cd.c`): check for NULL `file`, `file->handle`, and `sector` in `read_xa_sector`, and guard against NULL `stream_file` in `sdk_cd_mix`.
+    - [x] Clamp XA output buffer indexing (`ps1_xa.c`): add `output_index >= 7` check in `ps1_xa_mix` before accessing `player->output`.
+    - [x] Guard audio queue error state (`ps1_audio.c`): check `queued < 0` from `SDL_GetAudioStreamQueued` before pushing audio buffers.
+    - [x] Protect raw SPU voice sample fetching (`ps1_spu.c`): cleanly terminate active voice if `sample_data` is NULL in `fetch_voice_raw_sample`.
+    - [x] Safely permit unbinding actuators with `PadSetAct(port, NULL, 0)` in `sdk_pad.c`.
+    - [x] Expand synthetic tests in `ps1_seq_test.c`, `ps1_spu_test.c`, `ps1_xa_test.c`, `sdk_memory_test.c`, `original_pad_test.c`, `sdk_sync_test.c`, `sdk_gpu_test.c`, and `original_afile_test.c` (38/38 CTests, 9/9 Python tests passing in Debug and Release).
   - [x] Fourth subsystem hardening and edge-case audit: guard reverb channel bounds against out-of-bounds register reads, harden SPU VAB loading and key-on routines against NULL pointers, clamp XA mixer output index comparisons, eliminate 64-bit integer overflow in vector normalization with double-precision accumulation, add defensive NULL checks for CdReadSync file handles and card entry pattern matching, and guard GTE perspective quotient and projection IR against NULL flags pointers.
     - [x] Guard `ps1_reverb_step` (`ps1_reverb.c`): added `c > 1` protection to prevent out-of-bounds reads into registers beyond `RV_VLIN + 1`.
     - [x] Guard `ps1_spu_load_vab` and `ps1_spu_key_on_vab` (`ps1_spu.c`): validate `spu` non-null before dereferencing `spu->vabs`.

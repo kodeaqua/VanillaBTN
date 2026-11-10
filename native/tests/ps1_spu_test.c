@@ -373,6 +373,15 @@ static void test_spu_null_guards_and_reverb_mask(void) {
     assert(spu.reverb_voice_mask & (1u << 1));
     ps1_spu_key_on_raw(&spu, 1, dummy_block, sizeof(dummy_block), 0x10000, 127, 127);
     assert(!(spu.reverb_voice_mask & (1u << 1)));
+
+    /* Active voice with NULL sample_data must cleanly terminate without fault */
+    spu.voices[2].active = 1;
+    spu.voices[2].sample_data = NULL;
+    spu.voices[2].pitch_step = 0x10000;
+    spu.voices[2].frac_pos = 0x10000;
+    int16_t mix_out[2];
+    ps1_spu_mix(&spu, mix_out, 1, 0);
+    assert(spu.voices[2].active == 0);
 }
 
 int main(void) {

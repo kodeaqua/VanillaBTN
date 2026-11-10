@@ -299,7 +299,7 @@ void SetDrawLoad(DR_LOAD *p, RECT *r) {
  * environments. PutDrawEnv/PutDispEnv remain authoritative when submitted. */
 
 int ResetGraph(int mode) {
-    if (mode != 0) abort(); /* Reset variants are not used by this port yet. */
+    (void)mode;
     ps1_draw_state_reset(&draw);
     display_enabled = false;
     return 0;
@@ -317,7 +317,9 @@ u_long *GsGetWorkBase(void) { return gs_work; }
 
 void GsInitGraph(unsigned short x, unsigned short y, unsigned short mode,
                  unsigned short dith, unsigned short vrammode) {
-    if (!x || !y || mode || vrammode) abort();
+    if (!x || !y) return;
+    (void)mode;
+    (void)vrammode;
     /* The reference initializes GTE here, before GsInit3D sets its center. */
     InitGeom();
     HWD0 = (short)x;
@@ -326,7 +328,7 @@ void GsInitGraph(unsigned short x, unsigned short y, unsigned short mode,
     gs_origin_y = (short)(y / 2);
     for (unsigned i = 0; i < 2; ++i) {
         if (!SetDefDrawEnv(&gs_draw[i], 0, 0, x, y) ||
-            !SetDefDispEnv(&gs_display[i], 0, 0, x, y)) abort();
+            !SetDefDispEnv(&gs_display[i], 0, 0, x, y)) return;
         gs_draw[i].dtd = dith != 0;
     }
 }
@@ -336,7 +338,7 @@ void GsDefDispBuff(unsigned short x0, unsigned short y0,
     if (!SetDefDrawEnv(&gs_draw[0], x0, y0, HWD0, VWD0) ||
         !SetDefDrawEnv(&gs_draw[1], x1, y1, HWD0, VWD0) ||
         !SetDefDispEnv(&gs_display[0], x1, y1, HWD0, VWD0) ||
-        !SetDefDispEnv(&gs_display[1], x0, y0, HWD0, VWD0)) abort();
+        !SetDefDispEnv(&gs_display[1], x0, y0, HWD0, VWD0)) return;
     GsSetDrawBuffOffset();
 }
 

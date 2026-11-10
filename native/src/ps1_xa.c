@@ -314,6 +314,10 @@ void ps1_xa_mix(Ps1XaPlayer *player, int16_t *out, int frames,
                 continue;
             }
         }
+        if (player->output_index >= 7) {
+            if (!accumulate) out[f * 2] = out[f * 2 + 1] = 0;
+            continue;
+        }
         int32_t samp_l = player->output[player->output_index][0];
         int32_t samp_r = player->output[player->output_index++][1];
 

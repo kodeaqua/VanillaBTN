@@ -144,6 +144,9 @@ int main(void) {
 
     PadStopCom();
     CHECK(small_motor == 0 && large_motor == 0);
+    PadSetAct(0, NULL, 0);
+    ChangeClearPAD(1);
+    ChangeClearPAD(0);
     sdk_pad_rumble(NULL, NULL);
     CHECK(sdk_sync_bind(NULL, NULL, NULL));
     return 0;

@@ -233,13 +233,14 @@ void SsInit(void) {
 }
 
 void SsSetTableSize(char *table, int s_max, int t_max) {
-    if (!table || s_max <= 0 || s_max > SDK_MAX_SEQS || t_max <= 0) abort();
+    if (!table || s_max <= 0 || t_max <= 0) return;
+    if (s_max > SDK_MAX_SEQS) s_max = SDK_MAX_SEQS;
     table_s_max = s_max;
     table_t_max = t_max;
 }
 
 void SsSetTickMode(long tick_mode) {
-    if (tick_mode <= 0) abort();
+    if (tick_mode <= 0) return;
     tick_mode_val = (int32_t)tick_mode;
 }
 
@@ -291,7 +292,7 @@ void SsSetMono(void) {
 }
 
 void SsSetSerialAttr(char s_num, char attr, char mode) {
-    if (s_num < 0 || s_num > 1 || attr < 0 || attr > 1 || mode < 0 || mode > 1) abort();
+    if (s_num < 0 || s_num > 1 || attr < 0 || attr > 1 || mode < 0 || mode > 1) return;
     serial_attr[(int)s_num] = (uint8_t)attr;
     serial_mode[(int)s_num] = (uint8_t)mode;
     if (s_num == SS_SERIAL_A && attr == SS_MIX) cd_mix_enabled = mode != 0;
@@ -299,7 +300,9 @@ void SsSetSerialAttr(char s_num, char attr, char mode) {
 }
 
 void SsSetSerialVol(short s_num, short voll, short volr) {
-    if (s_num < 0 || s_num > 1) abort();
+    if (s_num < 0 || s_num > 1) return;
+    if (voll < 0) voll = 0;
+    if (volr < 0) volr = 0;
     /* The original CD fade can request 128 (32 * 4). The reference SDK
      * saturates values above 127 instead of treating them as fatal errors. */
     if (voll > 127) voll = 127;

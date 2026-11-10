@@ -51,6 +51,11 @@ uint8_t ps1_adpcm_decode_block(const uint8_t *block, int16_t *out,
  * ---------------------------------------------------------------------- */
 static int16_t fetch_voice_raw_sample(Ps1Voice *voice) {
     if (!voice->active) return 0;
+    if (!voice->sample_data) {
+        voice->active = 0;
+        voice->source_ended = 1;
+        return 0;
+    }
 
     if (voice->block_sample_idx >= ADPCM_SAMPLES_PER_BLOCK) {
         if (voice->stop_after_block || voice->byte_offset > voice->sample_len

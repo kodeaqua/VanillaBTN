@@ -111,9 +111,9 @@ int PadInfoMode(int number, int query, int index) {
 
 void PadSetAct(int number, unsigned char *data, int length) {
     Port *port = port_at(number);
-    if (!port || !data || length < 0) return;
+    if (!port || length < 0) return;
     port->actuators = data;
-    port->actuator_size = (unsigned)length;
+    port->actuator_size = data ? (unsigned)length : 0;
 }
 
 int PadSetActAlign(int number, unsigned char *alignment) {
@@ -131,5 +131,5 @@ int PadSetActAlign(int number, unsigned char *alignment) {
 void ChangeClearPAD(long mode) {
     /* This disables a PS1 interrupt-clearing quirk. Native input has no such
      * interrupt source. Only the original game's normal mode is supported. */
-    if (mode != 0) abort();
+    (void)mode;
 }

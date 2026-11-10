@@ -320,6 +320,8 @@ int main(void) {
     player.serial_volume = 128;
     ps1_xa_mix(&player, pcm, 1, 32767, 32767, 0);
     assert(pcm[0] == 32767 && pcm[1] == 32767);
+    player.output_index = 8;
+    ps1_xa_mix(&player, pcm, 1, 32767, 32767, 0);
     test_xa_synthetic_decode();
     test_xa_player_filtering_and_fading();
     test_xa_stereo_decode_and_histories();

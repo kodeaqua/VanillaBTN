@@ -524,6 +524,12 @@ int main(void) {
     CHECK(sdk_sound_status().master_vol_left == 127 && sdk_sound_status().master_vol_right == 0);
     SsSetRVol(200, -5);
     CHECK(sdk_sound_status().reverb_vol_left == 127 && sdk_sound_status().reverb_vol_right == 0);
+    SsSetTableSize(NULL, 0, 0);
+    SsSetTickMode(-1);
+    SsSetSerialAttr(-1, -1, -1);
+    SsSetSerialVol(-1, -1, -1);
+    SsSetSerialVol(0, -10, 200);
+    CHECK(sdk_sound_serial_vol(0).left == 0 && sdk_sound_serial_vol(0).right == 127);
 
 
     CHECK(CdSearchFile(&file, "\\A_FILE.HDT;1") == &file);
