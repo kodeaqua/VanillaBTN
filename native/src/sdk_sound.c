@@ -258,7 +258,10 @@ void SsEnd(void) {
 }
 
 void SsSetMVol(int voll, int volr) {
-    if (voll < 0 || voll > 127 || volr < 0 || volr > 127) abort();
+    if (voll < 0) voll = 0;
+    if (voll > 127) voll = 127;
+    if (volr < 0) volr = 0;
+    if (volr > 127) volr = 127;
     master_vol_l = (int16_t)voll;
     master_vol_r = (int16_t)volr;
     ps1_spu_set_master_vol(&spu,
@@ -267,7 +270,10 @@ void SsSetMVol(int voll, int volr) {
 }
 
 void SsSetRVol(int voll, int volr) {
-    if (voll < 0 || voll > 127 || volr < 0 || volr > 127) abort();
+    if (voll < 0) voll = 0;
+    if (voll > 127) voll = 127;
+    if (volr < 0) volr = 0;
+    if (volr > 127) volr = 127;
     reverb_vol_l = (int16_t)voll;
     reverb_vol_r = (int16_t)volr;
     reverb_depth_l = (int16_t)voll;

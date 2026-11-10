@@ -520,6 +520,10 @@ int main(void) {
     CHECK(sdk_sound_spu()->reverb_gain_left == 10320);
     SsSetRVol(20, 20); /* same EVOL register, not an additional multiplier */
     CHECK(sdk_sound_spu()->reverb_gain_left == 5160);
+    SsSetMVol(150, -10);
+    CHECK(sdk_sound_status().master_vol_left == 127 && sdk_sound_status().master_vol_right == 0);
+    SsSetRVol(200, -5);
+    CHECK(sdk_sound_status().reverb_vol_left == 127 && sdk_sound_status().reverb_vol_right == 0);
 
 
     CHECK(CdSearchFile(&file, "\\A_FILE.HDT;1") == &file);
