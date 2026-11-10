@@ -21,7 +21,7 @@ SdkDisplay sdk_gpu_display(void) {
 }
 
 #define SDK_END 0xFFFFFFul
-#define SDK_MAP_COUNT 32
+#define SDK_MAP_COUNT 256
 typedef struct PacketMap {
     unsigned char *memory;
     size_t size;

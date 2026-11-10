@@ -91,17 +91,17 @@ Gamepad (DualShock / Xbox / XInput / DirectInput):
   - Select             : Open town map
 
 Keyboard:
-  - Arrow Keys         : Move / Navigate menus
-  - Z                  : Action / Confirm (PS1 Cross)
-  - X                  : Put away / Cancel (PS1 Square)
-  - C                  : Rucksack / Inventory (PS1 Triangle)
-  - V                  : Eat / Pick up / Drop (PS1 Circle)
-  - A                  : Whistle (PS1 L1)
-  - S                  : Run (PS1 R1)
-  - D                  : Cycle tool (PS1 L2)
-  - F                  : Cycle item (PS1 R2)
-  - Enter              : Farm status menu (PS1 Start)
-  - Right Shift        : Town map (PS1 Select)
+  - Arrow Keys / WASD  : Move / Navigate menus
+  - X / K / Enter      : Action / Confirm / Use tool (PS1 Cross)
+  - C / U              : Cancel / Put item into rucksack (PS1 Square)
+  - V / I              : Open rucksack / inventory menu (PS1 Triangle)
+  - Z / J              : Eat / Pick up / Drop item (PS1 Circle)
+  - Q                  : Whistle (PS1 L1)
+  - E                  : Run (PS1 R1)
+  - 1                  : Cycle tool (PS1 L2)
+  - 2                  : Cycle item (PS1 R2)
+  - Space              : Open main farm status menu (PS1 Start)
+  - Escape / Tab       : Open town map (PS1 Select)
 
 SAVES
 -----

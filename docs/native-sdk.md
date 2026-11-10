@@ -737,3 +737,9 @@ The native Windows executable embeds native Win32 resources via `native/res/vani
 - **Version Resource**: `VS_VERSION_INFO` embeds file and product versioning, company metadata, and copyright matching project version increments.
 - **Automated Packaging**: `tools/package-release.ps1` orchestrates building `Release` with whole-program optimization, intrinsic acceleration, and COMDAT folding (`/O2 /Oi /Gy /GF /OPT:REF /OPT:ICF`), executes all 38 CTest suites and 9 Python tool checks, and packages `vanillabtn.exe`, documentation, and disc import utilities into a standalone zip distribution archive.
 
+### GPU mapping headroom and display presentation validation
+
+- **Packet mapping headroom**: `SDK_MAP_COUNT` in `sdk_gpu.c` is expanded from 32 to 256. This provides ample headroom for registering disjoint static/overlay packets (fades, dialog frames, festival sprites) during long gameplay sessions across seasons without exhausting slots.
+- **Display bounds validation**: `host_present_frame` validates the full rectangle bounds (`x >= 0`, `y >= 0`, `w > 0`, `h > 0`, `x + w <= 1024`, `y + h <= 512`), clearing the screen to black cleanly if coordinates fall outside VRAM rather than aborting presentation mid-lock.
+
+

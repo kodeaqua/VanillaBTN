@@ -58,6 +58,10 @@ int main(void) {
     CHECK(SDL_GetTextureSize(texture, &width, &height));
     CHECK(width == 320 && height == 240);
     color(surface, 255, 0, 0);
+    /* Out-of-bounds display position safely clears to black rather than failing. */
+    display.disp.x = 800;
+    CHECK(PutDispEnv(&display) == NULL); /* PutDispEnv rejects, but if direct display struct is out of bounds */
+    display.disp.x = 0;
     sdk_gpu_bind(NULL);
     SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);

@@ -8,8 +8,10 @@ bool host_present_frame(const Ps1Video *video, SDL_Renderer *renderer, SDL_Textu
     int pitch;
     bool copied;
     SdkDisplay display = sdk_gpu_display();
-    if (!display.enabled || display.width <= 0 || display.height <= 0
-        || display.width > PS1_VRAM_WIDTH || display.height > PS1_VRAM_HEIGHT) {
+    if (!display.enabled || display.x < 0 || display.y < 0
+        || display.width <= 0 || display.height <= 0
+        || display.width > PS1_VRAM_WIDTH - display.x
+        || display.height > PS1_VRAM_HEIGHT - display.y) {
         return SDL_RenderClear(renderer) && SDL_RenderPresent(renderer);
     }
     float width, height;
