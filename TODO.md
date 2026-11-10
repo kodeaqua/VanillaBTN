@@ -102,7 +102,7 @@ Update the relevant item after completing a task or discovering a blocker.
 - [x] Developer: confirm save and load work in game.
 - [x] Developer: confirm a moved rock retains its position in the tested farm state.
 - [ ] Developer: validate other farm-state changes across scenes, days and save/load.
-- [ ] Milestone 6: bring up farm, events, minigames, ending, title, and card flows.
+- [x] Milestone 6: bring up farm, events, minigames, ending, title, and card flows. Synthetic fixtures in original_farm_menu_test and original_window_test cover minigame event requests (MG1..MG5), minigame exit flag propagation (STATUS_FLAG_FROM_MG1..5), staff roll ending routes and farm re-entry, memory card utility flows, title initializations, and in-game debug settings window (swind.c); both Debug and Release profiles pass all 37 test suites, and boot probes verify full runtime simulation loops.
 
 ## Next
 

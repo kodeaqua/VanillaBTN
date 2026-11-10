@@ -442,6 +442,27 @@ in `sdk_math` and `libspu.h`. A nested helper in `mg2.c` (`mg2_draw_board_marker
 is hoisted to file-scope `static` under `VANILLABTN_NATIVE`, leaving the PS1
 nested function syntax intact when compiling the matching reference build.
 
+### Minigame, event and scene transition flows
+
+Minigame event handoffs from the farm overlay (`farm_event_step`) dispatch scene
+requests for horse racing (`SCENE_MG1`), cockfighting (`SCENE_MG2`), tomato
+festival (`SCENE_MG3`), dog racing (`SCENE_MG4`), swimming (`SCENE_MG5`), staff
+roll (`SCENE_STAFF_ROLL`), save/load (`SCENE_SAVE`, `SCENE_LOAD`), and the
+minigame debug window (`SCENE_MG_DEBUG`).
+
+When returning from minigames (`SCENE_FARM_MINIGAME_EXIT`), `farm_apply_mode_flags`
+recovers previous scene context via `main_get_previous_scene()`, clears transition
+flags, sets the specific minigame status flag (`STATUS_FLAG_FROM_MG1` through `5`),
+selects a new drift hour, and initializes `FARM_STARTUP_LAYOUT` with `entryStep = 1`.
+Staff roll endings route either back to farm startup (`SCENE_FARM_STAFF_EXIT` via
+`farm_enter_dispatch` entry step 7) or to the title screen (`SCENE_TITLE`).
+
+The in-game minigame debug utility (`30_GF_swind/swind.c`) provides page
+navigation, model selection, and memory staging backups via `StoreImage` /
+`LoadImage` before restoring display state and issuing `SCENE_FARM` scene requests.
+Synthetic fixtures in `original_farm_menu_test` and `original_window_test` cover
+these transitions in Debug and Release.
+
 ## Memory-card SDK bridge and test screen
 
 `game_window_frame` compiles `src/overlay/31_gf_mcard/mcard.c` directly without
