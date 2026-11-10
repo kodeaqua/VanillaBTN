@@ -447,6 +447,12 @@ target_link_libraries(ps1_input_test PRIVATE ps1_input)
 target_compile_options(ps1_input_test PRIVATE /W4)
 add_test(NAME ps1_input_repeat COMMAND ps1_input_test)
 
+add_executable(host_gamepad_test tests/host_gamepad_test.c)
+set_target_properties(host_gamepad_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_link_libraries(host_gamepad_test PRIVATE SDL3::SDL3 ps1_input)
+target_compile_options(host_gamepad_test PRIVATE /W4)
+add_test(NAME host_gamepad_snapshot COMMAND host_gamepad_test)
+
 add_executable(ps1_clock_test tests/ps1_clock_test.c)
 set_target_properties(ps1_clock_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_link_libraries(ps1_clock_test PRIVATE ps1_clock)

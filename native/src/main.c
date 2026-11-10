@@ -21,6 +21,7 @@ extern int main_scene;
 #include "sdk_memory.h"
 #include "sdk_sound.h"
 #include "sdk_sync.h"
+#include "host_gamepad.h"
 #include <libetc.h>
 #include <libcd.h>
 #include <libpad.h>
@@ -86,25 +87,6 @@ static uint32_t map_key_to_ps1_button(SDL_Keycode key) {
         return 0;
     }
 }
-
-static uint32_t map_gamepad_to_ps1_button(uint8_t button) {
-    switch (button) {
-    case SDL_GAMEPAD_BUTTON_DPAD_UP:        return PS1_PAD_UP;
-    case SDL_GAMEPAD_BUTTON_DPAD_DOWN:      return PS1_PAD_DOWN;
-    case SDL_GAMEPAD_BUTTON_DPAD_LEFT:      return PS1_PAD_LEFT;
-    case SDL_GAMEPAD_BUTTON_DPAD_RIGHT:     return PS1_PAD_RIGHT;
-    case SDL_GAMEPAD_BUTTON_SOUTH:          return PS1_PAD_CROSS;
-    case SDL_GAMEPAD_BUTTON_EAST:           return PS1_PAD_CIRCLE;
-    case SDL_GAMEPAD_BUTTON_WEST:           return PS1_PAD_SQUARE;
-    case SDL_GAMEPAD_BUTTON_NORTH:          return PS1_PAD_TRIANGLE;
-    case SDL_GAMEPAD_BUTTON_START:          return PS1_PAD_START;
-    case SDL_GAMEPAD_BUTTON_BACK:           return PS1_PAD_SELECT;
-    case SDL_GAMEPAD_BUTTON_LEFT_SHOULDER:  return PS1_PAD_L1;
-    case SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER: return PS1_PAD_R1;
-    default:                                return 0;
-    }
-}
-
 
 typedef struct HostGame {
     SDL_Window *window;
@@ -191,6 +173,16 @@ static void host_game_pump(void *context) {
                 host->stick_x[i] = host->stick_y[i] = 0;
                 host->trigger_left[i] = host->trigger_right[i] = 0;
             }
+        } else if (event.type == SDL_EVENT_WINDOW_FOCUS_GAINED) {
+            /* Input events need not repeat for controls held while unfocused. */
+            for (int i = 0; i < 2; ++i) {
+                HostPadSnapshot state = host_gamepad_snapshot(host->gamepads[i]);
+                host->controller_buttons[i] = state.buttons;
+                host->stick_x[i] = state.x;
+                host->stick_y[i] = state.y;
+                host->trigger_left[i] = state.left_trigger;
+                host->trigger_right[i] = state.right_trigger;
+            }
         } else if (event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP) {
             uint32_t btn = map_key_to_ps1_button(event.key.key);
             if (event.key.scancode > SDL_SCANCODE_UNKNOWN &&
@@ -209,7 +201,7 @@ static void host_game_pump(void *context) {
                 }
             }
             if (pad_idx >= 0) {
-                uint32_t btn = map_gamepad_to_ps1_button(event.gbutton.button);
+                uint32_t btn = host_gamepad_button((SDL_GamepadButton)event.gbutton.button);
                 if (btn != 0) {
                     if (event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN) host->controller_buttons[pad_idx] |= btn;
                     else host->controller_buttons[pad_idx] &= ~btn;
