@@ -194,7 +194,7 @@ static bool event(Ps1Seq *seq, Ps1Spu *spu) {
 }
 
 void ps1_seq_mix(Ps1Seq *seq, Ps1Spu *spu, int16_t *out, int frames) {
-    if (seq == NULL || spu == NULL || out == NULL || frames <= 0) return;
+    if (seq == NULL || spu == NULL || out == NULL || frames <= 0 || seq->ppqn == 0) return;
     if (seq->bank < 0 || seq->bank >= PS1_SPU_VAB_SLOTS || !spu->vabs[seq->bank].loaded) {
         seq->failed = true;
         seq->active = false;

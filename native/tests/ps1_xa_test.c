@@ -304,6 +304,9 @@ int main(void) {
     ps1_xa_fade_tick(NULL, 1);
     assert(ps1_xa_get_state(NULL) == PS1_XA_IDLE);
     ps1_xa_mix(NULL, NULL, 1, 0, 0, 0);
+    ps1_xa_play_track(NULL, 0);
+    ps1_xa_play_source(NULL, NULL, NULL, 0, 0, 0, 0);
+    assert(ps1_xa_filter_push(NULL, 0, 0, NULL) == 0);
 
     test_xa_hardware_impulse();
     test_xa_exact_stream_duration();

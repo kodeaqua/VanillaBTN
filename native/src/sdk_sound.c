@@ -599,7 +599,7 @@ void SsUtSetReverbDelay(short delay) {
 }
 
 void SpuSetCommonAttr(SpuCommonAttr *attr) {
-    if (!attr) abort();
+    if (!attr) return;
     unsigned long mask = attr->mask;
     int16_t mvol_l = spu.master_vol_left;
     int16_t mvol_r = spu.master_vol_right;
@@ -618,7 +618,7 @@ void SpuSetCommonAttr(SpuCommonAttr *attr) {
 }
 
 void SpuGetAllKeysStatus(void *status) {
-    if (!status) abort();
+    if (!status) return;
     uint8_t *bytes = (uint8_t *)status;
     for (int v = 0; v < PS1_SPU_VOICES; ++v) {
         bytes[v] = (uint8_t)(ps1_spu_voice_is_active(&spu, v) ? SPU_ON : SPU_OFF);

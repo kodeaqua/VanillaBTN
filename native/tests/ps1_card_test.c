@@ -499,6 +499,7 @@ static void test_external_block_chains(void) {
 }
 
 int main(void) {
+    assert(!ps1_card_recover_file(NULL));
 #ifdef _WIN32
     test_locked_primary_preserves_backup();
 #endif

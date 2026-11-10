@@ -4,6 +4,7 @@
 #include <libetc.h>
 #include <string.h>
 #include <stdlib.h>
+#include <limits.h>
 
 typedef struct Port {
     unsigned char *receive, *actuators;
@@ -122,7 +123,8 @@ int PadSetActAlign(int number, unsigned char *alignment) {
         if (alignment[i] != 0xFF && alignment[i] > 1) return 0;
     memcpy(port->alignment, alignment, 6);
     port->aligned = true;
-    port->ready_at = VSync(-1) + 3;
+    int now = VSync(-1);
+    port->ready_at = now < INT_MAX - 3 ? now + 3 : INT_MAX;
     return 1;
 }
 

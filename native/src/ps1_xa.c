@@ -198,6 +198,7 @@ static int fill_output(Ps1XaPlayer *player) {
 
 void ps1_xa_play_source(Ps1XaPlayer *player, Ps1XaSectorReader reader, void *context,
                         uint32_t first, uint32_t count, int file_number, int channel) {
+    if (!player) return;
     ps1_xa_init(player);
     if (!reader || first >= count || file_number < 0 || file_number > 255
         || channel < 0 || channel > 31) return;
@@ -213,7 +214,7 @@ void ps1_xa_play_source(Ps1XaPlayer *player, Ps1XaSectorReader reader, void *con
 }
 
 void ps1_xa_play_track(Ps1XaPlayer *player, int track) {
-    if (track < 0 || track >= PS1_XA_TRACK_COUNT) return;
+    if (!player || track < 0 || track >= PS1_XA_TRACK_COUNT) return;
 
     const Ps1XaTrackEntry *entry = &s_tracks[track];
     player->reader = NULL;

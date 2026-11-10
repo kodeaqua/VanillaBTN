@@ -37,7 +37,12 @@ int main(void) {
     if (ticks != 4) return 12;
     if (clock.total_ticks != 7) return 13;
 
-    /* 5. NULL pointer safety */
+    /* 5. Extreme delta (UINT64_MAX) must safely clamp without integer wrap */
+    ticks = ps1_clock_advance(&clock, UINT64_MAX);
+    if (ticks != 4) return 16;
+    if (clock.total_ticks != 11) return 17;
+
+    /* 6. NULL pointer safety */
     if (ps1_clock_advance(NULL, 10000000ull) != 0) return 14;
 
     return 0;

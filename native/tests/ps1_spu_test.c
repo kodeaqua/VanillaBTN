@@ -354,6 +354,8 @@ static void test_spu_null_guards_and_reverb_mask(void) {
     assert(ps1_spu_voice_is_active(NULL, 0) == 0);
     ps1_spu_set_master_vol(NULL, 0, 0);
     ps1_spu_set_cd_vol(NULL, 0, 0);
+    ps1_spu_init(NULL);
+    assert(ps1_spu_set_reverb_voice(NULL, 1, 1) == 0);
 
     /* Reverb mask clearing on raw key-on and VAB free */
     Ps1Spu spu;

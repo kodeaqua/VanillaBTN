@@ -50,6 +50,7 @@ static const int16_t coefficients[7][29] = {
 
 int ps1_xa_filter_push(Ps1XaFilter *filter, int16_t left, int16_t right,
                         int16_t output[7][2]) {
+    if (!filter || !output) return 0;
     filter->ring[filter->position][0] = left;
     filter->ring[filter->position][1] = right;
     filter->position = (filter->position + 1) & 31;

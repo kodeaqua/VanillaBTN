@@ -179,6 +179,7 @@ static void voice_step_adsr(Ps1Voice *v) {
  * SPU Lifecycle
  * ---------------------------------------------------------------------- */
 void ps1_spu_init(Ps1Spu *spu) {
+    if (spu == NULL) return;
     memset(spu, 0, sizeof(*spu));
     spu->master_vol_left = 0x3FFF;
     spu->master_vol_right = 0x3FFF;
@@ -439,6 +440,7 @@ void ps1_spu_set_reverb_params(Ps1Spu *spu, int type, int depth_l, int depth_r,
 }
 
 uint32_t ps1_spu_set_reverb_voice(Ps1Spu *spu, uint32_t mask, int enabled) {
+    if (!spu) return 0;
     mask &= 0x00ffffff;
     if (enabled) spu->reverb_voice_mask |= mask;
     else spu->reverb_voice_mask &= ~mask;

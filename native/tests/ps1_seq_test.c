@@ -183,5 +183,9 @@ int main(void) {
     test_malformed_sequences_terminate();
     test_standard_midi_channel_events();
     test_sequence_volume_scaling();
+    /* Defensive NULL and uninitialized guards */
+    Ps1Seq empty_seq = {0};
+    ps1_seq_mix(&empty_seq, &spu, pcm, 1);
+    ps1_seq_mix(NULL, NULL, NULL, 0);
     return 0;
 }

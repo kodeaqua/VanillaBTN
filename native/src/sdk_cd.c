@@ -324,7 +324,7 @@ int CdReadSync(int mode, u_char *result) {
     if (read_job.status > 0) {
         DiscFile *file = read_job.file;
         size_t size = (size_t)read_job.sectors * CD_SECTOR;
-        size_t bytes = file->size - read_job.offset;
+        size_t bytes = file->size > read_job.offset ? (size_t)(file->size - read_job.offset) : 0;
         if (bytes > size) bytes = size;
         /* Completion happens here for both wait and poll. Host file I/O is
          * synchronous; no artificial busy ticks or emulated seek delays. */

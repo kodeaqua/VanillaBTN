@@ -230,6 +230,7 @@ Ps1CardStatus ps1_card_delete_file(Ps1Card *card, const char *filename) {
 static Ps1CardStatus write_file_in_place(Ps1Card *card, const char *filename,
                                   const void *data, size_t size) {
     if (!card || !filename || !data || size == 0) return PS1_CARD_ERR_IO;
+    if (size > (size_t)PS1_CARD_DATA_BLOCKS * PS1_CARD_BLOCK_SIZE) return PS1_CARD_ERR_FULL;
     Ps1CardStatus validation = ps1_card_validate(card);
     if (validation != PS1_CARD_OK) return validation;
 
@@ -374,6 +375,7 @@ static bool read_card_image(FILE *file, Ps1Card *card) {
 }
 
 static bool is_valid_mcr_file(const char *filepath) {
+    if (!filepath) return false;
     FILE *file = fopen(filepath, "rb");
     if (!file) return false;
     Ps1Card *card = malloc(sizeof(*card));

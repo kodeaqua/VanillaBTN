@@ -54,6 +54,7 @@ bool ps1_ot_walk(const Ps1Ot *ot, bool (*visit)(uint32_t, void *), void *context
     for (size_t bucket = ot->depth; bucket > 0; --bucket) {
         for (size_t node = ot->heads[bucket - 1]; node != SIZE_MAX;
              node = ot->entries[node].next) {
+            if (node >= ot->count) return false;
             if (!visit(ot->entries[node].packet_id, context)) return false;
         }
     }

@@ -4,6 +4,7 @@
 #include <stdio.h>
 
 void FntPrint(const char *format, ...) {
+    if (!format) return;
     va_list args;
     va_start(args, format);
     vfprintf(stderr, format, args);
@@ -52,6 +53,7 @@ void KanjiFntClose(void) {
 }
 
 int KanjiFntPrint(const char *format, ...) {
+    if (!format) return 0;
     int written;
     va_list args;
     va_start(args, format);

@@ -37,6 +37,17 @@ int main(void) {
         ps1_ot_destroy(&ot);
         return 4;
     }
+    /* NULL guards and corrupted node index bounds check */
+    if (ps1_ot_walk(NULL, collect, &visits)
+        || ps1_ot_walk(&ot, NULL, &visits)) {
+        ps1_ot_destroy(&ot);
+        return 5;
+    }
+    ot.heads[ot.depth - 1] = ot.count + 10;
+    if (ps1_ot_walk(&ot, collect, &visits)) {
+        ps1_ot_destroy(&ot);
+        return 6;
+    }
     ps1_ot_destroy(&ot);
     return 0;
 }
