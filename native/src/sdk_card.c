@@ -200,6 +200,7 @@ static bool commit_card(Ps1Card *card, Ps1Card *staged) {
 
 int MemCardCreateFile(int chan, char *file, int blocks) {
     Ps1Card *card = get_card_for_chan(chan);
+    s_last_cmd = 0x09;
     if (file == NULL || !file[0] || strlen(file) > 20 ||
         blocks <= 0 || blocks > (int)PS1_CARD_DATA_BLOCKS) {
         s_last_result = McErrCardInvalid;
@@ -236,7 +237,7 @@ int MemCardCreateFile(int chan, char *file, int blocks) {
     void *zero_buf = calloc(1, total_size);
     if (!zero_buf) {
         s_last_result = McErrCardInvalid;
-        return -1;
+        return McErrCardInvalid;
     }
     Ps1Card *staged = stage_card(card);
     if (!staged) {
@@ -249,7 +250,7 @@ int MemCardCreateFile(int chan, char *file, int blocks) {
     if (status != PS1_CARD_OK) {
         if (staged != card) free(staged);
         s_last_result = McErrCardInvalid;
-        return -1;
+        return McErrCardInvalid;
     }
     bool ok = commit_card(card, staged);
     s_last_result = ok ? McErrNone : McErrCardInvalid;
@@ -515,15 +516,21 @@ int sdk_card_rename(const char *oldpath, const char *newpath) {
     const char *oldname = (colon_old != NULL) ? colon_old + 1 : oldpath;
     const char *newname = (colon_new != NULL) ? colon_new + 1 : newpath;
 
-    if (!newname[0] || strlen(newname) > 20) {
+    if (!oldname[0] || strlen(oldname) > 20 ||
+        !newname[0] || strlen(newname) > 20) {
         return -1;
+    }
+    if (oldpath[0] == 'b' && oldpath[1] == 'u') {
+        port = oldpath[2] - '0';
+    }
+    if (colon_new != NULL && newpath[0] == 'b' && newpath[1] == 'u') {
+        int new_port = newpath[2] - '0';
+        if (new_port != port) {
+            return -1;
+        }
     }
     if (strcmp(oldname, newname) == 0) {
         return 1;
-    }
-
-    if (oldpath[0] == 'b' && oldpath[1] == 'u') {
-        port = oldpath[2] - '0';
     }
     Ps1Card *card = sdk_card_get(port);
     if (card == NULL || !card->present || ps1_card_validate(card) != PS1_CARD_OK) {

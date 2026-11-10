@@ -473,10 +473,10 @@ supported and returns failure without altering the card.
 
 Card save file renames (`CARD_RENAME` in `mcard.c`) route through `sdk_card_rename`
 via `native/compat/libapi.h`. This updates the card's directory frame filename and
-recomputes the Frame XOR checksum. Rejection guards empty, oversized, and duplicate
-target filenames to protect directory uniqueness. `MemCardFormat` and `MemCardCreateFile`
-track command and result status codes consistently, reporting `McErrCardInvalid` for
-invalid port channels.
+recomputes the Frame XOR checksum. Rejection guards empty, oversized, duplicate,
+and cross-card rename attempts to protect directory uniqueness and device boundaries.
+`MemCardFormat` and `MemCardCreateFile` track command and result status codes consistently,
+reporting `McErrCardInvalid` for invalid port channels, internal allocation errors, or write failures.
 
 GPU font helpers `FntLoad`, `FntOpen`, `FntFlush`, and `SetDumpFnt` are provided
 by `libgpu.h` and `sdk_debug.c`, routing formatted output to `stderr` in `Debug`
