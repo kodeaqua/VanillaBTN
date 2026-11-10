@@ -114,6 +114,7 @@ typedef struct HostGame {
     bool running;
     uint32_t keyboard_buttons, controller_buttons[2];
     int16_t stick_x[2], stick_y[2];
+    int16_t trigger_left[2], trigger_right[2];
 #ifdef VANILLABTN_BOOT_TEST
     unsigned vblanks, vblank_limit, colored_frames, audible_frames;
     bool cycle_required, visited_farm, returned_title, new_game_required;
@@ -177,6 +178,7 @@ static void host_game_pump(void *context) {
                     host->gamepads[i] = NULL;
                     host->controller_buttons[i] = 0;
                     host->stick_x[i] = host->stick_y[i] = 0;
+                    host->trigger_left[i] = host->trigger_right[i] = 0;
                     break;
                 }
             }
@@ -185,6 +187,7 @@ static void host_game_pump(void *context) {
             for (int i = 0; i < 2; ++i) {
                 host->controller_buttons[i] = 0;
                 host->stick_x[i] = host->stick_y[i] = 0;
+                host->trigger_left[i] = host->trigger_right[i] = 0;
             }
         } else if (event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP) {
             uint32_t btn = map_key_to_ps1_button(event.key.key);
@@ -219,6 +222,8 @@ static void host_game_pump(void *context) {
             if (pad_idx >= 0) {
                 if (event.gaxis.axis == SDL_GAMEPAD_AXIS_LEFTX) host->stick_x[pad_idx] = event.gaxis.value;
                 if (event.gaxis.axis == SDL_GAMEPAD_AXIS_LEFTY) host->stick_y[pad_idx] = event.gaxis.value;
+                if (event.gaxis.axis == SDL_GAMEPAD_AXIS_LEFT_TRIGGER) host->trigger_left[pad_idx] = event.gaxis.value;
+                if (event.gaxis.axis == SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) host->trigger_right[pad_idx] = event.gaxis.value;
             }
         } else if (event.type == SDL_EVENT_WINDOW_EXPOSED
                    || event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) {
@@ -242,12 +247,14 @@ static void host_game_pump(void *context) {
     }
 #endif
     sdk_pad_sample(0, true, host->gamepads[0] != NULL,
-        (uint16_t)(host->keyboard_buttons | host->controller_buttons[0]),
+        (uint16_t)(host->keyboard_buttons | host->controller_buttons[0] |
+            ps1_input_trigger_buttons(host->trigger_left[0], host->trigger_right[0])),
         (uint8_t)(((int)host->stick_x[0] + 32768) / 256),
         (uint8_t)(((int)host->stick_y[0] + 32768) / 256));
 
     sdk_pad_sample(1, host->gamepads[1] != NULL, host->gamepads[1] != NULL,
-        (uint16_t)host->controller_buttons[1],
+        (uint16_t)(host->controller_buttons[1] |
+            ps1_input_trigger_buttons(host->trigger_left[1], host->trigger_right[1])),
         (uint8_t)(((int)host->stick_x[1] + 32768) / 256),
         (uint8_t)(((int)host->stick_y[1] + 32768) / 256));
 

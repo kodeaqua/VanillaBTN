@@ -5,6 +5,12 @@
 #include <assert.h>
 
 int main(void) {
+    /* SDL trigger axes span 0..32767; halfway is the digital press point. */
+    if (ps1_input_trigger_buttons(16383, 0) != 0) return 30;
+    if (ps1_input_trigger_buttons(16384, 0) != PS1_PAD_L2) return 31;
+    if (ps1_input_trigger_buttons(0, 32767) != PS1_PAD_R2) return 32;
+    if (ps1_input_trigger_buttons(32767, 32767) != (PS1_PAD_L2 | PS1_PAD_R2)) return 33;
+    if (ps1_input_trigger_buttons(-32768, -1) != 0) return 34;
     assert(ps1_input_stick_buttons(0, 0) == 0);
     assert(ps1_input_stick_buttons(0, -32768) == PS1_PAD_UP);
     assert(ps1_input_stick_buttons(32767, 0) == PS1_PAD_RIGHT);

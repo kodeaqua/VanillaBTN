@@ -41,6 +41,7 @@ Update the relevant item after completing a task or discovering a blocker.
     - [x] Connect original startup and module dispatch to the host loop; both profiles boot the original title through a finite headless probe (901 vblank pumps, 848 colored frames, 658 nonzero PCM intervals). No scene logic is replaced.
 - [x] Replace the blank backend harness with original startup/game execution; full-game acceptance remains open.
 - [x] Connect original controller polling through native SDK receive buffers and rumble.
+  - [x] Map both SDL gamepad trigger axes to digital L2/R2 for both ports. Synthetic boundary and combined-trigger checks pass; the developer must validate physical controller behavior.
   - [x] Match SDK atan/CORDIC math across all 16,641 analog magnitude pairs in both profiles.
   - [x] Compile original pad.c and pad_vibration.c against native receive buffers; verify repeats, sectors, replay, hot swaps and vibration script actuator requests.
   - [x] Invoke original pad polling from original startup/frame execution.

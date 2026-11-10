@@ -2,6 +2,11 @@
 #include <math.h>
 #include <stdlib.h>
 
+uint32_t ps1_input_trigger_buttons(int16_t left, int16_t right) {
+    return (left >= 16384 ? PS1_PAD_L2 : 0)
+        | (right >= 16384 ? PS1_PAD_R2 : 0);
+}
+
 uint32_t ps1_input_stick_buttons(int16_t host_x, int16_t host_y) {
     int x = ((int)host_x + 32768) / 256;
     int y = ((int)host_y + 32768) / 256;

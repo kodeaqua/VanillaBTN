@@ -72,4 +72,7 @@ void ps1_input_clear(Ps1InputRecord *record);
 /* Fold an SDL signed left stick into pad.c's four cardinal sectors/dead zone. */
 uint32_t ps1_input_stick_buttons(int16_t x, int16_t y);
 
+/* Convert SDL trigger axes into the original digital L2/R2 buttons. */
+uint32_t ps1_input_trigger_buttons(int16_t left, int16_t right);
+
 #endif /* VANILLABTN_PS1_INPUT_H */

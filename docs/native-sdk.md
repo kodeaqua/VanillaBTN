@@ -397,9 +397,9 @@ unsupported interrupt-clearing modes stop instead of pretending to work.
 
 The SDL host merges keyboard/controller raw bits into port 1, assigns a second
 physical SDL gamepad to port 2 when connected, and supplies rumble output for both
-opened gamepads. The smoke harness still uses its old input record while original
-startup is pending; raw SDK samples are ready for the original poller. Rumble,
-disconnects and controller feel still require developer validation.
+opened gamepads. Gamepad trigger axes map to digital L2/R2 once pressed at least
+halfway. Original startup uses the SDK samples through its own controller
+poller. Rumble, disconnects and controller feel still require developer validation.
 
 Fixtures supply the actual original main/farm record types, not replacement
 controller algorithms. They cover both ports, repeated and newly pressed
