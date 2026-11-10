@@ -41,7 +41,7 @@ Update the relevant item after completing a task or discovering a blocker.
     - [x] Connect original startup and module dispatch to the host loop; both profiles boot the original title through a finite headless probe (901 vblank pumps, 848 colored frames, 658 nonzero PCM intervals). No scene logic is replaced.
 - [x] Replace the blank backend harness with original startup/game execution; full-game acceptance remains open.
 - [x] Connect original controller polling through native SDK receive buffers and rumble.
-  - [x] Restore both gamepads' held buttons, stick and trigger states when window focus returns. An SDL virtual-gamepad fixture verifies snapshot reads and releases; physical focus behavior remains developer validation.
+  - [x] Restore both gamepads' held buttons, stick and trigger states when window focus returns or when a gamepad is connected. An SDL virtual-gamepad fixture verifies snapshot reads and releases; physical focus behavior remains developer validation.
   - [x] Track keyboard aliases per physical key, so releasing one alias does not release a PS1 button still held by another. Synthetic input checks cover overlapping aliases.
   - [x] Map both SDL gamepad trigger axes to digital L2/R2 for both ports. Synthetic boundary and combined-trigger checks pass; the developer must validate physical controller behavior.
   - [x] Match SDK atan/CORDIC math across all 16,641 analog magnitude pairs in both profiles.

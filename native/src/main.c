@@ -149,10 +149,22 @@ static void host_game_pump(void *context) {
         if (event.type == SDL_EVENT_QUIT) {
             host->running = false;
         } else if (event.type == SDL_EVENT_GAMEPAD_ADDED) {
+            int slot = -1;
             if (host->gamepads[0] == NULL) {
-                host->gamepads[0] = SDL_OpenGamepad(event.gdevice.which);
+                slot = 0;
             } else if (host->gamepads[1] == NULL) {
-                host->gamepads[1] = SDL_OpenGamepad(event.gdevice.which);
+                slot = 1;
+            }
+            if (slot >= 0) {
+                host->gamepads[slot] = SDL_OpenGamepad(event.gdevice.which);
+                if (host->gamepads[slot] != NULL) {
+                    HostPadSnapshot state = host_gamepad_snapshot(host->gamepads[slot]);
+                    host->controller_buttons[slot] = state.buttons;
+                    host->stick_x[slot] = state.x;
+                    host->stick_y[slot] = state.y;
+                    host->trigger_left[slot] = state.left_trigger;
+                    host->trigger_right[slot] = state.right_trigger;
+                }
             }
         } else if (event.type == SDL_EVENT_GAMEPAD_REMOVED) {
             for (int i = 0; i < 2; ++i) {
