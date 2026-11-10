@@ -530,6 +530,12 @@ Opening now uses the bounded parser and publishes only a successful result.
 Fixtures cover invalid PPQN, a short header, an unregistered buffer and a
 valid `FF 2F` delta followed by the actual end event. The invalid-header check
 fails on the previous implementation and again on temporary reversion.
+Standard MIDI channel events (polyphonic key pressure `0xA0`, channel aftertouch
+`0xD0`, pitch bend `0xE0`, controller resets `CC 121` and unmapped control
+changes) are parsed according to MIDI message length and consumed gracefully
+instead of terminating sequence playback. In particular, 1-byte channel
+pressure messages do not consume subsequent delta-time bytes. Independent
+fixtures verify all channel events in Debug and Release.
 
 ## Farm source compilation
 

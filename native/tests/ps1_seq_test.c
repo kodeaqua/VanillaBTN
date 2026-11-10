@@ -91,6 +91,26 @@ static void test_malformed_sequences_terminate(void) {
     assert(!ps1_seq_open(&seq, sequence, 14, 0, false) && !seq.active);
 }
 
+static void test_standard_midi_channel_events(void) {
+    uint8_t sequence[] = {
+        'p','Q','E','S',0,0,0,1,0,100,0x0F,0x42,0x40,4,2,
+        0, 0xB0, 1, 64,      /* CC 1 modulation */
+        0, 0xB0, 64, 127,    /* CC 64 sustain */
+        0, 0xB0, 121, 0,     /* CC 121 reset all controllers */
+        0, 0xA0, 60, 100,    /* Polyphonic aftertouch (2 bytes) */
+        0, 0xD0, 80,         /* Channel aftertouch (1 byte) */
+        0, 0xE0, 0, 64,      /* Pitch bend (2 bytes) */
+        0, 0x90, 60, 127,    /* Note On */
+        1, 0x80, 60, 0,      /* Note Off */
+        0, 0xFF, 0x2F, 0     /* EOT */
+    };
+    int16_t pcm[885 * 2];
+    Ps1Seq seq;
+    assert(ps1_seq_open(&seq, sequence, sizeof(sequence), bank(), false));
+    ps1_seq_mix(&seq, &spu, pcm, 885);
+    assert(!seq.active && !seq.failed && seq.note_events == 1);
+}
+
 int main(void) {
     /* A voice previously used by this sequence may now hold an external effect.
      * Note-off, CC volume/all-notes-off and EOT must not modify that effect. */
@@ -131,5 +151,6 @@ int main(void) {
     test_sample_boundaries_and_running_status();
     test_ps1_tempo_and_loop_commands();
     test_malformed_sequences_terminate();
+    test_standard_midi_channel_events();
     return 0;
 }

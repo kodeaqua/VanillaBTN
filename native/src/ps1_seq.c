@@ -135,6 +135,7 @@ static bool event(Ps1Seq *seq, Ps1Spu *spu) {
     channel = status & 15u;
     if (status < 128 || !byte(seq, &a) || a > 127) return false;
     if ((status & 240u) == 0xC0) { seq->channels[channel].program = a; return true; }
+    if ((status & 240u) == 0xD0) return true;
     if (!byte(seq, &b) || b > 127) return false;
     switch (status & 240u) {
     case 0x80: note_off(seq, spu, channel, a); return true;
@@ -142,6 +143,7 @@ static bool event(Ps1Seq *seq, Ps1Spu *spu) {
         if (b == 0) note_off(seq, spu, channel, a);
         else note_on(seq, spu, channel, a, b);
         return true;
+    case 0xA0: return true;
     case 0xB0:
         if (a == 7) seq->channels[channel].volume = b;
         else if (a == 10) seq->channels[channel].pan = b;
@@ -160,12 +162,15 @@ static bool event(Ps1Seq *seq, Ps1Spu *spu) {
                 if (spu->voices[v].vab_id == seq->bank
                     && seq->voices[v].channel == channel) ps1_spu_key_off(spu, (int)v);
             }
-        } else if (a != 6 && a != 99) return false;
+        } else if (a == 121) {
+            seq->channels[channel].expression = 127;
+        }
         for (unsigned v = 0; v < 24; ++v) {
             if (spu->voices[v].active && spu->voices[v].vab_id == seq->bank
                 && seq->voices[v].channel == channel) voice_volume(seq, spu, v);
         }
         return true;
+    case 0xE0: return true;
     default: return false;
     }
 }
