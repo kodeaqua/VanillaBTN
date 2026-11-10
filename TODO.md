@@ -96,7 +96,11 @@ Update the relevant item after completing a task or discovering a blocker.
       - [x] Implement widescreen mode presentation pipeline (`host_display_set_widescreen_mode`, `host_present_frame` in `host_display.c`/`host_display.h`) supporting `WIDESCREEN_AUTO`, `WIDESCREEN_ON` (True Hor+), `WIDESCREEN_STRETCH`, and `WIDESCREEN_OFF` (authentic 4:3 letterbox/pillarbox).
       - [x] Protect 2D safe area: preserve un-distorted 4:3 centering and scale for dialogue boxes, clock, portraits, and status icons.
       - [x] Add synthetic unit tests in `ps1_widescreen_test.c` verifying Hor+ scale setter/getter, exact $1/\text{scale}$ horizontal projection compression, vertical coordinate immutability, out-of-bounds safety, and mode persistence (52/52 CTests, 9/9 Python tests passing in Debug and Release).
-    - [ ] Milestone 16: Multi-backend graphics abstraction (`vulkan`, `d3d11`, `opengl`, `software`).
+    - [x] Milestone 16: Multi-backend graphics abstraction (`vulkan`, `d3d11`, `opengl`, `software`).
+      - [x] Implement multi-backend graphics abstraction layer (`host_renderer.h`/`host_renderer.c`) supporting `BACKEND_VULKAN`, `BACKEND_D3D11`, `BACKEND_D3D12`, `BACKEND_OPENGL`, `BACKEND_SOFTWARE`, and `BACKEND_AUTO`.
+      - [x] Implement prioritized automated fallback chain (Requested -> Default -> D3D11 -> OpenGL -> Software) guaranteeing resilient startup across diverse GPU hardware and environments without crashing.
+      - [x] Implement active backend query (`host_renderer_get_active_name`) and driver enumeration queries (`host_renderer_get_driver_count`, `host_renderer_is_driver_available`).
+      - [x] Add synthetic unit tests in `host_renderer_test.c` verifying driver enumeration, backend name mapping, fallback chain creation, and software fallback (53/53 CTests, 9/9 Python tests passing in Debug and Release).
     - [ ] Milestone 17: HD font rendering, extended draw distance, turbo hotkey, and auto-backup save data.
 
 - [x] Continuation audit: complete farm linkage/address translation and remove unsupported SDK success paths before claiming runtime integration.

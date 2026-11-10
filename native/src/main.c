@@ -18,6 +18,7 @@ extern int main_scene;
 #include "config.h"
 #include "sdk_gpu.h"
 #include "host_display.h"
+#include "host_renderer.h"
 #include "host_pacing.h"
 #include "sdk_pad.h"
 #include "sdk_card.h"
@@ -524,9 +525,8 @@ int main(int argc, char **argv) {
 disc_ready:
     host.window = host_display_create_window(&host.config.display);
     if (!host.window) goto done;
-    host.renderer = SDL_CreateRenderer(host.window, NULL);
-    if (!host.renderer || !SDL_SetRenderLogicalPresentation(host.renderer,
-        320, 240, SDL_LOGICAL_PRESENTATION_LETTERBOX)) goto done;
+    host.renderer = host_renderer_create(host.window, host.config.display.backend, host.config.display.vsync);
+    if (!host.renderer) goto done;
     sdk_memory_clear();
     sdk_gpu_bind(&video);
     if (!sdk_gpu_map(sdk_main_ram, SDK_RAM_SIZE)) goto done;

@@ -275,6 +275,19 @@ target_link_libraries(ps1_widescreen_test PRIVATE ps1_gte host_display)
 target_compile_options(ps1_widescreen_test PRIVATE /W4 /UNDEBUG)
 add_test(NAME ps1_true_widescreen COMMAND ps1_widescreen_test)
 
+add_library(host_renderer STATIC src/host_renderer.c)
+set_target_properties(host_renderer PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_include_directories(host_renderer PUBLIC src)
+target_link_libraries(host_renderer PUBLIC app_config SDL3::SDL3)
+target_compile_options(host_renderer PRIVATE /W4)
+target_link_libraries(vanillabtn PRIVATE host_renderer)
+
+add_executable(host_renderer_test tests/host_renderer_test.c)
+set_target_properties(host_renderer_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_link_libraries(host_renderer_test PRIVATE host_renderer)
+target_compile_options(host_renderer_test PRIVATE /W4 /UNDEBUG)
+add_test(NAME host_renderer_abstraction COMMAND host_renderer_test)
+
 add_library(game_screen STATIC
     ../src/main/debug_stubs.c
     ../src/main/game/cooking_recipes.c
@@ -625,7 +638,7 @@ target_compile_definitions(original_boot_test PRIVATE VANILLABTN_BOOT_TEST)
 target_link_libraries(original_boot_test PRIVATE Dbghelp)
 target_link_options(original_boot_test PRIVATE /MAP)
 target_compile_options(original_boot_test PRIVATE /W4)
-target_link_libraries(original_boot_test PRIVATE game_main host_display host_pacing SDL3::SDL3
+target_link_libraries(original_boot_test PRIVATE game_main host_display host_renderer host_pacing SDL3::SDL3
     ps1_input ps1_audio ps1_card app_config ps1_pgxp)
 
 add_executable(original_farm_memory_test tests/original_farm_memory_test.c)
