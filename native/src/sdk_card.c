@@ -226,9 +226,9 @@ int MemCardUnformat(int chan) {
 }
 
 int MemCardSync(int mode, long *cmds, long *rslt) {
-    if ((mode != 0 && mode != 1) || !s_completion_pending) return -1;
     if (cmds != NULL) *cmds = s_last_cmd;
     if (rslt != NULL) *rslt = s_last_result;
+    if ((mode != 0 && mode != 1) || !s_completion_pending) return -1;
     s_completion_pending = false;
     return 1;
 }
@@ -306,8 +306,7 @@ static int mcx_unavailable(long port, long command) {
 }
 
 int McxCardType(long port) {
-    mcx_unavailable(port, McxFuncCardType);
-    return 0;
+    return mcx_unavailable(port, McxFuncCardType);
 }
 
 int McxSync(long mode, long *cmd, long *result) {

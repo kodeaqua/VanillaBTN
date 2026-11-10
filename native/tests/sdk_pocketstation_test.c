@@ -26,6 +26,8 @@ int main(void) {
     CHECK(McxGetSerial(0, &serial) == 1);
     completion(10, 2); /* Standard PS1 card is not a PocketStation. */
     CHECK(serial == 0xCAFEBABE);
+    CHECK(McxCardType(0) == 1);
+    completion(19, 2); /* Card type query completes with Invalid on non-PDA card. */
     unsigned char output[128], unchanged[128];
     memset(output, 0xA5, sizeof(output));
     memcpy(unchanged, output, sizeof(output));

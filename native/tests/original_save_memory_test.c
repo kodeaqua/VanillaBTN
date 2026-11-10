@@ -54,6 +54,20 @@ int main(void) {
     save_image_shift_out();
     CHECK(memcmp(save_image_data, payload, sizeof(payload)) == 0);
 
+    /* Test original saveload card routines: probe, check space, create, write, read */
+    CHECK(save_card_probe(0) == SAVE_CARD_OK);
+    SaveSlotRecord test_record;
+    memset(&test_record, 0, sizeof(test_record));
+    CHECK(save_card_read_header(0, 0, &test_record) == SAVE_CARD_NO_FILE);
+    CHECK(save_card_check_space(0, 0) == SAVE_CARD_OK);
+    CHECK(save_card_create_file(0, 0) == SAVE_CARD_OK);
+    CHECK(save_card_write_file(0, 0, save_file_header) == SAVE_CARD_BUSY);
+    CHECK(save_card_write_file(0, 0, save_file_header) == SAVE_CARD_OK);
+    CHECK(save_card_read_header(0, 0, &test_record) == SAVE_CARD_OK);
+    CHECK(save_card_read_file(0, 0, (u8 *)readback) == SAVE_CARD_BUSY);
+    CHECK(save_card_read_file(0, 0, (u8 *)readback) == SAVE_CARD_OK);
+    CHECK(memcmp(readback, save_file_header, 0x8000) == 0);
+
     /* Verify PS1 wire translation and round-trip packing/unpacking of farm state. */
     CHECK(sizeof(Ps1AnimWire) == 0x30);
     CHECK(sizeof(Ps1ActorWire) == 0xAC);
