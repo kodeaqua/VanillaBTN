@@ -86,7 +86,11 @@ Update the relevant item after completing a task or discovering a blocker.
       - [x] Implement host window creation and dynamic runtime mode switching (`host_display_create_window`, `host_display_apply_mode`) supporting Windowed, Borderless Fullscreen Desktop, Exclusive Fullscreen (with closest mode matching), and Maximized Windowed.
       - [x] Implement runtime fullscreen toggling (`host_display_toggle_fullscreen`) wired to `Alt+Enter` and `F11` in `main.c` event pump with automatic configuration state tracking.
       - [x] Expand synthetic tests in `host_display_test.c` verifying display queries, mode applications, and bidirectional fullscreen toggling (50/50 CTests, 9/9 Python tests passing in Debug and Release).
-    - [ ] Milestone 14: Decoupled FPS limiter (30, 60, monitor Hz, unlocked) maintaining exact 60 virtual vblank simulation cadence.
+    - [x] Milestone 14: Decoupled FPS limiter (30, 60, monitor Hz, unlocked) maintaining exact 60 virtual vblank simulation cadence.
+      - [x] Implement decoupled pacing subsystem (`host_pacing.h`/`host_pacing.c`) calculating precise presentation deadlines for monitor Hz, unlocked (-1), 30 FPS retro cap, and explicit custom refresh targets while retaining authoritative 60 virtual vblanks/second simulation cadence.
+      - [x] Implement sub-tick wait slicing and presentation hook (`sdk_sync_subtick_hook` in `sdk_sync.c`/`sdk_sync.h`) allowing displays at 120 Hz, 144 Hz, or higher to present intermediate frames and eliminate 3:2 pull-down judder without altering game speed.
+      - [x] Wire renderer VSync (`SDL_SetRenderVSync`) and presentation pacing checks into `main.c` event and pump loop.
+      - [x] Add synthetic unit tests in `host_fps_test.c` verifying monitor Hz detection, 30 FPS frame skipping, 60 FPS synchronization, 120 Hz sub-tick slicing, unlocked mode, and deterministic SDK clock integration (51/51 CTests, 9/9 Python tests passing in Debug and Release).
     - [ ] Milestone 15: True Widescreen — Hor+ 3D FOV camera expansion, native culling band expansion, and 2D HUD safe-area protection.
     - [ ] Milestone 16: Multi-backend graphics abstraction (`vulkan`, `d3d11`, `opengl`, `software`).
     - [ ] Milestone 17: HD font rendering, extended draw distance, turbo hotkey, and auto-backup save data.

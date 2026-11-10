@@ -18,6 +18,7 @@ extern int main_scene;
 #include "config.h"
 #include "sdk_gpu.h"
 #include "host_display.h"
+#include "host_pacing.h"
 #include "sdk_pad.h"
 #include "sdk_card.h"
 #include "sdk_cd.h"
@@ -45,6 +46,7 @@ typedef struct HostGame {
     bool running;
     bool paused;
     AppConfig config;
+    HostPacing pacing;
     uint32_t keyboard_buttons, controller_buttons[2];
     uint16_t keyboard_keys[SDL_SCANCODE_COUNT];
     int16_t stick_x[2], stick_y[2];
@@ -139,6 +141,20 @@ static bool boot_save_frame(void) {
     return saved;
 }
 #endif
+
+static void host_subtick_pump(void *context) {
+    HostGame *host = context;
+    if (!host || !host->running || host->paused) return;
+    uint64_t now = SDL_GetTicksNS();
+    if (host_pacing_should_present(&host->pacing, now)) {
+        bool minimized = host->window != NULL &&
+            (SDL_GetWindowFlags(host->window) & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) != 0;
+        if (!minimized) {
+            host_present_frame(&video, host->renderer, &host->texture);
+        }
+        host_pacing_record_presentation(&host->pacing, now);
+    }
+}
 
 static void host_game_pump(void *context) {
     HostGame *host = context;
@@ -349,10 +365,15 @@ static void host_game_pump(void *context) {
         queued < (int)(sizeof(samples) * 4)) {
         SDL_PutAudioStreamData(audio.stream, samples, sizeof(samples));
     }
-    bool minimized = host->window != NULL &&
-        (SDL_GetWindowFlags(host->window) & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) != 0;
-    if (!minimized) {
-        host_present_frame(&video, host->renderer, &host->texture);
+    host_pacing_record_tick(&host->pacing);
+    uint64_t now = SDL_GetTicksNS();
+    if (host_pacing_should_present(&host->pacing, now)) {
+        bool minimized = host->window != NULL &&
+            (SDL_GetWindowFlags(host->window) & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) != 0;
+        if (!minimized) {
+            host_present_frame(&video, host->renderer, &host->texture);
+        }
+        host_pacing_record_presentation(&host->pacing, now);
     }
 }
 
@@ -511,6 +532,23 @@ disc_ready:
     host.texture = SDL_CreateTexture(host.renderer, SDL_PIXELFORMAT_ARGB8888,
         SDL_TEXTUREACCESS_STREAMING, 320, 240);
     if (!host.texture || !SDL_SetTextureScaleMode(host.texture, SDL_SCALEMODE_NEAREST)) goto done;
+
+    /* Query monitor refresh rate and initialize decoupled presentation pacing */
+    {
+        float monitor_hz = 60.0f;
+        SDL_DisplayID disp_id = host_display_get_monitor_id(host.config.display.monitor);
+        const SDL_DisplayMode *cur_mode = SDL_GetCurrentDisplayMode(disp_id);
+        if (cur_mode && cur_mode->refresh_rate >= 20.0f) {
+            monitor_hz = cur_mode->refresh_rate;
+        }
+        host_pacing_init(&host.pacing, &host.config.display, monitor_hz);
+        if (host.pacing.target_fps > 60 || host.pacing.target_fps == 0) {
+            sdk_sync_subtick_hook(host_subtick_pump, &host);
+        } else {
+            sdk_sync_subtick_hook(NULL, NULL);
+        }
+        SDL_SetRenderVSync(host.renderer, host.config.display.vsync ? 1 : 0);
+    }
     ps1_audio_init(&audio);
     ps1_spu_set_polyphony_expansion(&audio.spu, expand_poly);
     ps1_spu_set_pop_suppression(&audio.spu, pop_suppress);
@@ -560,6 +598,7 @@ disc_ready:
 #endif
 
 done:
+    sdk_sync_subtick_hook(NULL, NULL);
     sdk_sync_stop();
     sdk_sync_pump(NULL, NULL);
     VSyncCallback(NULL);

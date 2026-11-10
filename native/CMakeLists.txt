@@ -256,6 +256,19 @@ target_link_libraries(host_display_test PRIVATE host_display)
 target_compile_options(host_display_test PRIVATE /W4 /UNDEBUG)
 add_test(NAME native_display_selection COMMAND host_display_test)
 
+add_library(host_pacing STATIC src/host_pacing.c)
+set_target_properties(host_pacing PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_include_directories(host_pacing PUBLIC src)
+target_link_libraries(host_pacing PUBLIC app_config)
+target_compile_options(host_pacing PRIVATE /W4)
+target_link_libraries(vanillabtn PRIVATE host_pacing)
+
+add_executable(host_fps_test tests/host_fps_test.c)
+set_target_properties(host_fps_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_link_libraries(host_fps_test PRIVATE host_pacing sdk_sync)
+target_compile_options(host_fps_test PRIVATE /W4 /UNDEBUG)
+add_test(NAME host_fps_pacing COMMAND host_fps_test)
+
 add_library(game_screen STATIC
     ../src/main/debug_stubs.c
     ../src/main/game/cooking_recipes.c
@@ -606,7 +619,7 @@ target_compile_definitions(original_boot_test PRIVATE VANILLABTN_BOOT_TEST)
 target_link_libraries(original_boot_test PRIVATE Dbghelp)
 target_link_options(original_boot_test PRIVATE /MAP)
 target_compile_options(original_boot_test PRIVATE /W4)
-target_link_libraries(original_boot_test PRIVATE game_main host_display SDL3::SDL3
+target_link_libraries(original_boot_test PRIVATE game_main host_display host_pacing SDL3::SDL3
     ps1_input ps1_audio ps1_card app_config ps1_pgxp)
 
 add_executable(original_farm_memory_test tests/original_farm_memory_test.c)

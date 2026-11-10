@@ -9,9 +9,29 @@ static uint64_t sdl_now(void *context) {
     return SDL_GetTicksNS();
 }
 
+static void (*host_subtick_hook)(void *);
+static void *host_subtick_context;
+
+void sdk_sync_subtick_hook(void (*subtick)(void *), void *context) {
+    host_subtick_hook = subtick;
+    host_subtick_context = context;
+}
+
 static void sdl_wait(uint64_t deadline, void *context) {
     uint64_t now = sdl_now(context);
-    if (deadline > now) SDL_DelayNS(deadline - now);
+    if (!host_subtick_hook) {
+        if (deadline > now) SDL_DelayNS(deadline - now);
+        return;
+    }
+    while (deadline > now) {
+        uint64_t remaining = deadline - now;
+        uint64_t slice = remaining > 3000000ULL ? 3000000ULL : remaining;
+        SDL_DelayNS(slice);
+        now = sdl_now(context);
+        if (now < deadline && host_subtick_hook) {
+            host_subtick_hook(host_subtick_context);
+        }
+    }
 }
 
 static uint64_t (*clock_now)(void *) = sdl_now;
