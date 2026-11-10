@@ -6,7 +6,7 @@ Update the relevant item after completing a task or discovering a blocker.
 ## Active
 
 - [x] Enhancement & Modernization: Fix 35 PS1 hardware flaws and implement modern graphics and platform features (see `docs/enhancements.md`).
-  - [x] Interactive bug fixes: resolve palette upload desync (Natsume splash & title screen), eliminate audio stream underrun crackles, remove metallic reverb feedback, restore aspect-preserving window presentation, resolve frame pacing stutter, and eliminate text/texture blurring.
+  - [x] Interactive bug fixes: resolve palette upload desync (Natsume splash & title screen), eliminate audio stream underrun crackles, remove metallic reverb feedback, restore aspect-preserving window presentation, resolve frame pacing stutter, eliminate text/texture blurring, and eliminate artificial gray fog polygon wash.
     - [x] Synchronize `clut_vram` and `color32` on `LoadImage`, `MoveImage`, and `GP0_IMAGE_LOAD`, and default `atomic_clut` to `false` so CLUT sampling reads authoritative uploaded palettes instead of cleared background color.
     - [x] Fix unquantized 8-bit texture modulation formula in `texel_to_color32` to avoid truncation at unity gain (`cr = 128`).
     - [x] Eliminate blocking VSync sub-tick presentation loop from `sdl_wait`, restore direct delay, and increase audio buffer cushion to 8 frames, preventing simulation stalls and audio underrun crackles.
@@ -14,6 +14,7 @@ Update the relevant item after completing a task or discovering a blocker.
     - [x] Restore `SDL_LOGICAL_PRESENTATION_LETTERBOX` by default, cache presentation modes to eliminate redundant per-frame viewport reconfiguration, and avoid unneeded `SDL_RestoreWindow` on window creation.
     - [x] Eliminate double-VSync presentation stalls: remove duplicate unconditional post-loop `dispatch_vblank` invocation in `sdk_sync.c` and use `SDL_RENDERER_VSYNC_ADAPTIVE` (falling back to disabled), eliminating low-CPU/low-GPU stuttering and restoring smooth 30/60 FPS cadence.
     - [x] Restore crisp text and texture sharpness: restrict screen-space directional edge blur in `ps1_video.c` to `PS1_AA_SMAA`, increase mipmap LOD threshold from 1.25f to 2.0f, and enforce `SDL_SCALEMODE_NEAREST` on presentation texture scaling.
+    - [x] Eliminate artificial gray fog polygon wash: default `smooth_fog` to `false` in modern preset and guard `apply_atmospheric_fog` against distances $\ge 30000$ (PS1 GTE `fog_near = 32000` disabled state), eliminating 39,304 pixels (51.2% of screen) of gray polygon wash across farm, terrain, and building geometry.
     - [x] Verify all 54 CTests and 9 Python tests pass with 100% success in Debug and Release profiles.
   - [x] Phase 1: PS1 Inherent Flaws & Bottlenecks Fixes (Complete — all 35 hardware flaws fixed and verified).
     - [x] Milestone 1: Implement `vanillabtn.ini` configuration parser (`config.c`/`config.h`) with Master Preset System (`mode = modern / authentic_ps1 / custom`) and fallback defaults.

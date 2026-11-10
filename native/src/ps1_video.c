@@ -15,7 +15,7 @@ static bool s_alpha_halo_fix = true;
 static bool s_mipmapping = true;
 static Ps1TextureFilterMode s_texture_filter = PS1_FILTER_NEAREST;
 static Ps1AntiAliasingMode s_anti_aliasing = PS1_AA_SMAA;
-static bool s_smooth_fog = true;
+static bool s_smooth_fog = false;
 static float s_fog_near = 1000.0f;
 static float s_fog_far = 4000.0f;
 static uint32_t s_fog_color = 0xFF808080u;
@@ -34,7 +34,7 @@ static const int s_dither_matrix[4][4] = {
 };
 
 static uint32_t apply_atmospheric_fog(uint32_t color32, float z) {
-    if (!s_smooth_fog || s_fog_far <= s_fog_near) return color32;
+    if (!s_smooth_fog || s_fog_far <= s_fog_near || s_fog_near >= 30000.0f || z <= s_fog_near) return color32;
     if (z <= s_fog_near) return color32;
 
     float f = (z - s_fog_near) / (s_fog_far - s_fog_near);

@@ -458,7 +458,7 @@ int main(int argc, char **argv) {
     AntiAliasingMode aa_cfg = config_resolve_anti_aliasing(host.config.fixes.anti_aliasing, host.config.preset);
     Ps1AntiAliasingMode aa_mode = (aa_cfg == AA_OFF) ? PS1_AA_OFF :
                                   (aa_cfg == AA_SMAA) ? PS1_AA_SMAA : PS1_AA_MSAA_4X;
-    bool smooth_fog = config_resolve_bool(host.config.fixes.smooth_fog, host.config.preset, true);
+    bool smooth_fog = config_resolve_bool(host.config.fixes.smooth_fog, host.config.preset, false);
     bool oit_trans = config_resolve_bool(host.config.fixes.oit_transparency, host.config.preset, true);
     bool zero_lag = config_resolve_bool(host.config.fixes.zero_fillrate_lag, host.config.preset, true);
     bool hdr_tone = config_resolve_bool(host.config.fixes.hdr_tonemapping, host.config.preset, true);
