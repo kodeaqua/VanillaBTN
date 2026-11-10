@@ -381,11 +381,13 @@ int main(int argc, char **argv) {
     bool zbuff = config_resolve_bool(host.config.fixes.true_depth_buffer, host.config.preset, true);
     bool w_clip = config_resolve_bool(host.config.fixes.near_plane_w_clipping, host.config.preset, true);
     bool quad_sub = config_resolve_bool(host.config.fixes.quad_subdivision, host.config.preset, true);
+    bool float_gte = config_resolve_bool(host.config.fixes.smooth_camera_angles, host.config.preset, true);
 
     ps1_pgxp_set_enabled(pgxp_v, pgxp_t);
     ps1_video_set_true_depth_buffer(zbuff);
     ps1_video_set_near_plane_clipping(w_clip);
     ps1_video_set_quad_subdivision(quad_sub);
+    ps1_gte_set_float_math(float_gte);
 #ifdef VANILLABTN_BOOT_TEST
     SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "dummy");
     SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "dummy");

@@ -4,6 +4,16 @@
 #include <limits.h>
 #include <math.h>
 
+static bool s_float_gte_math = true;
+
+void ps1_gte_set_float_math(bool enabled) {
+    s_float_gte_math = enabled;
+}
+
+bool ps1_gte_get_float_math(void) {
+    return s_float_gte_math;
+}
+
 void ps1_gte_init(Ps1Gte *gte) {
     if (gte == NULL) return;
     memset(gte, 0, sizeof(*gte));
@@ -122,7 +132,38 @@ static void transform_vertex(const Ps1Gte *gte, const Ps1Vector3 *v,
     if (out_sub != NULL) {
         float sub_z = (float)cz;
         float sub_x, sub_y;
-        if (cz > 0) {
+
+        if (s_float_gte_math && cz > 0) {
+            float inv_4096 = 1.0f / 4096.0f;
+            float r00 = (float)gte->rot[0][0] * inv_4096;
+            float r01 = (float)gte->rot[0][1] * inv_4096;
+            float r02 = (float)gte->rot[0][2] * inv_4096;
+
+            float r10 = (float)gte->rot[1][0] * inv_4096;
+            float r11 = (float)gte->rot[1][1] * inv_4096;
+            float r12 = (float)gte->rot[1][2] * inv_4096;
+
+            float r20 = (float)gte->rot[2][0] * inv_4096;
+            float r21 = (float)gte->rot[2][1] * inv_4096;
+            float r22 = (float)gte->rot[2][2] * inv_4096;
+
+            float fx = (float)x;
+            float fy = (float)y;
+            float fz = (float)z;
+
+            float cx_fl = r00 * fx + r01 * fy + r02 * fz + (float)gte->trans[0];
+            float cy_fl = r10 * fx + r11 * fy + r12 * fz + (float)gte->trans[1];
+            float cz_fl = r20 * fx + r21 * fy + r22 * fz + (float)gte->trans[2];
+
+            if (cz_fl > 0.001f) {
+                sub_x = (float)gte->ofx + (cx_fl * (float)gte->h) / cz_fl;
+                sub_y = (float)gte->ofy + (cy_fl * (float)gte->h) / cz_fl;
+                sub_z = cz_fl;
+            } else {
+                sub_x = (float)screen_x / 65536.0f;
+                sub_y = (float)screen_y / 65536.0f;
+            }
+        } else if (cz > 0) {
             sub_x = (float)screen_x / 65536.0f;
             sub_y = (float)screen_y / 65536.0f;
         } else {
@@ -131,7 +172,7 @@ static void transform_vertex(const Ps1Gte *gte, const Ps1Vector3 *v,
             sub_y = (float)gte->ofy + (float)(cy * gte->h) / z_denom;
         }
 
-        float sub_w = (fabsf(sub_z) > 0.001f) ? (1.0f / sub_z) : 0.0f;
+        float sub_w = (sub_z > 0.001f || sub_z < -0.001f) ? (1.0f / sub_z) : 0.0f;
         out_sub->x = sub_x;
         out_sub->y = sub_y;
         out_sub->z = sub_z;

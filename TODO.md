@@ -34,7 +34,11 @@ Update the relevant item after completing a task or discovering a blocker.
       - [x] Implement dynamic quad subdivision (tessellation) in `ps1_video.c` for large and non-planar quads (`POLY_F4`, `POLY_FT4`, `POLY_G4`, `POLY_GT4`), decomposing them into a $2 \times 2$ grid (8 triangles) with bilinear color and texture coordinate interpolation, eliminating the diagonal kink and crease.
       - [x] Wire `fixes.near_plane_w_clipping` and `fixes.quad_subdivision` through `config_resolve_bool` to `ps1_video` control functions and `main.c`.
       - [x] Add synthetic unit tests in `ps1_clipping_test.c` verifying culling of behind-camera triangles, 1-vertex and 2-vertex near-plane clipping, quad tessellation, and toggle controls (42/42 CTests, 9/9 Python tests passing in Debug and Release).
-    - [ ] Milestone 5: 32-bit Float GTE Math (smooth camera rotation angles and skeletal joint precision).
+    - [x] Milestone 5: 32-bit Float GTE Math (smooth camera rotation angles and skeletal joint precision).
+      - [x] Implement 32-bit continuous floating-point matrix transformation and perspective projection in `ps1_gte.c` (`ps1_gte_set_float_math`, `ps1_gte_get_float_math`), bypassing 12-bit fixed-point truncation and UNR reciprocal quantization in native rendering.
+      - [x] Maintain authoritative integer SXY/SZ registers for original game simulation, ordering tables, and collision logic while routing continuous subpixel coordinates to PGXP precision cache.
+      - [x] Connect `fixes.smooth_camera_angles` via `config_resolve_bool` in `main.c` to enable continuous camera panning and eliminate skeletal joint twitches.
+      - [x] Add synthetic unit tests in `ps1_float_gte_test.c` verifying 3D rotation precision, smooth monotonic sweeps, and fallback to fixed-point when disabled (43/43 CTests, 9/9 Python tests passing in Debug and Release).
     - [ ] Milestone 6: True Color 32-bit pipeline (ARGB8888 anti-banding) and dithering removal (`dithering = off / deband`).
     - [ ] Milestone 7: Texture bleeding fix (sub-rectangle UV clamping), alpha halo fix (pre-filter alpha test), and automatic mipmapping.
     - [ ] Milestone 8: Anti-Aliasing (MSAA/SMAA) and smooth exponential atmospheric fog.
