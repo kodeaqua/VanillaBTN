@@ -108,6 +108,9 @@ int MemCardReadData(unsigned int *adrs, int ofs, int bytes) {
     return 0;
 }
 
+static Ps1Card *stage_card(Ps1Card *card);
+static bool commit_card(Ps1Card *card, Ps1Card *staged);
+
 /* Resolve the entire on-disk chain before copying anything. This
  * prevents a damaged tail from causing partial reads or corrupting a save. */
 static int transfer_file(int chan, char *file, unsigned int *adrs,
@@ -126,13 +129,15 @@ static int transfer_file(int chan, char *file, unsigned int *adrs,
     if (status == PS1_CARD_ERR_NO_FILE) s_last_result = McErrFileNotExist;
     if (status != PS1_CARD_OK || (unsigned)ofs > size ||
         (unsigned)bytes > size - (unsigned)ofs) return -1;
+    Ps1Card *target = write && bytes ? stage_card(card) : card;
+    if (!target) return -1;
     size_t done = 0;
     while (done < (size_t)bytes) {
         size_t pos = (size_t)ofs + done;
         size_t local = pos % PS1_CARD_BLOCK_SIZE;
         size_t chunk = PS1_CARD_BLOCK_SIZE - local;
         if (chunk > (size_t)bytes - done) chunk = (size_t)bytes - done;
-        uint8_t *storage = card->data +
+        uint8_t *storage = target->data +
             chain[pos / PS1_CARD_BLOCK_SIZE] * PS1_CARD_BLOCK_SIZE + local;
         uint8_t *buffer = (uint8_t *)adrs + done;
         if (write) memcpy(storage, buffer, chunk);
@@ -140,13 +145,9 @@ static int transfer_file(int chan, char *file, unsigned int *adrs,
         done += chunk;
     }
     if (write && bytes) {
-        card->dirty = true;
-        /* A completed game save must survive a crash before host shutdown.
-         * Unbound cards are deliberately in-memory fixtures. */
-        if (s_bound_manager != NULL) {
-            if (!ps1_card_save_to_file(card, card->filepath)) return -1;
-            card->dirty = false;
-        }
+        target->dirty = true;
+        /* Publish the changed image only after disk persistence succeeds. */
+        if (!commit_card(card, target)) return -1;
     }
     s_last_result = McErrNone;
     return 0;
@@ -178,7 +179,7 @@ int MemCardWriteFile(int chan, char *file, unsigned int *adrs, int ofs, int byte
     return register_transfer(chan, file, adrs, ofs, bytes, true);
 }
 
-/* Metadata operations must remain retryable when disk persistence fails. */
+/* Card mutations must remain retryable when disk persistence fails. */
 static Ps1Card *stage_card(Ps1Card *card) {
     if (!s_bound_manager) return card;
     Ps1Card *staged = malloc(sizeof(*staged));

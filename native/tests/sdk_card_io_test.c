@@ -47,11 +47,17 @@ static void test_write_persists_before_completion(void) {
     memset(buffer, 0xA5, sizeof(buffer));
     CHECK(MemCardWriteFile(0, "TEST", buffer, 0, sizeof(buffer)) == 1);
     completion(McErrCardInvalid, McFuncWriteFile);
-    CHECK(card->dirty);
+    CHECK(!card->dirty && memcmp(snapshot, card->data, sizeof(snapshot)) == 0);
     file = fopen(path, "rb");
     CHECK(file);
     unsigned char first[128];
     CHECK(fseek(file, PS1_CARD_BLOCK_SIZE, SEEK_SET) == 0);
+    CHECK(fread(first, 1, sizeof(first), file) == sizeof(first));
+    CHECK(fclose(file) == 0 && first[0] == 0x5A);
+    remove(temp);
+    CHECK(MemCardCreateFile(0, "NEXT", 1) == McErrNone);
+    file = fopen(path, "rb");
+    CHECK(file && fseek(file, PS1_CARD_BLOCK_SIZE, SEEK_SET) == 0);
     CHECK(fread(first, 1, sizeof(first), file) == sizeof(first));
     CHECK(fclose(file) == 0 && first[0] == 0x5A);
     sdk_card_bind_manager(NULL);
