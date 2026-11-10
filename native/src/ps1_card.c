@@ -479,9 +479,9 @@ bool ps1_card_save_to_file(const Ps1Card *card, const char *filepath) {
     }
 
     /* 3. Atomically replace target with temp file */
-    if (rename(tmp_path, filepath) != 0) {
+    if (!SDL_RenamePath(tmp_path, filepath)) {
         /* Restore backup if rename failed */
-        rename(bak_path, filepath);
+        SDL_RenamePath(bak_path, filepath);
         return false;
     }
 

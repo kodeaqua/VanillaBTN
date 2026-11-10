@@ -344,6 +344,17 @@ int main(int argc, char **argv) {
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--data") == 0 && i + 1 < argc) disc = argv[++i];
         else if (strcmp(argv[i], "--card-dir") == 0 && i + 1 < argc) card_directory = argv[++i];
+        else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
+            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "VanillaBTN",
+                "VanillaBTN - Native Windows Port\n\n"
+                "Usage:\n"
+                "  VanillaBTN [options]\n\n"
+                "Options:\n"
+                "  --data <path>      Path to disc directory containing A_FILE.BIN and A_FILE.HDT\n"
+                "  --card-dir <path>  Path to directory containing card1.mcr and card2.mcr\n"
+                "  --help, -h         Show this help information", NULL);
+            return 0;
+        }
 #ifdef VANILLABTN_BOOT_TEST
         else if (strcmp(argv[i], "--demo") == 0) host.vblank_limit = 5000;
         else if (strcmp(argv[i], "--new-game") == 0) {

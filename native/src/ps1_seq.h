@@ -22,10 +22,13 @@ typedef struct Ps1Seq {
     Ps1VabId bank;
     Ps1SeqChannel channels[16];
     Ps1SeqVoice voices[24];
+    unsigned seq_vol_left, seq_vol_right;
     bool active, failed, repeat;
 } Ps1Seq;
 
 bool ps1_seq_open(Ps1Seq *seq, const uint8_t *data, size_t size, Ps1VabId bank, bool repeat);
+/* Update sequence master volume (0..127) and scale all active voices. */
+void ps1_seq_set_vol(Ps1Seq *seq, Ps1Spu *spu, unsigned voll, unsigned volr);
 /* Schedule events at sample boundaries, then mix the same SPU voices to PCM. */
 void ps1_seq_mix(Ps1Seq *seq, Ps1Spu *spu, int16_t *out, int frames);
 

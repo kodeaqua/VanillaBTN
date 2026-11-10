@@ -292,6 +292,7 @@ void ps1_spu_key_on_raw(Ps1Spu *spu, int voice_idx, const uint8_t *data,
     v->sample_len = data_len;
     v->block_sample_idx = ADPCM_SAMPLES_PER_BLOCK;
     v->pitch_step = pitch_16_16 ? pitch_16_16 : 0x10000;
+    if (v->pitch_step > 0x40000) v->pitch_step = 0x40000;
     v->vol_left = vol_left;
     v->vol_right = vol_right;
     /* Raw sample playback has no VAB ADSR registers: hold its explicit volume.
@@ -333,6 +334,9 @@ void ps1_spu_key_on_vab(Ps1Spu *spu, int voice_idx, Ps1VabId vab_id,
     double ratio = pow(2.0, semitones / 12.0);
     uint32_t pitch = (uint32_t)(ratio * 65536.0 + 0.5);
     if (pitch == 0) pitch = 0x10000;
+    /* PS1 SPU pitch register is 14 bits (0..0x3FFF), max ~4.0x sample rate.
+     * Clamp 16.16 pitch step to 0x40000 to prevent runaway interpolation. */
+    if (pitch > 0x40000) pitch = 0x40000;
 
     /* Volume scaling: scale 0..127 to 0..0x7FFF */
     int32_t vl = ((int32_t)voll * (int32_t)tone_vol * 0x7FFF) / (127 * 127);

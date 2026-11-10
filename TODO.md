@@ -6,6 +6,13 @@ Update the relevant item after completing a task or discovering a blocker.
 ## Active
 
 - [x] Continuation audit: complete farm linkage/address translation and remove unsupported SDK success paths before claiming runtime integration.
+  - [x] Native runtime audit: wire sequence master volume, enable CD-XA seamless looping, enforce UTF-8 card path replacement, clamp SPU pitch step, reset letterbox draw color, and add CLI help.
+    - [x] Wire `Ps1Seq` master volume in `ps1_seq.c` and connect `SsSeqSetVol` in `sdk_sound.c`: sequence voices and notes now scale proportionally to sequence volume, enabling BGM fade-out and volume adjustments. Synthetic fixtures verify volume scaling in Debug and Release.
+    - [x] Report `CdlDiskError` (5) from `CdSync` on XA stream EOF in `sdk_cd.c` to trigger `cd_audio.c` track restarts (`cd_audio_restart(CdlReadS)`), restoring seamless background music looping.
+    - [x] Replace ANSI `rename()` with `SDL_RenamePath()` in `ps1_card.c` to guarantee safe atomic card replacement on UTF-8 paths containing unicode characters.
+    - [x] Clamp SPU pitch step to `0x40000` (4.0x sample rate / 14-bit pitch limit) in `ps1_spu.c` to prevent runaway sample-fetch loops on extreme notes.
+    - [x] Enforce black clear draw color before `SDL_RenderClear` in `host_display.c` so disabled displays and letterbox presentations remain pure black.
+    - [x] Add `--help` / `-h` dialog to `main.c` providing command-line usage instructions.
   - [x] Fix the reported flashback abort at SsSetSerialVol: the original CD fade emits 128 at volume 32, and the SDK must cap it to 127. The original-code regression fails on the old backend and after reversion; both profiles pass 32 synthetic checks. An optional Debug new-game replay reaches 18,000 vblanks beyond the previous abort.
   - [x] Investigate a separate optimized new-game probe failure in native menu state/callback handling before claiming Release gameplay stability. Guard farm menu last callback invocation when null, return early from options menu closing state to prevent out-of-bounds dispatch into options_state_handlers, and map status page sprites indices 3 and 4 explicitly to status_cursor_sprite and status_mark_sprite to handle MSVC x64 BSS non-adjacency. An asset-free Release new-game replay completes 18,000 vblanks into the farm scene with full audio/graphics without faults.
 

@@ -47,6 +47,8 @@ bool ps1_seq_open(Ps1Seq *seq, const uint8_t *data, size_t size, Ps1VabId bank, 
     seq->cursor = 15;
     seq->bank = bank;
     seq->repeat = repeat;
+    seq->seq_vol_left = 127;
+    seq->seq_vol_right = 127;
     for (unsigned i = 0; i < 16; ++i) {
         seq->channels[i] = (Ps1SeqChannel){0,127,64,127};
     }
@@ -83,8 +85,24 @@ static void voice_volume(Ps1Seq *seq, Ps1Spu *spu, unsigned voice) {
     unsigned right = volume * (unsigned)pan * 2u / 127u;
     if (left > 127) left = 127;
     if (right > 127) right = 127;
+    left = left * seq->seq_vol_left / 127u;
+    right = right * seq->seq_vol_right / 127u;
     spu->voices[voice].vol_left = (int16_t)(left * tone[2] * 32767u / (127u * 127u));
     spu->voices[voice].vol_right = (int16_t)(right * tone[2] * 32767u / (127u * 127u));
+}
+
+void ps1_seq_set_vol(Ps1Seq *seq, Ps1Spu *spu, unsigned voll, unsigned volr) {
+    if (seq == NULL) return;
+    if (voll > 127) voll = 127;
+    if (volr > 127) volr = 127;
+    seq->seq_vol_left = voll;
+    seq->seq_vol_right = volr;
+    if (spu == NULL || seq->bank < 0 || seq->bank >= PS1_SPU_VAB_SLOTS) return;
+    for (unsigned v = 0; v < 24; ++v) {
+        if (spu->voices[v].active && spu->voices[v].vab_id == seq->bank) {
+            voice_volume(seq, spu, v);
+        }
+    }
 }
 
 static void note_on(Ps1Seq *seq, Ps1Spu *spu, unsigned channel, unsigned note, unsigned velocity) {

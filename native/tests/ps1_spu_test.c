@@ -327,6 +327,23 @@ static void test_spu_vab_reverb_tail(void) {
 
 }
 
+static void test_spu_pitch_clamping(void) {
+    Ps1Spu spu;
+    ps1_spu_init(&spu);
+    uint8_t dummy_block[16];
+    memset(dummy_block, 0, sizeof(dummy_block));
+    dummy_block[0] = 0x04;
+    dummy_block[1] = PS1_ADPCM_FLAG_LOOP_START | PS1_ADPCM_FLAG_LOOP_END | PS1_ADPCM_FLAG_LOOP_REPEAT;
+
+    /* Raw key-on with extreme pitch */
+    ps1_spu_key_on_raw(&spu, 0, dummy_block, sizeof(dummy_block), 0x999999, 127, 127);
+    assert(spu.voices[0].pitch_step == 0x40000);
+
+    int16_t pcm[64];
+    ps1_spu_mix(&spu, pcm, 32, 0);
+    assert(spu.voices[0].active);
+}
+
 int main(void) {
     test_spu_vab_reverb_tail();
     test_final_adpcm_block_is_not_discarded();
@@ -336,6 +353,7 @@ int main(void) {
     test_spu_raw_playback_and_volume();
     test_spu_adsr_envelope();
     test_spu_reverb_without_voice_sends();
+    test_spu_pitch_clamping();
     printf("ps1_spu tests passed.\n");
     return 0;
 }

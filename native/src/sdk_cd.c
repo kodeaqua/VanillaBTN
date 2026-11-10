@@ -19,7 +19,7 @@ static unsigned file_count;
 static u_long next_sector, seek_sector, seek_target;
 static bool seek_pending;
 static u_char last_command, drive_mode, filter_file, filter_channel;
-static bool filter_set, xa_streaming, xa_paused;
+static bool filter_set, xa_streaming, xa_paused, stream_ended;
 static Ps1XaPlayer xa_player;
 static DiscFile *stream_file;
 static u_long stream_first;
@@ -58,7 +58,10 @@ void sdk_cd_mix(int16_t *out, int frames) {
         uint64_t position = stream_first + stream_clock / 44100;
         u_long end = stream_file->first + stream_file->sectors;
         seek_sector = position < end ? (u_long)position : end;
-        if (xa_player.state == PS1_XA_IDLE) stop_xa();
+        if (xa_player.state == PS1_XA_IDLE) {
+            stream_ended = true;
+            stop_xa();
+        }
     }
 }
 static struct {
@@ -82,7 +85,7 @@ void sdk_cd_unmount(void) {
     next_sector = seek_sector = seek_target = 0;
     seek_pending = false;
     last_command = drive_mode = filter_file = filter_channel = 0;
-    filter_set = xa_streaming = false;
+    filter_set = xa_streaming = stream_ended = false;
 }
 
 bool sdk_cd_mount(const char *directory) {
@@ -182,6 +185,7 @@ static DiscFile *find_sector_file(u_long sector) {
 
 int CdControl(u_char command, u_char *parameter, u_char *result) {
     if (command == CdlStandby || command == CdlPause) {
+        stream_ended = false;
         if (command == CdlPause && xa_streaming) {
             xa_paused = true;
             xa_streaming = false;
@@ -231,6 +235,7 @@ int CdControl(u_char command, u_char *parameter, u_char *result) {
         seek_pending = false;
         xa_paused = false;
         xa_streaming = true;
+        stream_ended = false;
     } else if (command == CdlGetlocP) {
         if (result) {
             CdlLOC pos;
@@ -261,6 +266,14 @@ u_char CdLastCom(void) {
 
 int CdSync(int mode, u_char *result) {
     if (!root[0] || (mode != 0 && mode != 1)) return -1;
+    if (stream_ended) {
+        stream_ended = false;
+        if (result) {
+            memset(result, 0, 8);
+            result[0] = 5;
+        }
+        return CdlDiskError;
+    }
     if (result) {
         memset(result, 0, 8);
         result[0] = 2;

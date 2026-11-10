@@ -111,6 +111,36 @@ static void test_standard_midi_channel_events(void) {
     assert(!seq.active && !seq.failed && seq.note_events == 1);
 }
 
+static void test_sequence_volume_scaling(void) {
+    uint8_t sequence[] = {
+        'p','Q','E','S',0,0,0,1,0,100,0x0F,0x42,0x40,4,2,
+        0, 0xC0, 0,
+        1, 0x90, 60, 127,
+        100, 0xFF, 0x2F, 0
+    };
+    Ps1Seq seq;
+    assert(ps1_seq_open(&seq, sequence, sizeof(sequence), bank(), false));
+    int16_t pcm[450 * 2];
+    ps1_seq_mix(&seq, &spu, pcm, 450);
+    assert(spu.voices[0].active);
+    int16_t full_vol_left = spu.voices[0].vol_left;
+    assert(full_vol_left > 0);
+
+    /* Half volume */
+    ps1_seq_set_vol(&seq, &spu, 64, 64);
+    assert(spu.voices[0].vol_left > 0 && spu.voices[0].vol_left < full_vol_left);
+    int16_t expected_half = (int16_t)((int32_t)full_vol_left * 64 / 127);
+    assert(abs(spu.voices[0].vol_left - expected_half) < 200);
+
+    /* Mute */
+    ps1_seq_set_vol(&seq, &spu, 0, 0);
+    assert(spu.voices[0].vol_left == 0 && spu.voices[0].vol_right == 0);
+
+    /* Restore */
+    ps1_seq_set_vol(&seq, &spu, 127, 127);
+    assert(spu.voices[0].vol_left == full_vol_left);
+}
+
 int main(void) {
     /* A voice previously used by this sequence may now hold an external effect.
      * Note-off, CC volume/all-notes-off and EOT must not modify that effect. */
@@ -152,5 +182,6 @@ int main(void) {
     test_ps1_tempo_and_loop_commands();
     test_malformed_sequences_terminate();
     test_standard_midi_channel_events();
+    test_sequence_volume_scaling();
     return 0;
 }

@@ -8,6 +8,7 @@ bool host_present_frame(const Ps1Video *video, SDL_Renderer *renderer, SDL_Textu
     int pitch;
     bool copied;
     SdkDisplay display = sdk_gpu_display();
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     if (!display.enabled || display.x < 0 || display.y < 0
         || display.width <= 0 || display.height <= 0
         || display.width > PS1_VRAM_WIDTH - display.x

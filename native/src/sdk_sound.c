@@ -436,6 +436,7 @@ void SsSeqPlay(int seq_access_num, char play_mode, short l_count) {
         return;
     }
     ps1_seq_open(&rec->seq, rec->data, rec->data_size, rec->vab_id, l_count == SSPLAY_INFINITY);
+    ps1_seq_set_vol(&rec->seq, &spu, (unsigned)rec->vol_left, (unsigned)rec->vol_right);
     rec->playing = true;
     rec->paused = false;
 }
@@ -481,6 +482,7 @@ void SsSeqSetVol(int seq_access_num, int voll, int volr) {
     if (volr > 127) volr = 127;
     rec->vol_left = (int16_t)voll;
     rec->vol_right = (int16_t)volr;
+    ps1_seq_set_vol(&rec->seq, &spu, (unsigned)voll, (unsigned)volr);
 }
 
 void SsSeqClose(int seq_access_num) {
