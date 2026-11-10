@@ -2,7 +2,7 @@
 
 VanillaBTN's current target is a native Windows port of *Harvest Moon: Back to
 Nature* that preserves the original experience. The repository builds a native
-Windows bringup window, but it does not run the game yet. Its matching PS1
+x64 Windows executable that runs the original game code, startup, and scene dispatcher. Its matching PS1
 decompilation is the behavioral and data-layout reference for that work.
 
 ## Fidelity rules
@@ -40,7 +40,7 @@ timing, visuals, and audio. The PS1 reference build
 keeps its existing compiler settings and SHA-1 checks.
 
 The staged implementation plan and stack decisions are in
-[roadmap.md](roadmap.md). Only the native toolchain and empty window from
-milestone 0 are implemented so far. The PS1 `check` target verifies byte
-identity of the reference; the developer will validate actual Windows gameplay
-separately.
+[roadmap.md](roadmap.md). Milestones 0 through 5 are fully implemented and verified,
+with Milestone 6 release packaging and runtime bringup established. The PS1 `check`
+target verifies byte identity of the reference; the developer validates actual Windows
+gameplay and runtime behavior.

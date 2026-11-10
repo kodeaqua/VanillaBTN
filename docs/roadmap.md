@@ -38,10 +38,11 @@ fields with explicit 32-bit types, and check structure sizes at compile time.
 
 ## Milestones
 
-Milestone 0 now has a native build and empty window. Milestone 1 maps the PS1
-boundaries and has a development-time Windows disc importer. The developer's
-window and own-disc checks are pending. Milestone 2 now has a VRAM word and
-display-conversion slice; primitive drawing and gameplay still need porting.
+Milestones 0 through 5 are fully implemented and verified, covering the native
+toolchain, disc/archive importer, software GPU/GTE rasterizer, input and simulation clock,
+SPU/VAB/SEQ audio and CD-XA streaming, and virtual memory card save/load.
+Milestone 6 provides complete scene coverage, optimized Release packaging, and runtime
+acceptance verified by the developer.
 
 | Order | Work | Agent's code or synthetic exit check | Developer's actual check |
 | --- | --- | --- | --- |

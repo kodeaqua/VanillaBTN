@@ -9,13 +9,13 @@ should be optional and separate from that default experience.
 ## Current status
 
 This repository contains a matching decompilation of the PlayStation USA
-release (`SLUS_011.15`) and a minimal native Windows bringup executable. The
-native executable now runs the original startup and scene dispatcher against
-locally imported disc data. A headless boot check reaches the original title
-with colored frames and nonzero PCM in both profiles. Full gameplay, save/load
-and audiovisual fidelity remain under audit. The PS1 source builds the EXE and its 13 overlays byte for byte and,
-given your own copy of the disc, the whole disc image. That build remains
-the reference baseline. Building it with Docker on Windows still produces
+release (`SLUS_011.15`) and a native x64 Windows bringup executable. The
+native executable runs the original startup and scene dispatcher against
+locally imported disc data, featuring complete software GPU/GTE rasterization,
+SPU/VAB/SEQ audio, CD-XA music streaming, dual controller input with rumble, and
+virtual memory card save/load. The PS1 source builds the EXE and its 13 overlays
+byte for byte and, given your own copy of the disc, the whole disc image. That build
+remains the reference baseline. Building it with Docker on Windows still produces
 PS1 binaries.
 
 The [Windows roadmap](docs/roadmap.md) orders the bringup work, and the
