@@ -448,6 +448,9 @@ Formatting requires a present card; an unavailable slot reports
 `McErrCardNotExist` without changing the retained image.
 Recovery replaces an invalid primary image only when a validated temporary or
 backup image can be renamed into place; a failed rename retains the primary.
+If the primary is missing and a recovery candidate remains, loading leaves the
+slot unavailable rather than creating a blank card. New temporary images are
+created exclusively so an unresolved candidate cannot be overwritten.
 
 Card save file renames (`CARD_RENAME` in `mcard.c`) route through `sdk_card_rename`
 via `native/compat/libapi.h`. This updates the card's directory frame filename and

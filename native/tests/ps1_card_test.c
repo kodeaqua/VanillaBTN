@@ -341,6 +341,36 @@ static void test_recovery_validates_directory(void) {
     assert(ps1_card_recover_file(path));
     check_image_fixture(path, good->data, PS1_CARD_SIZE);
     remove(path);
+#ifdef _WIN32
+    /* An unavailable recovery image must not be overwritten by blank-card
+     * creation when the primary image is missing. */
+    unsigned char payload[128] = {0x5A};
+    assert(ps1_card_write_file(good, "RECOVERY", payload, sizeof(payload)) == PS1_CARD_OK);
+    write_image_fixture(temp, good->data, PS1_CARD_SIZE);
+    ps1_card_format(bad);
+    assert(!ps1_card_save_to_file(bad, path));
+    check_image_fixture(temp, good->data, PS1_CARD_SIZE);
+    lock = CreateFileA(temp, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+        NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    assert(lock != INVALID_HANDLE_VALUE);
+    assert(!ps1_card_load_from_file(bad, path));
+    assert(CloseHandle(lock));
+    check_image_fixture(temp, good->data, PS1_CARD_SIZE);
+    assert(ps1_card_load_from_file(bad, path));
+    check_image_fixture(path, good->data, PS1_CARD_SIZE);
+    remove(path);
+    const char *backup = "test_directory_recovery.mcr.bak";
+    write_image_fixture(backup, good->data, PS1_CARD_SIZE);
+    lock = CreateFileA(backup, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+        NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    assert(lock != INVALID_HANDLE_VALUE);
+    assert(!ps1_card_load_from_file(bad, path));
+    assert(CloseHandle(lock));
+    check_image_fixture(backup, good->data, PS1_CARD_SIZE);
+    assert(ps1_card_load_from_file(bad, path));
+    check_image_fixture(path, good->data, PS1_CARD_SIZE);
+    remove(path);
+#endif
     free(bad);
     free(good);
 }

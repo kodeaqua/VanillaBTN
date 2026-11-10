@@ -424,6 +424,12 @@ bool ps1_card_load_from_file(Ps1Card *card, const char *filepath) {
         /* An access error is not an empty slot. Create only a genuinely missing
          * image, and expose no usable card if its initial persistence fails. */
         if (errno != ENOENT) return false;
+        char candidate[540];
+        SDL_PathInfo info;
+        snprintf(candidate, sizeof(candidate), "%s.tmp", filepath);
+        if (SDL_GetPathInfo(candidate, &info)) return false;
+        snprintf(candidate, sizeof(candidate), "%s.bak", filepath);
+        if (SDL_GetPathInfo(candidate, &info)) return false;
         ps1_card_format(card);
         bool saved = ps1_card_save_to_file(card, filepath);
         card->present = saved;
@@ -451,8 +457,8 @@ bool ps1_card_save_to_file(const Ps1Card *card, const char *filepath) {
     snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", filepath);
     snprintf(bak_path, sizeof(bak_path), "%s.bak", filepath);
 
-    /* 1. Write to temp file */
-    FILE *f = fopen(tmp_path, "wb");
+    /* Never overwrite an unresolved recovery candidate from an earlier run. */
+    FILE *f = fopen(tmp_path, "wbx");
     if (!f) return false;
 
     size_t written = fwrite(card->data, 1, PS1_CARD_SIZE, f);
