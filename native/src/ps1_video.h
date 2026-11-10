@@ -10,6 +10,7 @@
 
 typedef struct Ps1Video {
     uint16_t vram[PS1_VRAM_HEIGHT][PS1_VRAM_WIDTH];
+    float zbuffer[PS1_VRAM_HEIGHT][PS1_VRAM_WIDTH];
 } Ps1Video;
 
 typedef struct Ps1DrawState {
@@ -39,6 +40,10 @@ void ps1_video_set_pgxp_vertex_precision(bool enabled);
 void ps1_video_set_pgxp_perspective_texture(bool enabled);
 bool ps1_video_get_pgxp_vertex_precision(void);
 bool ps1_video_get_pgxp_perspective_texture(void);
+
+void ps1_video_set_true_depth_buffer(bool enabled);
+bool ps1_video_get_true_depth_buffer(void);
+void ps1_video_clear_zbuffer(Ps1Video *video);
 
 /* Preserve raw PS1 BGR555 words, including the high mask/semitransparency bit. */
 bool ps1_video_upload(Ps1Video *video, int x, int y, int width, int height,

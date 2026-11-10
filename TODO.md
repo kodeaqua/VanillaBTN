@@ -21,7 +21,13 @@ Update the relevant item after completing a task or discovering a blocker.
       - [x] Implement subpixel rasterization and top-left fill rules in `ps1_video.c`, eliminating polygon jitter/wobble on camera motion.
       - [x] Implement perspective-correct texture interpolation ($U/W, V/W, 1/W$) in `ps1_video.c`, eliminating affine texture warping on terrain, roofs, and oblique paths.
       - [x] Add synthetic unit tests in `ps1_pgxp_test.c` verifying subpixel coordinate accuracy, CPU overwrite invalidation, edge shifting, and perspective texturing (40/40 CTests, 9/9 Python tests passing in Debug and Release).
-    - [ ] Milestone 3: True Floating-Point Z-Buffer and polygon shadow bias (eliminating Z-fighting and sunken shadows).
+    - [x] Milestone 3: True Floating-Point Z-Buffer and polygon shadow bias (eliminating Z-fighting and sunken shadows).
+      - [x] Implement 32-bit floating-point reciprocal depth buffer ($W = 1/Z$) in `Ps1Video` (`ps1_video.h`/`ps1_video.c`).
+      - [x] Implement linear screen-space depth interpolation and depth testing ($W_{test} \ge W_{buffer}$) in `draw_triangle`, resolving coarse PS1 OT sorting errors and intersecting polygon popping.
+      - [x] Implement depth bias for semi-transparent decals and character shadows ($W_{test} = W \times 1.002 + 10^{-5}$), guaranteeing flat shadows sit smoothly on top of terrain without Z-fighting or sinking into the ground.
+      - [x] Protect 2D UI and unprojected primitives (`has_subpixel = false`) from depth tests, ensuring HUD elements, portraits, and dialog windows remain completely unoccluded.
+      - [x] Integrate buffer clearing on quick fill (`ps1_video_quick_fill`), packet resets, and configuration toggle `fixes.true_depth_buffer`.
+      - [x] Add synthetic unit tests in `ps1_zbuffer_test.c` verifying occlusion resolution, shadow bias, 2D UI safety, and toggle behavior (41/41 CTests, 9/9 Python tests passing in Debug and Release).
     - [ ] Milestone 4: 3D Frustum W-Clipping (preventing near-plane division-by-zero polygon spikes) and dynamic quad subdivision.
     - [ ] Milestone 5: 32-bit Float GTE Math (smooth camera rotation angles and skeletal joint precision).
     - [ ] Milestone 6: True Color 32-bit pipeline (ARGB8888 anti-banding) and dithering removal (`dithering = off / deband`).

@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <math.h>
 
+static bool s_true_depth_buffer = true;
+
 _Static_assert(sizeof(uint16_t) == 2, "PS1 VRAM words must be 16 bits");
 _Static_assert(sizeof(uint32_t) == 4, "ARGB pixels must be 32 bits");
 
@@ -65,7 +67,10 @@ void ps1_video_quick_fill(Ps1Video *video, int x, int y, int width, int height,
     /* GP0(02) ignores the drawing area and mask setting; coordinates wrap in VRAM. */
     for (int row = 0; row < fill_height; ++row) {
         for (int col = 0; col < fill_width; ++col) {
-            video->vram[(start_y + row) & 0x1FF][(start_x + col) & 0x3FF] = color;
+            int r = (start_y + row) & 0x1FF;
+            int c = (start_x + col) & 0x3FF;
+            video->vram[r][c] = color;
+            video->zbuffer[r][c] = 0.0f;
         }
     }
 }
@@ -276,6 +281,19 @@ static bool draw_triangle(Ps1Video *video, const Ps1DrawState *state,
                     double l1 = w1 * inv_det;
                     double l2 = w2 * inv_det;
 
+                    double interp_w = l0 * (double)fw0 + l1 * (double)fw1 + l2 * (double)fw2;
+
+                    if (s_true_depth_buffer) {
+                        float w_test = (float)interp_w;
+                        if (semi_transparent) {
+                            /* Apply shadow / decal depth bias: slightly closer to camera (larger W) */
+                            w_test = w_test * 1.002f + 1e-5f;
+                        }
+                        if (w_test < video->zbuffer[row][col] - 1e-6f) {
+                            continue; /* Occluded by nearer geometry! */
+                        }
+                    }
+
                     uint32_t shade = rgb24;
                     if (colors) {
                         shade = 0;
@@ -297,7 +315,6 @@ static bool draw_triangle(Ps1Video *video, const Ps1DrawState *state,
                     } else {
                         unsigned u, v;
                         if (use_perspective) {
-                            double interp_w = l0 * (double)fw0 + l1 * (double)fw1 + l2 * (double)fw2;
                             if (interp_w > 1e-9) {
                                 double inv_w = 1.0 / interp_w;
                                 double u_p = (l0 * (double)pu0 + l1 * (double)pu1 + l2 * (double)pu2) * inv_w;
@@ -331,6 +348,9 @@ static bool draw_triangle(Ps1Video *video, const Ps1DrawState *state,
                         }
                     }
                     *pixel = front | (state->force_mask ? 0x8000u : 0);
+                    if (s_true_depth_buffer && !semi_transparent) {
+                        video->zbuffer[row][col] = (float)interp_w;
+                    }
                 }
             }
         }
@@ -545,4 +565,17 @@ bool ps1_video_copy_argb(const Ps1Video *video, int x, int y, int width, int hei
         }
     }
     return true;
+}
+
+void ps1_video_set_true_depth_buffer(bool enabled) {
+    s_true_depth_buffer = enabled;
+}
+
+bool ps1_video_get_true_depth_buffer(void) {
+    return s_true_depth_buffer;
+}
+
+void ps1_video_clear_zbuffer(Ps1Video *video) {
+    if (video == NULL) return;
+    memset(video->zbuffer, 0, sizeof(video->zbuffer));
 }

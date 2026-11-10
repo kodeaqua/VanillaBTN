@@ -38,6 +38,7 @@ void sdk_gpu_reset_packets(void) {
     next_id = 4;
     packet_error = false;
     ps1_pgxp_clear();
+    ps1_video_clear_zbuffer(vram);
 }
 
 bool sdk_gpu_ok(void) { return !packet_error; }
@@ -131,6 +132,7 @@ static short gs_origin_x = 160, gs_origin_y = 120;
 void sdk_gpu_bind(Ps1Video *video) {
     vram = video;
     ps1_draw_state_reset(&draw);
+    ps1_video_clear_zbuffer(video);
     sdk_gpu_reset_packets();
     SetDefDispEnv(&display, 0, 240, 320, 240);
     display_enabled = (video != NULL);

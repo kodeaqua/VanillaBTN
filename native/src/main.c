@@ -378,6 +378,7 @@ int main(int argc, char **argv) {
     config_load(&host.config, config_path);
     ps1_pgxp_set_enabled(host.config.fixes.pgxp_vertex_precision,
                          host.config.fixes.pgxp_perspective_texture);
+    ps1_video_set_true_depth_buffer(host.config.fixes.true_depth_buffer);
 #ifdef VANILLABTN_BOOT_TEST
     SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "dummy");
     SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "dummy");
