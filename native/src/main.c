@@ -13,6 +13,7 @@ extern int main_scene;
 #include "ps1_card.h"
 #include "ps1_input.h"
 #include "ps1_video.h"
+#include "config.h"
 #include "sdk_gpu.h"
 #include "host_display.h"
 #include "sdk_pad.h"
@@ -94,6 +95,7 @@ typedef struct HostGame {
     SDL_Texture *texture;
     SDL_Gamepad *gamepads[2];
     bool running;
+    AppConfig config;
     uint32_t keyboard_buttons, controller_buttons[2];
     uint16_t keyboard_keys[SDL_SCANCODE_COUNT];
     int16_t stick_x[2], stick_y[2];
@@ -336,6 +338,7 @@ int main(int argc, char **argv) {
     int result = 1;
     const char *disc = "build/game-data/disc";
     const char *card_directory = NULL;
+    const char *config_path = NULL;
 #ifdef VANILLABTN_BOOT_TEST
     (void)card_directory;
     boot_fault_install(boot_fault_state);
@@ -345,6 +348,7 @@ int main(int argc, char **argv) {
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--data") == 0 && i + 1 < argc) disc = argv[++i];
         else if (strcmp(argv[i], "--card-dir") == 0 && i + 1 < argc) card_directory = argv[++i];
+        else if (strcmp(argv[i], "--config") == 0 && i + 1 < argc) config_path = argv[++i];
         else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "VanillaBTN",
                 "VanillaBTN - Native Windows Port\n\n"
@@ -353,6 +357,7 @@ int main(int argc, char **argv) {
                 "Options:\n"
                 "  --data <path>      Path to disc directory containing A_FILE.BIN and A_FILE.HDT\n"
                 "  --card-dir <path>  Path to directory containing card1.mcr and card2.mcr\n"
+                "  --config <path>    Path to custom vanillabtn.ini configuration file\n"
                 "  --help, -h         Show this help information", NULL);
             return 0;
         }
@@ -369,6 +374,7 @@ int main(int argc, char **argv) {
 #endif
         else return 1;
     }
+    config_load(&host.config, config_path);
 #ifdef VANILLABTN_BOOT_TEST
     SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "dummy");
     SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "dummy");
@@ -397,7 +403,11 @@ int main(int argc, char **argv) {
         goto done;
     }
 disc_ready:
-    host.window = SDL_CreateWindow("VanillaBTN", 640, 480, SDL_WINDOW_RESIZABLE);
+    {
+        int win_w = host.config.display.window_width >= 320 ? host.config.display.window_width : 640;
+        int win_h = host.config.display.window_height >= 240 ? host.config.display.window_height : 480;
+        host.window = SDL_CreateWindow("VanillaBTN", win_w, win_h, SDL_WINDOW_RESIZABLE);
+    }
     if (!host.window) goto done;
     host.renderer = SDL_CreateRenderer(host.window, NULL);
     if (!host.renderer || !SDL_SetRenderLogicalPresentation(host.renderer,

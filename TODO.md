@@ -7,7 +7,12 @@ Update the relevant item after completing a task or discovering a blocker.
 
 - [ ] Enhancement & Modernization: Fix 35 PS1 hardware flaws and implement modern graphics and platform features (see `docs/enhancements.md`).
   - [ ] Phase 1: PS1 Inherent Flaws & Bottlenecks Fixes (Highest Priority).
-    - [ ] Milestone 1: Implement `vanillabtn.ini` configuration parser (`config.c`/`config.h`) with Master Preset System (`mode = modern / authentic_ps1 / custom`) and fallback defaults.
+    - [x] Milestone 1: Implement `vanillabtn.ini` configuration parser (`config.c`/`config.h`) with Master Preset System (`mode = modern / authentic_ps1 / custom`) and fallback defaults.
+      - [x] Implement robust INI parser supporting sections, comments, case-insensitive key matching, booleans, tristates, and enumerated modes.
+      - [x] Provide Master Preset architecture with `mode = modern` (all 35 fixes auto-enabled), `mode = authentic_ps1` (classic 1999 console behavior), and `mode = custom` with granular `auto` fallbacks.
+      - [x] Generate self-documented `vanillabtn.ini` automatically when run without a configuration file.
+      - [x] Wire `--config <path>` command line argument and integration into `main.c` and `original_boot_test`.
+      - [x] Verify configuration serialization, preset resolution, and corrupt input fallbacks across 39/39 CTests in Debug and Release.
     - [ ] Milestone 2: PGXP Precision Pipeline — GTE 16-bit subpixel float vertex precision (anti-wobble) and perspective-correct texture mapping (anti-warp).
     - [ ] Milestone 3: True Floating-Point Z-Buffer and polygon shadow bias (eliminating Z-fighting and sunken shadows).
     - [ ] Milestone 4: 3D Frustum W-Clipping (preventing near-plane division-by-zero polygon spikes) and dynamic quad subdivision.

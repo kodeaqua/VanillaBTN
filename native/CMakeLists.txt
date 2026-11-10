@@ -79,6 +79,12 @@ target_include_directories(ps1_card PUBLIC src)
 target_link_libraries(ps1_card PUBLIC SDL3::SDL3)
 target_compile_options(ps1_card PRIVATE /W4)
 
+add_library(app_config STATIC src/config.c)
+set_target_properties(app_config PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_include_directories(app_config PUBLIC src compat)
+target_link_libraries(app_config PUBLIC SDL3::SDL3)
+target_compile_options(app_config PRIVATE /W4)
+
 # A named local candidate can be built while another runtime is in use.
 set(VANILLABTN_EXECUTABLE_NAME "vanillabtn" CACHE STRING "Native runtime output name")
 if(NOT VANILLABTN_EXECUTABLE_NAME MATCHES "^[A-Za-z0-9][A-Za-z0-9_-]*$")
@@ -88,7 +94,7 @@ add_executable(vanillabtn WIN32 src/main.c res/vanillabtn.rc res/vanillabtn.mani
 set_target_properties(vanillabtn PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES
     OUTPUT_NAME "${VANILLABTN_EXECUTABLE_NAME}")
 target_include_directories(vanillabtn PRIVATE res)
-target_link_libraries(vanillabtn PRIVATE SDL3::SDL3 ps1_video ps1_input ps1_clock ps1_audio ps1_card)
+target_link_libraries(vanillabtn PRIVATE SDL3::SDL3 ps1_video ps1_input ps1_clock ps1_audio ps1_card app_config)
 target_compile_options(vanillabtn PRIVATE /W4 $<$<CONFIG:Release>:/O2 /Oi /Gy /GF>)
 target_link_options(vanillabtn PRIVATE $<$<CONFIG:Release>:/OPT:REF /OPT:ICF>)
 
@@ -526,7 +532,7 @@ target_link_libraries(original_boot_test PRIVATE Dbghelp)
 target_link_options(original_boot_test PRIVATE /MAP)
 target_compile_options(original_boot_test PRIVATE /W4)
 target_link_libraries(original_boot_test PRIVATE game_main host_display SDL3::SDL3
-    ps1_input ps1_audio ps1_card)
+    ps1_input ps1_audio ps1_card app_config)
 
 add_executable(original_farm_memory_test tests/original_farm_memory_test.c)
 set_target_properties(original_farm_memory_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
@@ -583,3 +589,9 @@ set_target_properties(windows_resource_test PROPERTIES C_STANDARD 17 C_STANDARD_
 target_include_directories(windows_resource_test PRIVATE res)
 target_compile_options(windows_resource_test PRIVATE /W4)
 add_test(NAME windows_resource_embed COMMAND windows_resource_test)
+
+add_executable(config_test tests/config_test.c)
+set_target_properties(config_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_compile_options(config_test PRIVATE /W4)
+target_link_libraries(config_test PRIVATE app_config)
+add_test(NAME config_parser COMMAND config_test)
