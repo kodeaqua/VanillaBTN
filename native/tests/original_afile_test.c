@@ -527,6 +527,8 @@ int main(void) {
 
 
     CHECK(CdSearchFile(&file, "\\A_FILE.HDT;1") == &file);
+    CHECK(CdSearchFile(&file, "\\\\A_FILE.HDT;1") == &file);
+    CHECK(CdSearchFile(&file, "//A_FILE.HDT;1") == &file);
     CHECK(CdControl(CdlSetloc, (u_char *)&file.pos, NULL));
     CHECK(CdRead(1, buffer, 0x80));
     CHECK(!CdRead(1, buffer, 0x80));

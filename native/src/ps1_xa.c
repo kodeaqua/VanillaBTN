@@ -91,6 +91,7 @@ int ps1_xa_decode_sector_stereo(const uint8_t *sector, int16_t *out_samples,
  * Player Lifecycle
  * ---------------------------------------------------------------------- */
 void ps1_xa_init(Ps1XaPlayer *player) {
+    if (!player) return;
     memset(player, 0, sizeof(*player));
     player->state = PS1_XA_IDLE;
     player->track = -1;
@@ -103,7 +104,7 @@ void ps1_xa_init(Ps1XaPlayer *player) {
 }
 
 void ps1_xa_set_file(Ps1XaPlayer *player, int file_idx, const uint8_t *data, uint32_t size) {
-    if (file_idx < 0 || file_idx >= PS1_XA_FILES_COUNT) return;
+    if (!player || file_idx < 0 || file_idx >= PS1_XA_FILES_COUNT) return;
     player->files[file_idx] = data;
     player->file_sizes[file_idx] = size;
 }
@@ -244,13 +245,14 @@ void ps1_xa_play_track(Ps1XaPlayer *player, int track) {
 }
 
 void ps1_xa_stop(Ps1XaPlayer *player) {
+    if (!player) return;
     player->state = PS1_XA_IDLE;
     player->sector_sample_count = 0;
     player->sector_sample_idx = 0;
 }
 
 void ps1_xa_fade_tick(Ps1XaPlayer *player, int speed_mode) {
-    if (player->state != PS1_XA_PLAYING && player->state != PS1_XA_FADING) return;
+    if (!player || (player->state != PS1_XA_PLAYING && player->state != PS1_XA_FADING)) return;
 
     player->state = PS1_XA_FADING;
     int step = speed_mode;
@@ -272,6 +274,7 @@ void ps1_xa_fade_tick(Ps1XaPlayer *player, int speed_mode) {
 }
 
 Ps1XaState ps1_xa_get_state(const Ps1XaPlayer *player) {
+    if (!player) return PS1_XA_IDLE;
     return player->state;
 }
 

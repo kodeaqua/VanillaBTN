@@ -215,6 +215,12 @@ static void test_card_manager(void) {
     assert(mgr.cards[1].present);
     assert(ps1_card_validate(&mgr.cards[0]) == PS1_CARD_OK);
     assert(ps1_card_validate(&mgr.cards[1]) == PS1_CARD_OK);
+    assert(strstr(mgr.cards[0].filepath, "//") == NULL);
+
+    Ps1CardManager mgr_slash;
+    assert(ps1_card_manager_init(&mgr_slash, "test_mc_dir/"));
+    assert(strcmp(mgr_slash.base_dir, custom_dir) == 0);
+    assert(strstr(mgr_slash.cards[0].filepath, "//") == NULL);
 
     ps1_card_manager_shutdown(&mgr);
 

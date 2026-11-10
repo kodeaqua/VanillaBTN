@@ -297,6 +297,14 @@ static void test_xa_exact_stream_duration(void) {
 }
 
 int main(void) {
+    /* Defensive NULL pointer checks */
+    ps1_xa_init(NULL);
+    ps1_xa_set_file(NULL, 0, NULL, 0);
+    ps1_xa_stop(NULL);
+    ps1_xa_fade_tick(NULL, 1);
+    assert(ps1_xa_get_state(NULL) == PS1_XA_IDLE);
+    ps1_xa_mix(NULL, NULL, 1, 0, 0, 0);
+
     test_xa_hardware_impulse();
     test_xa_exact_stream_duration();
     test_xa_hardware_units();

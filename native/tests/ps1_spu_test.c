@@ -344,7 +344,35 @@ static void test_spu_pitch_clamping(void) {
     assert(spu.voices[0].active);
 }
 
+static void test_spu_null_guards_and_reverb_mask(void) {
+    /* Defensive NULL pointer checks */
+    ps1_spu_free_vab(NULL, 0);
+    ps1_spu_key_on_raw(NULL, 0, NULL, 0, 0, 0, 0);
+    ps1_spu_voice_set_adsr(NULL, 0, 0, 0);
+    ps1_spu_key_off(NULL, 0);
+    ps1_spu_key_off_all(NULL);
+    assert(ps1_spu_voice_is_active(NULL, 0) == 0);
+    ps1_spu_set_master_vol(NULL, 0, 0);
+    ps1_spu_set_cd_vol(NULL, 0, 0);
+
+    /* Reverb mask clearing on raw key-on and VAB free */
+    Ps1Spu spu;
+    ps1_spu_init(&spu);
+    spu.voices[0].vab_id = 0;
+    ps1_spu_set_reverb_voice(&spu, 1u << 0, 1);
+    assert(spu.reverb_voice_mask & (1u << 0));
+    ps1_spu_free_vab(&spu, 0);
+    assert(!(spu.reverb_voice_mask & (1u << 0)));
+
+    uint8_t dummy_block[16] = {0x04};
+    ps1_spu_set_reverb_voice(&spu, 1u << 1, 1);
+    assert(spu.reverb_voice_mask & (1u << 1));
+    ps1_spu_key_on_raw(&spu, 1, dummy_block, sizeof(dummy_block), 0x10000, 127, 127);
+    assert(!(spu.reverb_voice_mask & (1u << 1)));
+}
+
 int main(void) {
+    test_spu_null_guards_and_reverb_mask();
     test_spu_vab_reverb_tail();
     test_final_adpcm_block_is_not_discarded();
     test_adpcm_decode_basic();

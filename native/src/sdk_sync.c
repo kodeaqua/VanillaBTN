@@ -82,9 +82,11 @@ int ResetCallback(void) {
 int VSync(int mode) {
     ResetCallback();
     uint64_t now = clock_now(clock_context);
-    if (mode < 0) return result_units(now - epoch, 60);
-    if (mode == 1) return result_units(now - last_wait, 15750);
-    uint64_t tick = units((mode == 0 ? now : last_wait) - epoch, 60);
+    if (mode < 0) return result_units(now >= epoch ? now - epoch : 0, 60);
+    if (mode == 1) return result_units(now >= last_wait ? now - last_wait : 0, 15750);
+    uint64_t base = (mode == 0 ? now : last_wait);
+    uint64_t elapsed_base = base >= epoch ? base - epoch : 0;
+    uint64_t tick = units(elapsed_base, 60);
     tick += mode == 0 ? 1 : (unsigned)mode;
     /* Round upward so an integral-nanosecond deadline never falls before the
      * nominal vblank boundary; preserve phase rather than accumulating drift. */
@@ -92,15 +94,18 @@ int VSync(int mode) {
     while (now < deadline) {
         /* Service each intervening vblank, so VSync(2/3) does not batch the
          * original loading-screen and draw callbacks at the final deadline. */
-        uint64_t next = units(now - epoch, 60) + 1;
+        uint64_t elapsed_now = now >= epoch ? now - epoch : 0;
+        uint64_t next = units(elapsed_now, 60) + 1;
         clock_wait(tick_deadline(next), clock_context);
         now = clock_now(clock_context);
-        dispatch_vblank(units(now - epoch, 60));
+        elapsed_now = now >= epoch ? now - epoch : 0;
+        dispatch_vblank(units(elapsed_now, 60));
     }
     /* Late work delivers the current boundary once, without replaying stale
      * rendering callbacks or adding another frame delay. Queries stay pure. */
-    dispatch_vblank(units(now - epoch, 60));
-    int elapsed = result_units(now - last_wait, 15750);
+    uint64_t elapsed_final = now >= epoch ? now - epoch : 0;
+    dispatch_vblank(units(elapsed_final, 60));
+    int elapsed = result_units(now >= last_wait ? now - last_wait : 0, 15750);
     last_wait = now;
     return elapsed;
 }

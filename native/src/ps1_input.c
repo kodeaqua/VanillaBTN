@@ -4,6 +4,7 @@
 
 uint16_t ps1_input_keyboard_event(uint16_t *keys, size_t count, size_t key,
                                   uint16_t button, bool down) {
+    if (keys == NULL || count == 0) return 0;
     uint16_t buttons = 0;
     if (key < count) keys[key] = down ? button : 0;
     for (size_t i = 0; i < count; ++i) buttons |= keys[i];

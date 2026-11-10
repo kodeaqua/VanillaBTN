@@ -77,5 +77,15 @@ int main(int argc, char **argv) {
     gte_rtir();
     gte_stlvnl(wide);
     if (wide[0] != 1 || wide[1] != 2 || wide[2] != -32768) return 13;
+    gte_stsxy3_f3(NULL);
+    gte_stsxy3_g3(NULL);
+    gte_stsxy3_ft3(NULL);
+    gte_stsxy3_gt3(NULL);
+    gte_stsxy3_f4(NULL);
+    gte_stsxy3_g4(NULL);
+    gte_stsxy3_ft4(NULL);
+    gte_stsxy3_gt4(NULL);
+    gte_stsxy(NULL);
+    gte_stsxy2(NULL);
     return 0;
 }

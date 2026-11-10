@@ -544,6 +544,7 @@ void gte_stsxy2(void *out) {
 }
 
 void gte_stsxy3_f3(void *packet) {
+    if (!packet) return;
     uint8_t *p = (uint8_t *)packet;
     *(uint32_t *)(p + 0x08) = pack_sxy(g_sdk_gte.sxy[0]);
     *(uint32_t *)(p + 0x0C) = pack_sxy(g_sdk_gte.sxy[1]);
@@ -551,6 +552,7 @@ void gte_stsxy3_f3(void *packet) {
 }
 
 void gte_stsxy3_g3(void *packet) {
+    if (!packet) return;
     uint8_t *p = (uint8_t *)packet;
     *(uint32_t *)(p + 0x08) = pack_sxy(g_sdk_gte.sxy[0]);
     *(uint32_t *)(p + 0x10) = pack_sxy(g_sdk_gte.sxy[1]);
@@ -558,6 +560,7 @@ void gte_stsxy3_g3(void *packet) {
 }
 
 void gte_stsxy3_ft3(void *packet) {
+    if (!packet) return;
     uint8_t *p = (uint8_t *)packet;
     *(uint32_t *)(p + 0x08) = pack_sxy(g_sdk_gte.sxy[0]);
     *(uint32_t *)(p + 0x10) = pack_sxy(g_sdk_gte.sxy[1]);
@@ -565,6 +568,7 @@ void gte_stsxy3_ft3(void *packet) {
 }
 
 void gte_stsxy3_gt3(void *packet) {
+    if (!packet) return;
     uint8_t *p = (uint8_t *)packet;
     *(uint32_t *)(p + 0x08) = pack_sxy(g_sdk_gte.sxy[0]);
     *(uint32_t *)(p + 0x14) = pack_sxy(g_sdk_gte.sxy[1]);

@@ -5,7 +5,9 @@
 #include <assert.h>
 
 int main(void) {
+    assert(ps1_input_keyboard_event(NULL, 0, 0, 0, false) == 0);
     uint16_t keys[4] = {0};
+    assert(ps1_input_keyboard_event(keys, 0, 0, 0, false) == 0);
     ps1_input_keyboard_event(keys, 4, 0, PS1_PAD_UP, true);
     ps1_input_keyboard_event(keys, 4, 1, PS1_PAD_UP, true);
     if (ps1_input_keyboard_event(keys, 4, 2, PS1_PAD_CROSS, true) != (PS1_PAD_UP | PS1_PAD_CROSS)) return 35;

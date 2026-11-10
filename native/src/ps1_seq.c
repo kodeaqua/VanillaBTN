@@ -97,7 +97,7 @@ void ps1_seq_set_vol(Ps1Seq *seq, Ps1Spu *spu, unsigned voll, unsigned volr) {
     if (volr > 127) volr = 127;
     seq->seq_vol_left = voll;
     seq->seq_vol_right = volr;
-    if (spu == NULL || seq->bank < 0 || seq->bank >= PS1_SPU_VAB_SLOTS) return;
+    if (spu == NULL || seq->bank < 0 || seq->bank >= PS1_SPU_VAB_SLOTS || !spu->vabs[seq->bank].loaded) return;
     for (unsigned v = 0; v < 24; ++v) {
         if (spu->voices[v].active && spu->voices[v].vab_id == seq->bank) {
             voice_volume(seq, spu, v);

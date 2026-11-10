@@ -508,6 +508,12 @@ bool ps1_card_manager_init(Ps1CardManager *mgr, const char *custom_dir) {
         }
     }
 
+    size_t blen = strlen(mgr->base_dir);
+    while (blen > 1 && (mgr->base_dir[blen - 1] == '/' || mgr->base_dir[blen - 1] == '\\')) {
+        if (blen == 3 && mgr->base_dir[1] == ':') break;
+        mgr->base_dir[--blen] = '\0';
+    }
+
     char card1_path[540];
     char card2_path[540];
     snprintf(card1_path, sizeof(card1_path), "%s/card1.mcr", mgr->base_dir);

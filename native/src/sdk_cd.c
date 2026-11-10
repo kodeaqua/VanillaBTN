@@ -129,7 +129,7 @@ int CdPosToInt(CdlLOC *position) {
 
 static bool disc_name(char *output, const char *input) {
     if (!input) return false;
-    if (*input == '\\' || *input == '/') ++input;
+    while (*input == '\\' || *input == '/') ++input;
     size_t length = strcspn(input, ";");
     if (!length || length >= 256 || (input[length] && strcmp(input + length, ";1"))) return false;
     for (size_t i = 0; i < length; ++i) {

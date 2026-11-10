@@ -267,10 +267,11 @@ Ps1VabId ps1_spu_load_vab(Ps1Spu *spu, const uint8_t *header, uint32_t header_si
 }
 
 void ps1_spu_free_vab(Ps1Spu *spu, Ps1VabId id) {
-    if (id < 0 || id >= PS1_SPU_VAB_SLOTS) return;
+    if (!spu || id < 0 || id >= PS1_SPU_VAB_SLOTS) return;
     for (int v = 0; v < PS1_SPU_VOICES; v++) {
         if (spu->voices[v].vab_id == id) {
             memset(&spu->voices[v], 0, sizeof(spu->voices[v]));
+            spu->reverb_voice_mask &= ~(1u << v);
         }
     }
     memset(&spu->vabs[id], 0, sizeof(spu->vabs[id]));
@@ -282,8 +283,9 @@ void ps1_spu_free_vab(Ps1Spu *spu, Ps1VabId id) {
 void ps1_spu_key_on_raw(Ps1Spu *spu, int voice_idx, const uint8_t *data,
                         uint32_t data_len, uint32_t pitch_16_16,
                         int16_t vol_left, int16_t vol_right) {
-    if (voice_idx < 0 || voice_idx >= PS1_SPU_VOICES || !data || data_len < ADPCM_BLOCK_SIZE) return;
+    if (!spu || voice_idx < 0 || voice_idx >= PS1_SPU_VOICES || !data || data_len < ADPCM_BLOCK_SIZE) return;
 
+    spu->reverb_voice_mask &= ~(1u << voice_idx);
     Ps1Voice *v = &spu->voices[voice_idx];
     memset(v, 0, sizeof(*v));
     v->active = 1;
@@ -367,12 +369,12 @@ void ps1_spu_key_on_vab(Ps1Spu *spu, int voice_idx, Ps1VabId vab_id,
 }
 
 void ps1_spu_voice_set_adsr(Ps1Spu *spu, int voice_idx, uint16_t adsr1, uint16_t adsr2) {
-    if (voice_idx < 0 || voice_idx >= PS1_SPU_VOICES) return;
+    if (!spu || voice_idx < 0 || voice_idx >= PS1_SPU_VOICES) return;
     voice_init_adsr(&spu->voices[voice_idx], adsr1, adsr2);
 }
 
 void ps1_spu_key_off(Ps1Spu *spu, int voice_idx) {
-    if (voice_idx < 0 || voice_idx >= PS1_SPU_VOICES) return;
+    if (!spu || voice_idx < 0 || voice_idx >= PS1_SPU_VOICES) return;
     Ps1Voice *v = &spu->voices[voice_idx];
     if (!v->active) return;
     if (v->env_phase != PS1_ADSR_RELEASE) {
@@ -382,6 +384,7 @@ void ps1_spu_key_off(Ps1Spu *spu, int voice_idx) {
 }
 
 void ps1_spu_key_off_all(Ps1Spu *spu) {
+    if (!spu) return;
     for (int v = 0; v < PS1_SPU_VOICES; v++) {
         spu->voices[v].active = 0;
         spu->voices[v].env_phase = PS1_ADSR_OFF;
@@ -390,16 +393,18 @@ void ps1_spu_key_off_all(Ps1Spu *spu) {
 }
 
 int ps1_spu_voice_is_active(const Ps1Spu *spu, int voice_idx) {
-    if (voice_idx < 0 || voice_idx >= PS1_SPU_VOICES) return 0;
+    if (!spu || voice_idx < 0 || voice_idx >= PS1_SPU_VOICES) return 0;
     return spu->voices[voice_idx].active;
 }
 
 void ps1_spu_set_master_vol(Ps1Spu *spu, int16_t left, int16_t right) {
+    if (!spu) return;
     spu->master_vol_left = left;
     spu->master_vol_right = right;
 }
 
 void ps1_spu_set_cd_vol(Ps1Spu *spu, int16_t left, int16_t right) {
+    if (!spu) return;
     spu->cd_vol_left = left;
     spu->cd_vol_right = right;
 }
