@@ -21,6 +21,8 @@ static void test_defaults(void) {
     assert(cfg.fixes.pgxp_vertex_precision == TRISTATE_AUTO);
     assert(cfg.fixes.true_depth_buffer == TRISTATE_AUTO);
     assert(cfg.fixes.true_color_32bit == TRISTATE_AUTO);
+    assert(cfg.fixes.hdr_tonemapping == TRISTATE_AUTO);
+    assert(cfg.fixes.atomic_clut == TRISTATE_AUTO);
     assert(cfg.fixes.dithering == DITHER_AUTO);
     assert(cfg.fixes.expand_voice_polyphony == TRISTATE_AUTO);
 

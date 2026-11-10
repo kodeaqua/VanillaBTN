@@ -39,6 +39,7 @@ void sdk_gpu_reset_packets(void) {
     packet_error = false;
     ps1_pgxp_clear();
     ps1_video_clear_zbuffer(vram);
+    ps1_video_commit_clut(vram);
 }
 
 bool sdk_gpu_ok(void) { return !packet_error; }

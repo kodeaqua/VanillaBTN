@@ -398,6 +398,10 @@ int main(int argc, char **argv) {
     Ps1AntiAliasingMode aa_mode = (aa_cfg == AA_OFF) ? PS1_AA_OFF :
                                   (aa_cfg == AA_SMAA) ? PS1_AA_SMAA : PS1_AA_MSAA_4X;
     bool smooth_fog = config_resolve_bool(host.config.fixes.smooth_fog, host.config.preset, true);
+    bool oit_trans = config_resolve_bool(host.config.fixes.oit_transparency, host.config.preset, true);
+    bool zero_lag = config_resolve_bool(host.config.fixes.zero_fillrate_lag, host.config.preset, true);
+    bool hdr_tone = config_resolve_bool(host.config.fixes.hdr_tonemapping, host.config.preset, true);
+    bool atomic_clut = config_resolve_bool(host.config.fixes.atomic_clut, host.config.preset, true);
     bool expand_poly = config_resolve_bool(host.config.fixes.expand_voice_polyphony, host.config.preset, true);
     bool seamless_cd = config_resolve_bool(host.config.fixes.seamless_cd_loop, host.config.preset, true);
     bool pop_suppress = config_resolve_bool(host.config.fixes.audio_pop_suppression, host.config.preset, true);
@@ -418,6 +422,10 @@ int main(int argc, char **argv) {
     ps1_video_set_texture_filter(filter_mode);
     ps1_video_set_anti_aliasing(aa_mode);
     ps1_video_set_smooth_fog(smooth_fog);
+    ps1_video_set_oit_transparency(oit_trans);
+    ps1_video_set_zero_fillrate_lag(zero_lag);
+    ps1_video_set_hdr_tonemapping(hdr_tone);
+    ps1_video_set_atomic_clut(atomic_clut);
 
     sdk_sound_set_polyphony_expansion(expand_poly);
     sdk_sound_set_pop_suppression(pop_suppress);

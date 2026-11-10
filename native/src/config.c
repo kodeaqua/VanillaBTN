@@ -43,6 +43,8 @@ void config_set_defaults(AppConfig *config) {
     config->fixes.smooth_fog = TRISTATE_AUTO;
     config->fixes.oit_transparency = TRISTATE_AUTO;
     config->fixes.zero_fillrate_lag = TRISTATE_AUTO;
+    config->fixes.hdr_tonemapping = TRISTATE_AUTO;
+    config->fixes.atomic_clut = TRISTATE_AUTO;
     config->fixes.expand_voice_polyphony = TRISTATE_AUTO;
     config->fixes.seamless_cd_loop = TRISTATE_AUTO;
     config->fixes.audio_pop_suppression = TRISTATE_AUTO;
@@ -259,6 +261,8 @@ static void parse_kv(AppConfig *config, const char *section, const char *key, co
         } else if (str_equals_case(key, "smooth_fog")) config->fixes.smooth_fog = parse_tristate(val);
         else if (str_equals_case(key, "oit_transparency")) config->fixes.oit_transparency = parse_tristate(val);
         else if (str_equals_case(key, "zero_fillrate_lag")) config->fixes.zero_fillrate_lag = parse_tristate(val);
+        else if (str_equals_case(key, "hdr_tonemapping")) config->fixes.hdr_tonemapping = parse_tristate(val);
+        else if (str_equals_case(key, "atomic_clut")) config->fixes.atomic_clut = parse_tristate(val);
         else if (str_equals_case(key, "expand_voice_polyphony")) config->fixes.expand_voice_polyphony = parse_tristate(val);
         else if (str_equals_case(key, "seamless_cd_loop")) config->fixes.seamless_cd_loop = parse_tristate(val);
         else if (str_equals_case(key, "audio_pop_suppression")) config->fixes.audio_pop_suppression = parse_tristate(val);
@@ -461,6 +465,8 @@ bool config_save(const AppConfig *config, const char *path) {
         "smooth_fog = %s\n"
         "oit_transparency = %s\n"
         "zero_fillrate_lag = %s\n"
+        "hdr_tonemapping = %s\n"
+        "atomic_clut = %s\n"
         "expand_voice_polyphony = %s\n"
         "seamless_cd_loop = %s\n"
         "audio_pop_suppression = %s\n"
@@ -490,6 +496,8 @@ bool config_save(const AppConfig *config, const char *path) {
         tristate_str(config->fixes.smooth_fog),
         tristate_str(config->fixes.oit_transparency),
         tristate_str(config->fixes.zero_fillrate_lag),
+        tristate_str(config->fixes.hdr_tonemapping),
+        tristate_str(config->fixes.atomic_clut),
         tristate_str(config->fixes.expand_voice_polyphony),
         tristate_str(config->fixes.seamless_cd_loop),
         tristate_str(config->fixes.audio_pop_suppression),

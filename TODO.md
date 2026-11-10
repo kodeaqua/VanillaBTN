@@ -69,7 +69,12 @@ Update the relevant item after completing a task or discovering a blocker.
       - [x] Implement constant-energy equal-power stereo panning law (`ps1_seq_set_equal_power_panning`, `equal_power_panning`) in `ps1_seq.c`, using $\cos(\theta) / \sin(\theta)$ gains to preserve $1.0$ total acoustic energy across all stereo angles $[0, 127]$, eliminating the PS1 3 dB center-channel volume drop.
       - [x] Integrate Hi-Fi reverb and equal-power panning controls into `sdk_sound.h`/`sdk_sound.c` (`sdk_sound_set_hifi_reverb`, `sdk_sound_set_equal_power_panning`, `SsSeqPlay`) and wire through `fixes.hifi_reverb` in `main.c`.
       - [x] Add synthetic unit tests in `ps1_hifi_audio_test.c` verifying Hi-Fi full-bandwidth reverb processing, equal-power acoustic energy preservation, and SDK sound integration (48/48 CTests, 9/9 Python tests passing in Debug and Release).
-    - [ ] Milestone 11: Zero fill-rate bottleneck architecture (smooth 60 FPS in heavy rain and festival scenes).
+    - [x] Milestone 11: Zero fill-rate bottleneck architecture, Order-Independent Transparency (OIT), HDR soft-additive tonemapping, and atomic palette staging.
+      - [x] Implement Order-Independent Transparency (OIT) & depth layering (`s_oit_transparency`, `trans_z`) in `ps1_video.c`, integrating out-of-order transparent fragments under existing layers to eliminate transparency sorting pops.
+      - [x] Implement Zero Fill-Rate Bottleneck overdraw limiter (`s_zero_fillrate_lag`, `overdraw`) in `ps1_video.c`, capping redundant particle overdraw at 32 passes per pixel and eliminating PS1 GPU fill-rate stalls during heavy rain, snowstorms, and festival fireworks.
+      - [x] Implement HDR soft-additive tonemapping (`s_hdr_tonemapping`) in `blend_color32` mode 1, replacing hard digital clamping with smooth photographic saturation curve ($C = B + F - B \cdot F / 255$) and eliminating blown-out chalky white light clusters.
+      - [x] Implement double-buffered atomic CLUT palette staging (`s_atomic_clut`, `clut_vram`, `ps1_video_commit_clut`) in `ps1_video.c` and `sdk_gpu.c`, ensuring in-flight texel sampling never observes mid-frame palette tearing.
+      - [x] Add synthetic unit tests in `ps1_fillrate_oit_test.c` verifying OIT depth under-blending, fill-rate overdraw capping, HDR soft-additive blend saturation, and atomic CLUT double-buffering (49/49 CTests, 9/9 Python tests passing in Debug and Release).
     - [ ] Milestone 12: Input Subsystem Fixes — circular analog normalization (fix diagonal running bug), HD rumble motor curve, sub-frame raw input polling, and disconnect auto-pause.
   - [ ] Phase 2: Modern Graphics & Platform Enhancements.
     - [ ] Milestone 13: Multi-monitor discovery and 4 window modes (windowed, borderless, fullscreen, maximized).

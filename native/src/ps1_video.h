@@ -29,6 +29,9 @@ typedef struct Ps1Video {
     uint16_t vram[PS1_VRAM_HEIGHT][PS1_VRAM_WIDTH];
     float zbuffer[PS1_VRAM_HEIGHT][PS1_VRAM_WIDTH];
     uint32_t color32[PS1_VRAM_HEIGHT][PS1_VRAM_WIDTH];
+    float trans_z[PS1_VRAM_HEIGHT][PS1_VRAM_WIDTH];
+    uint8_t overdraw[PS1_VRAM_HEIGHT][PS1_VRAM_WIDTH];
+    uint16_t clut_vram[PS1_VRAM_HEIGHT][PS1_VRAM_WIDTH];
 } Ps1Video;
 
 typedef struct Ps1DrawState {
@@ -96,6 +99,19 @@ bool ps1_video_get_smooth_fog(void);
 
 void ps1_video_set_fog_params(float near_z, float far_z, uint32_t fog_color);
 void ps1_video_get_fog_params(float *near_z, float *far_z, uint32_t *fog_color);
+
+void ps1_video_set_oit_transparency(bool enabled);
+bool ps1_video_get_oit_transparency(void);
+
+void ps1_video_set_zero_fillrate_lag(bool enabled);
+bool ps1_video_get_zero_fillrate_lag(void);
+
+void ps1_video_set_hdr_tonemapping(bool enabled);
+bool ps1_video_get_hdr_tonemapping(void);
+
+void ps1_video_set_atomic_clut(bool enabled);
+bool ps1_video_get_atomic_clut(void);
+void ps1_video_commit_clut(Ps1Video *video);
 
 /* Preserve raw PS1 BGR555 words, including the high mask/semitransparency bit. */
 bool ps1_video_upload(Ps1Video *video, int x, int y, int width, int height,

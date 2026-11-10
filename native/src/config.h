@@ -108,6 +108,8 @@ typedef struct Ps1FixesConfig {
     TriState smooth_fog;
     TriState oit_transparency;
     TriState zero_fillrate_lag;
+    TriState hdr_tonemapping;
+    TriState atomic_clut;
     TriState expand_voice_polyphony;
     TriState seamless_cd_loop;
     TriState audio_pop_suppression;
