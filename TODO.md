@@ -81,7 +81,8 @@ Update the relevant item after completing a task or discovering a blocker.
 - [x] Trace the reported large attract-demo displacement to the original `scene_enter` area transition, rather than a large velocity; temporary write-watch instrumentation was removed. This does not establish console-equivalent demo behavior.
 - [ ] Developer: check controller feel and simulation pacing in native window.
 - [ ] Developer: compare music, effects, speech/streams, and timing by ear.
-- [ ] Developer: save, reload, and compare farms in game.
+- [x] Developer: confirm save and load work in game.
+- [ ] Developer: compare farm state after saving and loading in game.
 - [ ] Milestone 6: bring up farm, events, minigames, ending, title, and card flows.
 
 ## Next
