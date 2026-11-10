@@ -178,6 +178,25 @@ int MemCardWriteFile(int chan, char *file, unsigned int *adrs, int ofs, int byte
     return register_transfer(chan, file, adrs, ofs, bytes, true);
 }
 
+/* Metadata operations must remain retryable when disk persistence fails. */
+static Ps1Card *stage_card(Ps1Card *card) {
+    if (!s_bound_manager) return card;
+    Ps1Card *staged = malloc(sizeof(*staged));
+    if (staged) *staged = *card;
+    return staged;
+}
+
+static bool commit_card(Ps1Card *card, Ps1Card *staged) {
+    if (card == staged) return true;
+    bool saved = ps1_card_save_to_file(staged, staged->filepath);
+    if (saved) {
+        staged->dirty = false;
+        *card = *staged;
+    }
+    free(staged);
+    return saved;
+}
+
 int MemCardCreateFile(int chan, char *file, int blocks) {
     Ps1Card *card = get_card_for_chan(chan);
     if (card == NULL || file == NULL || !file[0] || strlen(file) > 20 ||
@@ -195,9 +214,15 @@ int MemCardCreateFile(int chan, char *file, int blocks) {
     if (!zero_buf) {
         return -1;
     }
-    Ps1CardStatus status = ps1_card_write_file(card, file, zero_buf, total_size);
+    Ps1Card *staged = stage_card(card);
+    if (!staged) { free(zero_buf); return McErrCardInvalid; }
+    Ps1CardStatus status = ps1_card_write_file(staged, file, zero_buf, total_size);
     free(zero_buf);
-    return (status == PS1_CARD_OK) ? 0 : -1;
+    if (status != PS1_CARD_OK) {
+        if (staged != card) free(staged);
+        return -1;
+    }
+    return commit_card(card, staged) ? McErrNone : McErrCardInvalid;
 }
 
 int MemCardDeleteFile(int chan, char *file) {
@@ -205,8 +230,14 @@ int MemCardDeleteFile(int chan, char *file) {
     if (card == NULL || file == NULL) {
         return -1;
     }
-    Ps1CardStatus status = ps1_card_delete_file(card, file);
-    return (status == PS1_CARD_OK) ? 0 : -1;
+    Ps1Card *staged = stage_card(card);
+    if (!staged) return -1;
+    Ps1CardStatus status = ps1_card_delete_file(staged, file);
+    if (status != PS1_CARD_OK) {
+        if (staged != card) free(staged);
+        return -1;
+    }
+    return commit_card(card, staged) ? 0 : -1;
 }
 
 int MemCardFormat(int chan) {
@@ -216,7 +247,10 @@ int MemCardFormat(int chan) {
     }
     /* Formatting cannot insert a card, even if its old bytes remain in RAM. */
     if (!card->present) return McErrCardNotExist;
-    ps1_card_format(card);
+    Ps1Card *staged = stage_card(card);
+    if (!staged) return McErrCardInvalid;
+    ps1_card_format(staged);
+    if (!commit_card(card, staged)) return McErrCardInvalid;
     s_last_cmd = 0x07;
     s_last_result = McErrNone;
     return 0;
@@ -227,6 +261,8 @@ int MemCardUnformat(int chan) {
     if (card == NULL) {
         return -1;
     }
+    /* Persistence validates formatted cards; do not claim a disk unformat. */
+    if (s_bound_manager != NULL) return -1;
     card->data[0] = 0;
     card->data[1] = 0;
     card->dirty = true;
@@ -438,11 +474,14 @@ int sdk_card_rename(const char *oldpath, const char *newpath) {
             memcpy(name_buf, entry + 10, 20);
             name_buf[20] = '\0';
             if (strcmp(name_buf, oldname) == 0) {
+                Ps1Card *staged = stage_card(card);
+                if (!staged) return -1;
+                entry = staged->data + b * PS1_CARD_FRAME_SIZE;
                 memset(entry + 10, 0, 20);
                 strncpy((char *)(entry + 10), newname, 20);
                 entry[127] = ps1_card_checksum(entry);
-                card->dirty = true;
-                return 1; /* 1 = success in PS1 rename */
+                staged->dirty = true;
+                return commit_card(card, staged) ? 1 : -1;
             }
         }
     }

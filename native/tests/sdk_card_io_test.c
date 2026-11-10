@@ -61,6 +61,55 @@ static void test_write_persists_before_completion(void) {
     free(manager);
 }
 
+static void check_disk_matches(Ps1Card *card, const char *path) {
+    FILE *file = fopen(path, "rb");
+    CHECK(file && fread(snapshot, 1, sizeof(snapshot), file) == sizeof(snapshot));
+    CHECK(fclose(file) == 0 && memcmp(snapshot, card->data, sizeof(snapshot)) == 0);
+}
+
+static void test_metadata_persistence(void) {
+    const char *path = "test_sdk_card_metadata.mcr";
+    const char *temp = "test_sdk_card_metadata.mcr.tmp";
+    const char *backup = "test_sdk_card_metadata.mcr.bak";
+    Ps1CardManager *manager = calloc(1, sizeof(*manager));
+    CHECK(manager);
+    remove(path); remove(temp); remove(backup);
+    Ps1Card *card = &manager->cards[0];
+    ps1_card_format(card);
+    CHECK(snprintf(card->filepath, sizeof(card->filepath), "%s", path) > 0);
+    CHECK(ps1_card_save_to_file(card, path));
+    card->dirty = false;
+    sdk_card_bind_manager(manager);
+    MemCardInit(0);
+    CHECK(MemCardCreateFile(0, "OLD", 1) == McErrNone);
+    check_disk_matches(card, path);
+    CHECK(sdk_card_rename("bu0:OLD", "bu0:NEW") == 1);
+    check_disk_matches(card, path);
+    CHECK(MemCardDeleteFile(0, "NEW") == 0);
+    check_disk_matches(card, path);
+    CHECK(MemCardCreateFile(0, "EXISTING", 1) == McErrNone);
+    CHECK(MemCardFormat(0) == McErrNone);
+    check_disk_matches(card, path);
+    CHECK(MemCardCreateFile(0, "KEEP", 1) == McErrNone);
+    check_disk_matches(card, path);
+    CHECK(MemCardUnformat(0) == -1);
+    check_disk_matches(card, path);
+    FILE *blocked = fopen(temp, "wb");
+    CHECK(blocked && fputc(0x42, blocked) == 0x42 && fclose(blocked) == 0);
+    CHECK(MemCardCreateFile(0, "FAIL", 1) == McErrCardInvalid);
+    check_disk_matches(card, path);
+    CHECK(sdk_card_rename("bu0:KEEP", "bu0:FAIL") == -1);
+    check_disk_matches(card, path);
+    CHECK(MemCardDeleteFile(0, "KEEP") == -1);
+    check_disk_matches(card, path);
+    CHECK(MemCardFormat(0) == McErrCardInvalid);
+    check_disk_matches(card, path);
+    CHECK(ps1_card_find_file(card, "KEEP", NULL) > 0);
+    sdk_card_bind_manager(NULL);
+    remove(path); remove(temp); remove(backup);
+    free(manager);
+}
+
 int main(void) {
     Ps1Card *card = sdk_card_get(0);
     MemCardInit(0);
@@ -173,5 +222,6 @@ int main(void) {
     CHECK(MemCardFormat(0) == McErrNone);
     CHECK(card->present && card->dirty && ps1_card_validate(card) == PS1_CARD_OK);
     test_write_persists_before_completion();
+    test_metadata_persistence();
     return 0;
 }
