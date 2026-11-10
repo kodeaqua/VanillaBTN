@@ -27,17 +27,25 @@ version, which can be printed with `python tools/version.py`.
 
 ## Building
 
-On Windows, build the native bringup executable from PowerShell with Visual
-Studio's Desktop development with C++ installed:
+### Native Windows (x64)
+
+Build the native executable from PowerShell with Visual Studio's Desktop development with C++ installed:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/build-windows.ps1 -Configuration Debug
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/build-windows.ps1 -Configuration Release
 ```
 
-See [building instructions](docs/building.md) for Release and the PS1 reference
-build. The native build does not use Docker, WSL, or MSYS.
+For release packaging with application icons and manifests into a standalone `.zip`:
 
-For the PS1 reference build on Linux or WSL:
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/package-release.ps1 -Configuration Release
+```
+
+See [building instructions](docs/building.md) for Debug profile options and testing. The native build does not use Docker, WSL, or MSYS.
+
+### PS1 Reference Build
+
+For the byte-matching PS1 reference build on Linux or WSL:
 
 ```sh
 docker build -t vanillabtn-build .
@@ -53,6 +61,44 @@ builds and checks only the 14 code binaries, which needs no game data.
 For Windows PowerShell, use the container build helper described in
 [docs/building.md](docs/building.md). It avoids problems with the old compiler
 on Windows bind mounts and CRLF checkouts.
+
+## Running
+
+### 1. Import Game Assets
+
+VanillaBTN does not distribute proprietary assets. Extract assets from your own original USA `SLUS_011.15` disc image (`.bin` in MODE2/2352):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/import-game.ps1 -Disc "C:\path\to\your-disc.bin"
+```
+
+This extracts the game archives into `build/game-data/disc/`.
+
+### 2. Launch the Game
+
+Run the compiled executable from PowerShell:
+
+```powershell
+& .\build\native\Release\vanillabtn.exe
+```
+
+The game automatically discovers assets in `./build/game-data/disc` or can be given an explicit path via `--data <path>`.
+
+### 3. Controls
+
+Both gamepads (Xbox / DualShock / SDL-compatible) and keyboard are supported out of the box:
+
+| PS1 Action | Gamepad | Keyboard |
+|---|---|---|
+| **D-Pad / Movement** | D-Pad / Left Stick | `W`, `A`, `S`, `D` or Arrow Keys |
+| **Cross (Confirm / Action)** | `A` (Xbox) / `Cross` (PS) | `X`, `K`, or `Enter` |
+| **Circle (Cancel / Whistle)** | `B` (Xbox) / `Circle` (PS) | `Z` or `J` |
+| **Square (Use Tool)** | `X` (Xbox) / `Square` (PS) | `C` or `U` |
+| **Triangle (Rucksack)** | `Y` (Xbox) / `Triangle` (PS) | `V` or `I` |
+| **Start (Pause / Menu)** | `Start` | `Space` |
+| **Select (Map / Town)** | `Back` / `Select` | `Esc` or `Tab` |
+| **L1 / R1** | `LB` / `RB` | `Q` / `E` |
+| **L2 / R2** | `LT` / `RT` | `1` / `2` |
 
 ## Exceptions
 
