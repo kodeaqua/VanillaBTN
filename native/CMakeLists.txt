@@ -563,12 +563,19 @@ target_link_libraries(ps1_fillrate_oit_test PRIVATE ps1_video ps1_pgxp)
 target_compile_options(ps1_fillrate_oit_test PRIVATE /W4)
 add_test(NAME ps1_fillrate_oit COMMAND ps1_fillrate_oit_test)
 
+add_executable(ps1_input_overhaul_test tests/ps1_input_overhaul_test.c)
+set_target_properties(ps1_input_overhaul_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_link_libraries(ps1_input_overhaul_test PRIVATE ps1_input)
+target_compile_options(ps1_input_overhaul_test PRIVATE /W4)
+add_test(NAME ps1_input_overhaul COMMAND ps1_input_overhaul_test)
+
 # Synthetic assertions remain active when testing optimized Release libraries.
 foreach(test_target ps1_video_test ps1_sprite_test ps1_ot_test ps1_gpu_test
         ps1_gte_test ps1_input_test ps1_clock_test ps1_spu_test ps1_xa_test
         ps1_audio_test ps1_card_test ps1_pgxp_test ps1_zbuffer_test ps1_clipping_test
         ps1_float_gte_test ps1_color32_test ps1_tex_filter_test ps1_aa_fog_test
-        ps1_audio_overhaul_test ps1_hifi_audio_test ps1_fillrate_oit_test)
+        ps1_audio_overhaul_test ps1_hifi_audio_test ps1_fillrate_oit_test
+        ps1_input_overhaul_test)
     target_compile_options(${test_target} PRIVATE /UNDEBUG)
 endforeach()
 

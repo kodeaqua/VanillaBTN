@@ -37,12 +37,38 @@ static Ps1Audio audio;
 static Ps1CardManager card_mgr;
 #endif
 
+typedef struct HostGame {
+    SDL_Window *window;
+    SDL_Renderer *renderer;
+    SDL_Texture *texture;
+    SDL_Gamepad *gamepads[2];
+    bool running;
+    bool paused;
+    AppConfig config;
+    uint32_t keyboard_buttons, controller_buttons[2];
+    uint16_t keyboard_keys[SDL_SCANCODE_COUNT];
+    int16_t stick_x[2], stick_y[2];
+    int16_t trigger_left[2], trigger_right[2];
+#ifdef VANILLABTN_BOOT_TEST
+    unsigned vblanks, vblank_limit, colored_frames, audible_frames;
+    bool cycle_required, visited_farm, returned_title, new_game_required;
+#endif
+} HostGame;
+
 static void send_rumble(unsigned slot, uint8_t small, uint8_t large, void *context) {
-    SDL_Gamepad **gamepads = context;
-    if (slot < 2 && gamepads[slot] != NULL) {
-        /* Refresh while the SDK polls the original actuator buffer. The short
-         * timeout also stops motors if host polling unexpectedly stalls. */
-        SDL_RumbleGamepad(gamepads[slot], (Uint16)(large * 257u), small ? 65535 : 0, 100);
+    HostGame *host = (HostGame *)context;
+    if (slot < 2 && host && host->gamepads[slot] != NULL) {
+        bool hd = config_resolve_bool(host->config.fixes.hd_rumble, host->config.preset, true);
+        if (hd) {
+            /* HD Rumble: graded tactile curve rather than 100% full-blast small motor buzzing */
+            Uint16 small_freq = small ? 26000 : 0;
+            float l_norm = (float)large / 255.0f;
+            Uint16 large_freq = (Uint16)(powf(l_norm, 1.4f) * 65535.0f);
+            SDL_RumbleGamepad(host->gamepads[slot], large_freq, small_freq, 100);
+        } else {
+            /* Authentic PS1: binary 1-bit small motor (full 65535 blast) and linear large */
+            SDL_RumbleGamepad(host->gamepads[slot], (Uint16)(large * 257u), small ? 65535 : 0, 100);
+        }
     }
 }
 
@@ -91,22 +117,7 @@ static uint32_t map_key_to_ps1_button(SDL_Keycode key) {
     }
 }
 
-typedef struct HostGame {
-    SDL_Window *window;
-    SDL_Renderer *renderer;
-    SDL_Texture *texture;
-    SDL_Gamepad *gamepads[2];
-    bool running;
-    AppConfig config;
-    uint32_t keyboard_buttons, controller_buttons[2];
-    uint16_t keyboard_keys[SDL_SCANCODE_COUNT];
-    int16_t stick_x[2], stick_y[2];
-    int16_t trigger_left[2], trigger_right[2];
-#ifdef VANILLABTN_BOOT_TEST
-    unsigned vblanks, vblank_limit, colored_frames, audible_frames;
-    bool cycle_required, visited_farm, returned_title, new_game_required;
-#endif
-} HostGame;
+
 
 #ifdef VANILLABTN_BOOT_TEST
 static bool boot_save_frame(void) {
@@ -153,6 +164,7 @@ static void host_game_pump(void *context) {
         if (event.type == SDL_EVENT_QUIT) {
             host->running = false;
         } else if (event.type == SDL_EVENT_GAMEPAD_ADDED) {
+            host->paused = false;
             int slot = -1;
             if (host->gamepads[0] == NULL) {
                 slot = 0;
@@ -178,6 +190,9 @@ static void host_game_pump(void *context) {
                     host->controller_buttons[i] = 0;
                     host->stick_x[i] = host->stick_y[i] = 0;
                     host->trigger_left[i] = host->trigger_right[i] = 0;
+                    if (i == 0 && host->config.input.pause_on_disconnect) {
+                        host->paused = true;
+                    }
                     break;
                 }
             }
@@ -262,6 +277,16 @@ static void host_game_pump(void *context) {
     }
 
     if (!host->running) { sdk_sync_stop(); return; }
+
+    if (host->paused) {
+        bool minimized = host->window != NULL &&
+            (SDL_GetWindowFlags(host->window) & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) != 0;
+        if (!minimized) {
+            host_present_frame(&video, host->renderer, &host->texture);
+        }
+        return;
+    }
+
     /* Supply raw samples only: original pad.c owns the analog/repeat rules
      * in the original game. Do not feed folded stick bits. */
 #ifdef VANILLABTN_BOOT_TEST
@@ -272,17 +297,23 @@ static void host_game_pump(void *context) {
             phase % 12 < 2 ? PS1_PAD_CROSS : 0;
     }
 #endif
+
+    bool fix_diag = config_resolve_bool(host->config.fixes.fix_diagonal_running, host->config.preset, true);
+    float deadzone = host->config.input.analog_deadzone;
+    uint8_t stick0_x, stick0_y, stick1_x, stick1_y;
+
+    ps1_input_normalize_stick(host->stick_x[0], host->stick_y[0], deadzone, fix_diag, &stick0_x, &stick0_y);
+    ps1_input_normalize_stick(host->stick_x[1], host->stick_y[1], deadzone, fix_diag, &stick1_x, &stick1_y);
+
     sdk_pad_sample(0, true, host->gamepads[0] != NULL,
         (uint16_t)(host->keyboard_buttons | host->controller_buttons[0] |
             ps1_input_trigger_buttons(host->trigger_left[0], host->trigger_right[0])),
-        (uint8_t)(((int)host->stick_x[0] + 32768) / 256),
-        (uint8_t)(((int)host->stick_y[0] + 32768) / 256));
+        stick0_x, stick0_y);
 
     sdk_pad_sample(1, host->gamepads[1] != NULL, host->gamepads[1] != NULL,
         (uint16_t)(host->controller_buttons[1] |
             ps1_input_trigger_buttons(host->trigger_left[1], host->trigger_right[1])),
-        (uint8_t)(((int)host->stick_x[1] + 32768) / 256),
-        (uint8_t)(((int)host->stick_y[1] + 32768) / 256));
+        stick1_x, stick1_y);
 
     /* Original game timing owns the cadence. Submit exactly one 60 Hz audio
      * interval from the same SDK SPU used by sound.c, not the smoke mixer. */
@@ -501,7 +532,7 @@ disc_ready:
     /* This probe must never read, recover, create or flush user save files. */
     sdk_card_bind_manager(NULL);
 #endif
-    sdk_pad_rumble(send_rumble, host.gamepads);
+    sdk_pad_rumble(send_rumble, &host);
     host.running = true;
     sdk_sync_pump(host_game_pump, &host);
 #ifdef VANILLABTN_BOOT_TEST

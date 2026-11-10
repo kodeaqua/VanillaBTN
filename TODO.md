@@ -6,7 +6,7 @@ Update the relevant item after completing a task or discovering a blocker.
 ## Active
 
 - [ ] Enhancement & Modernization: Fix 35 PS1 hardware flaws and implement modern graphics and platform features (see `docs/enhancements.md`).
-  - [ ] Phase 1: PS1 Inherent Flaws & Bottlenecks Fixes (Highest Priority).
+  - [x] Phase 1: PS1 Inherent Flaws & Bottlenecks Fixes (Complete — all 35 hardware flaws fixed and verified).
     - [x] Milestone 1: Implement `vanillabtn.ini` configuration parser (`config.c`/`config.h`) with Master Preset System (`mode = modern / authentic_ps1 / custom`) and fallback defaults.
       - [x] Implement robust INI parser supporting sections, comments, case-insensitive key matching, booleans, tristates, and enumerated modes.
       - [x] Provide Master Preset architecture with `mode = modern` (all 35 fixes auto-enabled), `mode = authentic_ps1` (classic 1999 console behavior), and `mode = custom` with granular `auto` fallbacks.
@@ -75,7 +75,11 @@ Update the relevant item after completing a task or discovering a blocker.
       - [x] Implement HDR soft-additive tonemapping (`s_hdr_tonemapping`) in `blend_color32` mode 1, replacing hard digital clamping with smooth photographic saturation curve ($C = B + F - B \cdot F / 255$) and eliminating blown-out chalky white light clusters.
       - [x] Implement double-buffered atomic CLUT palette staging (`s_atomic_clut`, `clut_vram`, `ps1_video_commit_clut`) in `ps1_video.c` and `sdk_gpu.c`, ensuring in-flight texel sampling never observes mid-frame palette tearing.
       - [x] Add synthetic unit tests in `ps1_fillrate_oit_test.c` verifying OIT depth under-blending, fill-rate overdraw capping, HDR soft-additive blend saturation, and atomic CLUT double-buffering (49/49 CTests, 9/9 Python tests passing in Debug and Release).
-    - [ ] Milestone 12: Input Subsystem Fixes — circular analog normalization (fix diagonal running bug), HD rumble motor curve, sub-frame raw input polling, and disconnect auto-pause.
+    - [x] Milestone 12: Input Subsystem Fixes — circular analog normalization (fix diagonal running bug), HD rumble motor curve, sub-frame raw input polling, and disconnect auto-pause.
+      - [x] Implement circular stick normalization and radial rescaling (`ps1_input_normalize_stick`) in `ps1_input.h`/`ps1_input.c`, mapping circular modern analog sticks to full $[0, 255]$ octagonal gate range and eliminating the diagonal running bug where the character dropped to a slow walk.
+      - [x] Implement HD rumble haptic curve (`send_rumble` in `main.c`) converting the 1-bit binary small motor into a tactile high-frequency pulse (~26000) and large motor through perceptual gamma 1.4 curve ($L^{1.4} \cdot 65535$).
+      - [x] Implement sub-frame raw event polling and disconnect auto-pause (`pause_on_disconnect` in `main.c`), safely freezing game loop on controller disconnection and resuming seamlessly upon reconnection or button press.
+      - [x] Add synthetic unit tests in `ps1_input_overhaul_test.c` verifying circular stick radial mapping, deadzone isolation, HD rumble gamma curve, and sub-frame input responsiveness (50/50 CTests, 9/9 Python tests passing in Debug and Release).
   - [ ] Phase 2: Modern Graphics & Platform Enhancements.
     - [ ] Milestone 13: Multi-monitor discovery and 4 window modes (windowed, borderless, fullscreen, maximized).
     - [ ] Milestone 14: Decoupled FPS limiter (30, 60, monitor Hz, unlocked) maintaining exact 60 virtual vblank simulation cadence.
