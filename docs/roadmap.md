@@ -58,3 +58,15 @@ The graphics/GTE and audio replacements are the main technical risks. Do the
 smallest vertical slice of each early; do not equate a compiled `.exe` with a
 playable port. Agents provide code-level evidence, while the developer owns
 actual Windows and gameplay testing.
+
+## Post-Bringup Roadmap: Enhancement & Modernization
+
+Following the completion of the native baseline bringup (Milestones 0–6), VanillaBTN progresses into the **Enhancement & Modernization** phase. Detailed architecture, technical specifications, and configuration parameters are documented in [docs/enhancements.md](enhancements.md).
+
+### Phased Priority
+1. **Phase 1: PS1 Hardware Inherent Flaws & Bottlenecks Fixes (Highest Priority)**:
+   Fixing 35 identified PS1 hardware flaws, including PGXP subpixel vertex precision (anti-wobble), PGXP perspective-correct texturing (anti-warp), true floating-point Z-buffer (anti-flicker), true color 32-bit (anti-banding), dithering removal, texture bleeding fix, 64-voice polyphony expansion, zero-gap CD-XA looping, micro-fade audio pop suppression, and circular analog stick normalization.
+2. **Phase 2: Modern Graphics & Platform Enhancements (Second Priority)**:
+   Introducing True Widescreen (Hor+ 3D FOV expansion without distortion, native culling expansion, and 2D HUD safe-area preservation), multi-backend graphics abstraction (Vulkan, Direct3D 11, OpenGL, Software), multi-monitor discovery with 4 window modes (windowed, borderless, fullscreen, maximized), decoupled pacing-locked FPS limiter (30, 60, monitor Hz, unlocked), and HD font rendering.
+3. **Master Preset Architecture**:
+   All options are managed via `vanillabtn.ini` with a master preset `mode = modern` (all fixes enabled automatically) or `mode = authentic_ps1` (100% original 1999 console behavior), allowing granular per-feature overrides.

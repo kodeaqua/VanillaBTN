@@ -5,6 +5,27 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Active
 
+- [ ] Enhancement & Modernization: Fix 35 PS1 hardware flaws and implement modern graphics and platform features (see `docs/enhancements.md`).
+  - [ ] Phase 1: PS1 Inherent Flaws & Bottlenecks Fixes (Highest Priority).
+    - [ ] Milestone 1: Implement `vanillabtn.ini` configuration parser (`config.c`/`config.h`) with Master Preset System (`mode = modern / authentic_ps1 / custom`) and fallback defaults.
+    - [ ] Milestone 2: PGXP Precision Pipeline — GTE 16-bit subpixel float vertex precision (anti-wobble) and perspective-correct texture mapping (anti-warp).
+    - [ ] Milestone 3: True Floating-Point Z-Buffer and polygon shadow bias (eliminating Z-fighting and sunken shadows).
+    - [ ] Milestone 4: 3D Frustum W-Clipping (preventing near-plane division-by-zero polygon spikes) and dynamic quad subdivision.
+    - [ ] Milestone 5: 32-bit Float GTE Math (smooth camera rotation angles and skeletal joint precision).
+    - [ ] Milestone 6: True Color 32-bit pipeline (ARGB8888 anti-banding) and dithering removal (`dithering = off / deband`).
+    - [ ] Milestone 7: Texture bleeding fix (sub-rectangle UV clamping), alpha halo fix (pre-filter alpha test), and automatic mipmapping.
+    - [ ] Milestone 8: Anti-Aliasing (MSAA/SMAA) and smooth exponential atmospheric fog.
+    - [ ] Milestone 9: Audio Subsystem Overhaul — expanded 64-voice polyphony (anti-voice stealing), seamless zero-gap CD-XA looping, micro-fade pop suppression, and VAG loop crossfading.
+    - [ ] Milestone 10: Hi-Fi 44.1/48 kHz 32-bit float reverb DSP and full-spectrum audio output.
+    - [ ] Milestone 11: Zero fill-rate bottleneck architecture (smooth 60 FPS in heavy rain and festival scenes).
+    - [ ] Milestone 12: Input Subsystem Fixes — circular analog normalization (fix diagonal running bug), HD rumble motor curve, sub-frame raw input polling, and disconnect auto-pause.
+  - [ ] Phase 2: Modern Graphics & Platform Enhancements.
+    - [ ] Milestone 13: Multi-monitor discovery and 4 window modes (windowed, borderless, fullscreen, maximized).
+    - [ ] Milestone 14: Decoupled FPS limiter (30, 60, monitor Hz, unlocked) maintaining exact 60 virtual vblank simulation cadence.
+    - [ ] Milestone 15: True Widescreen — Hor+ 3D FOV camera expansion, native culling band expansion, and 2D HUD safe-area protection.
+    - [ ] Milestone 16: Multi-backend graphics abstraction (`vulkan`, `d3d11`, `opengl`, `software`).
+    - [ ] Milestone 17: HD font rendering, extended draw distance, turbo hotkey, and auto-backup save data.
+
 - [x] Continuation audit: complete farm linkage/address translation and remove unsupported SDK success paths before claiming runtime integration.
   - [x] Fifth subsystem hardening and edge-case audit: eliminate latent abort crash points across sound, graphics, memory, input, and video sync SDK calls, harden sequence parser against out-of-bounds program and tone offsets, guard CD-XA mixing and sector streaming against NULL file contexts and output buffer indexing, prevent NULL sample dereferences in SPU voice fetching, and guard audio stream buffer queuing on device error.
     - [x] Eliminate SDK `abort()` crash points in `SsSetTableSize`, `SsSetTickMode`, `SsSetSerialAttr`, `SsSetSerialVol` (`sdk_sound.c`), `ResetGraph`, `GsInitGraph`, `GsDefDispBuff` (`sdk_gpu.c`), `SetMem` (`sdk_memory.c`), `ChangeClearPAD` (`sdk_pad.c`), and `SetVideoMode` (`sdk_sync.c`), ensuring resilient execution when games or scenes pass out-of-range parameters.

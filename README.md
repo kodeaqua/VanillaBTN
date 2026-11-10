@@ -19,7 +19,8 @@ remains the reference baseline. Building it with Docker on Windows still produce
 PS1 binaries.
 
 The [Windows roadmap](docs/roadmap.md) orders the bringup work, and the
-[porting rules](docs/porting.md) define its fidelity boundaries. The
+[enhancement blueprint](docs/enhancements.md) defines the post-bringup modernization roadmap.
+The [porting rules](docs/porting.md) define its fidelity boundaries. The
 [architecture guide](docs/architecture.md) maps the current code.
 [AGENTS.md](AGENTS.md) records repository rules for coding agents.
 The [versioning policy](docs/versioning.md) explains the project's development
