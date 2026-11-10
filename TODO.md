@@ -5,7 +5,7 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Active
 
-- [ ] Enhancement & Modernization: Fix 35 PS1 hardware flaws and implement modern graphics and platform features (see `docs/enhancements.md`).
+- [x] Enhancement & Modernization: Fix 35 PS1 hardware flaws and implement modern graphics and platform features (see `docs/enhancements.md`).
   - [x] Phase 1: PS1 Inherent Flaws & Bottlenecks Fixes (Complete — all 35 hardware flaws fixed and verified).
     - [x] Milestone 1: Implement `vanillabtn.ini` configuration parser (`config.c`/`config.h`) with Master Preset System (`mode = modern / authentic_ps1 / custom`) and fallback defaults.
       - [x] Implement robust INI parser supporting sections, comments, case-insensitive key matching, booleans, tristates, and enumerated modes.
