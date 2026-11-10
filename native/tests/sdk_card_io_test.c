@@ -222,9 +222,14 @@ int main(void) {
     CHECK(!card->dirty && memcmp(snapshot, card->data, sizeof(snapshot)) == 0);
     card->data[0] = 'X';
     CHECK(MemCardCreateFile(0, "UNFORMATTED", 1) == McErrNotFormat);
+    CHECK(MemCardGetDirentry(0, "*", entries, &files, 0, 1) == McErrNotFormat);
     card->data[0] = 'M';
     card->data[127] ^= 1;
     CHECK(MemCardCreateFile(0, "DAMAGED", 1) == McErrCardInvalid);
+    CHECK(MemCardGetDirentry(0, "*", entries, &files, 0, 1) == McErrCardInvalid);
+    card->present = false;
+    CHECK(MemCardGetDirentry(0, "*", entries, &files, 0, 1) == McErrCardNotExist);
+    card->present = true;
     CHECK(MemCardFormat(0) == McErrNone);
     CHECK(card->present && card->dirty && ps1_card_validate(card) == PS1_CARD_OK);
     test_write_persists_before_completion();

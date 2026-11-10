@@ -447,7 +447,10 @@ provide standard PS1 memory card definitions (`MemCardInit`, `MemCardAccept`,
 system (`ps1_card`). Channels 0 and 0x10 map to virtual slots 0 and 1. Card probe
 requests distinguish between unformatted cards, damaged/invalid headers, standard
 PS1 cards, and missing cards, reporting `McxErrInvalid` for standard PS1 memory
-cards (indicating non-PDA cards).
+cards (indicating non-PDA cards). `MemCardGetDirentry` returns canonical SDK
+result codes: `McErrCardNotExist` when a card slot is absent, `McErrNotFormat`
+when unformatted, `McErrCardInvalid` when corrupt or invalid, and `McErrNone` on
+success, matching `saveload.c` error handling and retry loops.
 Formatting requires a present card; an unavailable slot reports
 `McErrCardNotExist` without changing the retained image.
 Recovery replaces an invalid primary image only when a validated temporary or

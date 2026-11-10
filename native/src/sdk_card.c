@@ -297,13 +297,28 @@ int MemCardGetDirentry(int chan, const char *name, struct DIRENTRY *dir, long *f
     long count = 0;
 
     s_last_cmd = 0x08;
-    if (card == NULL || !card->present || ofs < 0 || max < 0 ||
-        (max > 0 && dir == NULL) || ps1_card_validate(card) != PS1_CARD_OK) {
+    if (files != NULL) {
+        *files = 0;
+    }
+    if (ofs < 0 || max < 0 || (max > 0 && dir == NULL)) {
         s_last_result = McErrCardInvalid;
-        if (files != NULL) {
-            *files = 0;
-        }
         return -1;
+    }
+    if (card == NULL) {
+        s_last_result = McErrCardInvalid;
+        return McErrCardInvalid;
+    }
+    if (!card->present) {
+        s_last_result = McErrCardNotExist;
+        return McErrCardNotExist;
+    }
+    if (card->data[0] != 'M' || card->data[1] != 'C') {
+        s_last_result = McErrNotFormat;
+        return McErrNotFormat;
+    }
+    if (ps1_card_validate(card) != PS1_CARD_OK) {
+        s_last_result = McErrCardInvalid;
+        return McErrCardInvalid;
     }
 
     int skip = ofs;
