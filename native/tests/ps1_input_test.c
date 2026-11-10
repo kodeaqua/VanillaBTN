@@ -22,6 +22,11 @@ int main(void) {
     assert(ps1_input_stick_buttons(32767, 0) == PS1_PAD_RIGHT);
     assert(ps1_input_stick_buttons(0, 32767) == PS1_PAD_DOWN);
     assert(ps1_input_stick_buttons(-32768, 0) == PS1_PAD_LEFT);
+    /* Verify diagonal boundaries (45, 135, 225, 315 deg) do not drop inputs */
+    assert(ps1_input_stick_buttons(12800, -12800) == PS1_PAD_RIGHT);
+    assert(ps1_input_stick_buttons(12800, 12800) == PS1_PAD_DOWN);
+    assert(ps1_input_stick_buttons(-12800, 12800) == PS1_PAD_LEFT);
+    assert(ps1_input_stick_buttons(-12800, -12800) == PS1_PAD_UP);
     Ps1InputRecord record;
     ps1_input_init(&record);
 

@@ -149,7 +149,23 @@ static void test_mix_block_boundaries(void) {
     CHECK(whole.cd_input_position == 512 && split.cd_input_position == 512);
 }
 
+static void test_reverb_null_and_bounds_safety(void) {
+    int16_t out[2] = {0};
+    /* NULL safety checks */
+    ps1_reverb_set_echo(NULL, 7, 64, 64);
+    ps1_reverb_clock(NULL, 0, 0, 0, out);
+    ps1_reverb_clock(NULL, 0, 0, 0, NULL);
+    CHECK(ps1_reverb_step(NULL, 0, 1000, 1) == 0);
+
+    /* Zero/empty reverb struct safety (length <= 0 division protection) */
+    Ps1Reverb r;
+    memset(&r, 0, sizeof(r));
+    r.base = PS1_REVERB_WORDS; /* length = 0 */
+    ps1_reverb_clock(&r, 1000, 1000, 1, out);
+}
+
 int main(void) {
+    test_reverb_null_and_bounds_safety();
     test_register_arithmetic();
     test_wrap_and_presets();
     test_half_rate_fir_and_disable();

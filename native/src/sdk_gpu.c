@@ -135,7 +135,7 @@ void sdk_gpu_bind(Ps1Video *video) {
     ps1_draw_state_reset(&draw);
     sdk_gpu_reset_packets();
     SetDefDispEnv(&display, 0, 240, 320, 240);
-    display_enabled = true;
+    display_enabled = (video != NULL);
     SetDefDrawEnv(&gs_draw[0], 0, 0, 320, 240);
     SetDefDrawEnv(&gs_draw[1], 0, 240, 320, 240);
     SetDefDispEnv(&gs_display[0], 0, 240, 320, 240);

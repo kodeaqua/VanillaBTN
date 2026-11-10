@@ -19,9 +19,13 @@ bool game_archive_open(GameArchive *archive, const char *directory) {
     FILE *index;
     long length;
     int written;
+    size_t dlen;
+    const char *sep;
     if (archive == NULL || directory == NULL) return false;
     memset(archive, 0, sizeof(*archive));
-    written = snprintf(path, sizeof(path), "%s/A_FILE.HDT", directory);
+    dlen = strlen(directory);
+    sep = (dlen > 0 && (directory[dlen - 1] == '/' || directory[dlen - 1] == '\\')) ? "" : "/";
+    written = snprintf(path, sizeof(path), "%s%sA_FILE.HDT", directory, sep);
     if (written < 0 || (size_t)written >= sizeof(path)) return false;
     index = fopen(path, "rb");
     if (index == NULL) return false;
@@ -37,7 +41,7 @@ bool game_archive_open(GameArchive *archive, const char *directory) {
             return false;
         }
     }
-    written = snprintf(path, sizeof(path), "%s/A_FILE.BIN", directory);
+    written = snprintf(path, sizeof(path), "%s%sA_FILE.BIN", directory, sep);
     if (written < 0 || (size_t)written >= sizeof(path)) return false;
     archive->file = fopen(path, "rb");
     if (archive->file == NULL) return false;

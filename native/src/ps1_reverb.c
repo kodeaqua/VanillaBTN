@@ -81,6 +81,7 @@ static int32_t multiply(int32_t value, int16_t gain) {
  * Wrapping is relative to ESA, including negative all-pass displacements. */
 static unsigned address(const Ps1Reverb *r, int offset) {
     int length = PS1_REVERB_WORDS - (int)r->base;
+    if (length <= 0) return 0;
     int relative = ((int)r->cursor - (int)r->base + offset) % length;
     if (relative < 0) relative += length;
     return r->base + relative;
@@ -106,7 +107,7 @@ int ps1_reverb_set_preset(Ps1Reverb *r, int type, int clear) {
     return ps1_reverb_set_registers(r, presets[type].registers, presets[type].bytes, clear);
 }
 void ps1_reverb_set_echo(Ps1Reverb *r, int type, int delay, int feedback) {
-    if (type != 7 && type != 8) return;
+    if (!r || (type != 7 && type != 8)) return;
     if (delay < 0) delay = 0;
     if (delay > 127) delay = 127;
     if (feedback < 0) feedback = 0;
@@ -124,6 +125,7 @@ void ps1_reverb_set_echo(Ps1Reverb *r, int type, int delay, int feedback) {
 }
 
 int16_t ps1_reverb_step(Ps1Reverb *r, unsigned c, int16_t input, int write_enable) {
+    if (!r) return 0;
     const uint16_t *v = r->registers;
     /* IIR reflections read the previous halfword, not the previous frame. */
     if (write_enable) {
@@ -161,6 +163,7 @@ int16_t ps1_reverb_step(Ps1Reverb *r, unsigned c, int16_t input, int write_enabl
 
 void ps1_reverb_clock(Ps1Reverb *r, int32_t left, int32_t right,
                        int write_enable, int16_t output[2]) {
+    if (!r || !output) return;
     unsigned p = r->history_position;
     unsigned c = r->phase; /* left/right alternate on successive clocks */
     r->input_history[p][0] = saturate(left);

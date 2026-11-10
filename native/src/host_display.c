@@ -34,6 +34,10 @@ bool host_present_frame(const Ps1Video *video, SDL_Renderer *renderer, SDL_Textu
     if (!SDL_LockTexture(*texture, NULL, &pixels, &pitch)) {
         return false;
     }
+    if (pitch <= 0 || (pitch % (int)sizeof(uint32_t)) != 0) {
+        SDL_UnlockTexture(*texture);
+        return false;
+    }
     copied = ps1_video_copy_argb(video, display.x, display.y, display.width, display.height, pixels,
                                  (size_t)pitch / sizeof(uint32_t));
     SDL_UnlockTexture(*texture);

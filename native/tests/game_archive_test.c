@@ -33,6 +33,15 @@ int main(void) {
     assert(!game_archive_read(&archive, 32, 0, bytes, 1));
     assert(!game_archive_read(&archive, 0, UINT32_MAX, bytes, 1));
     game_archive_close(&archive);
+    /* Test directory with trailing slash and backslash */
+    assert(game_archive_open(&archive, "./"));
+    assert(game_archive_read(&archive, 0, 254, bytes, 4));
+    assert(bytes[0] == 254 && bytes[1] == 255 && bytes[2] == 0 && bytes[3] == 1);
+    game_archive_close(&archive);
+    assert(game_archive_open(&archive, ".\\"));
+    assert(game_archive_read(&archive, 0, 254, bytes, 4));
+    assert(bytes[0] == 254 && bytes[1] == 255 && bytes[2] == 0 && bytes[3] == 1);
+    game_archive_close(&archive);
     game_archive_close(&archive);
     write_fixture(true);
     assert(!game_archive_open(&archive, "."));

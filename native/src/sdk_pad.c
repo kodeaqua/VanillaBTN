@@ -35,7 +35,7 @@ static void refresh(unsigned slot) {
         data[7] = port->left_y;
     }
     uint8_t small = 0, large = 0;
-    if (started && port->connected && port->aligned && VSync(-1) >= port->ready_at) {
+    if (started && port->connected && port->aligned && port->actuators && VSync(-1) >= port->ready_at) {
         for (unsigned i = 0; i < 6 && i < port->actuator_size; ++i) {
             if (port->alignment[i] == 0) small = port->actuators[i] != 0;
             if (port->alignment[i] == 1) large = port->actuators[i];

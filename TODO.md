@@ -6,6 +6,17 @@ Update the relevant item after completing a task or discovering a blocker.
 ## Active
 
 - [x] Continuation audit: complete farm linkage/address translation and remove unsupported SDK success paths before claiming runtime integration.
+  - [x] Subsystem hardening and edge-case audit: eliminate analog diagonal dead notches, prevent division by zero in zero-length reverb buffers, harden pad actuator and OT walking null guards, enforce UTF-8 file removal for memory card atomic writes, sanitize directory paths with trailing slashes in archive and CD mounting, validate pitch before presentation, and prevent unsigned 64-bit underflow in sequence timing.
+    - [x] Fix strict-inequality diagonal drops in `ps1_input.c`: `ps1_input_stick_buttons` now cleanly partitions the 360-degree plane into 4 full 90-degree octants without dropping inputs at exact 45, 135, 225, or 315 degree boundaries.
+    - [x] Guard `Ps1Reverb` against division by zero on zero-length buffers (`length <= 0`) and check for NULL pointers in `ps1_reverb_set_echo`, `ps1_reverb_step`, and `ps1_reverb_clock`.
+    - [x] Add NULL check for `port->actuators` in `sdk_pad.c` actuator loop to prevent potential null pointer dereferences during rumble refresh.
+    - [x] Replace remaining ANSI `remove()` calls in `ps1_card.c` with UTF-8 `SDL_RemovePath()` in `ps1_card_recover_file` and `ps1_card_save_to_file`.
+    - [x] Cleanly handle directories ending with trailing slashes or backslashes in `game_archive_open` (`game_archive.c`) and `sdk_cd_mount` (`sdk_cd.c`), preventing Windows MSVC `_stat64` failures on directories like `disc\`.
+    - [x] Add NULL check for `ot->entries` in `ps1_ot_walk` (`ps1_ot.c`).
+    - [x] Protect against unsigned 64-bit underflow in `ps1_seq_mix` (`ps1_seq.c`) when resetting timing origin after long loop playback.
+    - [x] Validate texture pitch in `host_present_frame` (`host_display.c`) before ARGB buffer copies.
+    - [x] Clear `display_enabled` when unbinding GPU in `sdk_gpu_bind(NULL)`.
+    - [x] Synthetic tests in `ps1_input_test.c`, `ps1_reverb_test.c`, and `game_archive_test.c` verify all boundary conditions and safety checks in Debug and Release (100% pass rate).
   - [x] Native runtime audit: wire sequence master volume, enable CD-XA seamless looping, enforce UTF-8 card path replacement, clamp SPU pitch step, reset letterbox draw color, and add CLI help.
     - [x] Wire `Ps1Seq` master volume in `ps1_seq.c` and connect `SsSeqSetVol` in `sdk_sound.c`: sequence voices and notes now scale proportionally to sequence volume, enabling BGM fade-out and volume adjustments. Synthetic fixtures verify volume scaling in Debug and Release.
     - [x] Report `CdlDiskError` (5) from `CdSync` on XA stream EOF in `sdk_cd.c` to trigger `cd_audio.c` track restarts (`cd_audio_restart(CdlReadS)`), restoring seamless background music looping.

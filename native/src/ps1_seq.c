@@ -205,7 +205,11 @@ void ps1_seq_mix(Ps1Seq *seq, Ps1Spu *spu, int16_t *out, int frames) {
         /* Keep the timing origin close to the current sample across long loops. */
         if (seq->active && seq->sample_clock >= PS1_SPU_SAMPLE_RATE) {
             uint64_t origin = (seq->sample_clock - 1) * denominator;
-            seq->time_units -= origin;
+            if (seq->time_units >= origin) {
+                seq->time_units -= origin;
+            } else {
+                seq->time_units = 0;
+            }
             seq->sample_clock = 1;
         }
         while (seq->active && seq->time_units <= seq->sample_clock * denominator) {

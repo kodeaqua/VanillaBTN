@@ -28,11 +28,10 @@ uint32_t ps1_input_stick_buttons(int16_t host_x, int16_t host_y) {
     else if (y > 128) angle += 180;
     else angle = 360 - angle;
     if (angle == 360) angle = 0;
-    if (angle < 45 || angle > 315) return PS1_PAD_UP;
-    if (angle > 45 && angle < 135) return PS1_PAD_RIGHT;
-    if (angle > 135 && angle < 225) return PS1_PAD_DOWN;
-    if (angle > 225) return PS1_PAD_LEFT;
-    return 0;
+    if (angle < 45 || angle >= 315) return PS1_PAD_UP;
+    if (angle < 135) return PS1_PAD_RIGHT;
+    if (angle < 225) return PS1_PAD_DOWN;
+    return PS1_PAD_LEFT;
 }
 
 #include <string.h>

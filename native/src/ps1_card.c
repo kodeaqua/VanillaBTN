@@ -394,7 +394,7 @@ bool ps1_card_recover_file(const char *filepath) {
 
     /* If primary file is already valid, nothing to recover */
     if (is_valid_mcr_file(filepath)) {
-        remove(tmp_path);
+        SDL_RemovePath(tmp_path);
         return true;
     }
 
@@ -467,14 +467,14 @@ bool ps1_card_save_to_file(const Ps1Card *card, const char *filepath) {
     if (fclose(f) != 0) complete = false;
 
     if (!complete || !is_valid_mcr_file(tmp_path)) {
-        remove(tmp_path);
+        SDL_RemovePath(tmp_path);
         return false;
     }
 
     /* Replace the old backup only if the primary can be moved into place. */
     SDL_PathInfo info;
     if (SDL_GetPathInfo(filepath, &info) && !SDL_RenamePath(filepath, bak_path)) {
-        remove(tmp_path);
+        SDL_RemovePath(tmp_path);
         return false;
     }
 

@@ -91,9 +91,17 @@ void sdk_cd_unmount(void) {
 bool sdk_cd_mount(const char *directory) {
     struct _stat64 info;
     sdk_cd_unmount();
-    if (!directory || strlen(directory) >= sizeof(root)
-        || _stat64(directory, &info) != 0 || !(info.st_mode & _S_IFDIR)) return false;
-    strcpy(root, directory);
+    if (!directory || !*directory || strlen(directory) >= sizeof(root)) return false;
+    char dir_clean[sizeof(root)];
+    size_t dlen = strlen(directory);
+    if (dlen >= sizeof(dir_clean)) return false;
+    memcpy(dir_clean, directory, dlen + 1);
+    while (dlen > 1 && (dir_clean[dlen - 1] == '/' || dir_clean[dlen - 1] == '\\')) {
+        if (dlen == 3 && dir_clean[1] == ':') break;
+        dir_clean[--dlen] = '\0';
+    }
+    if (_stat64(dir_clean, &info) != 0 || !(info.st_mode & _S_IFDIR)) return false;
+    strcpy(root, dir_clean);
     return true;
 }
 

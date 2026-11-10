@@ -50,7 +50,7 @@ bool ps1_ot_insert(Ps1Ot *ot, int bucket, uint32_t packet_id) {
 }
 
 bool ps1_ot_walk(const Ps1Ot *ot, bool (*visit)(uint32_t, void *), void *context) {
-    if (ot == NULL || ot->heads == NULL || visit == NULL) return false;
+    if (ot == NULL || ot->heads == NULL || ot->entries == NULL || visit == NULL) return false;
     for (size_t bucket = ot->depth; bucket > 0; --bucket) {
         for (size_t node = ot->heads[bucket - 1]; node != SIZE_MAX;
              node = ot->entries[node].next) {
