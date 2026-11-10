@@ -1,6 +1,7 @@
 #include "sdk_gpu.h"
 #include "ps1_gpu.h"
 #include <libgpu.h>
+#include <libgte.h>
 #include <libgs.h>
 #include <string.h>
 #include <stdlib.h>
@@ -123,12 +124,24 @@ void DrawOTag(u_long *ot) {
     if (id != SDK_END) packet_error = true; /* Cycles cannot hang the host. */
 }
 
+static DRAWENV gs_draw[2];
+static DISPENV gs_display[2];
+static u_long *gs_work;
+static int graph_debug;
+static short gs_origin_x = 160, gs_origin_y = 120;
+
 void sdk_gpu_bind(Ps1Video *video) {
     vram = video;
     ps1_draw_state_reset(&draw);
     sdk_gpu_reset_packets();
     SetDefDispEnv(&display, 0, 240, 320, 240);
     display_enabled = true;
+    SetDefDrawEnv(&gs_draw[0], 0, 0, 320, 240);
+    SetDefDrawEnv(&gs_draw[1], 0, 240, 320, 240);
+    SetDefDispEnv(&gs_display[0], 0, 240, 320, 240);
+    SetDefDispEnv(&gs_display[1], 0, 0, 320, 240);
+    gs_origin_x = 160;
+    gs_origin_y = 120;
 }
 
 static bool valid_area(int x, int y, int w, int h) {
@@ -284,10 +297,6 @@ void SetDrawLoad(DR_LOAD *p, RECT *r) {
 
 /* GS bootstrap state is kept separately from the game's explicit per-frame
  * environments. PutDrawEnv/PutDispEnv remain authoritative when submitted. */
-static DRAWENV gs_draw[2];
-static DISPENV gs_display[2];
-static u_long *gs_work;
-static int graph_debug;
 
 int ResetGraph(int mode) {
     if (mode != 0) abort(); /* Reset variants are not used by this port yet. */
@@ -311,6 +320,8 @@ void GsInitGraph(unsigned short x, unsigned short y, unsigned short mode,
     if (!x || !y || mode || vrammode) abort();
     HWD0 = (short)x;
     VWD0 = (short)y;
+    gs_origin_x = (short)(x / 2);
+    gs_origin_y = (short)(y / 2);
     for (unsigned i = 0; i < 2; ++i) {
         if (!SetDefDrawEnv(&gs_draw[i], 0, 0, x, y) ||
             !SetDefDispEnv(&gs_display[i], 0, 0, x, y)) abort();
@@ -331,13 +342,19 @@ void GsSetOffset(long x, long y) {
         gs_draw[i].ofs[0] = (short)(gs_draw[i].clip.x + x);
         gs_draw[i].ofs[1] = (short)(gs_draw[i].clip.y + y);
     }
+    SetGeomOffset(x, y);
 }
 
 void GsSetDrawBuffOffset(void) {
-    PutDrawEnv(&gs_draw[0]);
+    if (vram != NULL && valid_area(gs_draw[0].clip.x, gs_draw[0].clip.y, gs_draw[0].clip.w, gs_draw[0].clip.h)) {
+        PutDrawEnv(&gs_draw[0]);
+    }
+    SetGeomOffset(gs_origin_x, gs_origin_y);
 }
 
 void GsInit3D(void) {
     InitGeom();
+    gs_origin_x = (short)(HWD0 / 2);
+    gs_origin_y = (short)(VWD0 / 2);
     GsSetDrawBuffOffset();
 }

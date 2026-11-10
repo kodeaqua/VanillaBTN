@@ -338,6 +338,16 @@ int main(void) {
      * Truncating the negative dot product previously hid this quantization. */
     assert(otz > 0 && proj_xy.x == 160 && proj_xy.y == 119);
 
+    /* Verify that GsSetOffset can select temporary offsets and GsSetDrawBuffOffset
+     * restores the persistent 3D projection center origin (160, 120), matching
+     * Sony libgs behavior across scene resets and farm re-entry after saving. */
+    GsSetOffset(0, 0);
+    otz = gte_project_vertex(&proj_xy, &center_v);
+    assert(otz > 0 && proj_xy.x == 0 && proj_xy.y == -1);
+    GsSetDrawBuffOffset();
+    otz = gte_project_vertex(&proj_xy, &center_v);
+    assert(otz > 0 && proj_xy.x == 160 && proj_xy.y == 119);
+
     ClearOTagR(current_frame->ot, FRAME_OT_DEPTH);
     current_frame->primCursor.bytes = current_frame->primStart;
     FarmScreenXY projected[3];
