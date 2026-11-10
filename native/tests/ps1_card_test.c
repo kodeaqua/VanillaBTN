@@ -8,6 +8,7 @@
 
 #ifdef _WIN32
 #include <direct.h>
+#include <windows.h>
 #define rmdir _rmdir
 #else
 #include <unistd.h>
@@ -327,6 +328,16 @@ static void test_recovery_validates_directory(void) {
     remove("test_directory_recovery.mcr.bak");
     write_image_fixture(path, bad->data, PS1_CARD_SIZE);
     write_image_fixture(temp, good->data, PS1_CARD_SIZE);
+#ifdef _WIN32
+    /* Allow validation reads, but deny renaming the candidate. */
+    HANDLE lock = CreateFileA(temp, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+        NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    assert(lock != INVALID_HANDLE_VALUE);
+    assert(!ps1_card_recover_file(path));
+    assert(CloseHandle(lock));
+    check_image_fixture(path, bad->data, PS1_CARD_SIZE);
+    check_image_fixture(temp, good->data, PS1_CARD_SIZE);
+#endif
     assert(ps1_card_recover_file(path));
     check_image_fixture(path, good->data, PS1_CARD_SIZE);
     remove(path);

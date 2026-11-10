@@ -398,16 +398,14 @@ bool ps1_card_recover_file(const char *filepath) {
         return true;
     }
 
-    /* Try recovering from .tmp */
+    /* Replace directly: deleting the primary first loses it if rename fails. */
     if (is_valid_mcr_file(tmp_path)) {
-        remove(filepath);
-        if (rename(tmp_path, filepath) == 0) return true;
+        if (SDL_RenamePath(tmp_path, filepath)) return true;
     }
 
     /* Try recovering from .bak */
     if (is_valid_mcr_file(bak_path)) {
-        remove(filepath);
-        if (rename(bak_path, filepath) == 0) return true;
+        if (SDL_RenamePath(bak_path, filepath)) return true;
     }
 
     return false;
