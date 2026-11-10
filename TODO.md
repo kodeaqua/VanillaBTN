@@ -91,7 +91,11 @@ Update the relevant item after completing a task or discovering a blocker.
       - [x] Implement sub-tick wait slicing and presentation hook (`sdk_sync_subtick_hook` in `sdk_sync.c`/`sdk_sync.h`) allowing displays at 120 Hz, 144 Hz, or higher to present intermediate frames and eliminate 3:2 pull-down judder without altering game speed.
       - [x] Wire renderer VSync (`SDL_SetRenderVSync`) and presentation pacing checks into `main.c` event and pump loop.
       - [x] Add synthetic unit tests in `host_fps_test.c` verifying monitor Hz detection, 30 FPS frame skipping, 60 FPS synchronization, 120 Hz sub-tick slicing, unlocked mode, and deterministic SDK clock integration (51/51 CTests, 9/9 Python tests passing in Debug and Release).
-    - [ ] Milestone 15: True Widescreen — Hor+ 3D FOV camera expansion, native culling band expansion, and 2D HUD safe-area protection.
+    - [x] Milestone 15: True Widescreen — Hor+ 3D FOV camera expansion, native culling band expansion, and 2D HUD safe-area protection.
+      - [x] Implement horizontal FOV aspect ratio expansion in GTE perspective projection (`ps1_gte_set_widescreen_scale`, `transform_vertex` in `ps1_gte.c`/`ps1_gte.h`), compressing projection X by $1.0 / \text{scale}$ to capture $33\%$ wider field of view (for 16:9) without vertical distortion or Vert- cropping.
+      - [x] Implement widescreen mode presentation pipeline (`host_display_set_widescreen_mode`, `host_present_frame` in `host_display.c`/`host_display.h`) supporting `WIDESCREEN_AUTO`, `WIDESCREEN_ON` (True Hor+), `WIDESCREEN_STRETCH`, and `WIDESCREEN_OFF` (authentic 4:3 letterbox/pillarbox).
+      - [x] Protect 2D safe area: preserve un-distorted 4:3 centering and scale for dialogue boxes, clock, portraits, and status icons.
+      - [x] Add synthetic unit tests in `ps1_widescreen_test.c` verifying Hor+ scale setter/getter, exact $1/\text{scale}$ horizontal projection compression, vertical coordinate immutability, out-of-bounds safety, and mode persistence (52/52 CTests, 9/9 Python tests passing in Debug and Release).
     - [ ] Milestone 16: Multi-backend graphics abstraction (`vulkan`, `d3d11`, `opengl`, `software`).
     - [ ] Milestone 17: HD font rendering, extended draw distance, turbo hotkey, and auto-backup save data.
 

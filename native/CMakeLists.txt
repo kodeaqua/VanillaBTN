@@ -247,7 +247,7 @@ add_test(NAME native_memory_regions COMMAND sdk_memory_test)
 add_library(host_display STATIC src/host_display.c)
 set_target_properties(host_display PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_include_directories(host_display PUBLIC src)
-target_link_libraries(host_display PUBLIC sdk_gpu SDL3::SDL3)
+target_link_libraries(host_display PUBLIC sdk_gpu ps1_gte SDL3::SDL3)
 target_compile_options(host_display PRIVATE /W4)
 target_link_libraries(vanillabtn PRIVATE host_display)
 add_executable(host_display_test tests/host_display_test.c)
@@ -268,6 +268,12 @@ set_target_properties(host_fps_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED
 target_link_libraries(host_fps_test PRIVATE host_pacing sdk_sync)
 target_compile_options(host_fps_test PRIVATE /W4 /UNDEBUG)
 add_test(NAME host_fps_pacing COMMAND host_fps_test)
+
+add_executable(ps1_widescreen_test tests/ps1_widescreen_test.c)
+set_target_properties(ps1_widescreen_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_link_libraries(ps1_widescreen_test PRIVATE ps1_gte host_display)
+target_compile_options(ps1_widescreen_test PRIVATE /W4 /UNDEBUG)
+add_test(NAME ps1_true_widescreen COMMAND ps1_widescreen_test)
 
 add_library(game_screen STATIC
     ../src/main/debug_stubs.c

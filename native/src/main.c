@@ -478,6 +478,7 @@ int main(int argc, char **argv) {
     ps1_video_set_texture_bleeding_fix(tex_bleed);
     ps1_video_set_alpha_halo_fix(alpha_halo);
     ps1_video_set_mipmapping(mipmap);
+    host_display_set_widescreen_mode(host.config.display.widescreen);
     ps1_video_set_texture_filter(filter_mode);
     ps1_video_set_anti_aliasing(aa_mode);
     ps1_video_set_smooth_fog(smooth_fog);

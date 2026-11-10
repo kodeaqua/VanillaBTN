@@ -5,6 +5,7 @@
 #include <math.h>
 
 static bool s_float_gte_math = true;
+static float s_widescreen_scale = 1.0f;
 
 void ps1_gte_set_float_math(bool enabled) {
     s_float_gte_math = enabled;
@@ -12,6 +13,18 @@ void ps1_gte_set_float_math(bool enabled) {
 
 bool ps1_gte_get_float_math(void) {
     return s_float_gte_math;
+}
+
+void ps1_gte_set_widescreen_scale(float scale) {
+    if (scale >= 0.5f && scale <= 4.0f) {
+        s_widescreen_scale = scale;
+    } else {
+        s_widescreen_scale = 1.0f;
+    }
+}
+
+float ps1_gte_get_widescreen_scale(void) {
+    return s_widescreen_scale;
 }
 
 void ps1_gte_init(Ps1Gte *gte) {
@@ -115,7 +128,11 @@ static void transform_vertex(const Ps1Gte *gte, const Ps1Vector3 *v,
     int32_t ir_y = projection_ir(cy, 23, flags);
     projection_ir(cz, 22, flags);
     uint32_t quotient = perspective_quotient((uint16_t)gte->h, (uint16_t)*out_sz, flags);
-    int64_t screen_x = (int64_t)gte->ofx * 65536 + (int64_t)ir_x * quotient;
+    int64_t proj_ir_x = (int64_t)ir_x * quotient;
+    if (s_widescreen_scale != 1.0f && s_widescreen_scale > 0.0f) {
+        proj_ir_x = (int64_t)((float)proj_ir_x / s_widescreen_scale);
+    }
+    int64_t screen_x = (int64_t)gte->ofx * 65536 + proj_ir_x;
     int64_t screen_y = (int64_t)gte->ofy * 65536 + (int64_t)ir_y * quotient;
     if (screen_x > INT32_MAX || screen_y > INT32_MAX) *flags |= 1u << 16;
     if (screen_x < INT32_MIN || screen_y < INT32_MIN) *flags |= 1u << 15;
@@ -156,19 +173,35 @@ static void transform_vertex(const Ps1Gte *gte, const Ps1Vector3 *v,
             float cz_fl = r20 * fx + r21 * fy + r22 * fz + (float)gte->trans[2];
 
             if (cz_fl > 0.001f) {
-                sub_x = (float)gte->ofx + (cx_fl * (float)gte->h) / cz_fl;
+                float proj_x = (cx_fl * (float)gte->h) / cz_fl;
+                if (s_widescreen_scale != 1.0f && s_widescreen_scale > 0.0f) {
+                    proj_x /= s_widescreen_scale;
+                }
+                sub_x = (float)gte->ofx + proj_x;
                 sub_y = (float)gte->ofy + (cy_fl * (float)gte->h) / cz_fl;
                 sub_z = cz_fl;
             } else {
-                sub_x = (float)screen_x / 65536.0f;
+                float proj_x = (float)(screen_x - (int64_t)gte->ofx * 65536) / 65536.0f;
+                if (s_widescreen_scale != 1.0f && s_widescreen_scale > 0.0f) {
+                    proj_x /= s_widescreen_scale;
+                }
+                sub_x = (float)gte->ofx + proj_x;
                 sub_y = (float)screen_y / 65536.0f;
             }
         } else if (cz > 0) {
-            sub_x = (float)screen_x / 65536.0f;
+            float proj_x = (float)(screen_x - (int64_t)gte->ofx * 65536) / 65536.0f;
+            if (s_widescreen_scale != 1.0f && s_widescreen_scale > 0.0f) {
+                proj_x /= s_widescreen_scale;
+            }
+            sub_x = (float)gte->ofx + proj_x;
             sub_y = (float)screen_y / 65536.0f;
         } else {
             float z_denom = (cz < -1) ? (float)cz : -1.0f;
-            sub_x = (float)gte->ofx + (float)(cx * gte->h) / z_denom;
+            float proj_x = (float)(cx * gte->h) / z_denom;
+            if (s_widescreen_scale != 1.0f && s_widescreen_scale > 0.0f) {
+                proj_x /= s_widescreen_scale;
+            }
+            sub_x = (float)gte->ofx + proj_x;
             sub_y = (float)gte->ofy + (float)(cy * gte->h) / z_denom;
         }
 

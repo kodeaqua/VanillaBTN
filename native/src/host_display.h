@@ -19,6 +19,10 @@ bool host_display_apply_mode(SDL_Window *window, const DisplayConfig *config);
 /* Toggle between fullscreen/borderless and windowed mode */
 bool host_display_toggle_fullscreen(SDL_Window *window, DisplayConfig *config);
 
+/* Configure and query widescreen presentation mode */
+void host_display_set_widescreen_mode(WidescreenMode mode);
+WidescreenMode host_display_get_widescreen_mode(void);
+
 /* Present the SDK-selected VRAM rectangle, retaining original internal size.
  * Replaces the owned streaming texture when the game changes display size. */
 bool host_present_frame(const Ps1Video *video, SDL_Renderer *renderer, SDL_Texture **texture);

@@ -1,6 +1,17 @@
 #include "host_display.h"
 #include "sdk_gpu.h"
+#include "ps1_gte.h"
 #include <string.h>
+
+static WidescreenMode s_widescreen_mode = WIDESCREEN_AUTO;
+
+void host_display_set_widescreen_mode(WidescreenMode mode) {
+    s_widescreen_mode = mode;
+}
+
+WidescreenMode host_display_get_widescreen_mode(void) {
+    return s_widescreen_mode;
+}
 
 /* Query connected displays count */
 int host_display_get_monitor_count(void) {
@@ -160,18 +171,45 @@ bool host_present_frame(const Ps1Video *video, SDL_Renderer *renderer, SDL_Textu
     }
     float width, height;
     if (!SDL_GetTextureSize(*texture, &width, &height)) return false;
+
+    int win_w = 0, win_h = 0;
+    float window_aspect = 4.0f / 3.0f;
+    if (SDL_GetRenderOutputSize(renderer, &win_w, &win_h) && win_h > 0) {
+        window_aspect = (float)win_w / (float)win_h;
+    }
+
+    WidescreenMode effective_mode = s_widescreen_mode;
+    if (effective_mode == WIDESCREEN_AUTO) {
+        effective_mode = (window_aspect > 1.34f) ? WIDESCREEN_ON : WIDESCREEN_OFF;
+    }
+
+    SDL_RendererLogicalPresentation pres_mode = SDL_LOGICAL_PRESENTATION_LETTERBOX;
+    if (effective_mode == WIDESCREEN_ON) {
+        float fov_scale = window_aspect / (4.0f / 3.0f);
+        if (fov_scale < 1.0f) fov_scale = 1.0f;
+        ps1_gte_set_widescreen_scale(fov_scale);
+        pres_mode = SDL_LOGICAL_PRESENTATION_STRETCH;
+    } else if (effective_mode == WIDESCREEN_STRETCH) {
+        ps1_gte_set_widescreen_scale(1.0f);
+        pres_mode = SDL_LOGICAL_PRESENTATION_STRETCH;
+    } else {
+        ps1_gte_set_widescreen_scale(1.0f);
+        pres_mode = SDL_LOGICAL_PRESENTATION_LETTERBOX;
+    }
+
     if (width != display.width || height != display.height) {
         SDL_Texture *replacement = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
             SDL_TEXTUREACCESS_STREAMING, display.width, display.height);
         if (!replacement) return false;
         if (!SDL_SetTextureScaleMode(replacement, SDL_SCALEMODE_NEAREST)
-            || !SDL_SetRenderLogicalPresentation(renderer, display.width, display.height,
-                                                  SDL_LOGICAL_PRESENTATION_LETTERBOX)) {
+            || !SDL_SetRenderLogicalPresentation(renderer, display.width, display.height, pres_mode)) {
             SDL_DestroyTexture(replacement);
             return false;
         }
         SDL_DestroyTexture(*texture);
         *texture = replacement;
+    } else {
+        SDL_SetRenderLogicalPresentation(renderer, display.width, display.height, pres_mode);
     }
 
     if (!SDL_LockTexture(*texture, NULL, &pixels, &pitch)) {
