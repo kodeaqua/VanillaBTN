@@ -187,6 +187,20 @@ static void host_game_pump(void *context) {
             }
         } else if (event.type == SDL_EVENT_WINDOW_FOCUS_GAINED) {
             /* Input events need not repeat for controls held while unfocused. */
+            int numkeys = 0;
+            const bool *keys = SDL_GetKeyboardState(&numkeys);
+            if (keys) {
+                host->keyboard_buttons = 0;
+                for (int sc = 1; sc < numkeys && sc < SDL_SCANCODE_COUNT; ++sc) {
+                    if (keys[sc]) {
+                        SDL_Keycode kc = SDL_GetKeyFromScancode((SDL_Scancode)sc, SDL_KMOD_NONE, false);
+                        uint32_t btn = map_key_to_ps1_button(kc);
+                        host->keyboard_buttons = ps1_input_keyboard_event(
+                            host->keyboard_keys, SDL_SCANCODE_COUNT, (size_t)sc,
+                            (uint16_t)btn, true);
+                    }
+                }
+            }
             for (int i = 0; i < 2; ++i) {
                 HostPadSnapshot state = host_gamepad_snapshot(host->gamepads[i]);
                 host->controller_buttons[i] = state.buttons;

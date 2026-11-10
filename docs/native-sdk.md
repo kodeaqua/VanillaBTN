@@ -404,9 +404,9 @@ halfway. Original startup uses the SDK samples through its own controller
 poller. Keyboard aliases are tracked per physical key so overlapping aliases
 remain held until all are released. Rumble, disconnects and controller feel
 still require developer validation.
-When window focus returns or when a gamepad is connected, SDL gamepad
-buttons and axes are sampled immediately so controls held across the focus change
-or at device addition do not depend on receiving a new motion/button event.
+When window focus returns, SDL keyboard state and gamepad buttons/axes are sampled
+immediately so controls held across the focus change do not depend on receiving new
+transition events. Newly connected gamepads are similarly sampled on addition.
 
 Fixtures supply the actual original main/farm record types, not replacement
 controller algorithms. They cover both ports, repeated and newly pressed
