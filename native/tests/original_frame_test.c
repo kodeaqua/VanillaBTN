@@ -341,12 +341,27 @@ int main(void) {
     /* Verify that GsSetOffset can select temporary offsets and GsSetDrawBuffOffset
      * restores the persistent 3D projection center origin (160, 120), matching
      * Sony libgs behavior across scene resets and farm re-entry after saving. */
+    GsDefDispBuff(0, 0, 0, 0);
     GsSetOffset(0, 0);
     otz = gte_project_vertex(&proj_xy, &center_v);
     assert(otz > 0 && proj_xy.x == 0 && proj_xy.y == -1);
     GsSetDrawBuffOffset();
     otz = gte_project_vertex(&proj_xy, &center_v);
     assert(otz > 0 && proj_xy.x == 160 && proj_xy.y == 119);
+
+    /* With mode 0 and active buffer 0, libgs adds buffer 1's VRAM origin. */
+    GsInitGraph(320, 240, 0, 0, 0);
+    GsDefDispBuff(10, 20, 300, 240);
+    otz = gte_project_vertex(&proj_xy, &center_v);
+    assert(otz > 0 && proj_xy.x == 460 && proj_xy.y == 359);
+    GsSetOffset(5, 7);
+    otz = gte_project_vertex(&proj_xy, &center_v);
+    assert(otz > 0 && proj_xy.x == 305 && proj_xy.y == 246);
+    GsSetDrawBuffOffset();
+    otz = gte_project_vertex(&proj_xy, &center_v);
+    assert(otz > 0 && proj_xy.x == 460 && proj_xy.y == 359);
+    GsDefDispBuff(0, 0, 0, 0);
+    GsSetDrawBuffOffset();
 
     ClearOTagR(current_frame->ot, FRAME_OT_DEPTH);
     current_frame->primCursor.bytes = current_frame->primStart;

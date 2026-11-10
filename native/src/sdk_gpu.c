@@ -335,21 +335,19 @@ void GsDefDispBuff(unsigned short x0, unsigned short y0,
         !SetDefDrawEnv(&gs_draw[1], x1, y1, HWD0, VWD0) ||
         !SetDefDispEnv(&gs_display[0], x1, y1, HWD0, VWD0) ||
         !SetDefDispEnv(&gs_display[1], x0, y0, HWD0, VWD0)) abort();
+    GsSetDrawBuffOffset();
 }
 
 void GsSetOffset(long x, long y) {
-    for (unsigned i = 0; i < 2; ++i) {
-        gs_draw[i].ofs[0] = (short)(gs_draw[i].clip.x + x);
-        gs_draw[i].ofs[1] = (short)(gs_draw[i].clip.y + y);
-    }
-    SetGeomOffset(x, y);
+    /* The supported mode uses the inactive GS buffer's VRAM origin; the
+     * original game never swaps GS buffers, so buffer 1 is inactive. */
+    SetGeomOffset((short)(gs_draw[1].clip.x + x),
+                  (short)(gs_draw[1].clip.y + y));
 }
 
 void GsSetDrawBuffOffset(void) {
-    if (vram != NULL && valid_area(gs_draw[0].clip.x, gs_draw[0].clip.y, gs_draw[0].clip.w, gs_draw[0].clip.h)) {
-        PutDrawEnv(&gs_draw[0]);
-    }
-    SetGeomOffset(gs_origin_x, gs_origin_y);
+    SetGeomOffset((short)(gs_draw[1].clip.x + gs_origin_x),
+                  (short)(gs_draw[1].clip.y + gs_origin_y));
 }
 
 void GsInit3D(void) {

@@ -316,6 +316,11 @@ exposes `AddPrim`, `setPolyF4`/`SetPolyF4`, `SetSemiTrans`, `setRGB0`,
 draw-mode and draw-area packets), `ps1_gpu_exec` dispatches multi-word
 `0xE1..0xE6` environment packets, `libgs.h` exposes `HWD0`/`VWD0` (`320`/`240`),
 and `sdk_work` supplies `SystemError` at the fatal platform boundary.
+For the supported GS graph mode, projection offsets include the inactive GS
+buffer's VRAM origin, as in the reference SDK. The game does not swap GS
+buffers and initializes both origins to zero; other GS modes and buffer
+swapping are not implemented. The game's own frame draw environments remain
+authoritative for GPU drawing.
 Its actual packets exposed missing flat-line and Gouraud-polygon dispatch in
 the software GPU. The backend now draws inclusive flat-line endpoints and
 untextured Gouraud triangles/quads, retaining clipping, masks and blending.
