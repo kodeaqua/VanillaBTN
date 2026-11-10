@@ -39,7 +39,12 @@ Update the relevant item after completing a task or discovering a blocker.
       - [x] Maintain authoritative integer SXY/SZ registers for original game simulation, ordering tables, and collision logic while routing continuous subpixel coordinates to PGXP precision cache.
       - [x] Connect `fixes.smooth_camera_angles` via `config_resolve_bool` in `main.c` to enable continuous camera panning and eliminate skeletal joint twitches.
       - [x] Add synthetic unit tests in `ps1_float_gte_test.c` verifying 3D rotation precision, smooth monotonic sweeps, and fallback to fixed-point when disabled (43/43 CTests, 9/9 Python tests passing in Debug and Release).
-    - [ ] Milestone 6: True Color 32-bit pipeline (ARGB8888 anti-banding) and dithering removal (`dithering = off / deband`).
+    - [x] Milestone 6: True Color 32-bit pipeline (ARGB8888 anti-banding) and dithering removal (`dithering = off / deband`).
+      - [x] Add dual framebuffer architecture in `Ps1Video` (`color32[512][1024]` alongside `vram[512][1024]`), maintaining authoritative 15-bit VRAM compatibility for game memory reads while storing unquantized 24-bit/32-bit ARGB8888 colors for display presentation.
+      - [x] Update rasterizers (`draw_triangle`, `ps1_video_draw_tile`, `ps1_video_draw_sprite`, `ps1_video_draw_line`, `ps1_video_quick_fill`, `ps1_video_upload`) to compute and store full 32-bit colors.
+      - [x] Implement dithering control (`ps1_video_set_dithering` with `PS1_DITHER_OFF`, `PS1_DITHER_NATIVE`, `PS1_DITHER_DEBAND`) respecting draw state GP0(E1) bit 9 and PSY-Q `DRAWENV.dtd`.
+      - [x] Update `ps1_video_copy_argb` to output 32-bit true color in modern mode and provide authentic 15-bit quantized fallback when `s_true_color_32bit` is disabled.
+      - [x] Add synthetic unit tests in `ps1_color32_test.c` verifying 32-bit precision preservation, smooth Gouraud gradients, and dither pattern suppression (44/44 CTests, 9/9 Python tests passing in Debug and Release).
     - [ ] Milestone 7: Texture bleeding fix (sub-rectangle UV clamping), alpha halo fix (pre-filter alpha test), and automatic mipmapping.
     - [ ] Milestone 8: Anti-Aliasing (MSAA/SMAA) and smooth exponential atmospheric fog.
     - [ ] Milestone 9: Audio Subsystem Overhaul — expanded 64-voice polyphony (anti-voice stealing), seamless zero-gap CD-XA looping, micro-fade pop suppression, and VAG loop crossfading.

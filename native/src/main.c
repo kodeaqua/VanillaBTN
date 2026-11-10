@@ -382,12 +382,18 @@ int main(int argc, char **argv) {
     bool w_clip = config_resolve_bool(host.config.fixes.near_plane_w_clipping, host.config.preset, true);
     bool quad_sub = config_resolve_bool(host.config.fixes.quad_subdivision, host.config.preset, true);
     bool float_gte = config_resolve_bool(host.config.fixes.smooth_camera_angles, host.config.preset, true);
+    bool true_color = config_resolve_bool(host.config.fixes.true_color_32bit, host.config.preset, true);
+    DitherMode dither_cfg = config_resolve_dither(host.config.fixes.dithering, host.config.preset);
+    Ps1DitherMode dither_mode = (dither_cfg == DITHER_NATIVE) ? PS1_DITHER_NATIVE :
+                                (dither_cfg == DITHER_DEBAND) ? PS1_DITHER_DEBAND : PS1_DITHER_OFF;
 
     ps1_pgxp_set_enabled(pgxp_v, pgxp_t);
     ps1_video_set_true_depth_buffer(zbuff);
     ps1_video_set_near_plane_clipping(w_clip);
     ps1_video_set_quad_subdivision(quad_sub);
     ps1_gte_set_float_math(float_gte);
+    ps1_video_set_true_color(true_color);
+    ps1_video_set_dithering(dither_mode);
 #ifdef VANILLABTN_BOOT_TEST
     SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "dummy");
     SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "dummy");

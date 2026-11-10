@@ -8,8 +8,80 @@
 static bool s_true_depth_buffer = true;
 static bool s_near_plane_w_clipping = true;
 static bool s_quad_subdivision = true;
+static bool s_true_color_32bit = true;
+static Ps1DitherMode s_dithering = PS1_DITHER_OFF;
 
 #define PS1_NEAR_PLANE_Z 8.0f
+
+static const int s_dither_matrix[4][4] = {
+    { -4,  0, -3,  1 },
+    {  2, -2,  3, -1 },
+    { -1,  3, -2,  2 },
+    {  1, -3,  0, -4 }
+};
+
+static uint32_t blend_color32(uint32_t back, uint32_t front, unsigned blend_mode) {
+    uint32_t br = (back >> 16) & 255u;
+    uint32_t bg = (back >> 8) & 255u;
+    uint32_t bb = back & 255u;
+
+    uint32_t fr = (front >> 16) & 255u;
+    uint32_t fg = (front >> 8) & 255u;
+    uint32_t fb = front & 255u;
+
+    uint32_t r, g, b;
+    switch (blend_mode) {
+    case 0: /* 0.5 * Back + 0.5 * Front */
+        r = (br + fr) >> 1;
+        g = (bg + fg) >> 1;
+        b = (bb + fb) >> 1;
+        break;
+    case 1: /* Back + Front */
+        r = br + fr; if (r > 255) r = 255;
+        g = bg + fg; if (g > 255) g = 255;
+        b = bb + fb; if (b > 255) b = 255;
+        break;
+    case 2: /* Back - Front */
+        r = (br > fr) ? br - fr : 0;
+        g = (bg > fg) ? bg - fg : 0;
+        b = (bb > fb) ? bb - fb : 0;
+        break;
+    case 3: /* Back + 0.25 * Front */
+        r = br + (fr >> 2); if (r > 255) r = 255;
+        g = bg + (fg >> 2); if (g > 255) g = 255;
+        b = bb + (fb >> 2); if (b > 255) b = 255;
+        break;
+    default:
+        r = fr; g = fg; b = fb;
+        break;
+    }
+    return 0xFF000000u | (r << 16) | (g << 8) | b;
+}
+
+static uint32_t texel_to_color32(uint16_t texel, uint32_t rgb24, bool raw_texture) {
+    uint32_t red5 = texel & 31u;
+    uint32_t green5 = (texel >> 5) & 31u;
+    uint32_t blue5 = (texel >> 10) & 31u;
+
+    if (raw_texture) {
+        uint32_t r8 = (red5 << 3) | (red5 >> 2);
+        uint32_t g8 = (green5 << 3) | (green5 >> 2);
+        uint32_t b8 = (blue5 << 3) | (blue5 >> 2);
+        return 0xFF000000u | (r8 << 16) | (g8 << 8) | b8;
+    } else {
+        uint32_t cr = (rgb24 >> 16) & 255u;
+        uint32_t cg = (rgb24 >> 8) & 255u;
+        uint32_t cb = rgb24 & 255u;
+
+        uint32_t r8 = (red5 * cr) / 16u;
+        uint32_t g8 = (green5 * cg) / 16u;
+        uint32_t b8 = (blue5 * cb) / 16u;
+        if (r8 > 255) r8 = 255;
+        if (g8 > 255) g8 = 255;
+        if (b8 > 255) b8 = 255;
+        return 0xFF000000u | (r8 << 16) | (g8 << 8) | b8;
+    }
+}
 
 _Static_assert(sizeof(uint16_t) == 2, "PS1 VRAM words must be 16 bits");
 _Static_assert(sizeof(uint32_t) == 4, "ARGB pixels must be 32 bits");
@@ -29,6 +101,20 @@ static bool valid_draw_state(const Ps1DrawState *state) {
 static uint16_t rgb15(uint32_t rgb24) {
     return (uint16_t)(((rgb24 >> 19) & 31u) | ((rgb24 >> 6) & 0x3E0u)
                       | ((rgb24 << 7) & 0x7C00u));
+}
+
+static uint16_t quantize_rgb24(uint32_t rgb24, int row, int col, bool dither_enabled) {
+    if (dither_enabled && s_dithering == PS1_DITHER_NATIVE) {
+        int d = s_dither_matrix[row & 3][col & 3];
+        int r = (int)((rgb24 >> 16) & 255u) + d;
+        int g = (int)((rgb24 >> 8) & 255u) + d;
+        int b = (int)(rgb24 & 255u) + d;
+        if (r < 0) r = 0; if (r > 255) r = 255;
+        if (g < 0) g = 0; if (g > 255) g = 255;
+        if (b < 0) b = 0; if (b > 255) b = 255;
+        return (uint16_t)(((r >> 3) & 31u) | (((g >> 3) & 31u) << 5) | (((b >> 3) & 31u) << 10));
+    }
+    return rgb15(rgb24);
 }
 
 static int signed11(int value) {
@@ -56,7 +142,7 @@ void ps1_draw_state_reset(Ps1DrawState *state) {
     if (state == NULL) return;
     /* tpage 0 = texture page X base 0, Y base 0, 4-bit depth, opaque mode. */
     *state = (Ps1DrawState){0, 0, PS1_VRAM_WIDTH - 1, PS1_VRAM_HEIGHT - 1,
-                            0, 0, 0, 0, false, false};
+                            0, 0, 0, 0, false, false, false};
 }
 
 void ps1_video_quick_fill(Ps1Video *video, int x, int y, int width, int height,
@@ -67,6 +153,7 @@ void ps1_video_quick_fill(Ps1Video *video, int x, int y, int width, int height,
     int fill_width = ((width & 0x3FF) + 15) & ~15;
     int fill_height = height & 0x1FF;
     uint16_t color = rgb15(rgb24);
+    uint32_t c32 = 0xFF000000u | (rgb24 & 0xFFFFFFu);
 
     /* GP0(02) ignores the drawing area and mask setting; coordinates wrap in VRAM. */
     for (int row = 0; row < fill_height; ++row) {
@@ -75,6 +162,7 @@ void ps1_video_quick_fill(Ps1Video *video, int x, int y, int width, int height,
             int c = (start_x + col) & 0x3FF;
             video->vram[r][c] = color;
             video->zbuffer[r][c] = 0.0f;
+            video->color32[r][c] = c32;
         }
     }
 }
@@ -91,6 +179,7 @@ bool ps1_video_draw_tile(Ps1Video *video, const Ps1DrawState *state, int x, int 
     int right = left + tile_width;
     int bottom = top + tile_height;
     uint16_t color = rgb15(rgb24);
+    uint32_t c32_solid = 0xFF000000u | (rgb24 & 0xFFFFFFu);
 
     if (left < state->left) left = state->left;
     if (top < state->top) top = state->top;
@@ -103,6 +192,10 @@ bool ps1_video_draw_tile(Ps1Video *video, const Ps1DrawState *state, int x, int 
             uint16_t front = semi_transparent
                 ? blend_pixel(*pixel, color, state->blend_mode) : color;
             *pixel = front | (state->force_mask ? 0x8000u : 0);
+
+            uint32_t c32 = semi_transparent
+                ? blend_color32(video->color32[row][col], c32_solid, state->blend_mode) : c32_solid;
+            video->color32[row][col] = c32;
         }
     }
     return true;
@@ -178,6 +271,12 @@ bool ps1_video_draw_sprite(Ps1Video *video, const Ps1DrawState *state,
                 front = blend_pixel(*pixel, front, state->blend_mode) | 0x8000u;
             }
             *pixel = front | (state->force_mask ? 0x8000u : 0);
+
+            uint32_t front_c32 = texel_to_color32(texel, sprite->rgb24, sprite->raw_texture);
+            if (sprite->semi_transparent && (texel & 0x8000u)) {
+                front_c32 = blend_color32(video->color32[row][col], front_c32, state->blend_mode);
+            }
+            video->color32[row][col] = front_c32;
         }
     }
     return true;
@@ -474,11 +573,18 @@ static bool draw_triangle(Ps1Video *video, const Ps1DrawState *state,
                     }
 
                     uint16_t front;
+                    uint32_t front32;
                     if (!textured) {
-                        uint16_t color = colors ? rgb15(shade) : flat_color;
+                        uint16_t color = colors
+                            ? quantize_rgb24(shade, row, col, state->dither)
+                            : (state->dither && s_dithering == PS1_DITHER_NATIVE ? quantize_rgb24(rgb24, row, col, true) : flat_color);
                         front = semi_transparent
                             ? blend_pixel(*pixel, color, state->blend_mode)
                             : color;
+                        uint32_t c32_poly = 0xFF000000u | (shade & 0xFFFFFFu);
+                        front32 = semi_transparent
+                            ? blend_color32(video->color32[row][col], c32_poly, state->blend_mode)
+                            : c32_poly;
                     } else {
                         unsigned u, v;
                         if (use_perspective) {
@@ -513,8 +619,14 @@ static bool draw_triangle(Ps1Video *video, const Ps1DrawState *state,
                         if (semi_transparent && (texel & 0x8000u)) {
                             front = blend_pixel(*pixel, front, state->blend_mode) | 0x8000u;
                         }
+
+                        front32 = texel_to_color32(texel, shade, raw_texture);
+                        if (semi_transparent && (texel & 0x8000u)) {
+                            front32 = blend_color32(video->color32[row][col], front32, state->blend_mode);
+                        }
                     }
                     *pixel = front | (state->force_mask ? 0x8000u : 0);
+                    video->color32[row][col] = front32;
                     if (s_true_depth_buffer && !semi_transparent) {
                         video->zbuffer[row][col] = (float)interp_w;
                     }
@@ -593,11 +705,18 @@ static bool draw_triangle(Ps1Video *video, const Ps1DrawState *state,
                     }
                 }
                 uint16_t front;
+                uint32_t front32;
                 if (!textured) {
-                    uint16_t color = colors ? rgb15(shade) : flat_color;
+                    uint16_t color = colors
+                        ? quantize_rgb24(shade, row, col, state->dither)
+                        : (state->dither && s_dithering == PS1_DITHER_NATIVE ? quantize_rgb24(rgb24, row, col, true) : flat_color);
                     front = semi_transparent
                         ? blend_pixel(*pixel, color, state->blend_mode)
                         : color;
+                    uint32_t c32_poly = 0xFF000000u | (shade & 0xFFFFFFu);
+                    front32 = semi_transparent
+                        ? blend_color32(video->color32[row][col], c32_poly, state->blend_mode)
+                        : c32_poly;
                 } else {
                     unsigned u = (unsigned)((w0 * u0 + w1 * u1 + w2 * u2) / det);
                     unsigned v = (unsigned)((w0 * v_0 + w1 * v_1 + w2 * v_2) / det);
@@ -611,8 +730,14 @@ static bool draw_triangle(Ps1Video *video, const Ps1DrawState *state,
                     if (semi_transparent && (texel & 0x8000u)) {
                         front = blend_pixel(*pixel, front, state->blend_mode) | 0x8000u;
                     }
+
+                    front32 = texel_to_color32(texel, shade, raw_texture);
+                    if (semi_transparent && (texel & 0x8000u)) {
+                        front32 = blend_color32(video->color32[row][col], front32, state->blend_mode);
+                    }
                 }
                 *pixel = front | (state->force_mask ? 0x8000u : 0);
+                video->color32[row][col] = front32;
             }
         }
     }
@@ -670,12 +795,16 @@ bool ps1_video_draw_line(Ps1Video *video, const Ps1DrawState *state,
     int sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
     int error = dx + dy;
     uint16_t color = rgb15(rgb24);
+    uint32_t c32_solid = 0xFF000000u | (rgb24 & 0xFFFFFFu);
     for (;;) {
         if (x0 >= state->left && x0 <= state->right && y0 >= state->top && y0 <= state->bottom) {
             uint16_t *pixel = &video->vram[y0][x0];
             if (!state->check_mask || !(*pixel & 0x8000)) {
                 *pixel = (semi_transparent ? blend_pixel(*pixel, color, state->blend_mode) : color)
                     | (state->force_mask ? 0x8000 : 0);
+                uint32_t c32 = semi_transparent
+                    ? blend_color32(video->color32[y0][x0], c32_solid, state->blend_mode) : c32_solid;
+                video->color32[y0][x0] = c32;
             }
         }
         if (x0 == x1 && y0 == y1) break;
@@ -876,6 +1005,16 @@ bool ps1_video_upload(Ps1Video *video, int x, int y, int width, int height,
     for (int row = 0; row < height; ++row) {
         memcpy(&video->vram[y + row][x], source + row * source_stride,
                (size_t)width * sizeof(uint16_t));
+        for (int col = 0; col < width; ++col) {
+            uint16_t pixel = source[row * source_stride + col];
+            uint32_t red = pixel & 31u;
+            uint32_t green = (pixel >> 5) & 31u;
+            uint32_t blue = (pixel >> 10) & 31u;
+            video->color32[y + row][x + col] = 0xFF000000u
+                | ((red << 3 | red >> 2) << 16)
+                | ((green << 3 | green >> 2) << 8)
+                | (blue << 3 | blue >> 2);
+        }
     }
     return true;
 }
@@ -888,15 +1027,19 @@ bool ps1_video_copy_argb(const Ps1Video *video, int x, int y, int width, int hei
     }
     for (int row = 0; row < height; ++row) {
         for (int col = 0; col < width; ++col) {
-            uint16_t pixel = video->vram[y + row][x + col];
-            uint32_t red = pixel & 31u;
-            uint32_t green = (pixel >> 5) & 31u;
-            uint32_t blue = (pixel >> 10) & 31u;
-            /* Expand five color bits to eight without touching the PS1 mask bit. */
-            target[row * target_stride + col] = 0xFF000000u
-                | ((red << 3 | red >> 2) << 16)
-                | ((green << 3 | green >> 2) << 8)
-                | (blue << 3 | blue >> 2);
+            if (s_true_color_32bit && video->color32[y + row][x + col] != 0) {
+                target[row * target_stride + col] = video->color32[y + row][x + col];
+            } else {
+                uint16_t pixel = video->vram[y + row][x + col];
+                uint32_t red = pixel & 31u;
+                uint32_t green = (pixel >> 5) & 31u;
+                uint32_t blue = (pixel >> 10) & 31u;
+                /* Expand five color bits to eight without touching the PS1 mask bit. */
+                target[row * target_stride + col] = 0xFF000000u
+                    | ((red << 3 | red >> 2) << 16)
+                    | ((green << 3 | green >> 2) << 8)
+                    | (blue << 3 | blue >> 2);
+            }
         }
     }
     return true;
@@ -929,4 +1072,20 @@ void ps1_video_set_quad_subdivision(bool enabled) {
 
 bool ps1_video_get_quad_subdivision(void) {
     return s_quad_subdivision;
+}
+
+void ps1_video_set_true_color(bool enabled) {
+    s_true_color_32bit = enabled;
+}
+
+bool ps1_video_get_true_color(void) {
+    return s_true_color_32bit;
+}
+
+void ps1_video_set_dithering(Ps1DitherMode mode) {
+    s_dithering = mode;
+}
+
+Ps1DitherMode ps1_video_get_dithering(void) {
+    return s_dithering;
 }

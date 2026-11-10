@@ -8,9 +8,16 @@
 #define PS1_VRAM_WIDTH 1024
 #define PS1_VRAM_HEIGHT 512
 
+typedef enum Ps1DitherMode {
+    PS1_DITHER_OFF = 0,
+    PS1_DITHER_NATIVE = 1,
+    PS1_DITHER_DEBAND = 2
+} Ps1DitherMode;
+
 typedef struct Ps1Video {
     uint16_t vram[PS1_VRAM_HEIGHT][PS1_VRAM_WIDTH];
     float zbuffer[PS1_VRAM_HEIGHT][PS1_VRAM_WIDTH];
+    uint32_t color32[PS1_VRAM_HEIGHT][PS1_VRAM_WIDTH];
 } Ps1Video;
 
 typedef struct Ps1DrawState {
@@ -19,6 +26,7 @@ typedef struct Ps1DrawState {
     unsigned blend_mode;          /* GP0(E1) bits 5-6: average, add, subtract, add quarter. */
     unsigned tpage;               /* GP0(E1) bits 0-8: texture page (x64/y256 base, depth). */
     bool force_mask, check_mask;  /* GP0(E6) bits 0-1. */
+    bool dither;                  /* GP0(E1) bit 9. */
 } Ps1DrawState;
 
 typedef struct Ps1Sprite {
@@ -50,6 +58,12 @@ bool ps1_video_get_near_plane_clipping(void);
 
 void ps1_video_set_quad_subdivision(bool enabled);
 bool ps1_video_get_quad_subdivision(void);
+
+void ps1_video_set_true_color(bool enabled);
+bool ps1_video_get_true_color(void);
+
+void ps1_video_set_dithering(Ps1DitherMode mode);
+Ps1DitherMode ps1_video_get_dithering(void);
 
 /* Preserve raw PS1 BGR555 words, including the high mask/semitransparency bit. */
 bool ps1_video_upload(Ps1Video *video, int x, int y, int width, int height,

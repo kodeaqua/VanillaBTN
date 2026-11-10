@@ -210,6 +210,7 @@ static void exec_poly_ft3(Ps1Video *video, Ps1DrawState *state,
 
     state->tpage = tpage_word & 0x1FFu;
     state->blend_mode = (tpage_word >> 5) & 3u;
+    state->dither = (bool)((tpage_word >> 9) & 1u);
 
     ps1_video_draw_triangle(video, state, &v0, &v1, &v2,
                             rgb24, state->tpage, clut,
@@ -248,6 +249,7 @@ static void exec_poly_ft4(Ps1Video *video, Ps1DrawState *state,
 
     state->tpage = tpage_word & 0x1FFu;
     state->blend_mode = (tpage_word >> 5) & 3u;
+    state->dither = (bool)((tpage_word >> 9) & 1u);
 
     ps1_video_draw_quad(video, state, &v0, &v1, &v2, &v3,
                         rgb24, state->tpage, clut,
@@ -264,6 +266,7 @@ static void exec_draw_mode(Ps1DrawState *state, uint32_t word) {
     state->tpage = (unsigned)(word & 0x1FFu);  /* bits 0-8 */
     /* Semi-transparency mode lives in bits 5-6 of the GP0(E1) parameter. */
     state->blend_mode = (unsigned)((word >> 5) & 3u);
+    state->dither = (bool)((word >> 9) & 1u);
 }
 
 /* Update draw state from GP0(E3): set draw area top-left.
@@ -349,6 +352,7 @@ bool ps1_gpu_exec(Ps1Video *video, Ps1DrawState *state,
         unsigned tpage_word = (words[5] >> 16) & 0xFFFFu;
         state->tpage = tpage_word & 0x1FFu;
         state->blend_mode = (tpage_word >> 5) & 3u;
+        state->dither = (bool)((tpage_word >> 9) & 1u);
         uint32_t colors[4];
         for (unsigned i = 0; i < vertices; ++i) colors[i] = gp0_rgb24(words[i * 3]);
         bool raw_tex = (code & 1) != 0;

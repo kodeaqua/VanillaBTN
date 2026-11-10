@@ -180,6 +180,7 @@ DRAWENV *PutDrawEnv(DRAWENV *env) {
     draw.offset_y = env->ofs[1];
     draw.tpage = env->tpage & 0x1FF;
     draw.blend_mode = (env->tpage >> 5) & 3;
+    draw.dither = env->dtd != 0;
     if (env->isbg) ClearImage(&env->clip, env->r0, env->g0, env->b0);
     return env;
 }
