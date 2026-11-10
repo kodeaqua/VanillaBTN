@@ -45,7 +45,12 @@ Update the relevant item after completing a task or discovering a blocker.
       - [x] Implement dithering control (`ps1_video_set_dithering` with `PS1_DITHER_OFF`, `PS1_DITHER_NATIVE`, `PS1_DITHER_DEBAND`) respecting draw state GP0(E1) bit 9 and PSY-Q `DRAWENV.dtd`.
       - [x] Update `ps1_video_copy_argb` to output 32-bit true color in modern mode and provide authentic 15-bit quantized fallback when `s_true_color_32bit` is disabled.
       - [x] Add synthetic unit tests in `ps1_color32_test.c` verifying 32-bit precision preservation, smooth Gouraud gradients, and dither pattern suppression (44/44 CTests, 9/9 Python tests passing in Debug and Release).
-    - [ ] Milestone 7: Texture bleeding fix (sub-rectangle UV clamping), alpha halo fix (pre-filter alpha test), and automatic mipmapping.
+    - [x] Milestone 7: Texture bleeding fix (sub-rectangle UV clamping), alpha halo fix (pre-filter alpha test), and automatic mipmapping.
+      - [x] Implement sub-rectangle UV boundary clamping (`s_texture_bleeding_fix`) in `draw_triangle` and `ps1_video_draw_sprite`, preventing texture sampling from crossing into adjacent tiles on shared 256x256 texture pages and eliminating 1-pixel seam lines.
+      - [x] Implement alpha-weighted pre-filter sampling (`s_alpha_halo_fix`) during texture filtering, excluding transparent black texels (`0x0000`) from color averaging to eliminate dark halos and black fringes around cutout sprites and foliage.
+      - [x] Implement analytical LOD gradient calculation ($\nabla L$) and area box-filtering (`s_mipmapping`), suppressing distant texture aliasing and crawling shimmering on receding geometry.
+      - [x] Add bilinear texture filtering mode (`ps1_video_set_texture_filter`) controlled via `graphics.texture_filter` and the Master Preset System.
+      - [x] Add synthetic unit tests in `ps1_tex_filter_test.c` verifying tile boundary isolation, pure white alpha-halo suppression, and mipmap toggle behavior (45/45 CTests, 9/9 Python tests passing in Debug and Release).
     - [ ] Milestone 8: Anti-Aliasing (MSAA/SMAA) and smooth exponential atmospheric fog.
     - [ ] Milestone 9: Audio Subsystem Overhaul — expanded 64-voice polyphony (anti-voice stealing), seamless zero-gap CD-XA looping, micro-fade pop suppression, and VAG loop crossfading.
     - [ ] Milestone 10: Hi-Fi 44.1/48 kHz 32-bit float reverb DSP and full-spectrum audio output.

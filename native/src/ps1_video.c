@@ -10,6 +10,10 @@ static bool s_near_plane_w_clipping = true;
 static bool s_quad_subdivision = true;
 static bool s_true_color_32bit = true;
 static Ps1DitherMode s_dithering = PS1_DITHER_OFF;
+static bool s_texture_bleeding_fix = true;
+static bool s_alpha_halo_fix = true;
+static bool s_mipmapping = true;
+static Ps1TextureFilterMode s_texture_filter = PS1_FILTER_NEAREST;
 
 #define PS1_NEAR_PLANE_Z 8.0f
 
@@ -227,6 +231,165 @@ bool ps1_video_sample_texel(const Ps1Video *video, unsigned tpage, unsigned clut
     return true;
 }
 
+static bool sample_single_raw(const Ps1Video *video, unsigned tpage, unsigned clut,
+                              int u, int v, uint16_t *texel) {
+    if (u < 0) u = 0; if (u > 255) u = 255;
+    if (v < 0) v = 0; if (v > 255) v = 255;
+    return ps1_video_sample_texel(video, tpage, clut, (unsigned)u, (unsigned)v, texel);
+}
+
+static bool sample_texel_advanced(const Ps1Video *video, unsigned tpage, unsigned clut,
+                                  float uf, float vf, float lod,
+                                  float u_min, float u_max, float v_min, float v_max,
+                                  uint16_t *out_texel, uint32_t *out_c32, uint32_t shade, bool raw_texture) {
+    if (s_texture_bleeding_fix) {
+        if (uf < u_min) uf = u_min;
+        if (uf > u_max) uf = u_max;
+        if (vf < v_min) vf = v_min;
+        if (vf > v_max) vf = v_max;
+    }
+
+    if (s_texture_filter == PS1_FILTER_NEAREST && (!s_mipmapping || lod <= 1.25f)) {
+        int iu = (int)(uf + 0.5f);
+        int iv = (int)(vf + 0.5f);
+        if (s_texture_bleeding_fix) {
+            if (iu < (int)u_min) iu = (int)u_min;
+            if (iu > (int)u_max) iu = (int)u_max;
+            if (iv < (int)v_min) iv = (int)v_min;
+            if (iv > (int)v_max) iv = (int)v_max;
+        }
+        uint16_t t;
+        if (!sample_single_raw(video, tpage, clut, iu, iv, &t)) return false;
+        *out_texel = t;
+        if (out_c32) {
+            *out_c32 = texel_to_color32(t, shade, raw_texture);
+        }
+        return true;
+    }
+
+    /* Mipmapping box-sampling or bilinear sampling */
+    if (s_mipmapping && lod > 1.25f) {
+        float offset = 0.25f * fminf(lod, 3.0f);
+        float samples_u[4] = { uf - offset, uf + offset, uf - offset, uf + offset };
+        float samples_v[4] = { vf - offset, vf - offset, vf + offset, vf + offset };
+
+        uint16_t raw_t[4];
+        float w[4] = { 0.25f, 0.25f, 0.25f, 0.25f };
+        float total_w = 0.0f;
+        float sum_r = 0.0f, sum_g = 0.0f, sum_b = 0.0f;
+        bool has_mask = false;
+
+        for (int i = 0; i < 4; ++i) {
+            int su = (int)(samples_u[i] + 0.5f);
+            int sv = (int)(samples_v[i] + 0.5f);
+            if (s_texture_bleeding_fix) {
+                if (su < (int)u_min) su = (int)u_min;
+                if (su > (int)u_max) su = (int)u_max;
+                if (sv < (int)v_min) sv = (int)v_min;
+                if (sv > (int)v_max) sv = (int)v_max;
+            }
+            if (sample_single_raw(video, tpage, clut, su, sv, &raw_t[i]) && raw_t[i] != 0) {
+                total_w += w[i];
+                sum_r += w[i] * (float)(raw_t[i] & 31u);
+                sum_g += w[i] * (float)((raw_t[i] >> 5) & 31u);
+                sum_b += w[i] * (float)((raw_t[i] >> 10) & 31u);
+                if (raw_t[i] & 0x8000u) has_mask = true;
+            } else if (!s_alpha_halo_fix) {
+                /* Authentic bug: transparent black is blended in, darkening the edges */
+                total_w += w[i];
+            }
+        }
+
+        if (total_w < 0.25f) {
+            *out_texel = 0;
+            if (out_c32) *out_c32 = 0;
+            return true;
+        }
+
+        uint32_t r5 = (uint32_t)(sum_r / total_w + 0.5f);
+        uint32_t g5 = (uint32_t)(sum_g / total_w + 0.5f);
+        uint32_t b5 = (uint32_t)(sum_b / total_w + 0.5f);
+        if (r5 > 31) r5 = 31;
+        if (g5 > 31) g5 = 31;
+        if (b5 > 31) b5 = 31;
+
+        *out_texel = (uint16_t)(r5 | (g5 << 5) | (b5 << 10) | (has_mask ? 0x8000u : 0));
+        if (out_c32) {
+            *out_c32 = texel_to_color32(*out_texel, shade, raw_texture);
+        }
+        return true;
+    }
+
+    /* Bilinear filtering */
+    int u0 = (int)floorf(uf);
+    int v0 = (int)floorf(vf);
+    int u1 = u0 + 1;
+    int v1 = v0 + 1;
+    if (s_texture_bleeding_fix) {
+        if (u0 < (int)u_min) u0 = (int)u_min;
+        if (u0 > (int)u_max) u0 = (int)u_max;
+        if (u1 < (int)u_min) u1 = (int)u_min;
+        if (u1 > (int)u_max) u1 = (int)u_max;
+        if (v0 < (int)v_min) v0 = (int)v_min;
+        if (v0 > (int)v_max) v0 = (int)v_max;
+        if (v1 < (int)v_min) v1 = (int)v_min;
+        if (v1 > (int)v_max) v1 = (int)v_max;
+    }
+
+    float frac_u = uf - floorf(uf);
+    float frac_v = vf - floorf(vf);
+
+    uint16_t t00 = 0, t10 = 0, t01 = 0, t11 = 0;
+    sample_single_raw(video, tpage, clut, u0, v0, &t00);
+    sample_single_raw(video, tpage, clut, u1, v0, &t10);
+    sample_single_raw(video, tpage, clut, u0, v1, &t01);
+    sample_single_raw(video, tpage, clut, u1, v1, &t11);
+
+    float w00 = (1.0f - frac_u) * (1.0f - frac_v);
+    float w10 = frac_u * (1.0f - frac_v);
+    float w01 = (1.0f - frac_u) * frac_v;
+    float w11 = frac_u * frac_v;
+
+    uint16_t ts[4] = { t00, t10, t01, t11 };
+    float ws[4] = { w00, w10, w01, w11 };
+
+    float total_w = 0.0f;
+    float sum_r = 0.0f, sum_g = 0.0f, sum_b = 0.0f;
+    bool has_mask = false;
+
+    for (int i = 0; i < 4; ++i) {
+        if (ts[i] != 0) {
+            total_w += ws[i];
+            sum_r += ws[i] * (float)(ts[i] & 31u);
+            sum_g += ws[i] * (float)((ts[i] >> 5) & 31u);
+            sum_b += ws[i] * (float)((ts[i] >> 10) & 31u);
+            if (ts[i] & 0x8000u) has_mask = true;
+        } else if (!s_alpha_halo_fix) {
+            /* Black transparent fringe */
+            total_w += ws[i];
+        }
+    }
+
+    if (total_w < 0.25f) {
+        *out_texel = 0;
+        if (out_c32) *out_c32 = 0;
+        return true;
+    }
+
+    uint32_t r5 = (uint32_t)(sum_r / total_w + 0.5f);
+    uint32_t g5 = (uint32_t)(sum_g / total_w + 0.5f);
+    uint32_t b5 = (uint32_t)(sum_b / total_w + 0.5f);
+    if (r5 > 31) r5 = 31;
+    if (g5 > 31) g5 = 31;
+    if (b5 > 31) b5 = 31;
+
+    *out_texel = (uint16_t)(r5 | (g5 << 5) | (b5 << 10) | (has_mask ? 0x8000u : 0));
+    if (out_c32) {
+        *out_c32 = texel_to_color32(*out_texel, shade, raw_texture);
+    }
+    return true;
+}
+
 static unsigned modulate_channel(unsigned texel, unsigned color) {
     unsigned result = (texel * color) >> 7;
     return result > 31 ? 31 : result;
@@ -256,12 +419,22 @@ bool ps1_video_draw_sprite(Ps1Video *video, const Ps1DrawState *state,
     if (top < state->top) top = state->top;
     if (right > state->right + 1) right = state->right + 1;
     if (bottom > state->bottom + 1) bottom = state->bottom + 1;
+    float u_min = (float)sprite->u;
+    float u_max = (float)(sprite->u + (sprite->width & 0x3FF) - 1);
+    float v_min = (float)sprite->v;
+    float v_max = (float)(sprite->v + (sprite->height & 0x1FF) - 1);
+
     for (int row = top; row < bottom; ++row) {
         for (int col = left; col < right; ++col) {
+            float uf = (float)(sprite->u + (unsigned)(col - origin_x));
+            float vf = (float)(sprite->v + (unsigned)(row - origin_y));
             uint16_t texel;
-            ps1_video_sample_texel(video, sprite->tpage, sprite->clut,
-                                   sprite->u + (unsigned)(col - origin_x),
-                                   sprite->v + (unsigned)(row - origin_y), &texel);
+            uint32_t front_c32;
+            if (!sample_texel_advanced(video, sprite->tpage, sprite->clut, uf, vf, 1.0f,
+                                       u_min, u_max, v_min, v_max,
+                                       &texel, &front_c32, sprite->rgb24, sprite->raw_texture)) {
+                continue;
+            }
             if (texel == 0) continue; /* Zero texels leave the destination untouched. */
             uint16_t *pixel = &video->vram[row][col];
             if (state->check_mask && (*pixel & 0x8000u)) continue;
@@ -272,7 +445,6 @@ bool ps1_video_draw_sprite(Ps1Video *video, const Ps1DrawState *state,
             }
             *pixel = front | (state->force_mask ? 0x8000u : 0);
 
-            uint32_t front_c32 = texel_to_color32(texel, sprite->rgb24, sprite->raw_texture);
             if (sprite->semi_transparent && (texel & 0x8000u)) {
                 front_c32 = blend_color32(video->color32[row][col], front_c32, state->blend_mode);
             }
@@ -524,6 +696,26 @@ static bool draw_triangle(Ps1Video *video, const Ps1DrawState *state,
         uint16_t flat_color = rgb15(rgb24);
         double inv_det = 1.0 / fdet;
 
+        float u_min = fminf(fu0, fminf(fu1, fu2));
+        float u_max = fmaxf(fu0, fmaxf(fu1, fu2));
+        float v_min = fminf(fv0, fminf(fv1, fv2));
+        float v_max = fmaxf(fv0, fmaxf(fv1, fv2));
+
+        float dl0_dx = -(float)(fy2 - fy1) * (float)inv_det;
+        float dl1_dx = -(float)(fy0 - fy2) * (float)inv_det;
+        float dl2_dx = -(float)(fy1 - fy0) * (float)inv_det;
+
+        float dl0_dy = (float)(fx2 - fx1) * (float)inv_det;
+        float dl1_dy = (float)(fx0 - fx2) * (float)inv_det;
+        float dl2_dy = (float)(fx1 - fx0) * (float)inv_det;
+
+        float du_dx = dl0_dx * fu0 + dl1_dx * fu1 + dl2_dx * fu2;
+        float dv_dx = dl0_dx * fv0 + dl1_dx * fv1 + dl2_dx * fv2;
+        float du_dy = dl0_dy * fu0 + dl1_dy * fu1 + dl2_dy * fu2;
+        float dv_dy = dl0_dy * fv0 + dl1_dy * fv1 + dl2_dy * fv2;
+
+        float tri_lod = fmaxf(sqrtf(du_dx * du_dx + dv_dx * dv_dx), sqrtf(du_dy * du_dy + dv_dy * dv_dy));
+
         bool edge0 = (fy2 < fy1) || (fy2 == fy1 && fx2 > fx1);
         bool edge1 = (fy0 < fy2) || (fy0 == fy2 && fx0 > fx2);
         bool edge2 = (fy1 < fy0) || (fy1 == fy0 && fx1 > fx0);
@@ -586,31 +778,25 @@ static bool draw_triangle(Ps1Video *video, const Ps1DrawState *state,
                             ? blend_color32(video->color32[row][col], c32_poly, state->blend_mode)
                             : c32_poly;
                     } else {
-                        unsigned u, v;
+                        float uf, vf;
                         if (use_perspective) {
                             if (interp_w > 1e-9) {
                                 double inv_w = 1.0 / interp_w;
-                                double u_p = (l0 * (double)pu0 + l1 * (double)pu1 + l2 * (double)pu2) * inv_w;
-                                double v_p = (l0 * (double)pv0 + l1 * (double)pv1 + l2 * (double)pv2) * inv_w;
-                                int iu = (int)(u_p + 0.5);
-                                int iv = (int)(v_p + 0.5);
-                                u = (iu < 0) ? 0 : (iu > 255) ? 255 : (unsigned)iu;
-                                v = (iv < 0) ? 0 : (iv > 255) ? 255 : (unsigned)iv;
+                                uf = (float)((l0 * (double)pu0 + l1 * (double)pu1 + l2 * (double)pu2) * inv_w);
+                                vf = (float)((l0 * (double)pv0 + l1 * (double)pv1 + l2 * (double)pv2) * inv_w);
                             } else {
-                                int iu = (int)(l0 * (double)fu0 + l1 * (double)fu1 + l2 * (double)fu2 + 0.5);
-                                int iv = (int)(l0 * (double)fv0 + l1 * (double)fv1 + l2 * (double)fv2 + 0.5);
-                                u = (iu < 0) ? 0 : (iu > 255) ? 255 : (unsigned)iu;
-                                v = (iv < 0) ? 0 : (iv > 255) ? 255 : (unsigned)iv;
+                                uf = (float)(l0 * (double)fu0 + l1 * (double)fu1 + l2 * (double)fu2);
+                                vf = (float)(l0 * (double)fv0 + l1 * (double)fv1 + l2 * (double)fv2);
                             }
                         } else {
-                            int iu = (int)(l0 * (double)fu0 + l1 * (double)fu1 + l2 * (double)fu2 + 0.5);
-                            int iv = (int)(l0 * (double)fv0 + l1 * (double)fv1 + l2 * (double)fv2 + 0.5);
-                            u = (iu < 0) ? 0 : (iu > 255) ? 255 : (unsigned)iu;
-                            v = (iv < 0) ? 0 : (iv > 255) ? 255 : (unsigned)iv;
+                            uf = (float)(l0 * (double)fu0 + l1 * (double)fu1 + l2 * (double)fu2);
+                            vf = (float)(l0 * (double)fv0 + l1 * (double)fv1 + l2 * (double)fv2);
                         }
 
                         uint16_t texel;
-                        if (!ps1_video_sample_texel(video, tpage, clut, u, v, &texel)) {
+                        if (!sample_texel_advanced(video, tpage, clut, uf, vf, tri_lod,
+                                                   u_min, u_max, v_min, v_max,
+                                                   &texel, &front32, shade, raw_texture)) {
                             continue;
                         }
                         if (texel == 0) continue;
@@ -619,8 +805,6 @@ static bool draw_triangle(Ps1Video *video, const Ps1DrawState *state,
                         if (semi_transparent && (texel & 0x8000u)) {
                             front = blend_pixel(*pixel, front, state->blend_mode) | 0x8000u;
                         }
-
-                        front32 = texel_to_color32(texel, shade, raw_texture);
                         if (semi_transparent && (texel & 0x8000u)) {
                             front32 = blend_color32(video->color32[row][col], front32, state->blend_mode);
                         }
@@ -676,6 +860,10 @@ static bool draw_triangle(Ps1Video *video, const Ps1DrawState *state,
     if (bottom > state->bottom + 1) bottom = state->bottom + 1;
 
     uint16_t flat_color = rgb15(rgb24);
+    float u_min = (float)min3((int)u0, (int)u1, (int)u2);
+    float u_max = (float)max3((int)u0, (int)u1, (int)u2);
+    float v_min = (float)min3((int)v_0, (int)v_1, (int)v_2);
+    float v_max = (float)max3((int)v_0, (int)v_1, (int)v_2);
 
     for (int row = top; row < bottom; ++row) {
         for (int col = left; col < right; ++col) {
@@ -718,10 +906,12 @@ static bool draw_triangle(Ps1Video *video, const Ps1DrawState *state,
                         ? blend_color32(video->color32[row][col], c32_poly, state->blend_mode)
                         : c32_poly;
                 } else {
-                    unsigned u = (unsigned)((w0 * u0 + w1 * u1 + w2 * u2) / det);
-                    unsigned v = (unsigned)((w0 * v_0 + w1 * v_1 + w2 * v_2) / det);
+                    float uf = (float)((w0 * u0 + w1 * u1 + w2 * u2) / det);
+                    float vf = (float)((w0 * v_0 + w1 * v_1 + w2 * v_2) / det);
                     uint16_t texel;
-                    if (!ps1_video_sample_texel(video, tpage, clut, u, v, &texel)) {
+                    if (!sample_texel_advanced(video, tpage, clut, uf, vf, 1.0f,
+                                               u_min, u_max, v_min, v_max,
+                                               &texel, &front32, shade, raw_texture)) {
                         continue;
                     }
                     if (texel == 0) continue;
@@ -730,8 +920,6 @@ static bool draw_triangle(Ps1Video *video, const Ps1DrawState *state,
                     if (semi_transparent && (texel & 0x8000u)) {
                         front = blend_pixel(*pixel, front, state->blend_mode) | 0x8000u;
                     }
-
-                    front32 = texel_to_color32(texel, shade, raw_texture);
                     if (semi_transparent && (texel & 0x8000u)) {
                         front32 = blend_color32(video->color32[row][col], front32, state->blend_mode);
                     }
@@ -1088,4 +1276,36 @@ void ps1_video_set_dithering(Ps1DitherMode mode) {
 
 Ps1DitherMode ps1_video_get_dithering(void) {
     return s_dithering;
+}
+
+void ps1_video_set_texture_bleeding_fix(bool enabled) {
+    s_texture_bleeding_fix = enabled;
+}
+
+bool ps1_video_get_texture_bleeding_fix(void) {
+    return s_texture_bleeding_fix;
+}
+
+void ps1_video_set_alpha_halo_fix(bool enabled) {
+    s_alpha_halo_fix = enabled;
+}
+
+bool ps1_video_get_alpha_halo_fix(void) {
+    return s_alpha_halo_fix;
+}
+
+void ps1_video_set_mipmapping(bool enabled) {
+    s_mipmapping = enabled;
+}
+
+bool ps1_video_get_mipmapping(void) {
+    return s_mipmapping;
+}
+
+void ps1_video_set_texture_filter(Ps1TextureFilterMode mode) {
+    s_texture_filter = mode;
+}
+
+Ps1TextureFilterMode ps1_video_get_texture_filter(void) {
+    return s_texture_filter;
 }

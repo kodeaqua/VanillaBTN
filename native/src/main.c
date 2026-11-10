@@ -386,6 +386,13 @@ int main(int argc, char **argv) {
     DitherMode dither_cfg = config_resolve_dither(host.config.fixes.dithering, host.config.preset);
     Ps1DitherMode dither_mode = (dither_cfg == DITHER_NATIVE) ? PS1_DITHER_NATIVE :
                                 (dither_cfg == DITHER_DEBAND) ? PS1_DITHER_DEBAND : PS1_DITHER_OFF;
+    bool tex_bleed = config_resolve_bool(host.config.fixes.texture_bleeding_fix, host.config.preset, true);
+    bool alpha_halo = config_resolve_bool(host.config.fixes.alpha_halo_fix, host.config.preset, true);
+    bool mipmap = config_resolve_bool(host.config.fixes.mipmapping, host.config.preset, true);
+    Ps1TextureFilterMode filter_mode = (host.config.graphics.texture_filter == FILTER_BILINEAR) ? PS1_FILTER_BILINEAR : PS1_FILTER_NEAREST;
+    if (host.config.preset == PRESET_AUTHENTIC_PS1) {
+        filter_mode = PS1_FILTER_NEAREST;
+    }
 
     ps1_pgxp_set_enabled(pgxp_v, pgxp_t);
     ps1_video_set_true_depth_buffer(zbuff);
@@ -394,6 +401,10 @@ int main(int argc, char **argv) {
     ps1_gte_set_float_math(float_gte);
     ps1_video_set_true_color(true_color);
     ps1_video_set_dithering(dither_mode);
+    ps1_video_set_texture_bleeding_fix(tex_bleed);
+    ps1_video_set_alpha_halo_fix(alpha_halo);
+    ps1_video_set_mipmapping(mipmap);
+    ps1_video_set_texture_filter(filter_mode);
 #ifdef VANILLABTN_BOOT_TEST
     SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "dummy");
     SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "dummy");

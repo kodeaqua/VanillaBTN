@@ -14,6 +14,11 @@ typedef enum Ps1DitherMode {
     PS1_DITHER_DEBAND = 2
 } Ps1DitherMode;
 
+typedef enum Ps1TextureFilterMode {
+    PS1_FILTER_NEAREST = 0,
+    PS1_FILTER_BILINEAR = 1
+} Ps1TextureFilterMode;
+
 typedef struct Ps1Video {
     uint16_t vram[PS1_VRAM_HEIGHT][PS1_VRAM_WIDTH];
     float zbuffer[PS1_VRAM_HEIGHT][PS1_VRAM_WIDTH];
@@ -64,6 +69,18 @@ bool ps1_video_get_true_color(void);
 
 void ps1_video_set_dithering(Ps1DitherMode mode);
 Ps1DitherMode ps1_video_get_dithering(void);
+
+void ps1_video_set_texture_bleeding_fix(bool enabled);
+bool ps1_video_get_texture_bleeding_fix(void);
+
+void ps1_video_set_alpha_halo_fix(bool enabled);
+bool ps1_video_get_alpha_halo_fix(void);
+
+void ps1_video_set_mipmapping(bool enabled);
+bool ps1_video_get_mipmapping(void);
+
+void ps1_video_set_texture_filter(Ps1TextureFilterMode mode);
+Ps1TextureFilterMode ps1_video_get_texture_filter(void);
 
 /* Preserve raw PS1 BGR555 words, including the high mask/semitransparency bit. */
 bool ps1_video_upload(Ps1Video *video, int x, int y, int width, int height,
