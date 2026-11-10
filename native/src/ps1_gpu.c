@@ -320,11 +320,13 @@ bool ps1_gpu_exec(Ps1Video *video, Ps1DrawState *state,
             points[i] = make_poly_vertex(gp0_x(words[i * 2 + 1]), gp0_y(words[i * 2 + 1]), 0, 0, &words[i * 2 + 1]);
             colors[i] = gp0_rgb24(words[i * 2]);
         }
-        if (!ps1_video_draw_gouraud_triangle(video, state, points, points + 1, points + 2,
-                                             colors, (code & 2) != 0)) return false;
-        if (vertices == 4)
-            return ps1_video_draw_gouraud_triangle(video, state, points + 1, points + 2, points + 3,
-                                                   colors + 1, (code & 2) != 0);
+        if (vertices == 4) {
+            return ps1_video_draw_gouraud_quad(video, state, points, points + 1, points + 2, points + 3,
+                                               colors, (code & 2) != 0);
+        } else {
+            return ps1_video_draw_gouraud_triangle(video, state, points, points + 1, points + 2,
+                                                   colors, (code & 2) != 0);
+        }
         break;
     }
     case 0x34: case 0x35: case 0x36: case 0x37:
@@ -351,13 +353,14 @@ bool ps1_gpu_exec(Ps1Video *video, Ps1DrawState *state,
         for (unsigned i = 0; i < vertices; ++i) colors[i] = gp0_rgb24(words[i * 3]);
         bool raw_tex = (code & 1) != 0;
         bool semi_trans = (code & 2) != 0;
-        if (!ps1_video_draw_textured_gouraud_triangle(video, state,
-            &points[0], &points[1], &points[2], colors, state->tpage, clut,
-            raw_tex, semi_trans)) return false;
         if (vertices == 4) {
-            return ps1_video_draw_textured_gouraud_triangle(video, state,
-                &points[1], &points[2], &points[3], colors + 1, state->tpage,
+            return ps1_video_draw_textured_gouraud_quad(video, state,
+                &points[0], &points[1], &points[2], &points[3], colors, state->tpage,
                 clut, raw_tex, semi_trans);
+        } else {
+            return ps1_video_draw_textured_gouraud_triangle(video, state,
+                &points[0], &points[1], &points[2], colors, state->tpage, clut,
+                raw_tex, semi_trans);
         }
         break;
     }

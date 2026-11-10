@@ -2,6 +2,7 @@
 
 #include <string.h>
 #include <limits.h>
+#include <math.h>
 
 void ps1_gte_init(Ps1Gte *gte) {
     if (gte == NULL) return;
@@ -119,15 +120,18 @@ static void transform_vertex(const Ps1Gte *gte, const Ps1Vector3 *v,
     *out_sy = sy < -1024 ? -1024 : sy > 1023 ? 1023 : (int32_t)sy;
 
     if (out_sub != NULL) {
-        float sub_x = (float)screen_x / 65536.0f;
-        float sub_y = (float)screen_y / 65536.0f;
-        if (sub_x < -1024.0f) sub_x = -1024.0f;
-        else if (sub_x > 1023.0f) sub_x = 1023.0f;
-        if (sub_y < -1024.0f) sub_y = -1024.0f;
-        else if (sub_y > 1023.0f) sub_y = 1023.0f;
+        float sub_z = (float)cz;
+        float sub_x, sub_y;
+        if (cz > 0) {
+            sub_x = (float)screen_x / 65536.0f;
+            sub_y = (float)screen_y / 65536.0f;
+        } else {
+            float z_denom = (cz < -1) ? (float)cz : -1.0f;
+            sub_x = (float)gte->ofx + (float)(cx * gte->h) / z_denom;
+            sub_y = (float)gte->ofy + (float)(cy * gte->h) / z_denom;
+        }
 
-        float sub_z = (cz > 0) ? (float)cz : (float)*out_sz;
-        float sub_w = (sub_z > 0.001f) ? (1.0f / sub_z) : 1.0f;
+        float sub_w = (fabsf(sub_z) > 0.001f) ? (1.0f / sub_z) : 0.0f;
         out_sub->x = sub_x;
         out_sub->y = sub_y;
         out_sub->z = sub_z;

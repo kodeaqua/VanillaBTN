@@ -45,6 +45,12 @@ void ps1_video_set_true_depth_buffer(bool enabled);
 bool ps1_video_get_true_depth_buffer(void);
 void ps1_video_clear_zbuffer(Ps1Video *video);
 
+void ps1_video_set_near_plane_clipping(bool enabled);
+bool ps1_video_get_near_plane_clipping(void);
+
+void ps1_video_set_quad_subdivision(bool enabled);
+bool ps1_video_get_quad_subdivision(void);
+
 /* Preserve raw PS1 BGR555 words, including the high mask/semitransparency bit. */
 bool ps1_video_upload(Ps1Video *video, int x, int y, int width, int height,
                       const uint16_t *source, size_t source_stride);
@@ -90,11 +96,22 @@ bool ps1_video_draw_gouraud_triangle(Ps1Video *video, const Ps1DrawState *state,
     const Ps1Vertex *v0, const Ps1Vertex *v1, const Ps1Vertex *v2,
     const uint32_t colors[3], bool semi_transparent);
 
-/* Draw a flat or textured PS1 quad (split into triangles v0-v1-v2 and v1-v2-v3). */
+/* Draw a flat or textured PS1 quad (split into triangles v0-v1-v2 and v1-v2-v3, or subdivided). */
 bool ps1_video_draw_quad(Ps1Video *video, const Ps1DrawState *state,
                          const Ps1Vertex *v0, const Ps1Vertex *v1,
                          const Ps1Vertex *v2, const Ps1Vertex *v3,
                          uint32_t rgb24, unsigned tpage, unsigned clut,
                          bool textured, bool raw_texture, bool semi_transparent);
+
+bool ps1_video_draw_gouraud_quad(Ps1Video *video, const Ps1DrawState *state,
+                                const Ps1Vertex *v0, const Ps1Vertex *v1,
+                                const Ps1Vertex *v2, const Ps1Vertex *v3,
+                                const uint32_t colors[4], bool semi_transparent);
+
+bool ps1_video_draw_textured_gouraud_quad(Ps1Video *video, const Ps1DrawState *state,
+                                         const Ps1Vertex *v0, const Ps1Vertex *v1,
+                                         const Ps1Vertex *v2, const Ps1Vertex *v3,
+                                         const uint32_t colors[4], unsigned tpage, unsigned clut,
+                                         bool raw_texture, bool semi_transparent);
 
 #endif

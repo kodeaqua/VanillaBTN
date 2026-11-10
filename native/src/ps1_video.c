@@ -6,6 +6,10 @@
 #include <math.h>
 
 static bool s_true_depth_buffer = true;
+static bool s_near_plane_w_clipping = true;
+static bool s_quad_subdivision = true;
+
+#define PS1_NEAR_PLANE_Z 8.0f
 
 _Static_assert(sizeof(uint16_t) == 2, "PS1 VRAM words must be 16 bits");
 _Static_assert(sizeof(uint32_t) == 4, "ARGB pixels must be 32 bits");
@@ -189,6 +193,152 @@ static int max3(int a, int b, int c) {
     return m > c ? m : c;
 }
 
+static void intersect_near_plane(const Ps1Vertex *a, const Ps1Vertex *b,
+                                 uint32_t ca, uint32_t cb,
+                                 Ps1Vertex *out_v, uint32_t *out_c) {
+    float za = a->z;
+    float zb = b->z;
+    float denom = zb - za;
+    float t = (fabsf(denom) > 1e-6f) ? (PS1_NEAR_PLANE_Z - za) / denom : 0.5f;
+    if (t < 0.0f) t = 0.0f;
+    if (t > 1.0f) t = 1.0f;
+
+    float z_near = PS1_NEAR_PLANE_Z;
+    float w_near = 1.0f / z_near;
+
+    out_v->z = z_near;
+    out_v->w = w_near;
+    out_v->has_subpixel = true;
+
+    float ofx = 160.0f;
+    float ofy = 120.0f;
+    float xh_a = (a->sub_x - ofx) * a->z;
+    float yh_a = (a->sub_y - ofy) * a->z;
+    float xh_b = (b->sub_x - ofx) * b->z;
+    float yh_b = (b->sub_y - ofy) * b->z;
+
+    float xh_i = (1.0f - t) * xh_a + t * xh_b;
+    float yh_i = (1.0f - t) * yh_a + t * yh_b;
+
+    out_v->sub_x = ofx + xh_i * w_near;
+    out_v->sub_y = ofy + yh_i * w_near;
+
+    if (out_v->sub_x < -1024.0f) out_v->sub_x = -1024.0f;
+    else if (out_v->sub_x > 1023.0f) out_v->sub_x = 1023.0f;
+    if (out_v->sub_y < -1024.0f) out_v->sub_y = -1024.0f;
+    else if (out_v->sub_y > 1023.0f) out_v->sub_y = 1023.0f;
+
+    out_v->x = (int)roundf(out_v->sub_x);
+    out_v->y = (int)roundf(out_v->sub_y);
+
+    float uw_a = (float)a->u * a->w;
+    float vw_a = (float)a->v * a->w;
+    float uw_b = (float)b->u * b->w;
+    float vw_b = (float)b->v * b->w;
+
+    float uw_i = (1.0f - t) * uw_a + t * uw_b;
+    float vw_i = (1.0f - t) * vw_a + t * vw_b;
+
+    float u_val = uw_i / w_near;
+    float v_val = vw_i / w_near;
+    out_v->u = (unsigned)(u_val < 0.0f ? 0.0f : (u_val > 255.0f ? 255.0f : roundf(u_val)));
+    out_v->v = (unsigned)(v_val < 0.0f ? 0.0f : (v_val > 255.0f ? 255.0f : roundf(v_val)));
+
+    if (out_c) {
+        float rw_a = (float)((ca >> 16) & 255) * a->w;
+        float gw_a = (float)((ca >> 8) & 255) * a->w;
+        float bw_a = (float)(ca & 255) * a->w;
+
+        float rw_b = (float)((cb >> 16) & 255) * b->w;
+        float gw_b = (float)((cb >> 8) & 255) * b->w;
+        float bw_b = (float)(cb & 255) * b->w;
+
+        float rw_i = (1.0f - t) * rw_a + t * rw_b;
+        float gw_i = (1.0f - t) * gw_a + t * gw_b;
+        float bw_i = (1.0f - t) * bw_a + t * bw_b;
+
+        uint32_t r = (uint32_t)roundf(rw_i / w_near);
+        uint32_t g = (uint32_t)roundf(gw_i / w_near);
+        uint32_t b = (uint32_t)roundf(bw_i / w_near);
+        if (r > 255) r = 255;
+        if (g > 255) g = 255;
+        if (b > 255) b = 255;
+        *out_c = (r << 16) | (g << 8) | b;
+    }
+}
+
+static int clip_triangle_near_plane(const Ps1Vertex *v0, const Ps1Vertex *v1, const Ps1Vertex *v2,
+                                    const uint32_t *colors,
+                                    Ps1Vertex out_v[2][3], uint32_t out_c[2][3]) {
+    const Ps1Vertex *inv[3] = {v0, v1, v2};
+    uint32_t inc[3] = {colors ? colors[0] : 0, colors ? colors[1] : 0, colors ? colors[2] : 0};
+
+    bool inside[3] = {
+        v0->z >= PS1_NEAR_PLANE_Z,
+        v1->z >= PS1_NEAR_PLANE_Z,
+        v2->z >= PS1_NEAR_PLANE_Z
+    };
+    int inside_count = (inside[0] ? 1 : 0) + (inside[1] ? 1 : 0) + (inside[2] ? 1 : 0);
+
+    if (inside_count == 3) {
+        out_v[0][0] = *v0; out_v[0][1] = *v1; out_v[0][2] = *v2;
+        if (colors) { out_c[0][0] = inc[0]; out_c[0][1] = inc[1]; out_c[0][2] = inc[2]; }
+        return 1;
+    }
+    if (inside_count == 0) {
+        return 0;
+    }
+
+    if (inside_count == 1) {
+        int i0 = inside[0] ? 0 : (inside[1] ? 1 : 2);
+        int i1 = (i0 + 1) % 3;
+        int i2 = (i0 + 2) % 3;
+
+        Ps1Vertex p1, p2;
+        uint32_t c1 = 0, c2 = 0;
+        intersect_near_plane(inv[i0], inv[i1], inc[i0], inc[i1], &p1, colors ? &c1 : NULL);
+        intersect_near_plane(inv[i2], inv[i0], inc[i2], inc[i0], &p2, colors ? &c2 : NULL);
+
+        out_v[0][0] = *inv[i0];
+        out_v[0][1] = p1;
+        out_v[0][2] = p2;
+        if (colors) {
+            out_c[0][0] = inc[i0];
+            out_c[0][1] = c1;
+            out_c[0][2] = c2;
+        }
+        return 1;
+    }
+
+    int o = !inside[0] ? 0 : (!inside[1] ? 1 : 2);
+    int i1 = (o + 1) % 3;
+    int i2 = (o + 2) % 3;
+
+    Ps1Vertex p1, p2;
+    uint32_t c1 = 0, c2 = 0;
+    intersect_near_plane(inv[i2], inv[o], inc[i2], inc[o], &p1, colors ? &c1 : NULL);
+    intersect_near_plane(inv[o], inv[i1], inc[o], inc[i1], &p2, colors ? &c2 : NULL);
+
+    out_v[0][0] = *inv[i1];
+    out_v[0][1] = *inv[i2];
+    out_v[0][2] = p1;
+    if (colors) {
+        out_c[0][0] = inc[i1];
+        out_c[0][1] = inc[i2];
+        out_c[0][2] = c1;
+    }
+
+    out_v[1][0] = *inv[i1];
+    out_v[1][1] = p1;
+    out_v[1][2] = p2;
+    if (colors) {
+        out_c[1][0] = inc[i1];
+        out_c[1][1] = c1;
+        out_c[1][2] = c2;
+    }
+    return 2;
+}
+
 static bool draw_triangle(Ps1Video *video, const Ps1DrawState *state,
                              const Ps1Vertex *v0, const Ps1Vertex *v1, const Ps1Vertex *v2,
                              uint32_t rgb24, unsigned tpage, unsigned clut,
@@ -199,6 +349,23 @@ static bool draw_triangle(Ps1Video *video, const Ps1DrawState *state,
     }
     if (textured && ((tpage >> 7) & 3u) == 3u) {
         return false;
+    }
+
+    if (s_near_plane_w_clipping && v0->has_subpixel && v1->has_subpixel && v2->has_subpixel) {
+        if (v0->z < PS1_NEAR_PLANE_Z || v1->z < PS1_NEAR_PLANE_Z || v2->z < PS1_NEAR_PLANE_Z) {
+            Ps1Vertex clipped_v[2][3];
+            uint32_t clipped_c[2][3];
+            int count = clip_triangle_near_plane(v0, v1, v2, colors, clipped_v, clipped_c);
+            if (count == 0) return true;
+            for (int i = 0; i < count; ++i) {
+                if (!draw_triangle(video, state, &clipped_v[i][0], &clipped_v[i][1], &clipped_v[i][2],
+                                   rgb24, tpage, clut, textured, raw_texture, semi_transparent,
+                                   colors ? clipped_c[i] : NULL)) {
+                    return false;
+                }
+            }
+            return true;
+        }
     }
 
     bool use_subpixel = ps1_pgxp_is_vertex_precision_enabled()
@@ -519,17 +686,185 @@ bool ps1_video_draw_line(Ps1Video *video, const Ps1DrawState *state,
     return true;
 }
 
+static Ps1Vertex lerp_vertex(const Ps1Vertex *a, const Ps1Vertex *b, float t) {
+    Ps1Vertex out;
+    out.sub_x = (1.0f - t) * a->sub_x + t * b->sub_x;
+    out.sub_y = (1.0f - t) * a->sub_y + t * b->sub_y;
+    out.x = (int)roundf(out.sub_x);
+    out.y = (int)roundf(out.sub_y);
+    out.u = (unsigned)roundf((1.0f - t) * (float)a->u + t * (float)b->u);
+    out.v = (unsigned)roundf((1.0f - t) * (float)a->v + t * (float)b->v);
+    out.z = (1.0f - t) * a->z + t * b->z;
+    out.w = (1.0f - t) * a->w + t * b->w;
+    out.has_subpixel = a->has_subpixel && b->has_subpixel;
+    return out;
+}
+
+static uint32_t lerp_color(uint32_t c0, uint32_t c1, float t) {
+    uint32_t r = (uint32_t)roundf((1.0f - t) * ((c0 >> 16) & 255) + t * ((c1 >> 16) & 255));
+    uint32_t g = (uint32_t)roundf((1.0f - t) * ((c0 >> 8) & 255) + t * ((c1 >> 8) & 255));
+    uint32_t b = (uint32_t)roundf((1.0f - t) * (c0 & 255) + t * (c1 & 255));
+    return (r << 16) | (g << 8) | b;
+}
+
+static bool should_subdivide_quad(const Ps1Vertex *v0, const Ps1Vertex *v1,
+                                  const Ps1Vertex *v2, const Ps1Vertex *v3) {
+    if (!s_quad_subdivision) return false;
+    if (!v0->has_subpixel || !v1->has_subpixel || !v2->has_subpixel || !v3->has_subpixel) {
+        return false;
+    }
+    float min_x = fminf(fminf(v0->sub_x, v1->sub_x), fminf(v2->sub_x, v3->sub_x));
+    float max_x = fmaxf(fmaxf(v0->sub_x, v1->sub_x), fmaxf(v2->sub_x, v3->sub_x));
+    float min_y = fminf(fminf(v0->sub_y, v1->sub_y), fminf(v2->sub_y, v3->sub_y));
+    float max_y = fmaxf(fmaxf(v0->sub_y, v1->sub_y), fmaxf(v2->sub_y, v3->sub_y));
+
+    float w = max_x - min_x;
+    float h = max_y - min_y;
+    if (w > 24.0f || h > 24.0f) return true;
+
+    float dz1 = fabsf(v0->z - v3->z);
+    float dz2 = fabsf(v1->z - v2->z);
+    return (dz1 > 15.0f || dz2 > 15.0f);
+}
+
 bool ps1_video_draw_quad(Ps1Video *video, const Ps1DrawState *state,
                          const Ps1Vertex *v0, const Ps1Vertex *v1,
                          const Ps1Vertex *v2, const Ps1Vertex *v3,
                          uint32_t rgb24, unsigned tpage, unsigned clut,
                          bool textured, bool raw_texture, bool semi_transparent) {
+    if (should_subdivide_quad(v0, v1, v2, v3)) {
+        Ps1Vertex m01 = lerp_vertex(v0, v1, 0.5f);
+        Ps1Vertex m23 = lerp_vertex(v2, v3, 0.5f);
+        Ps1Vertex m02 = lerp_vertex(v0, v2, 0.5f);
+        Ps1Vertex m13 = lerp_vertex(v1, v3, 0.5f);
+        Ps1Vertex mmid = lerp_vertex(&m01, &m23, 0.5f);
+
+        const Ps1Vertex *quads[4][4] = {
+            { v0,   &m01, &m02, &mmid },
+            { &m01, v1,   &mmid, &m13 },
+            { &m02, &mmid, v2,   &m23 },
+            { &mmid, &m13, &m23, v3   }
+        };
+        for (int q = 0; q < 4; ++q) {
+            if (!ps1_video_draw_triangle(video, state, quads[q][0], quads[q][1], quads[q][2],
+                                         rgb24, tpage, clut, textured, raw_texture, semi_transparent))
+                return false;
+            if (!ps1_video_draw_triangle(video, state, quads[q][1], quads[q][2], quads[q][3],
+                                         rgb24, tpage, clut, textured, raw_texture, semi_transparent))
+                return false;
+        }
+        return true;
+    }
+
     if (!ps1_video_draw_triangle(video, state, v0, v1, v2, rgb24, tpage, clut,
                                  textured, raw_texture, semi_transparent)) {
         return false;
     }
     return ps1_video_draw_triangle(video, state, v1, v2, v3, rgb24, tpage, clut,
                                    textured, raw_texture, semi_transparent);
+}
+
+bool ps1_video_draw_gouraud_quad(Ps1Video *video, const Ps1DrawState *state,
+                                const Ps1Vertex *v0, const Ps1Vertex *v1,
+                                const Ps1Vertex *v2, const Ps1Vertex *v3,
+                                const uint32_t colors[4], bool semi_transparent) {
+    if (!colors) return false;
+    if (should_subdivide_quad(v0, v1, v2, v3)) {
+        Ps1Vertex m01 = lerp_vertex(v0, v1, 0.5f);
+        Ps1Vertex m23 = lerp_vertex(v2, v3, 0.5f);
+        Ps1Vertex m02 = lerp_vertex(v0, v2, 0.5f);
+        Ps1Vertex m13 = lerp_vertex(v1, v3, 0.5f);
+        Ps1Vertex mmid = lerp_vertex(&m01, &m23, 0.5f);
+
+        uint32_t c01 = lerp_color(colors[0], colors[1], 0.5f);
+        uint32_t c23 = lerp_color(colors[2], colors[3], 0.5f);
+        uint32_t c02 = lerp_color(colors[0], colors[2], 0.5f);
+        uint32_t c13 = lerp_color(colors[1], colors[3], 0.5f);
+        uint32_t cmid = lerp_color(c01, c23, 0.5f);
+
+        const Ps1Vertex *quads[4][4] = {
+            { v0,   &m01, &m02, &mmid },
+            { &m01, v1,   &mmid, &m13 },
+            { &m02, &mmid, v2,   &m23 },
+            { &mmid, &m13, &m23, v3   }
+        };
+        uint32_t qcolors[4][4] = {
+            { colors[0], c01, c02, cmid },
+            { c01, colors[1], cmid, c13 },
+            { c02, cmid, colors[2], c23 },
+            { cmid, c13, c23, colors[3] }
+        };
+        for (int q = 0; q < 4; ++q) {
+            uint32_t tri_c0[3] = { qcolors[q][0], qcolors[q][1], qcolors[q][2] };
+            uint32_t tri_c1[3] = { qcolors[q][1], qcolors[q][2], qcolors[q][3] };
+            if (!ps1_video_draw_gouraud_triangle(video, state, quads[q][0], quads[q][1], quads[q][2],
+                                                 tri_c0, semi_transparent))
+                return false;
+            if (!ps1_video_draw_gouraud_triangle(video, state, quads[q][1], quads[q][2], quads[q][3],
+                                                 tri_c1, semi_transparent))
+                return false;
+        }
+        return true;
+    }
+
+    uint32_t c_first[3] = { colors[0], colors[1], colors[2] };
+    uint32_t c_second[3] = { colors[1], colors[2], colors[3] };
+    if (!ps1_video_draw_gouraud_triangle(video, state, v0, v1, v2, c_first, semi_transparent))
+        return false;
+    return ps1_video_draw_gouraud_triangle(video, state, v1, v2, v3, c_second, semi_transparent);
+}
+
+bool ps1_video_draw_textured_gouraud_quad(Ps1Video *video, const Ps1DrawState *state,
+                                         const Ps1Vertex *v0, const Ps1Vertex *v1,
+                                         const Ps1Vertex *v2, const Ps1Vertex *v3,
+                                         const uint32_t colors[4], unsigned tpage, unsigned clut,
+                                         bool raw_texture, bool semi_transparent) {
+    if (!colors) return false;
+    if (should_subdivide_quad(v0, v1, v2, v3)) {
+        Ps1Vertex m01 = lerp_vertex(v0, v1, 0.5f);
+        Ps1Vertex m23 = lerp_vertex(v2, v3, 0.5f);
+        Ps1Vertex m02 = lerp_vertex(v0, v2, 0.5f);
+        Ps1Vertex m13 = lerp_vertex(v1, v3, 0.5f);
+        Ps1Vertex mmid = lerp_vertex(&m01, &m23, 0.5f);
+
+        uint32_t c01 = lerp_color(colors[0], colors[1], 0.5f);
+        uint32_t c23 = lerp_color(colors[2], colors[3], 0.5f);
+        uint32_t c02 = lerp_color(colors[0], colors[2], 0.5f);
+        uint32_t c13 = lerp_color(colors[1], colors[3], 0.5f);
+        uint32_t cmid = lerp_color(c01, c23, 0.5f);
+
+        const Ps1Vertex *quads[4][4] = {
+            { v0,   &m01, &m02, &mmid },
+            { &m01, v1,   &mmid, &m13 },
+            { &m02, &mmid, v2,   &m23 },
+            { &mmid, &m13, &m23, v3   }
+        };
+        uint32_t qcolors[4][4] = {
+            { colors[0], c01, c02, cmid },
+            { c01, colors[1], cmid, c13 },
+            { c02, cmid, colors[2], c23 },
+            { cmid, c13, c23, colors[3] }
+        };
+        for (int q = 0; q < 4; ++q) {
+            uint32_t tri_c0[3] = { qcolors[q][0], qcolors[q][1], qcolors[q][2] };
+            uint32_t tri_c1[3] = { qcolors[q][1], qcolors[q][2], qcolors[q][3] };
+            if (!ps1_video_draw_textured_gouraud_triangle(video, state, quads[q][0], quads[q][1], quads[q][2],
+                                                          tri_c0, tpage, clut, raw_texture, semi_transparent))
+                return false;
+            if (!ps1_video_draw_textured_gouraud_triangle(video, state, quads[q][1], quads[q][2], quads[q][3],
+                                                          tri_c1, tpage, clut, raw_texture, semi_transparent))
+                return false;
+        }
+        return true;
+    }
+
+    uint32_t c_first[3] = { colors[0], colors[1], colors[2] };
+    uint32_t c_second[3] = { colors[1], colors[2], colors[3] };
+    if (!ps1_video_draw_textured_gouraud_triangle(video, state, v0, v1, v2, c_first, tpage, clut,
+                                                  raw_texture, semi_transparent))
+        return false;
+    return ps1_video_draw_textured_gouraud_triangle(video, state, v1, v2, v3, c_second, tpage, clut,
+                                                    raw_texture, semi_transparent);
 }
 
 bool ps1_video_upload(Ps1Video *video, int x, int y, int width, int height,
@@ -578,4 +913,20 @@ bool ps1_video_get_true_depth_buffer(void) {
 void ps1_video_clear_zbuffer(Ps1Video *video) {
     if (video == NULL) return;
     memset(video->zbuffer, 0, sizeof(video->zbuffer));
+}
+
+void ps1_video_set_near_plane_clipping(bool enabled) {
+    s_near_plane_w_clipping = enabled;
+}
+
+bool ps1_video_get_near_plane_clipping(void) {
+    return s_near_plane_w_clipping;
+}
+
+void ps1_video_set_quad_subdivision(bool enabled) {
+    s_quad_subdivision = enabled;
+}
+
+bool ps1_video_get_quad_subdivision(void) {
+    return s_quad_subdivision;
 }

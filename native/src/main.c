@@ -376,9 +376,16 @@ int main(int argc, char **argv) {
         else return 1;
     }
     config_load(&host.config, config_path);
-    ps1_pgxp_set_enabled(host.config.fixes.pgxp_vertex_precision,
-                         host.config.fixes.pgxp_perspective_texture);
-    ps1_video_set_true_depth_buffer(host.config.fixes.true_depth_buffer);
+    bool pgxp_v = config_resolve_bool(host.config.fixes.pgxp_vertex_precision, host.config.preset, true);
+    bool pgxp_t = config_resolve_bool(host.config.fixes.pgxp_perspective_texture, host.config.preset, true);
+    bool zbuff = config_resolve_bool(host.config.fixes.true_depth_buffer, host.config.preset, true);
+    bool w_clip = config_resolve_bool(host.config.fixes.near_plane_w_clipping, host.config.preset, true);
+    bool quad_sub = config_resolve_bool(host.config.fixes.quad_subdivision, host.config.preset, true);
+
+    ps1_pgxp_set_enabled(pgxp_v, pgxp_t);
+    ps1_video_set_true_depth_buffer(zbuff);
+    ps1_video_set_near_plane_clipping(w_clip);
+    ps1_video_set_quad_subdivision(quad_sub);
 #ifdef VANILLABTN_BOOT_TEST
     SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "dummy");
     SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "dummy");

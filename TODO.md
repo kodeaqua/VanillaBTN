@@ -28,7 +28,12 @@ Update the relevant item after completing a task or discovering a blocker.
       - [x] Protect 2D UI and unprojected primitives (`has_subpixel = false`) from depth tests, ensuring HUD elements, portraits, and dialog windows remain completely unoccluded.
       - [x] Integrate buffer clearing on quick fill (`ps1_video_quick_fill`), packet resets, and configuration toggle `fixes.true_depth_buffer`.
       - [x] Add synthetic unit tests in `ps1_zbuffer_test.c` verifying occlusion resolution, shadow bias, 2D UI safety, and toggle behavior (41/41 CTests, 9/9 Python tests passing in Debug and Release).
-    - [ ] Milestone 4: 3D Frustum W-Clipping (preventing near-plane division-by-zero polygon spikes) and dynamic quad subdivision.
+    - [x] Milestone 4: 3D Frustum W-Clipping (preventing near-plane division-by-zero polygon spikes) and dynamic quad subdivision.
+      - [x] Preserve signed camera-space depth in GTE transform pipeline (`ps1_gte.c`), enabling exact near-plane geometric intersection math.
+      - [x] Implement near-plane frustum W-clipping against $Z = 8.0f$ in `ps1_video.c`, cleanly clipping intersecting triangles into 1 or 2 well-formed triangles and culling triangles behind the camera, eliminating screen-spanning coordinate spikes and division-by-zero artifacts.
+      - [x] Implement dynamic quad subdivision (tessellation) in `ps1_video.c` for large and non-planar quads (`POLY_F4`, `POLY_FT4`, `POLY_G4`, `POLY_GT4`), decomposing them into a $2 \times 2$ grid (8 triangles) with bilinear color and texture coordinate interpolation, eliminating the diagonal kink and crease.
+      - [x] Wire `fixes.near_plane_w_clipping` and `fixes.quad_subdivision` through `config_resolve_bool` to `ps1_video` control functions and `main.c`.
+      - [x] Add synthetic unit tests in `ps1_clipping_test.c` verifying culling of behind-camera triangles, 1-vertex and 2-vertex near-plane clipping, quad tessellation, and toggle controls (42/42 CTests, 9/9 Python tests passing in Debug and Release).
     - [ ] Milestone 5: 32-bit Float GTE Math (smooth camera rotation angles and skeletal joint precision).
     - [ ] Milestone 6: True Color 32-bit pipeline (ARGB8888 anti-banding) and dithering removal (`dithering = off / deband`).
     - [ ] Milestone 7: Texture bleeding fix (sub-rectangle UV clamping), alpha halo fix (pre-filter alpha test), and automatic mipmapping.
