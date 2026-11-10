@@ -45,6 +45,10 @@ static bool sound_running;
 static bool sound_stereo_enabled = true;
 static bool reverb_enabled;
 static bool cd_mix_enabled;
+static bool sound_polyphony_expanded = false;
+static bool sound_pop_suppression = false;
+static bool sound_vag_crossfade = false;
+static bool sound_float_mixing = false;
 static int32_t tick_mode_val;
 static int32_t reserved_voices_val = PS1_SPU_VOICES;
 static int32_t table_s_max = SDK_MAX_SEQS;
@@ -133,6 +137,10 @@ void sdk_sound_reset(void) {
     sequence_source = NULL;
     sequence_source_size = 0;
     ps1_spu_init(&spu);
+    if (sound_polyphony_expanded) ps1_spu_set_polyphony_expansion(&spu, 1);
+    if (sound_pop_suppression) ps1_spu_set_pop_suppression(&spu, 1);
+    if (sound_vag_crossfade) ps1_spu_set_vag_crossfade(&spu, 1);
+    if (sound_float_mixing) ps1_spu_set_float_mixing(&spu, 1);
     serial_vol[0] = (SdkSerialVol){0, 0};
     serial_vol[1] = (SdkSerialVol){0, 0};
     serial_attr[0] = serial_attr[1] = 0;
@@ -468,7 +476,8 @@ void SsSeqStop(int seq_access_num) {
     rec->playing = false;
     rec->paused = false;
     rec->seq.active = false;
-    for (int v = 0; v < PS1_SPU_VOICES; ++v) {
+    int limit = spu.num_voices > 0 ? spu.num_voices : PS1_SPU_HW_VOICES;
+    for (int v = 0; v < limit; ++v) {
         if (spu.voices[v].vab_id == rec->vab_id) {
             ps1_spu_key_off(&spu, v);
         }
@@ -495,15 +504,17 @@ void SsSeqClose(int seq_access_num) {
 }
 
 short SsUtKeyOnV(int voice, int vabId, int prog, int tone, int note, int fine, int voll, int volr) {
-    if (voice < 0 || voice >= PS1_SPU_VOICES) return -1;
+    int max_v = spu.num_voices > 0 ? spu.num_voices : PS1_SPU_HW_VOICES;
+    if (voice < 0 || voice >= max_v) return -1;
     ps1_spu_key_on_vab(&spu, voice, vabId, prog, tone, note, fine, voll, volr);
     return (short)voice;
 }
 
 short SsUtKeyOn(int vabId, int prog, int tone, int note, int fine, int voll, int volr) {
-    int limit = reserved_voices_val > 0 && reserved_voices_val <= PS1_SPU_VOICES
+    int max_v = spu.num_voices > 0 ? spu.num_voices : PS1_SPU_HW_VOICES;
+    int limit = reserved_voices_val > 0 && reserved_voices_val <= max_v
                     ? reserved_voices_val
-                    : PS1_SPU_VOICES;
+                    : max_v;
     int chosen = -1;
     for (int v = 0; v < limit; ++v) {
         if (!ps1_spu_voice_is_active(&spu, v)) {
@@ -511,12 +522,21 @@ short SsUtKeyOn(int vabId, int prog, int tone, int note, int fine, int voll, int
             break;
         }
     }
+    if (chosen < 0 && sound_polyphony_expanded && max_v > PS1_SPU_HW_VOICES) {
+        for (int v = PS1_SPU_HW_VOICES; v < max_v; ++v) {
+            if (!ps1_spu_voice_is_active(&spu, v)) {
+                chosen = v;
+                break;
+            }
+        }
+    }
     if (chosen < 0) return -1;
     return SsUtKeyOnV(chosen, vabId, prog, tone, note, fine, voll, volr);
 }
 
 short SsUtKeyOffV(int voice) {
-    if (voice < 0 || voice >= PS1_SPU_VOICES) return -1;
+    int max_v = spu.num_voices > 0 ? spu.num_voices : PS1_SPU_HW_VOICES;
+    if (voice < 0 || voice >= max_v) return -1;
     ps1_spu_key_off(&spu, voice);
     return 0;
 }
@@ -535,7 +555,8 @@ void SsUtAllKeyOff(int mode) {
 }
 
 short SsUtSetVVol(int voice, int voll, int volr) {
-    if (voice < 0 || voice >= PS1_SPU_VOICES) return -1;
+    int max_v = spu.num_voices > 0 ? spu.num_voices : PS1_SPU_HW_VOICES;
+    if (voice < 0 || voice >= max_v) return -1;
     if (voll < 0) voll = 0;
     if (voll > 127) voll = 127;
     if (volr < 0) volr = 0;
@@ -548,7 +569,8 @@ short SsUtSetVVol(int voice, int voll, int volr) {
 void SsVoKeyOff(long vab_pro, long pitch) {
     (void)pitch;
     int voice = (int)(vab_pro & 0xFF);
-    if (voice >= 0 && voice < PS1_SPU_VOICES) {
+    int max_v = spu.num_voices > 0 ? spu.num_voices : PS1_SPU_HW_VOICES;
+    if (voice >= 0 && voice < max_v) {
         ps1_spu_key_off(&spu, voice);
     }
 }
@@ -639,4 +661,40 @@ long SpuGetKeyStatus(unsigned long voice_bit) {
 
 unsigned long SpuSetReverbVoice(long on, unsigned long voice_bit) {
     return ps1_spu_set_reverb_voice(&spu, (uint32_t)voice_bit, on != 0);
+}
+
+void sdk_sound_set_polyphony_expansion(bool enabled) {
+    sound_polyphony_expanded = enabled;
+    ps1_spu_set_polyphony_expansion(&spu, enabled ? 1 : 0);
+}
+
+bool sdk_sound_get_polyphony_expansion(void) {
+    return sound_polyphony_expanded;
+}
+
+void sdk_sound_set_pop_suppression(bool enabled) {
+    sound_pop_suppression = enabled;
+    ps1_spu_set_pop_suppression(&spu, enabled ? 1 : 0);
+}
+
+bool sdk_sound_get_pop_suppression(void) {
+    return sound_pop_suppression;
+}
+
+void sdk_sound_set_vag_crossfade(bool enabled) {
+    sound_vag_crossfade = enabled;
+    ps1_spu_set_vag_crossfade(&spu, enabled ? 1 : 0);
+}
+
+bool sdk_sound_get_vag_crossfade(void) {
+    return sound_vag_crossfade;
+}
+
+void sdk_sound_set_float_mixing(bool enabled) {
+    sound_float_mixing = enabled;
+    ps1_spu_set_float_mixing(&spu, enabled ? 1 : 0);
+}
+
+bool sdk_sound_get_float_mixing(void) {
+    return sound_float_mixing;
 }

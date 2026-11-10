@@ -73,6 +73,10 @@ typedef struct {
     int16_t         held_left, held_right;
     int             repeat_input; /* duplicate 18.9 kHz input before FIR */
 
+    /* Seamless gapless looping */
+    int             seamless_loop;
+    uint32_t        loop_start_sector;
+
     /* ADPCM filter history across sound groups */
     int16_t         hist1;
     int16_t         hist2;
@@ -99,6 +103,10 @@ void ps1_xa_play_source(Ps1XaPlayer *player, Ps1XaSectorReader reader, void *con
 
 /* Stop playback */
 void ps1_xa_stop(Ps1XaPlayer *player);
+
+/* Configure seamless 0ms CD-XA looping */
+void ps1_xa_set_seamless_loop(Ps1XaPlayer *player, int enabled);
+int  ps1_xa_get_seamless_loop(const Ps1XaPlayer *player);
 
 /* Tick fade-out (called once per frame, speed_mode 1..3) */
 void ps1_xa_fade_tick(Ps1XaPlayer *player, int speed_mode);

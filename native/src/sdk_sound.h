@@ -39,6 +39,16 @@ SdkSoundStatus sdk_sound_status(void);
 const Ps1Spu *sdk_sound_spu(void);
 void sdk_sound_mix(int16_t *out, int frames);
 
+/* Audio enhancement toggles */
+void sdk_sound_set_polyphony_expansion(bool enabled);
+bool sdk_sound_get_polyphony_expansion(void);
+void sdk_sound_set_pop_suppression(bool enabled);
+bool sdk_sound_get_pop_suppression(void);
+void sdk_sound_set_vag_crossfade(bool enabled);
+bool sdk_sound_get_vag_crossfade(void);
+void sdk_sound_set_float_mixing(bool enabled);
+bool sdk_sound_get_float_mixing(void);
+
 /* Supply the exact borrowed asset span for the next SsSeqOpen call. The SDK
  * signature omits a length, so unknown/unregistered source buffers are rejected.
  * The view is consumed once; playback borrows the bytes until SsSeqClose. */

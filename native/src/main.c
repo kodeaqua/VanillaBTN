@@ -398,6 +398,11 @@ int main(int argc, char **argv) {
     Ps1AntiAliasingMode aa_mode = (aa_cfg == AA_OFF) ? PS1_AA_OFF :
                                   (aa_cfg == AA_SMAA) ? PS1_AA_SMAA : PS1_AA_MSAA_4X;
     bool smooth_fog = config_resolve_bool(host.config.fixes.smooth_fog, host.config.preset, true);
+    bool expand_poly = config_resolve_bool(host.config.fixes.expand_voice_polyphony, host.config.preset, true);
+    bool seamless_cd = config_resolve_bool(host.config.fixes.seamless_cd_loop, host.config.preset, true);
+    bool pop_suppress = config_resolve_bool(host.config.fixes.audio_pop_suppression, host.config.preset, true);
+    bool vag_cross = config_resolve_bool(host.config.fixes.vag_loop_crossfade, host.config.preset, true);
+    bool float_mix = config_resolve_bool(host.config.fixes.float_audio_mixing, host.config.preset, true);
 
     ps1_pgxp_set_enabled(pgxp_v, pgxp_t);
     ps1_video_set_true_depth_buffer(zbuff);
@@ -412,6 +417,12 @@ int main(int argc, char **argv) {
     ps1_video_set_texture_filter(filter_mode);
     ps1_video_set_anti_aliasing(aa_mode);
     ps1_video_set_smooth_fog(smooth_fog);
+
+    sdk_sound_set_polyphony_expansion(expand_poly);
+    sdk_sound_set_pop_suppression(pop_suppress);
+    sdk_sound_set_vag_crossfade(vag_cross);
+    sdk_sound_set_float_mixing(float_mix);
+    sdk_cd_set_seamless_loop(seamless_cd);
 #ifdef VANILLABTN_BOOT_TEST
     SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "dummy");
     SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "dummy");
@@ -456,6 +467,11 @@ disc_ready:
         SDL_TEXTUREACCESS_STREAMING, 320, 240);
     if (!host.texture || !SDL_SetTextureScaleMode(host.texture, SDL_SCALEMODE_NEAREST)) goto done;
     ps1_audio_init(&audio);
+    ps1_spu_set_polyphony_expansion(&audio.spu, expand_poly);
+    ps1_spu_set_pop_suppression(&audio.spu, pop_suppress);
+    ps1_spu_set_vag_crossfade(&audio.spu, vag_cross);
+    ps1_spu_set_float_mixing(&audio.spu, float_mix);
+    ps1_xa_set_seamless_loop(&audio.xa, seamless_cd);
 #ifndef VANILLABTN_BOOT_TEST
     if (card_directory) {
         SDL_PathInfo info;

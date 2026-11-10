@@ -56,7 +56,14 @@ Update the relevant item after completing a task or discovering a blocker.
       - [x] Implement continuous atmospheric depth-cueing fog (`apply_atmospheric_fog` with `s_smooth_fog`), replacing PS1 fixed-point depth banding with 32-bit floating-point linear/exponential fog attenuation.
       - [x] Wire `fixes.anti_aliasing` and `fixes.smooth_fog` through Master Preset System in `main.c` and provide `ps1_video_set_fog_params` for dynamic time/weather color transitions.
       - [x] Add synthetic unit tests in `ps1_aa_fog_test.c` verifying near/mid/far fog interpolation and edge anti-aliasing smoothing (46/46 CTests, 9/9 Python tests passing in Debug and Release).
-    - [ ] Milestone 9: Audio Subsystem Overhaul — expanded 64-voice polyphony (anti-voice stealing), seamless zero-gap CD-XA looping, micro-fade pop suppression, and VAG loop crossfading.
+    - [x] Milestone 9: Audio Subsystem Overhaul — expanded 64-voice polyphony (anti-voice stealing), seamless zero-gap CD-XA looping, micro-fade pop suppression, VAG loop crossfading, and 32-bit float audio mixing.
+      - [x] Expand SPU voice capacity from 24 to 64 voices (`PS1_SPU_MAX_VOICES = 64`) with 64-bit reverb routing (`ps1_spu.h`/`ps1_spu.c`).
+      - [x] Integrate polyphony expansion into `sdk_sound.c` (`SsUtKeyOn`, `SsUtKeyOnV`), automatically routing sound effects to channels 24..63 when baseline channels 0..23 are occupied by sequences, completely eliminating voice stealing and dropped SFX.
+      - [x] Implement 64-sample (~1.45 ms) micro-fade linear ramp-down on sudden key-off (`ps1_spu_key_off_all`), eliminating DC offset step discontinuities and audible pops/clicks.
+      - [x] Implement 0 ms gapless CD-XA streaming in `ps1_xa.c` and `sdk_cd.c` (`seamless_loop`), wrapping back to track start instantly at EOF and eliminating the 100-300 ms physical disc seek silence gap.
+      - [x] Implement VAG sample loop boundary crossfading (`vag_loop_crossfade`), smoothing ADPCM predictor discontinuities across loop seam wraps.
+      - [x] Implement 32-bit floating-point audio accumulator with transparent soft-knee limiter (`tanh` compression above 28000), eliminating harsh digital clipping and integer overflow while preserving linear fidelity.
+      - [x] Add synthetic unit tests in `ps1_audio_overhaul_test.c` verifying 64-voice allocation, pop suppression, gapless CD-XA looping, VAG loop smoothing, and float soft limiting (47/47 CTests, 9/9 Python tests passing in Debug and Release).
     - [ ] Milestone 10: Hi-Fi 44.1/48 kHz 32-bit float reverb DSP and full-spectrum audio output.
     - [ ] Milestone 11: Zero fill-rate bottleneck architecture (smooth 60 FPS in heavy rain and festival scenes).
     - [ ] Milestone 12: Input Subsystem Fixes — circular analog normalization (fix diagonal running bug), HD rumble motor curve, sub-frame raw input polling, and disconnect auto-pause.
