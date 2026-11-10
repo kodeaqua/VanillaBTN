@@ -82,7 +82,8 @@ Update the relevant item after completing a task or discovering a blocker.
 - [ ] Developer: check controller feel and simulation pacing in native window.
 - [ ] Developer: compare music, effects, speech/streams, and timing by ear.
 - [x] Developer: confirm save and load work in game.
-- [ ] Developer: compare farm state after saving and loading in game.
+- [x] Developer: confirm a moved rock retains its position in the tested farm state.
+- [ ] Developer: validate other farm-state changes across scenes, days and save/load.
 - [ ] Milestone 6: bring up farm, events, minigames, ending, title, and card flows.
 
 ## Next
