@@ -103,10 +103,11 @@ Update the relevant item after completing a task or discovering a blocker.
 - [x] Developer: confirm a moved rock retains its position in the tested farm state.
 - [ ] Developer: validate other farm-state changes across scenes, days and save/load.
 - [x] Milestone 6: bring up farm, events, minigames, ending, title, and card flows. Synthetic fixtures in original_farm_menu_test and original_window_test cover minigame event requests (MG1..MG5), minigame exit flag propagation (STATUS_FLAG_FROM_MG1..5), staff roll ending routes and farm re-entry, memory card utility flows, title initializations, and in-game debug settings window (swind.c); both Debug and Release profiles pass all 37 test suites, and boot probes verify full runtime simulation loops.
+- [x] Optimization and release packaging: generate multi-resolution Windows ICO from original master art with sharp Lanczos filtering across standard dimensions (16x16 through 256x256), embed application icon, version resource (0.6.0.0), DPI awareness (PerMonitorV2), and UTF-8 manifest into vanillabtn.exe, optimize Release profile with /O2 /Oi /Gy /GF /OPT:REF /OPT:ICF, support disc and data directory fallback discovery, add windows_resource_test, test_icon, and test_package suites (38/38 CTests and 9/9 Python tool tests pass), and provide automated packaging via tools/package-release.ps1.
 
 ## Next
 
-- [ ] Optimization and release packaging.
+- [ ] Developer validation: physical controller feel, seasonal audio balance, and long-term farm simulation progression.
 
 ## Completed
 

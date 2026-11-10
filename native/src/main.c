@@ -362,19 +362,29 @@ int main(int argc, char **argv) {
     SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "dummy");
 #endif
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD)) return 1;
-    if (!sdk_cd_mount(disc)) {
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "VanillaBTN",
-            "Game data was not found. Import your disc and use --data with its disc directory.", NULL);
-        goto done;
-    }
-    /* Fail before the original SDK's retry loops when required files are absent. */
     CdlFILE required;
-    if (!CdSearchFile(&required, "\\A_FILE.HDT;1") ||
+    if (!sdk_cd_mount(disc) ||
+        !CdSearchFile(&required, "\\A_FILE.HDT;1") ||
         !CdSearchFile(&required, "\\A_FILE.BIN;1")) {
+        if (strcmp(disc, "build/game-data/disc") == 0) {
+            if (sdk_cd_mount("disc") &&
+                CdSearchFile(&required, "\\A_FILE.HDT;1") &&
+                CdSearchFile(&required, "\\A_FILE.BIN;1")) {
+                disc = "disc";
+                goto disc_ready;
+            }
+            if (sdk_cd_mount("data") &&
+                CdSearchFile(&required, "\\A_FILE.HDT;1") &&
+                CdSearchFile(&required, "\\A_FILE.BIN;1")) {
+                disc = "data";
+                goto disc_ready;
+            }
+        }
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "VanillaBTN",
-            "The disc directory is missing A_FILE.HDT or A_FILE.BIN.", NULL);
+            "Game data was not found. Import your disc and use --data with its disc directory, or place A_FILE.HDT and A_FILE.BIN in a 'disc' or 'data' folder.", NULL);
         goto done;
     }
+disc_ready:
     host.window = SDL_CreateWindow("VanillaBTN", 640, 480, SDL_WINDOW_RESIZABLE);
     if (!host.window) goto done;
     host.renderer = SDL_CreateRenderer(host.window, NULL);

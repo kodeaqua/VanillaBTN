@@ -24,6 +24,16 @@ visual, audio and gameplay acceptance remains with the developer.
 To inspect the Debug window, run `& .\build\native\Debug\vanillabtn.exe` and
 close it with the window's close button.
 
+## Release packaging
+
+To assemble a standalone distribution archive for Windows with embedded application metadata and icon:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/package-release.ps1 -Configuration Release
+```
+
+This compiles the optimized `Release` executable, embeds the application icon (`vanillabtn.ico`), version resource, and DPI awareness manifest, validates all 38 CTests and 9 Python tool tests, and packages a ready-to-distribute standalone folder and `.zip` archive into `dist/VanillaBTN-v<version>-win64.zip`.
+
 ## Importing game data on Windows
 
 For development, provide your own USA `SLUS_011.15` disc image in raw

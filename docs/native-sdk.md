@@ -728,3 +728,12 @@ overflow. The old implementation fails both winding tests.
 A local headless frame captured after the fix shows farm terrain instead of the
 black area reported in the developer's window. This confirms the culling fix,
 not full gameplay, lighting or audiovisual fidelity.
+
+### Windows resources, application icon, manifest, and release packaging
+
+The native Windows executable embeds native Win32 resources via `native/res/vanillabtn.rc`:
+- **Application Icon**: `1 ICON "vanillabtn.ico"` compiled into the PE binary with multi-resolution mipmaps (16×16, 24×24, 32×32, 48×48, 64×64, 128×128, 256×256) generated using Lanczos downsampling with 32-bit RGBA transparency. Windows Explorer, the taskbar, and the window titlebar automatically display the icon.
+- **Application Manifest**: `vanillabtn.manifest` declares DPI awareness (`PerMonitorV2`), UTF-8 active code page, Common Controls v6 visual styling, and OS compatibility IDs.
+- **Version Resource**: `VS_VERSION_INFO` embeds file and product versioning, company metadata, and copyright matching project version increments.
+- **Automated Packaging**: `tools/package-release.ps1` orchestrates building `Release` with whole-program optimization, intrinsic acceleration, and COMDAT folding (`/O2 /Oi /Gy /GF /OPT:REF /OPT:ICF`), executes all 38 CTest suites and 9 Python tool checks, and packages `vanillabtn.exe`, documentation, and disc import utilities into a standalone zip distribution archive.
+

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(VanillaBTNNative LANGUAGES C)
+project(VanillaBTNNative LANGUAGES C RC)
 
 if(NOT WIN32 OR NOT MSVC OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(FATAL_ERROR "The native bringup currently requires an x64 MSVC toolchain on Windows")
@@ -84,11 +84,13 @@ set(VANILLABTN_EXECUTABLE_NAME "vanillabtn" CACHE STRING "Native runtime output 
 if(NOT VANILLABTN_EXECUTABLE_NAME MATCHES "^[A-Za-z0-9][A-Za-z0-9_-]*$")
     message(FATAL_ERROR "VANILLABTN_EXECUTABLE_NAME must be a simple executable name")
 endif()
-add_executable(vanillabtn WIN32 src/main.c)
+add_executable(vanillabtn WIN32 src/main.c res/vanillabtn.rc res/vanillabtn.manifest)
 set_target_properties(vanillabtn PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES
     OUTPUT_NAME "${VANILLABTN_EXECUTABLE_NAME}")
+target_include_directories(vanillabtn PRIVATE res)
 target_link_libraries(vanillabtn PRIVATE SDL3::SDL3 ps1_video ps1_input ps1_clock ps1_audio ps1_card)
-target_compile_options(vanillabtn PRIVATE /W4)
+target_compile_options(vanillabtn PRIVATE /W4 $<$<CONFIG:Release>:/O2 /Oi /Gy /GF>)
+target_link_options(vanillabtn PRIVATE $<$<CONFIG:Release>:/OPT:REF /OPT:ICF>)
 
 enable_testing()
 add_library(game_texture_pack STATIC ../src/main/graphics/texture_pack.c)
@@ -575,3 +577,9 @@ set_target_properties(original_status_sprites_test PROPERTIES C_STANDARD 17 C_ST
 target_compile_options(original_status_sprites_test PRIVATE /W4 /Gy)
 target_link_libraries(original_status_sprites_test PRIVATE game_main)
 add_test(NAME original_status_sprites_layout COMMAND original_status_sprites_test)
+
+add_executable(windows_resource_test tests/windows_resource_test.c res/vanillabtn.rc)
+set_target_properties(windows_resource_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_include_directories(windows_resource_test PRIVATE res)
+target_compile_options(windows_resource_test PRIVATE /W4)
+add_test(NAME windows_resource_embed COMMAND windows_resource_test)
