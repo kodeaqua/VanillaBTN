@@ -181,6 +181,9 @@ bool host_present_frame(const Ps1Video *video, SDL_Renderer *renderer, SDL_Textu
     }
 
     WidescreenMode effective_mode = s_widescreen_mode;
+    if (effective_mode == WIDESCREEN_AUTO) {
+        effective_mode = (window_aspect >= 1.55f) ? WIDESCREEN_ON : WIDESCREEN_OFF;
+    }
     SDL_RendererLogicalPresentation pres_mode = SDL_LOGICAL_PRESENTATION_LETTERBOX;
     if (effective_mode == WIDESCREEN_STRETCH) {
         ps1_gte_set_widescreen_scale(1.0f);
@@ -189,7 +192,7 @@ bool host_present_frame(const Ps1Video *video, SDL_Renderer *renderer, SDL_Textu
         float fov_scale = window_aspect / (4.0f / 3.0f);
         if (fov_scale < 1.0f) fov_scale = 1.0f;
         ps1_gte_set_widescreen_scale(fov_scale);
-        pres_mode = SDL_LOGICAL_PRESENTATION_LETTERBOX;
+        pres_mode = SDL_LOGICAL_PRESENTATION_STRETCH;
     } else {
         ps1_gte_set_widescreen_scale(1.0f);
         pres_mode = SDL_LOGICAL_PRESENTATION_LETTERBOX;

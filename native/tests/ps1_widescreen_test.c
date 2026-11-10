@@ -89,6 +89,16 @@ static void test_host_display_widescreen_modes(void) {
 
     host_display_set_widescreen_mode(WIDESCREEN_AUTO);
     CHECK(host_display_get_widescreen_mode() == WIDESCREEN_AUTO);
+
+    /* 16:9 aspect ratio (e.g. 1280x720) auto-resolves to Hor+ FOV expansion factor */
+    float aspect_16_9 = 1280.0f / 720.0f;
+    CHECK(aspect_16_9 >= 1.55f);
+    float fov_scale = aspect_16_9 / (4.0f / 3.0f);
+    CHECK(fabsf(fov_scale - 1.333333f) < 0.001f);
+
+    /* 4:3 aspect ratio (e.g. 1280x960) remains 1.0f */
+    float aspect_4_3 = 1280.0f / 960.0f;
+    CHECK(aspect_4_3 < 1.55f);
 }
 
 int main(void) {

@@ -339,8 +339,8 @@ static bool sample_texel_advanced(const Ps1Video *video, unsigned tpage, unsigne
     }
 
     if (s_texture_filter == PS1_FILTER_NEAREST && (!s_mipmapping || lod <= 2.0f)) {
-        int iu = (int)(uf + 0.5f);
-        int iv = (int)(vf + 0.5f);
+        int iu = s_texture_bleeding_fix ? (int)floorf(uf + 1e-4f) : (int)(uf + 0.5f);
+        int iv = s_texture_bleeding_fix ? (int)floorf(vf + 1e-4f) : (int)(vf + 0.5f);
         if (s_texture_bleeding_fix) {
             if (iu < (int)u_min) iu = (int)u_min;
             if (iu > (int)u_max) iu = (int)u_max;
