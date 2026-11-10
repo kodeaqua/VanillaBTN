@@ -143,19 +143,6 @@ static bool boot_save_frame(void) {
 }
 #endif
 
-static void host_subtick_pump(void *context) {
-    HostGame *host = context;
-    if (!host || !host->running || host->paused) return;
-    uint64_t now = SDL_GetTicksNS();
-    if (host_pacing_should_present(&host->pacing, now)) {
-        bool minimized = host->window != NULL &&
-            (SDL_GetWindowFlags(host->window) & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) != 0;
-        if (!minimized) {
-            host_present_frame(&video, host->renderer, &host->texture);
-        }
-        host_pacing_record_presentation(&host->pacing, now);
-    }
-}
 
 static void host_game_pump(void *context) {
     HostGame *host = context;
@@ -377,7 +364,7 @@ static void host_game_pump(void *context) {
 #endif
     int queued = audio.stream ? SDL_GetAudioStreamQueued(audio.stream) : -1;
     if (audio.stream && queued >= 0 &&
-        queued < (int)(sizeof(samples) * 4)) {
+        queued < (int)(sizeof(samples) * 8)) {
         SDL_PutAudioStreamData(audio.stream, samples, sizeof(samples));
     }
     host_pacing_record_tick(&host->pacing);
@@ -475,7 +462,7 @@ int main(int argc, char **argv) {
     bool oit_trans = config_resolve_bool(host.config.fixes.oit_transparency, host.config.preset, true);
     bool zero_lag = config_resolve_bool(host.config.fixes.zero_fillrate_lag, host.config.preset, true);
     bool hdr_tone = config_resolve_bool(host.config.fixes.hdr_tonemapping, host.config.preset, true);
-    bool atomic_clut = config_resolve_bool(host.config.fixes.atomic_clut, host.config.preset, true);
+    bool atomic_clut = config_resolve_bool(host.config.fixes.atomic_clut, host.config.preset, false);
     bool expand_poly = config_resolve_bool(host.config.fixes.expand_voice_polyphony, host.config.preset, true);
     bool seamless_cd = config_resolve_bool(host.config.fixes.seamless_cd_loop, host.config.preset, true);
     bool pop_suppress = config_resolve_bool(host.config.fixes.audio_pop_suppression, host.config.preset, true);
@@ -562,11 +549,7 @@ disc_ready:
             monitor_hz = cur_mode->refresh_rate;
         }
         host_pacing_init(&host.pacing, &host.config.display, monitor_hz);
-        if (host.pacing.target_fps > 60 || host.pacing.target_fps == 0) {
-            sdk_sync_subtick_hook(host_subtick_pump, &host);
-        } else {
-            sdk_sync_subtick_hook(NULL, NULL);
-        }
+        sdk_sync_subtick_hook(NULL, NULL);
         SDL_SetRenderVSync(host.renderer, host.config.display.vsync ? 1 : 0);
     }
     ps1_audio_init(&audio);

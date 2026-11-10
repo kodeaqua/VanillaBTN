@@ -151,22 +151,20 @@ static uint32_t texel_to_color32(uint16_t texel, uint32_t rgb24, bool raw_textur
     uint32_t green5 = (texel >> 5) & 31u;
     uint32_t blue5 = (texel >> 10) & 31u;
 
+    uint32_t r8 = (red5 << 3) | (red5 >> 2);
+    uint32_t g8 = (green5 << 3) | (green5 >> 2);
+    uint32_t b8 = (blue5 << 3) | (blue5 >> 2);
+
     if (raw_texture) {
-        uint32_t r8 = (red5 << 3) | (red5 >> 2);
-        uint32_t g8 = (green5 << 3) | (green5 >> 2);
-        uint32_t b8 = (blue5 << 3) | (blue5 >> 2);
         return 0xFF000000u | (r8 << 16) | (g8 << 8) | b8;
     } else {
         uint32_t cr = (rgb24 >> 16) & 255u;
         uint32_t cg = (rgb24 >> 8) & 255u;
         uint32_t cb = rgb24 & 255u;
 
-        uint32_t r8 = (red5 * cr) / 16u;
-        uint32_t g8 = (green5 * cg) / 16u;
-        uint32_t b8 = (blue5 * cb) / 16u;
-        if (r8 > 255) r8 = 255;
-        if (g8 > 255) g8 = 255;
-        if (b8 > 255) b8 = 255;
+        r8 = (r8 * cr + 64u) / 128u; if (r8 > 255) r8 = 255;
+        g8 = (g8 * cg + 64u) / 128u; if (g8 > 255) g8 = 255;
+        b8 = (b8 * cb + 64u) / 128u; if (b8 > 255) b8 = 255;
         return 0xFF000000u | (r8 << 16) | (g8 << 8) | b8;
     }
 }
@@ -933,7 +931,7 @@ static bool draw_triangle(Ps1Video *video, const Ps1DrawState *state,
                             }
                         }
                     }
-                    if (s_smooth_fog && interp_w > 1e-9) {
+                    if (s_smooth_fog && (v0->w > 0.0f || v1->w > 0.0f || v2->w > 0.0f) && interp_w > 1e-9) {
                         float cam_z = (float)(1.0 / interp_w);
                         front32 = apply_atmospheric_fog(front32, cam_z);
                     }

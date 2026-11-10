@@ -19,18 +19,8 @@ void sdk_sync_subtick_hook(void (*subtick)(void *), void *context) {
 
 static void sdl_wait(uint64_t deadline, void *context) {
     uint64_t now = sdl_now(context);
-    if (!host_subtick_hook) {
-        if (deadline > now) SDL_DelayNS(deadline - now);
-        return;
-    }
-    while (deadline > now) {
-        uint64_t remaining = deadline - now;
-        uint64_t slice = remaining > 3000000ULL ? 3000000ULL : remaining;
-        SDL_DelayNS(slice);
-        now = sdl_now(context);
-        if (now < deadline && host_subtick_hook) {
-            host_subtick_hook(host_subtick_context);
-        }
+    if (deadline > now) {
+        SDL_DelayNS(deadline - now);
     }
 }
 

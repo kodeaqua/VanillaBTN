@@ -503,7 +503,14 @@ bool ps1_gpu_exec(Ps1Video *video, Ps1DrawState *state,
         for (size_t i = 0; i < pixels; ++i) {
             uint32_t word = words[3u + (i >> 1)];
             uint16_t texel = (i & 1u) ? (uint16_t)(word >> 16) : (uint16_t)(word & 0xFFFFu);
-            video->vram[y + (int)(i / (size_t)w)][x + (int)(i % (size_t)w)] = texel;
+            int py = y + (int)(i / (size_t)w);
+            int px = x + (int)(i % (size_t)w);
+            video->vram[py][px] = texel;
+            video->clut_vram[py][px] = texel;
+            uint32_t r = (texel & 31u) << 3 | (texel & 31u) >> 2;
+            uint32_t g = ((texel >> 5) & 31u) << 3 | ((texel >> 5) & 31u) >> 2;
+            uint32_t b = ((texel >> 10) & 31u) << 3 | ((texel >> 10) & 31u) >> 2;
+            video->color32[py][px] = 0xFF000000u | (r << 16) | (g << 8) | b;
         }
         break;
     }

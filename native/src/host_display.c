@@ -61,7 +61,9 @@ bool host_display_apply_mode(SDL_Window *window, const DisplayConfig *config) {
     switch (mode) {
     case WINDOW_MODE_WINDOWED: {
         SDL_SetWindowFullscreen(window, false);
-        SDL_RestoreWindow(window);
+        if (SDL_GetWindowFlags(window) & (SDL_WINDOW_MAXIMIZED | SDL_WINDOW_MINIMIZED)) {
+            SDL_RestoreWindow(window);
+        }
         int w = (config && config->window_width >= 320) ? config->window_width : 640;
         int h = (config && config->window_height >= 240) ? config->window_height : 480;
         SDL_SetWindowSize(window, w, h);
@@ -179,23 +181,23 @@ bool host_present_frame(const Ps1Video *video, SDL_Renderer *renderer, SDL_Textu
     }
 
     WidescreenMode effective_mode = s_widescreen_mode;
-    if (effective_mode == WIDESCREEN_AUTO) {
-        effective_mode = (window_aspect > 1.34f) ? WIDESCREEN_ON : WIDESCREEN_OFF;
-    }
-
     SDL_RendererLogicalPresentation pres_mode = SDL_LOGICAL_PRESENTATION_LETTERBOX;
-    if (effective_mode == WIDESCREEN_ON) {
+    if (effective_mode == WIDESCREEN_STRETCH) {
+        ps1_gte_set_widescreen_scale(1.0f);
+        pres_mode = SDL_LOGICAL_PRESENTATION_STRETCH;
+    } else if (effective_mode == WIDESCREEN_ON) {
         float fov_scale = window_aspect / (4.0f / 3.0f);
         if (fov_scale < 1.0f) fov_scale = 1.0f;
         ps1_gte_set_widescreen_scale(fov_scale);
-        pres_mode = SDL_LOGICAL_PRESENTATION_STRETCH;
-    } else if (effective_mode == WIDESCREEN_STRETCH) {
-        ps1_gte_set_widescreen_scale(1.0f);
-        pres_mode = SDL_LOGICAL_PRESENTATION_STRETCH;
+        pres_mode = SDL_LOGICAL_PRESENTATION_LETTERBOX;
     } else {
         ps1_gte_set_widescreen_scale(1.0f);
         pres_mode = SDL_LOGICAL_PRESENTATION_LETTERBOX;
     }
+
+    static int s_last_w = 0;
+    static int s_last_h = 0;
+    static SDL_RendererLogicalPresentation s_last_pres = (SDL_RendererLogicalPresentation)-1;
 
     if (width != display.width || height != display.height) {
         SDL_Texture *replacement = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
@@ -208,8 +210,14 @@ bool host_present_frame(const Ps1Video *video, SDL_Renderer *renderer, SDL_Textu
         }
         SDL_DestroyTexture(*texture);
         *texture = replacement;
-    } else {
+        s_last_w = display.width;
+        s_last_h = display.height;
+        s_last_pres = pres_mode;
+    } else if (display.width != s_last_w || display.height != s_last_h || pres_mode != s_last_pres) {
         SDL_SetRenderLogicalPresentation(renderer, display.width, display.height, pres_mode);
+        s_last_w = display.width;
+        s_last_h = display.height;
+        s_last_pres = pres_mode;
     }
 
     if (!SDL_LockTexture(*texture, NULL, &pixels, &pitch)) {

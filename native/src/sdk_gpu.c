@@ -218,8 +218,17 @@ int MoveImage(RECT *rect, int x, int y) {
     if (!copy) return -1;
     for (int row = 0; row < rect->h; ++row)
         memcpy(copy + (size_t)row * rect->w * 2, &vram->vram[rect->y + row][rect->x], (size_t)rect->w * 2);
-    for (int row = 0; row < rect->h; ++row)
+    for (int row = 0; row < rect->h; ++row) {
         memcpy(&vram->vram[y + row][x], copy + (size_t)row * rect->w * 2, (size_t)rect->w * 2);
+        memcpy(&vram->clut_vram[y + row][x], copy + (size_t)row * rect->w * 2, (size_t)rect->w * 2);
+        for (int col = 0; col < rect->w; ++col) {
+            uint16_t pix = vram->vram[y + row][x + col];
+            uint32_t r = (pix & 31u) << 3 | (pix & 31u) >> 2;
+            uint32_t g = ((pix >> 5) & 31u) << 3 | ((pix >> 5) & 31u) >> 2;
+            uint32_t b = ((pix >> 10) & 31u) << 3 | ((pix >> 10) & 31u) >> 2;
+            vram->color32[y + row][x + col] = 0xFF000000u | (r << 16) | (g << 8) | b;
+        }
+    }
     free(copy);
     return 0;
 }
@@ -239,6 +248,16 @@ int LoadImage(RECT *rect, u_long *pixels) {
         memcpy(&vram->vram[rect->y + row][rect->x],
                (const unsigned char *)pixels + (size_t)row * rect->w * 2,
                (size_t)rect->w * 2);
+        memcpy(&vram->clut_vram[rect->y + row][rect->x],
+               (const unsigned char *)pixels + (size_t)row * rect->w * 2,
+               (size_t)rect->w * 2);
+        for (int col = 0; col < rect->w; ++col) {
+            uint16_t pix = vram->vram[rect->y + row][rect->x + col];
+            uint32_t r = (pix & 31u) << 3 | (pix & 31u) >> 2;
+            uint32_t g = ((pix >> 5) & 31u) << 3 | ((pix >> 5) & 31u) >> 2;
+            uint32_t b = ((pix >> 10) & 31u) << 3 | ((pix >> 10) & 31u) >> 2;
+            vram->color32[rect->y + row][rect->x + col] = 0xFF000000u | (r << 16) | (g << 8) | b;
+        }
     }
     return 0;
 }
