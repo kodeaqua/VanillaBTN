@@ -451,6 +451,8 @@ backup image can be renamed into place; a failed rename retains the primary.
 If the primary is missing and a recovery candidate remains, loading leaves the
 slot unavailable rather than creating a blank card. New temporary images are
 created exclusively so an unresolved candidate cannot be overwritten.
+During saving, the prior backup is replaced only when the primary image can be
+moved into its place; a failed move leaves both existing images intact.
 
 Card save file renames (`CARD_RENAME` in `mcard.c`) route through `sdk_card_rename`
 via `native/compat/libapi.h`. This updates the card's directory frame filename and

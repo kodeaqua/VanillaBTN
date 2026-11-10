@@ -471,9 +471,12 @@ bool ps1_card_save_to_file(const Ps1Card *card, const char *filepath) {
         return false;
     }
 
-    /* 2. Backup existing file to .bak */
-    remove(bak_path);
-    rename(filepath, bak_path);
+    /* Replace the old backup only if the primary can be moved into place. */
+    SDL_PathInfo info;
+    if (SDL_GetPathInfo(filepath, &info) && !SDL_RenamePath(filepath, bak_path)) {
+        remove(tmp_path);
+        return false;
+    }
 
     /* 3. Atomically replace target with temp file */
     if (rename(tmp_path, filepath) != 0) {

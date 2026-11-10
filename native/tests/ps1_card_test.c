@@ -267,6 +267,37 @@ static void check_image_fixture(const char *path, const uint8_t *bytes, size_t s
     assert(fclose(file) == 0);
 }
 
+#ifdef _WIN32
+static void test_locked_primary_preserves_backup(void) {
+    const char *path = "test_locked_primary.mcr";
+    const char *backup = "test_locked_primary.mcr.bak";
+    Ps1Card *current = malloc(sizeof(*current));
+    Ps1Card *previous = malloc(sizeof(*previous));
+    assert(current && previous);
+    remove(path);
+    remove(backup);
+    remove("test_locked_primary.mcr.tmp");
+    ps1_card_format(current);
+    ps1_card_format(previous);
+    unsigned char payload[128] = {0x7B};
+    assert(ps1_card_write_file(previous, "BACKUP", payload, sizeof(payload)) == PS1_CARD_OK);
+    write_image_fixture(path, current->data, PS1_CARD_SIZE);
+    write_image_fixture(backup, previous->data, PS1_CARD_SIZE);
+    HANDLE lock = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+        NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    assert(lock != INVALID_HANDLE_VALUE);
+    assert(!ps1_card_save_to_file(current, path));
+    assert(CloseHandle(lock));
+    check_image_fixture(path, current->data, PS1_CARD_SIZE);
+    check_image_fixture(backup, previous->data, PS1_CARD_SIZE);
+    remove(path);
+    remove(backup);
+    remove("test_locked_primary.mcr.tmp");
+    free(previous);
+    free(current);
+}
+#endif
+
 static void test_invalid_load_preserves_image(void) {
     const char *path = "test_invalid_card.mcr";
     Ps1Card *source = malloc(sizeof(*source));
@@ -462,6 +493,9 @@ static void test_external_block_chains(void) {
 }
 
 int main(void) {
+#ifdef _WIN32
+    test_locked_primary_preserves_backup();
+#endif
     test_external_block_chains();
     test_invalid_load_preserves_image();
     test_recovery_validates_directory();
