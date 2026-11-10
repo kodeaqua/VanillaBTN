@@ -36,7 +36,20 @@ void cue_draw_frame(ItemCue *object, u_long *ot, s16 x, s16 y) {
     s16 remainder;
 
     if (object->phase != 0) {
+#ifdef VANILLABTN_NATIVE
+        if (ui_icon_anim.source != (AnimFile *)farm_area.stageData) {
+            anim_bind_file(&ui_icon_anim, (AnimFile *)farm_area.stageData);
+        }
+        if (!ui_icon_anim.ranges) {
+            return;
+        }
+#endif
         tableValue = anim_range_frames(&ui_icon_anim, object->id);
+#ifdef VANILLABTN_NATIVE
+        if (tableValue <= 0) {
+            return;
+        }
+#endif
         divisor = object->phase / 10;
         remainder = divisor % tableValue;
         anim_draw_sprt_cursor(ot, &ui_icon_anim, object->id, tableValue - remainder - 1,
