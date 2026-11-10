@@ -1574,3 +1574,27 @@ void ps1_video_commit_clut(Ps1Video *video) {
         memcpy(video->clut_vram, video->vram, sizeof(video->clut_vram));
     }
 }
+
+static bool s_extended_draw_distance = false;
+static bool s_hd_font = false;
+
+void ps1_video_set_extended_draw_distance(bool enabled) {
+    s_extended_draw_distance = enabled;
+    if (enabled) {
+        ps1_video_set_fog_params(1500.0f, 8000.0f, 0x00A0A0A0);
+    } else {
+        ps1_video_set_fog_params(500.0f, 3000.0f, 0x00808080);
+    }
+}
+
+bool ps1_video_get_extended_draw_distance(void) {
+    return s_extended_draw_distance;
+}
+
+void ps1_video_set_hd_font(bool enabled) {
+    s_hd_font = enabled;
+}
+
+bool ps1_video_get_hd_font(void) {
+    return s_hd_font;
+}

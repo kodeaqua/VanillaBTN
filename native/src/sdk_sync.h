@@ -17,6 +17,10 @@ void sdk_sync_pump(void (*pump)(void *), void *context);
  * Context is passed to the hook. Pass NULL to disable. */
 void sdk_sync_subtick_hook(void (*subtick)(void *), void *context);
 
+/* Turbo speed multiplier (1 = normal 60 Hz simulation, 2 = 2x, 3 = 3x, etc.) */
+void sdk_sync_set_turbo(uint32_t multiplier);
+uint32_t sdk_sync_get_turbo(void);
+
 /* Cooperative cancellation allows the original loop to return on window close. */
 void sdk_sync_start(void);
 void sdk_sync_stop(void);

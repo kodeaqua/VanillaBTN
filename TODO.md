@@ -80,7 +80,7 @@ Update the relevant item after completing a task or discovering a blocker.
       - [x] Implement HD rumble haptic curve (`send_rumble` in `main.c`) converting the 1-bit binary small motor into a tactile high-frequency pulse (~26000) and large motor through perceptual gamma 1.4 curve ($L^{1.4} \cdot 65535$).
       - [x] Implement sub-frame raw event polling and disconnect auto-pause (`pause_on_disconnect` in `main.c`), safely freezing game loop on controller disconnection and resuming seamlessly upon reconnection or button press.
       - [x] Add synthetic unit tests in `ps1_input_overhaul_test.c` verifying circular stick radial mapping, deadzone isolation, HD rumble gamma curve, and sub-frame input responsiveness (50/50 CTests, 9/9 Python tests passing in Debug and Release).
-  - [ ] Phase 2: Modern Graphics & Platform Enhancements.
+  - [x] Phase 2: Modern Graphics & Platform Enhancements (Complete — all platform and modern enhancements implemented and verified).
     - [x] Milestone 13: Multi-monitor discovery and 4 window modes (windowed, borderless, fullscreen, maximized).
       - [x] Implement multi-monitor discovery and desktop query functions (`host_display_get_monitor_count`, `host_display_get_monitor_id`, `host_display_get_monitor_bounds`) in `host_display.h`/`host_display.c`.
       - [x] Implement host window creation and dynamic runtime mode switching (`host_display_create_window`, `host_display_apply_mode`) supporting Windowed, Borderless Fullscreen Desktop, Exclusive Fullscreen (with closest mode matching), and Maximized Windowed.
@@ -101,7 +101,12 @@ Update the relevant item after completing a task or discovering a blocker.
       - [x] Implement prioritized automated fallback chain (Requested -> Default -> D3D11 -> OpenGL -> Software) guaranteeing resilient startup across diverse GPU hardware and environments without crashing.
       - [x] Implement active backend query (`host_renderer_get_active_name`) and driver enumeration queries (`host_renderer_get_driver_count`, `host_renderer_is_driver_available`).
       - [x] Add synthetic unit tests in `host_renderer_test.c` verifying driver enumeration, backend name mapping, fallback chain creation, and software fallback (53/53 CTests, 9/9 Python tests passing in Debug and Release).
-    - [ ] Milestone 17: HD font rendering, extended draw distance, turbo hotkey, and auto-backup save data.
+    - [x] Milestone 17: HD font rendering, extended draw distance, turbo hotkey, and auto-backup save data.
+      - [x] Implement multi-generational save file backup rotation (`ps1_card_rotate_backups` in `ps1_card.c`/`ps1_card.h`), rotating `.bak -> .bak.1 -> .bak.2 ... .bak.5` on successful save commits, protecting player diaries across multiple game seasons.
+      - [x] Implement turbo speed multiplier subsystem (`sdk_sync_set_turbo`/`sdk_sync_get_turbo` in `sdk_sync.c`/`sdk_sync.h`) and wire runtime toggle to configurable hotkey (default `Tab` / `F10`) in `main.c`.
+      - [x] Implement extended draw distance toggle (`ps1_video_set_extended_draw_distance` in `ps1_video.c`/`ps1_video.h`) expanding atmospheric fog horizon to 8000.0f units for expansive valley views.
+      - [x] Implement HD font rendering toggle (`ps1_video_set_hd_font` in `ps1_video.c`/`ps1_video.h`) connected to `config.graphics.hd_font` and Master Preset resolution.
+      - [x] Add synthetic unit tests in `ps1_qol_features_test.c` verifying backup rotation chain, locked file safety, turbo multipliers, extended draw distance fog horizon, and HD font toggles (54/54 CTests, 9/9 Python tests passing in Debug and Release).
 
 - [x] Continuation audit: complete farm linkage/address translation and remove unsupported SDK success paths before claiming runtime integration.
   - [x] Fifth subsystem hardening and edge-case audit: eliminate latent abort crash points across sound, graphics, memory, input, and video sync SDK calls, harden sequence parser against out-of-bounds program and tone offsets, guard CD-XA mixing and sector streaming against NULL file contexts and output buffer indexing, prevent NULL sample dereferences in SPU voice fetching, and guard audio stream buffer queuing on device error.

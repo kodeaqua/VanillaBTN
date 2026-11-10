@@ -55,9 +55,24 @@ int VSyncCallback(void (*callback)(void)) {
     return 0;
 }
 
+static uint32_t s_turbo_multiplier = 1;
+
+void sdk_sync_set_turbo(uint32_t multiplier) {
+    if (multiplier >= 1 && multiplier <= 8) {
+        s_turbo_multiplier = multiplier;
+    } else {
+        s_turbo_multiplier = 1;
+    }
+}
+
+uint32_t sdk_sync_get_turbo(void) {
+    return s_turbo_multiplier;
+}
+
 static uint64_t tick_deadline(uint64_t tick) {
-    return epoch + tick / 60 * 1000000000
-        + (tick % 60 * 1000000000 + 59) / 60;
+    uint64_t rate = 60ULL * (uint64_t)s_turbo_multiplier;
+    return epoch + tick / rate * 1000000000
+        + (tick % rate * 1000000000 + rate - 1) / rate;
 }
 
 static void dispatch_vblank(uint64_t tick) {

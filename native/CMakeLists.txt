@@ -288,6 +288,12 @@ target_link_libraries(host_renderer_test PRIVATE host_renderer)
 target_compile_options(host_renderer_test PRIVATE /W4 /UNDEBUG)
 add_test(NAME host_renderer_abstraction COMMAND host_renderer_test)
 
+add_executable(ps1_qol_features_test tests/ps1_qol_features_test.c)
+set_target_properties(ps1_qol_features_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_link_libraries(ps1_qol_features_test PRIVATE ps1_card sdk_sync ps1_video SDL3::SDL3)
+target_compile_options(ps1_qol_features_test PRIVATE /W4 /UNDEBUG)
+add_test(NAME ps1_qol_features COMMAND ps1_qol_features_test)
+
 add_library(game_screen STATIC
     ../src/main/debug_stubs.c
     ../src/main/game/cooking_recipes.c

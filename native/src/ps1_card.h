@@ -134,10 +134,14 @@ bool ps1_card_load_from_file(Ps1Card *card, const char *filepath);
 /* Atomically saves card to disk:
  * 1. Writes to filepath.tmp
  * 2. Validates written temp file
- * 3. Backs up existing file to filepath.bak
- * 4. Replaces filepath with temp file
+ * 3. Rotates existing backups (.bak -> .bak.1 -> .bak.2 ...)
+ * 4. Backs up existing file to filepath.bak
+ * 5. Replaces filepath with temp file
  */
 bool ps1_card_save_to_file(const Ps1Card *card, const char *filepath);
+
+/* Rotates multi-generational backups up to max_backups */
+bool ps1_card_rotate_backups(const char *filepath, int max_backups);
 
 /* Checks for leftover .tmp or .bak files from interrupted writes and recovers */
 bool ps1_card_recover_file(const char *filepath);

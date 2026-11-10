@@ -252,6 +252,20 @@ static void host_game_pump(void *context) {
                     host_display_toggle_fullscreen(host->window, &host->config.display);
                     continue;
                 }
+                bool is_turbo = (event.key.key == SDLK_F10);
+                if (host->config.input.turbo_hotkey[0] != '\0') {
+                    if (SDL_strcasecmp(host->config.input.turbo_hotkey, "Tab") == 0 && event.key.key == SDLK_TAB) {
+                        is_turbo = true;
+                    } else if (SDL_strcasecmp(host->config.input.turbo_hotkey, "F10") == 0 && event.key.key == SDLK_F10) {
+                        is_turbo = true;
+                    }
+                }
+                if (is_turbo) {
+                    uint32_t cur = sdk_sync_get_turbo();
+                    uint32_t target_spd = (uint32_t)(host->config.input.turbo_speed >= 2.0f ? host->config.input.turbo_speed : 3.0f);
+                    sdk_sync_set_turbo(cur == 1 ? target_spd : 1);
+                    continue;
+                }
             }
             uint32_t btn = map_key_to_ps1_button(event.key.key);
             if (event.key.scancode > SDL_SCANCODE_UNKNOWN &&
@@ -487,6 +501,11 @@ int main(int argc, char **argv) {
     ps1_video_set_zero_fillrate_lag(zero_lag);
     ps1_video_set_hdr_tonemapping(hdr_tone);
     ps1_video_set_atomic_clut(atomic_clut);
+
+    bool hd_font = config_resolve_bool(host.config.graphics.hd_font, host.config.preset, true);
+    bool ext_draw = config_resolve_bool(host.config.graphics.extended_draw_distance, host.config.preset, true);
+    ps1_video_set_hd_font(hd_font);
+    ps1_video_set_extended_draw_distance(ext_draw);
 
     sdk_sound_set_polyphony_expansion(expand_poly);
     sdk_sound_set_pop_suppression(pop_suppress);

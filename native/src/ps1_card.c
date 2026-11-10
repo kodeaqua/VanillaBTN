@@ -452,16 +452,39 @@ bool ps1_card_load_from_file(Ps1Card *card, const char *filepath) {
     return ps1_card_validate(card) == PS1_CARD_OK;
 }
 
+bool ps1_card_rotate_backups(const char *filepath, int max_backups) {
+    if (!filepath || max_backups <= 0) return false;
+    char src[560], dst[560];
+    for (int i = max_backups; i >= 1; --i) {
+        if (i == 1) {
+            snprintf(src, sizeof(src), "%s.bak", filepath);
+            snprintf(dst, sizeof(dst), "%s.bak.1", filepath);
+        } else {
+            snprintf(src, sizeof(src), "%s.bak.%d", filepath, i - 1);
+            snprintf(dst, sizeof(dst), "%s.bak.%d", filepath, i);
+        }
+        SDL_PathInfo info;
+        if (SDL_GetPathInfo(src, &info)) {
+            SDL_RemovePath(dst);
+            SDL_RenamePath(src, dst);
+        }
+    }
+    return true;
+}
+
 bool ps1_card_save_to_file(const Ps1Card *card, const char *filepath) {
     if (!card || !filepath || !card->present ||
         ps1_card_validate(card) != PS1_CARD_OK) return false;
 
     char tmp_path[540];
     char bak_path[540];
+    char bak_hold[540];
     int len_tmp = snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", filepath);
     int len_bak = snprintf(bak_path, sizeof(bak_path), "%s.bak", filepath);
+    int len_hold = snprintf(bak_hold, sizeof(bak_hold), "%s.bak.hold", filepath);
     if (len_tmp < 0 || (size_t)len_tmp >= sizeof(tmp_path) ||
-        len_bak < 0 || (size_t)len_bak >= sizeof(bak_path)) return false;
+        len_bak < 0 || (size_t)len_bak >= sizeof(bak_path) ||
+        len_hold < 0 || (size_t)len_hold >= sizeof(bak_hold)) return false;
 
     /* Never overwrite an unresolved recovery candidate from an earlier run. */
     FILE *f = fopen(tmp_path, "wbx");
@@ -477,21 +500,33 @@ bool ps1_card_save_to_file(const Ps1Card *card, const char *filepath) {
         return false;
     }
 
-    /* Replace the old backup only if the primary can be moved into place. */
+    /* Move existing primary to hold location without touching .bak yet */
     SDL_PathInfo info;
-    if (SDL_GetPathInfo(filepath, &info) && !SDL_RenamePath(filepath, bak_path)) {
+    bool had_primary = false;
+    if (SDL_GetPathInfo(filepath, &info)) {
+        if (!SDL_RenamePath(filepath, bak_hold)) {
+            SDL_RemovePath(tmp_path);
+            return false;
+        }
+        had_primary = true;
+    }
+
+    /* Atomically replace target with temp file */
+    if (!SDL_RenamePath(tmp_path, filepath)) {
+        if (had_primary) {
+            SDL_RenamePath(bak_hold, filepath);
+        }
         SDL_RemovePath(tmp_path);
         return false;
     }
 
-    /* 3. Atomically replace target with temp file */
-    if (!SDL_RenamePath(tmp_path, filepath)) {
-        /* Restore backup if rename failed */
-        SDL_RenamePath(bak_path, filepath);
-        return false;
+    /* Once primary is successfully replaced, rotate historical backups and promote hold to .bak */
+    if (had_primary) {
+        ps1_card_rotate_backups(filepath, 5);
+        SDL_RemovePath(bak_path);
+        SDL_RenamePath(bak_hold, bak_path);
     }
 
-    /* Keep .bak as a safety net */
     return true;
 }
 

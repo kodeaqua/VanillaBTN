@@ -113,6 +113,12 @@ void ps1_video_set_atomic_clut(bool enabled);
 bool ps1_video_get_atomic_clut(void);
 void ps1_video_commit_clut(Ps1Video *video);
 
+void ps1_video_set_extended_draw_distance(bool enabled);
+bool ps1_video_get_extended_draw_distance(void);
+
+void ps1_video_set_hd_font(bool enabled);
+bool ps1_video_get_hd_font(void);
+
 /* Preserve raw PS1 BGR555 words, including the high mask/semitransparency bit. */
 bool ps1_video_upload(Ps1Video *video, int x, int y, int width, int height,
                       const uint16_t *source, size_t source_stride);
