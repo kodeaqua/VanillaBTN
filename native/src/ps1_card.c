@@ -391,8 +391,10 @@ bool ps1_card_recover_file(const char *filepath) {
 
     char tmp_path[540];
     char bak_path[540];
-    snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", filepath);
-    snprintf(bak_path, sizeof(bak_path), "%s.bak", filepath);
+    int len_tmp = snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", filepath);
+    int len_bak = snprintf(bak_path, sizeof(bak_path), "%s.bak", filepath);
+    if (len_tmp < 0 || (size_t)len_tmp >= sizeof(tmp_path) ||
+        len_bak < 0 || (size_t)len_bak >= sizeof(bak_path)) return false;
 
     /* If primary file is already valid, nothing to recover */
     if (is_valid_mcr_file(filepath)) {
@@ -456,8 +458,10 @@ bool ps1_card_save_to_file(const Ps1Card *card, const char *filepath) {
 
     char tmp_path[540];
     char bak_path[540];
-    snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", filepath);
-    snprintf(bak_path, sizeof(bak_path), "%s.bak", filepath);
+    int len_tmp = snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", filepath);
+    int len_bak = snprintf(bak_path, sizeof(bak_path), "%s.bak", filepath);
+    if (len_tmp < 0 || (size_t)len_tmp >= sizeof(tmp_path) ||
+        len_bak < 0 || (size_t)len_bak >= sizeof(bak_path)) return false;
 
     /* Never overwrite an unresolved recovery candidate from an earlier run. */
     FILE *f = fopen(tmp_path, "wbx");
@@ -518,8 +522,10 @@ bool ps1_card_manager_init(Ps1CardManager *mgr, const char *custom_dir) {
 
     char card1_path[540];
     char card2_path[540];
-    snprintf(card1_path, sizeof(card1_path), "%s/card1.mcr", mgr->base_dir);
-    snprintf(card2_path, sizeof(card2_path), "%s/card2.mcr", mgr->base_dir);
+    int len1 = snprintf(card1_path, sizeof(card1_path), "%s/card1.mcr", mgr->base_dir);
+    int len2 = snprintf(card2_path, sizeof(card2_path), "%s/card2.mcr", mgr->base_dir);
+    if (len1 < 0 || (size_t)len1 >= sizeof(card1_path) ||
+        len2 < 0 || (size_t)len2 >= sizeof(card2_path)) return false;
 
     ps1_card_load_from_file(&mgr->cards[0], card1_path);
     ps1_card_load_from_file(&mgr->cards[1], card2_path);

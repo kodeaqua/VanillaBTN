@@ -302,8 +302,9 @@ static void host_game_pump(void *context) {
     }
     if (colored) ++host->colored_frames;
 #endif
-    if (audio.stream && SDL_GetAudioStreamQueued(audio.stream) <
-        (int)(sizeof(samples) * 4)) {
+    int queued = audio.stream ? SDL_GetAudioStreamQueued(audio.stream) : -1;
+    if (audio.stream && queued >= 0 &&
+        queued < (int)(sizeof(samples) * 4)) {
         SDL_PutAudioStreamData(audio.stream, samples, sizeof(samples));
     }
     bool minimized = host->window != NULL &&
