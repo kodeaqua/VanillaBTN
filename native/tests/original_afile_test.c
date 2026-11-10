@@ -464,6 +464,20 @@ int main(void) {
     sdk_sound_mix(pcm, 2);
     CHECK(sdk_sound_spu()->voices[0].active == 0);
 
+    /* Verify voice allocation and exhaustion in SsUtKeyOn:
+     * allocate all 24 voices; subsequent allocation must report -1. */
+    for (int v = 0; v < PS1_SPU_VOICES; ++v) {
+        CHECK(SsUtKeyOnV(v, 0, 0, 0, 60, 0, 64, 64) == v);
+    }
+    CHECK(SsUtKeyOn(0, 0, 0, 60, 0, 64, 64) == -1);
+    CHECK(SsUtKeyOffV(5) == 0);
+    /* SPU release requires an audio mix tick to transition envelope. */
+    sdk_sound_mix(pcm, 2);
+    CHECK(!sdk_sound_spu()->voices[5].active);
+    CHECK(SsUtKeyOn(0, 0, 0, 60, 0, 64, 64) == 5);
+    SsUtAllKeyOff(0);
+    sdk_sound_mix(pcm, 2);
+
     /* Load and play the pQES sequence at offset 24576 via sound_queue_seq_pair(4, 0) + sound_update. */
     sound_offsets[8] = 24576;
     sound_offsets[10] = 28672;

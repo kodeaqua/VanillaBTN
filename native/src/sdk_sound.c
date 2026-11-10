@@ -61,6 +61,11 @@ static int16_t reverb_delay_val;
 
 static void free_vab_record(int slot) {
     if (slot < 0 || slot >= SDK_MAX_VABS) return;
+    for (int i = 0; i < SDK_MAX_SEQS; ++i) {
+        if (seq_records[i].open && seq_records[i].vab_id == slot) {
+            SsSeqStop(i);
+        }
+    }
     ps1_spu_free_vab(&spu, slot);
     free(vab_records[slot].header_buf);
     free(vab_records[slot].body_buf);
@@ -488,13 +493,14 @@ short SsUtKeyOn(int vabId, int prog, int tone, int note, int fine, int voll, int
     int limit = reserved_voices_val > 0 && reserved_voices_val <= PS1_SPU_VOICES
                     ? reserved_voices_val
                     : PS1_SPU_VOICES;
-    int chosen = 0;
+    int chosen = -1;
     for (int v = 0; v < limit; ++v) {
         if (!ps1_spu_voice_is_active(&spu, v)) {
             chosen = v;
             break;
         }
     }
+    if (chosen < 0) return -1;
     return SsUtKeyOnV(chosen, vabId, prog, tone, note, fine, voll, volr);
 }
 

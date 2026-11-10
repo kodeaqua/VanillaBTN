@@ -178,7 +178,9 @@ points used by `sound.c` and `sound_request.c`: `SsInit`, `SsSetTableSize`,
 `SsUtSetReverbDelay`, `SpuSetCommonAttr`, `SpuGetAllKeysStatus` and
 `SpuGetKeyStatus`. VAB headers and chunk-streamed bodies are copied into
 per-slot SPU buffers and loaded into `Ps1Spu`, while opened `pQES` sequences
-and keyed voices drive `Ps1Seq` and `Ps1Spu` directly. Voice
+and keyed voices drive `Ps1Seq` and `Ps1Spu` directly. `SsUtKeyOn` returns -1
+when all allocatable voices are active rather than clobbering voice 0, and closing
+a VAB stops active sequences associated with that sound bank. Voice
 ADSR envelopes use 44.1 kHz shift/step counters, exponential modes, all-ones
 rate holds and the original sustain targets, following the
 [SPU envelope specification](https://psx-spx.consoledev.net/soundprocessingunitspu/).
