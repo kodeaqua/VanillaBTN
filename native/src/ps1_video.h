@@ -19,6 +19,12 @@ typedef enum Ps1TextureFilterMode {
     PS1_FILTER_BILINEAR = 1
 } Ps1TextureFilterMode;
 
+typedef enum Ps1AntiAliasingMode {
+    PS1_AA_OFF = 0,
+    PS1_AA_MSAA_4X = 1,
+    PS1_AA_SMAA = 2
+} Ps1AntiAliasingMode;
+
 typedef struct Ps1Video {
     uint16_t vram[PS1_VRAM_HEIGHT][PS1_VRAM_WIDTH];
     float zbuffer[PS1_VRAM_HEIGHT][PS1_VRAM_WIDTH];
@@ -81,6 +87,15 @@ bool ps1_video_get_mipmapping(void);
 
 void ps1_video_set_texture_filter(Ps1TextureFilterMode mode);
 Ps1TextureFilterMode ps1_video_get_texture_filter(void);
+
+void ps1_video_set_anti_aliasing(Ps1AntiAliasingMode mode);
+Ps1AntiAliasingMode ps1_video_get_anti_aliasing(void);
+
+void ps1_video_set_smooth_fog(bool enabled);
+bool ps1_video_get_smooth_fog(void);
+
+void ps1_video_set_fog_params(float near_z, float far_z, uint32_t fog_color);
+void ps1_video_get_fog_params(float *near_z, float *far_z, uint32_t *fog_color);
 
 /* Preserve raw PS1 BGR555 words, including the high mask/semitransparency bit. */
 bool ps1_video_upload(Ps1Video *video, int x, int y, int width, int height,

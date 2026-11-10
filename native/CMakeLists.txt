@@ -539,11 +539,17 @@ target_link_libraries(ps1_tex_filter_test PRIVATE ps1_video ps1_pgxp)
 target_compile_options(ps1_tex_filter_test PRIVATE /W4)
 add_test(NAME ps1_texture_filtering COMMAND ps1_tex_filter_test)
 
+add_executable(ps1_aa_fog_test tests/ps1_aa_fog_test.c)
+set_target_properties(ps1_aa_fog_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_link_libraries(ps1_aa_fog_test PRIVATE ps1_video ps1_pgxp)
+target_compile_options(ps1_aa_fog_test PRIVATE /W4)
+add_test(NAME ps1_anti_aliasing_fog COMMAND ps1_aa_fog_test)
+
 # Synthetic assertions remain active when testing optimized Release libraries.
 foreach(test_target ps1_video_test ps1_sprite_test ps1_ot_test ps1_gpu_test
         ps1_gte_test ps1_input_test ps1_clock_test ps1_spu_test ps1_xa_test
         ps1_audio_test ps1_card_test ps1_pgxp_test ps1_zbuffer_test ps1_clipping_test
-        ps1_float_gte_test ps1_color32_test ps1_tex_filter_test)
+        ps1_float_gte_test ps1_color32_test ps1_tex_filter_test ps1_aa_fog_test)
     target_compile_options(${test_target} PRIVATE /UNDEBUG)
 endforeach()
 

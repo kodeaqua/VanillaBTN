@@ -51,7 +51,11 @@ Update the relevant item after completing a task or discovering a blocker.
       - [x] Implement analytical LOD gradient calculation ($\nabla L$) and area box-filtering (`s_mipmapping`), suppressing distant texture aliasing and crawling shimmering on receding geometry.
       - [x] Add bilinear texture filtering mode (`ps1_video_set_texture_filter`) controlled via `graphics.texture_filter` and the Master Preset System.
       - [x] Add synthetic unit tests in `ps1_tex_filter_test.c` verifying tile boundary isolation, pure white alpha-halo suppression, and mipmap toggle behavior (45/45 CTests, 9/9 Python tests passing in Debug and Release).
-    - [ ] Milestone 8: Anti-Aliasing (MSAA/SMAA) and smooth exponential atmospheric fog.
+    - [x] Milestone 8: Anti-Aliasing (MSAA/SMAA) and smooth exponential atmospheric fog.
+      - [x] Implement subpixel edge anti-aliasing (`apply_subpixel_anti_aliasing` with `s_anti_aliasing`) in `ps1_video_copy_argb`, detecting high-contrast geometric silhouettes and blending along edge gradients to eliminate jagged stair-stepping.
+      - [x] Implement continuous atmospheric depth-cueing fog (`apply_atmospheric_fog` with `s_smooth_fog`), replacing PS1 fixed-point depth banding with 32-bit floating-point linear/exponential fog attenuation.
+      - [x] Wire `fixes.anti_aliasing` and `fixes.smooth_fog` through Master Preset System in `main.c` and provide `ps1_video_set_fog_params` for dynamic time/weather color transitions.
+      - [x] Add synthetic unit tests in `ps1_aa_fog_test.c` verifying near/mid/far fog interpolation and edge anti-aliasing smoothing (46/46 CTests, 9/9 Python tests passing in Debug and Release).
     - [ ] Milestone 9: Audio Subsystem Overhaul — expanded 64-voice polyphony (anti-voice stealing), seamless zero-gap CD-XA looping, micro-fade pop suppression, and VAG loop crossfading.
     - [ ] Milestone 10: Hi-Fi 44.1/48 kHz 32-bit float reverb DSP and full-spectrum audio output.
     - [ ] Milestone 11: Zero fill-rate bottleneck architecture (smooth 60 FPS in heavy rain and festival scenes).

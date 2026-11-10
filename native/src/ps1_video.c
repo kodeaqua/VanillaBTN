@@ -14,6 +14,11 @@ static bool s_texture_bleeding_fix = true;
 static bool s_alpha_halo_fix = true;
 static bool s_mipmapping = true;
 static Ps1TextureFilterMode s_texture_filter = PS1_FILTER_NEAREST;
+static Ps1AntiAliasingMode s_anti_aliasing = PS1_AA_SMAA;
+static bool s_smooth_fog = true;
+static float s_fog_near = 1000.0f;
+static float s_fog_far = 4000.0f;
+static uint32_t s_fog_color = 0xFF808080u;
 
 #define PS1_NEAR_PLANE_Z 8.0f
 
@@ -23,6 +28,31 @@ static const int s_dither_matrix[4][4] = {
     { -1,  3, -2,  2 },
     {  1, -3,  0, -4 }
 };
+
+static uint32_t apply_atmospheric_fog(uint32_t color32, float z) {
+    if (!s_smooth_fog || s_fog_far <= s_fog_near) return color32;
+    if (z <= s_fog_near) return color32;
+
+    float f = (z - s_fog_near) / (s_fog_far - s_fog_near);
+    if (f > 1.0f) f = 1.0f;
+
+    uint32_t cr = (color32 >> 16) & 255u;
+    uint32_t cg = (color32 >> 8) & 255u;
+    uint32_t cb = color32 & 255u;
+
+    uint32_t fr = (s_fog_color >> 16) & 255u;
+    uint32_t fg = (s_fog_color >> 8) & 255u;
+    uint32_t fb = s_fog_color & 255u;
+
+    uint32_t r = (uint32_t)roundf((1.0f - f) * (float)cr + f * (float)fr);
+    uint32_t g = (uint32_t)roundf((1.0f - f) * (float)cg + f * (float)fg);
+    uint32_t b = (uint32_t)roundf((1.0f - f) * (float)cb + f * (float)fb);
+    if (r > 255) r = 255;
+    if (g > 255) g = 255;
+    if (b > 255) b = 255;
+
+    return 0xFF000000u | (r << 16) | (g << 8) | b;
+}
 
 static uint32_t blend_color32(uint32_t back, uint32_t front, unsigned blend_mode) {
     uint32_t br = (back >> 16) & 255u;
@@ -530,11 +560,11 @@ static void intersect_near_plane(const Ps1Vertex *a, const Ps1Vertex *b,
 
         uint32_t r = (uint32_t)roundf(rw_i / w_near);
         uint32_t g = (uint32_t)roundf(gw_i / w_near);
-        uint32_t b = (uint32_t)roundf(bw_i / w_near);
+        uint32_t bl = (uint32_t)roundf(bw_i / w_near);
         if (r > 255) r = 255;
         if (g > 255) g = 255;
-        if (b > 255) b = 255;
-        *out_c = (r << 16) | (g << 8) | b;
+        if (bl > 255) bl = 255;
+        *out_c = (r << 16) | (g << 8) | bl;
     }
 }
 
@@ -808,6 +838,10 @@ static bool draw_triangle(Ps1Video *video, const Ps1DrawState *state,
                         if (semi_transparent && (texel & 0x8000u)) {
                             front32 = blend_color32(video->color32[row][col], front32, state->blend_mode);
                         }
+                    }
+                    if (s_smooth_fog && interp_w > 1e-9) {
+                        float cam_z = (float)(1.0 / interp_w);
+                        front32 = apply_atmospheric_fog(front32, cam_z);
                     }
                     *pixel = front | (state->force_mask ? 0x8000u : 0);
                     video->color32[row][col] = front32;
@@ -1207,6 +1241,63 @@ bool ps1_video_upload(Ps1Video *video, int x, int y, int width, int height,
     return true;
 }
 
+static inline float pixel_luma(uint32_t c) {
+    float r = (float)((c >> 16) & 255u);
+    float g = (float)((c >> 8) & 255u);
+    float b = (float)(c & 255u);
+    return 0.299f * r + 0.587f * g + 0.114f * b;
+}
+
+static void apply_subpixel_anti_aliasing(uint32_t *target, int width, int height, size_t stride) {
+    if (width < 3 || height < 3) return;
+    for (int row = 1; row < height - 1; ++row) {
+        for (int col = 1; col < width - 1; ++col) {
+            uint32_t c_center = target[row * stride + col];
+            float l_c = pixel_luma(c_center);
+
+            uint32_t c_up    = target[(row - 1) * stride + col];
+            uint32_t c_down  = target[(row + 1) * stride + col];
+            uint32_t c_left  = target[row * stride + (col - 1)];
+            uint32_t c_right = target[row * stride + (col + 1)];
+
+            float l_u = pixel_luma(c_up);
+            float l_d = pixel_luma(c_down);
+            float l_l = pixel_luma(c_left);
+            float l_r = pixel_luma(c_right);
+
+            float l_min = fminf(l_c, fminf(fminf(l_u, l_d), fminf(l_l, l_r)));
+            float l_max = fmaxf(l_c, fmaxf(fmaxf(l_u, l_d), fmaxf(l_l, l_r)));
+
+            float contrast = l_max - l_min;
+            if (contrast < 24.0f) continue;
+
+            float edge_h = fabsf((l_l + l_r) - 2.0f * l_c);
+            float edge_v = fabsf((l_u + l_d) - 2.0f * l_c);
+
+            uint32_t neighbor;
+            if (edge_h >= edge_v) {
+                neighbor = fabsf(l_l - l_c) > fabsf(l_r - l_c) ? c_left : c_right;
+            } else {
+                neighbor = fabsf(l_u - l_c) > fabsf(l_d - l_c) ? c_up : c_down;
+            }
+
+            uint32_t cr = (c_center >> 16) & 255u;
+            uint32_t cg = (c_center >> 8) & 255u;
+            uint32_t cb = c_center & 255u;
+
+            uint32_t nr = (neighbor >> 16) & 255u;
+            uint32_t ng = (neighbor >> 8) & 255u;
+            uint32_t nb = neighbor & 255u;
+
+            uint32_t out_r = (5u * cr + 3u * nr) >> 3;
+            uint32_t out_g = (5u * cg + 3u * ng) >> 3;
+            uint32_t out_b = (5u * cb + 3u * nb) >> 3;
+
+            target[row * stride + col] = 0xFF000000u | (out_r << 16) | (out_g << 8) | out_b;
+        }
+    }
+}
+
 bool ps1_video_copy_argb(const Ps1Video *video, int x, int y, int width, int height,
                          uint32_t *target, size_t target_stride) {
     if (video == NULL || target == NULL || !valid_rect(x, y, width, height)
@@ -1229,6 +1320,9 @@ bool ps1_video_copy_argb(const Ps1Video *video, int x, int y, int width, int hei
                     | (blue << 3 | blue >> 2);
             }
         }
+    }
+    if (s_anti_aliasing != PS1_AA_OFF) {
+        apply_subpixel_anti_aliasing(target, width, height, target_stride);
     }
     return true;
 }
@@ -1308,4 +1402,32 @@ void ps1_video_set_texture_filter(Ps1TextureFilterMode mode) {
 
 Ps1TextureFilterMode ps1_video_get_texture_filter(void) {
     return s_texture_filter;
+}
+
+void ps1_video_set_anti_aliasing(Ps1AntiAliasingMode mode) {
+    s_anti_aliasing = mode;
+}
+
+Ps1AntiAliasingMode ps1_video_get_anti_aliasing(void) {
+    return s_anti_aliasing;
+}
+
+void ps1_video_set_smooth_fog(bool enabled) {
+    s_smooth_fog = enabled;
+}
+
+bool ps1_video_get_smooth_fog(void) {
+    return s_smooth_fog;
+}
+
+void ps1_video_set_fog_params(float near_z, float far_z, uint32_t fog_color) {
+    s_fog_near = near_z;
+    s_fog_far = far_z;
+    s_fog_color = fog_color;
+}
+
+void ps1_video_get_fog_params(float *near_z, float *far_z, uint32_t *fog_color) {
+    if (near_z) *near_z = s_fog_near;
+    if (far_z) *far_z = s_fog_far;
+    if (fog_color) *fog_color = s_fog_color;
 }
