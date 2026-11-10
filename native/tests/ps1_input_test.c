@@ -5,6 +5,12 @@
 #include <assert.h>
 
 int main(void) {
+    uint16_t keys[4] = {0};
+    ps1_input_keyboard_event(keys, 4, 0, PS1_PAD_UP, true);
+    ps1_input_keyboard_event(keys, 4, 1, PS1_PAD_UP, true);
+    if (ps1_input_keyboard_event(keys, 4, 2, PS1_PAD_CROSS, true) != (PS1_PAD_UP | PS1_PAD_CROSS)) return 35;
+    if (ps1_input_keyboard_event(keys, 4, 0, PS1_PAD_UP, false) != (PS1_PAD_UP | PS1_PAD_CROSS)) return 36;
+    if (ps1_input_keyboard_event(keys, 4, 1, PS1_PAD_UP, false) != PS1_PAD_CROSS) return 37;
     /* SDL trigger axes span 0..32767; halfway is the digital press point. */
     if (ps1_input_trigger_buttons(16383, 0) != 0) return 30;
     if (ps1_input_trigger_buttons(16384, 0) != PS1_PAD_L2) return 31;

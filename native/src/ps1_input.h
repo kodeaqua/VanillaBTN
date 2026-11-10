@@ -15,6 +15,7 @@
  */
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #define PS1_PAD_L2       0x0001u
@@ -74,5 +75,9 @@ uint32_t ps1_input_stick_buttons(int16_t x, int16_t y);
 
 /* Convert SDL trigger axes into the original digital L2/R2 buttons. */
 uint32_t ps1_input_trigger_buttons(int16_t left, int16_t right);
+
+/* Keep keyboard aliases independent until their physical keys are released. */
+uint16_t ps1_input_keyboard_event(uint16_t *keys, size_t count, size_t key,
+                                  uint16_t button, bool down);
 
 #endif /* VANILLABTN_PS1_INPUT_H */

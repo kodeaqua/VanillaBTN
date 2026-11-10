@@ -2,6 +2,14 @@
 #include <math.h>
 #include <stdlib.h>
 
+uint16_t ps1_input_keyboard_event(uint16_t *keys, size_t count, size_t key,
+                                  uint16_t button, bool down) {
+    uint16_t buttons = 0;
+    if (key < count) keys[key] = down ? button : 0;
+    for (size_t i = 0; i < count; ++i) buttons |= keys[i];
+    return buttons;
+}
+
 uint32_t ps1_input_trigger_buttons(int16_t left, int16_t right) {
     return (left >= 16384 ? PS1_PAD_L2 : 0)
         | (right >= 16384 ? PS1_PAD_R2 : 0);

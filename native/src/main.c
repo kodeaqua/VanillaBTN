@@ -113,6 +113,7 @@ typedef struct HostGame {
     SDL_Gamepad *gamepads[2];
     bool running;
     uint32_t keyboard_buttons, controller_buttons[2];
+    uint16_t keyboard_keys[SDL_SCANCODE_COUNT];
     int16_t stick_x[2], stick_y[2];
     int16_t trigger_left[2], trigger_right[2];
 #ifdef VANILLABTN_BOOT_TEST
@@ -184,6 +185,7 @@ static void host_game_pump(void *context) {
             }
         } else if (event.type == SDL_EVENT_WINDOW_FOCUS_LOST) {
             host->keyboard_buttons = 0;
+            memset(host->keyboard_keys, 0, sizeof(host->keyboard_keys));
             for (int i = 0; i < 2; ++i) {
                 host->controller_buttons[i] = 0;
                 host->stick_x[i] = host->stick_y[i] = 0;
@@ -191,9 +193,11 @@ static void host_game_pump(void *context) {
             }
         } else if (event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP) {
             uint32_t btn = map_key_to_ps1_button(event.key.key);
-            if (btn != 0) {
-                if (event.type == SDL_EVENT_KEY_DOWN) host->keyboard_buttons |= btn;
-                else host->keyboard_buttons &= ~btn;
+            if (event.key.scancode > SDL_SCANCODE_UNKNOWN &&
+                event.key.scancode < SDL_SCANCODE_COUNT) {
+                host->keyboard_buttons = ps1_input_keyboard_event(
+                    host->keyboard_keys, SDL_SCANCODE_COUNT, event.key.scancode,
+                    (uint16_t)btn, event.type == SDL_EVENT_KEY_DOWN);
             }
         } else if (event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN
                    || event.type == SDL_EVENT_GAMEPAD_BUTTON_UP) {
