@@ -139,7 +139,15 @@ static int transfer_file(int chan, char *file, unsigned int *adrs,
         else memcpy(buffer, storage, chunk);
         done += chunk;
     }
-    if (write && bytes) card->dirty = true;
+    if (write && bytes) {
+        card->dirty = true;
+        /* A completed game save must survive a crash before host shutdown.
+         * Unbound cards are deliberately in-memory fixtures. */
+        if (s_bound_manager != NULL) {
+            if (!ps1_card_save_to_file(card, card->filepath)) return -1;
+            card->dirty = false;
+        }
+    }
     s_last_result = McErrNone;
     return 0;
 }

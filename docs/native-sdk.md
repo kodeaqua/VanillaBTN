@@ -453,6 +453,10 @@ slot unavailable rather than creating a blank card. New temporary images are
 created exclusively so an unresolved candidate cannot be overwritten.
 During saving, the prior backup is replaced only when the primary image can be
 moved into its place; a failed move leaves both existing images intact.
+For bound disk-backed cards, an SDK file-write completion reports success only
+after the card image has been written. A failed write reports a card error and
+retains the dirty in-memory image for retry. The unbound test cards stay in
+memory. Other card mutations still rely on the shutdown flush.
 
 Card save file renames (`CARD_RENAME` in `mcard.c`) route through `sdk_card_rename`
 via `native/compat/libapi.h`. This updates the card's directory frame filename and

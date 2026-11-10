@@ -16,6 +16,51 @@ static void completion(long expected, long expected_command) {
     CHECK(MemCardSync(1, &command, &result) == -1);
 }
 
+static void test_write_persists_before_completion(void) {
+    const char *path = "test_sdk_card_write.mcr";
+    const char *temp = "test_sdk_card_write.mcr.tmp";
+    const char *backup = "test_sdk_card_write.mcr.bak";
+    Ps1CardManager *manager = calloc(1, sizeof(*manager));
+    CHECK(manager);
+    remove(path);
+    remove(temp);
+    remove(backup);
+    Ps1Card *card = &manager->cards[0];
+    ps1_card_format(card);
+    CHECK(ps1_card_write_file(card, "TEST", data, PS1_CARD_BLOCK_SIZE) == PS1_CARD_OK);
+    CHECK(snprintf(card->filepath, sizeof(card->filepath), "%s", path) > 0);
+    CHECK(ps1_card_save_to_file(card, path));
+    card->dirty = false;
+    sdk_card_bind_manager(manager);
+    MemCardInit(0);
+    memset(buffer, 0x5A, sizeof(buffer));
+    CHECK(MemCardWriteFile(0, "TEST", buffer, 0, sizeof(buffer)) == 1);
+    completion(McErrNone, McFuncWriteFile);
+    FILE *file = fopen(path, "rb");
+    CHECK(file && fread(snapshot, 1, sizeof(snapshot), file) == sizeof(snapshot));
+    CHECK(fclose(file) == 0);
+    CHECK(memcmp(snapshot, card->data, sizeof(snapshot)) == 0 && !card->dirty);
+
+    /* A pending recovery image blocks persistence and must report failure. */
+    file = fopen(temp, "wb");
+    CHECK(file && fputc(0x42, file) == 0x42 && fclose(file) == 0);
+    memset(buffer, 0xA5, sizeof(buffer));
+    CHECK(MemCardWriteFile(0, "TEST", buffer, 0, sizeof(buffer)) == 1);
+    completion(McErrCardInvalid, McFuncWriteFile);
+    CHECK(card->dirty);
+    file = fopen(path, "rb");
+    CHECK(file);
+    unsigned char first[128];
+    CHECK(fseek(file, PS1_CARD_BLOCK_SIZE, SEEK_SET) == 0);
+    CHECK(fread(first, 1, sizeof(first), file) == sizeof(first));
+    CHECK(fclose(file) == 0 && first[0] == 0x5A);
+    sdk_card_bind_manager(NULL);
+    remove(path);
+    remove(temp);
+    remove(backup);
+    free(manager);
+}
+
 int main(void) {
     Ps1Card *card = sdk_card_get(0);
     MemCardInit(0);
@@ -127,5 +172,6 @@ int main(void) {
     CHECK(MemCardCreateFile(0, "DAMAGED", 1) == McErrCardInvalid);
     CHECK(MemCardFormat(0) == McErrNone);
     CHECK(card->present && card->dirty && ps1_card_validate(card) == PS1_CARD_OK);
+    test_write_persists_before_completion();
     return 0;
 }
