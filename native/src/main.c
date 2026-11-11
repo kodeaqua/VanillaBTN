@@ -379,6 +379,23 @@ static void host_game_pump(void *context) {
     }
 }
 
+/* Wake independently of simulation ticks when the configured presentation
+ * cadence is higher than 60 Hz. This remains on the VSync thread, so it does
+ * not race the original renderer or advance game state. */
+static uint64_t host_presentation_subtick(uint64_t simulation_deadline, void *context) {
+    HostGame *host = (HostGame *)context;
+    uint64_t now = SDL_GetTicksNS();
+    if (host_pacing_should_present(&host->pacing, now)) {
+        bool minimized = host->window != NULL &&
+            (SDL_GetWindowFlags(host->window) & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) != 0;
+        if (!minimized) {
+            host_present_frame(&video, host->renderer, &host->texture);
+        }
+        host_pacing_record_presentation(&host->pacing, now);
+    }
+    return host_pacing_next_wait_deadline(&host->pacing, now, simulation_deadline);
+}
+
 #ifdef VANILLABTN_BOOT_TEST
 void boot_fault_install(void (*hook)(void));
 static void boot_fault_state(void) {
@@ -549,7 +566,7 @@ disc_ready:
             monitor_hz = cur_mode->refresh_rate;
         }
         host_pacing_init(&host.pacing, &host.config.display, monitor_hz);
-        sdk_sync_subtick_hook(NULL, NULL);
+        sdk_sync_subtick_hook(host_presentation_subtick, &host);
         int vsync_val = host.config.display.vsync ? SDL_RENDERER_VSYNC_ADAPTIVE : SDL_RENDERER_VSYNC_DISABLED;
         if (!SDL_SetRenderVSync(host.renderer, vsync_val)) {
             SDL_SetRenderVSync(host.renderer, SDL_RENDERER_VSYNC_DISABLED);

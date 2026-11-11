@@ -64,12 +64,14 @@ static void test_save_and_load(void) {
     strncpy(original.input.turbo_hotkey, "Space", sizeof(original.input.turbo_hotkey) - 1);
 
     assert(config_save(&original, test_ini) == true);
+    original.display.window_width = 1600;
+    assert(config_save(&original, test_ini) == true);
 
     AppConfig loaded;
     assert(config_load(&loaded, test_ini) == true);
 
     assert(loaded.preset == PRESET_MODERN);
-    assert(loaded.display.window_width == 1920);
+    assert(loaded.display.window_width == 1600);
     assert(loaded.display.window_height == 1080);
     assert(loaded.display.window_mode == WINDOW_MODE_BORDERLESS);
     assert(loaded.display.backend == BACKEND_VULKAN);

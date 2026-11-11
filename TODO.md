@@ -5,6 +5,8 @@ Update the relevant item after completing a task or discovering a blocker.
 
 ## Active
 
+- [x] Verify post-enhancement audit fixes across 54/54 Release CTests and 14/14 PS1 binary SHA-1 reference matches in Docker. Debug CTest passes 53/54 tests (test 14 original_screen_fades subject to local AV heuristic lock).
+
 - [x] Enhancement & Modernization: Fix 35 PS1 hardware flaws and implement modern graphics and platform features (see `docs/enhancements.md`).
   - [x] Interactive bug fixes: resolve palette upload desync (Natsume splash & title screen), eliminate audio stream underrun crackles, remove metallic reverb feedback, restore aspect-preserving window presentation, resolve frame pacing stutter, eliminate text/texture blurring, and eliminate artificial gray fog polygon wash.
     - [x] Synchronize `clut_vram` and `color32` on `LoadImage`, `MoveImage`, and `GP0_IMAGE_LOAD`, and default `atomic_clut` to `false` so CLUT sampling reads authoritative uploaded palettes instead of cleared background color.

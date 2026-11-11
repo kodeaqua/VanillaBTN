@@ -13,9 +13,10 @@ bool sdk_sync_bind(uint64_t (*now)(void *), void (*wait)(uint64_t, void *), void
  * Only waiting VSync calls pump; query modes never submit another frame. */
 void sdk_sync_pump(void (*pump)(void *), void *context);
 
-/* Sub-tick presentation hook called during wait intervals when presentation rate exceeds 60 Hz.
- * Context is passed to the hook. Pass NULL to disable. */
-void sdk_sync_subtick_hook(void (*subtick)(void *), void *context);
+/* Called while VSync is waiting. The hook may render an interpolated host
+ * frame and returns its next desired wake-up time, or the VSync deadline when
+ * no extra presentation is due. */
+void sdk_sync_subtick_hook(uint64_t (*subtick)(uint64_t deadline, void *), void *context);
 
 /* Turbo speed multiplier (1 = normal 60 Hz simulation, 2 = 2x, 3 = 3x, etc.) */
 void sdk_sync_set_turbo(uint32_t multiplier);

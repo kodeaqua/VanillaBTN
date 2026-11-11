@@ -52,10 +52,14 @@ SDL_Renderer *host_renderer_create(SDL_Window *window, BackendType backend, bool
     if (primary != NULL) {
         fallback_chain[chain_count++] = primary;
     }
-    fallback_chain[chain_count++] = NULL;           /* SDL default best backend */
-    fallback_chain[chain_count++] = "direct3d11";   /* D3D11 stable Windows fallback */
-    fallback_chain[chain_count++] = "opengl";       /* OpenGL cross-platform fallback */
-    fallback_chain[chain_count++] = "software";     /* Software CPU fallback */
+    /* Software is an explicit recovery choice, not a preference that may
+     * silently select an accelerated renderer. */
+    if (backend != BACKEND_SOFTWARE) {
+        fallback_chain[chain_count++] = NULL;           /* SDL default best backend */
+        fallback_chain[chain_count++] = "direct3d11";   /* D3D11 stable Windows fallback */
+        fallback_chain[chain_count++] = "opengl";       /* OpenGL cross-platform fallback */
+        fallback_chain[chain_count++] = "software";     /* Software CPU fallback */
+    }
 
     SDL_Renderer *renderer = NULL;
     for (int i = 0; i < chain_count; ++i) {

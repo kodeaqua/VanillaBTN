@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <windows.h>
 #include <SDL3/SDL.h>
 
 void config_set_defaults(AppConfig *config) {
@@ -380,7 +381,8 @@ bool config_save(const AppConfig *config, const char *path) {
     if (!config || !path || !*path) return false;
 
     char tmp_path[1050];
-    snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", path);
+    int path_length = snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", path);
+    if (path_length < 0 || (size_t)path_length >= sizeof(tmp_path)) return false;
 
     FILE *f = fopen(tmp_path, "w");
     if (!f) return false;
@@ -543,9 +545,19 @@ bool config_save(const AppConfig *config, const char *path) {
         config->input.turbo_hotkey[0] ? config->input.turbo_hotkey : "none",
         config->input.turbo_speed);
 
-    fclose(f);
+    bool write_failed = ferror(f) != 0;
+    if (fclose(f) != 0) write_failed = true;
+    if (write_failed) {
+        SDL_RemovePath(tmp_path);
+        return false;
+    }
 
-    /* Atomic replace */
-    SDL_RemovePath(path);
-    return SDL_RenamePath(tmp_path, path);
+    /* The temporary file is next to its destination, so replacement stays on
+     * one volume. MoveFileEx replaces the old configuration without the
+     * delete-then-rename window that could lose it on a failed rename. */
+    if (!MoveFileExA(tmp_path, path, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+        SDL_RemovePath(tmp_path);
+        return false;
+    }
+    return true;
 }

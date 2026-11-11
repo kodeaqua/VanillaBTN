@@ -182,17 +182,13 @@ static void transform_vertex(const Ps1Gte *gte, const Ps1Vector3 *v,
                 sub_z = cz_fl;
             } else {
                 float proj_x = (float)(screen_x - (int64_t)gte->ofx * 65536) / 65536.0f;
-                if (s_widescreen_scale != 1.0f && s_widescreen_scale > 0.0f) {
-                    proj_x /= s_widescreen_scale;
-                }
+                /* screen_x already includes the Hor+ scale above. */
                 sub_x = (float)gte->ofx + proj_x;
                 sub_y = (float)screen_y / 65536.0f;
             }
         } else if (cz > 0) {
             float proj_x = (float)(screen_x - (int64_t)gte->ofx * 65536) / 65536.0f;
-            if (s_widescreen_scale != 1.0f && s_widescreen_scale > 0.0f) {
-                proj_x /= s_widescreen_scale;
-            }
+            /* screen_x already includes the Hor+ scale above. */
             sub_x = (float)gte->ofx + proj_x;
             sub_y = (float)screen_y / 65536.0f;
         } else {

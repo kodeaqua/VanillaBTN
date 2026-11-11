@@ -23,7 +23,7 @@ flowchart TD
     Execution_Order -.->|Master Preset + Granular Overrides| Config["vanillabtn.ini"]
 ```
 
-- **Untouched Baseline Source**: C decompilation code in `src/` remains completely unmodified. The PS1 reference build continues to pass 100% byte-matching SHA-1 checks.
+- **Protected Baseline Source**: Native-only compatibility conditionals in `src/` are compiled exclusively with `VANILLABTN_NATIVE`; the PS1 reference target retains its original behavior and SHA-1 checks.
 - **Master Preset ("Best of Both Worlds")**: A single master switch `[Preset] mode = modern` enables all 35 fixes automatically. Granular toggles remain available with default `auto` values for advanced users seeking custom per-feature tuning.
 - **Authoritative Simulation Pacing**: Game simulation (villager AI, clock/calendar, seasons, character movement speed, audio streaming) **remains strictly locked to real wall-clock time** (60 virtual vblanks/second). High-refresh-rate presentation never accelerates game time.
 

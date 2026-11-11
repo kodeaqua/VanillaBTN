@@ -9,18 +9,25 @@ static uint64_t sdl_now(void *context) {
     return SDL_GetTicksNS();
 }
 
-static void (*host_subtick_hook)(void *);
+static uint64_t (*host_subtick_hook)(uint64_t deadline, void *);
 static void *host_subtick_context;
 
-void sdk_sync_subtick_hook(void (*subtick)(void *), void *context) {
+void sdk_sync_subtick_hook(uint64_t (*subtick)(uint64_t deadline, void *), void *context) {
     host_subtick_hook = subtick;
     host_subtick_context = context;
 }
 
 static void sdl_wait(uint64_t deadline, void *context) {
     uint64_t now = sdl_now(context);
-    if (deadline > now) {
-        SDL_DelayNS(deadline - now);
+    while (now < deadline) {
+        uint64_t wake = deadline;
+        if (host_subtick_hook) {
+            wake = host_subtick_hook(deadline, host_subtick_context);
+            /* A malformed hook must not spin the VSync thread. */
+            if (wake <= now || wake > deadline) wake = deadline;
+        }
+        SDL_DelayNS(wake - now);
+        now = sdl_now(context);
     }
 }
 

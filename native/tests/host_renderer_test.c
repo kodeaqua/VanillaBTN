@@ -59,6 +59,7 @@ static void test_renderer_fallback_creation(void) {
     CHECK(r_sw != NULL);
     const char *name_sw = host_renderer_get_active_name(r_sw);
     CHECK(name_sw != NULL);
+    CHECK(SDL_strcasecmp(name_sw, "software") == 0);
     SDL_DestroyRenderer(r_sw);
 
     /* 3. Request specific backend that triggers fallback chain if unavailable */

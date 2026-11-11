@@ -198,10 +198,6 @@ bool host_present_frame(const Ps1Video *video, SDL_Renderer *renderer, SDL_Textu
         pres_mode = SDL_LOGICAL_PRESENTATION_LETTERBOX;
     }
 
-    static int s_last_w = 0;
-    static int s_last_h = 0;
-    static SDL_RendererLogicalPresentation s_last_pres = (SDL_RendererLogicalPresentation)-1;
-
     if (width != display.width || height != display.height) {
         SDL_Texture *replacement = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
             SDL_TEXTUREACCESS_STREAMING, display.width, display.height);
@@ -213,14 +209,11 @@ bool host_present_frame(const Ps1Video *video, SDL_Renderer *renderer, SDL_Textu
         }
         SDL_DestroyTexture(*texture);
         *texture = replacement;
-        s_last_w = display.width;
-        s_last_h = display.height;
-        s_last_pres = pres_mode;
-    } else if (display.width != s_last_w || display.height != s_last_h || pres_mode != s_last_pres) {
-        SDL_SetRenderLogicalPresentation(renderer, display.width, display.height, pres_mode);
-        s_last_w = display.width;
-        s_last_h = display.height;
-        s_last_pres = pres_mode;
+    } else if (!SDL_SetRenderLogicalPresentation(renderer, display.width, display.height, pres_mode)) {
+        /* SDL3 has no logical-presentation state getter. Keep this operation
+         * renderer-local and correct instead of sharing stale global cache
+         * state across a replacement renderer. */
+        return false;
     }
 
     if (!SDL_LockTexture(*texture, NULL, &pixels, &pitch)) {
@@ -233,7 +226,6 @@ bool host_present_frame(const Ps1Video *video, SDL_Renderer *renderer, SDL_Textu
     copied = ps1_video_copy_argb(video, display.x, display.y, display.width, display.height, pixels,
                                  (size_t)pitch / sizeof(uint32_t));
     SDL_UnlockTexture(*texture);
-    SDL_SetTextureScaleMode(*texture, SDL_SCALEMODE_NEAREST);
     return copied && SDL_RenderClear(renderer)
         && SDL_RenderTexture(renderer, *texture, NULL, NULL)
         && SDL_RenderPresent(renderer);

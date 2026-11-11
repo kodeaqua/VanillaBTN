@@ -77,6 +77,29 @@ static void test_hor_plus_3d_projection(void) {
     ps1_gte_set_widescreen_scale(1.0f);
 }
 
+static void test_fixed_point_hor_plus_projection(void) {
+    Ps1Gte gte;
+    Ps1Vector3 v = {100, 50, 1000, 0};
+    Ps1SubpixelCoord base, wide;
+    const float scale = (16.0f / 9.0f) / (4.0f / 3.0f);
+
+    ps1_gte_init(&gte);
+    ps1_gte_set_geom_offset(&gte, 160, 120);
+    ps1_gte_set_geom_screen(&gte, 1000);
+    ps1_gte_set_float_math(false);
+
+    ps1_gte_set_widescreen_scale(1.0f);
+    CHECK(ps1_gte_rtps(&gte, &v));
+    ps1_gte_get_sub_sxy(&gte, 2, &base);
+    ps1_gte_set_widescreen_scale(scale);
+    CHECK(ps1_gte_rtps(&gte, &v));
+    ps1_gte_get_sub_sxy(&gte, 2, &wide);
+    CHECK(fabsf((wide.x - 160.0f) - (base.x - 160.0f) / scale) < 0.1f);
+
+    ps1_gte_set_float_math(true);
+    ps1_gte_set_widescreen_scale(1.0f);
+}
+
 static void test_host_display_widescreen_modes(void) {
     host_display_set_widescreen_mode(WIDESCREEN_OFF);
     CHECK(host_display_get_widescreen_mode() == WIDESCREEN_OFF);
@@ -104,6 +127,7 @@ static void test_host_display_widescreen_modes(void) {
 int main(void) {
     test_widescreen_scale_get_set();
     test_hor_plus_3d_projection();
+    test_fixed_point_hor_plus_projection();
     test_host_display_widescreen_modes();
 
     printf("ps1_widescreen_test: All True Widescreen Hor+ FOV tests passed successfully.\n");

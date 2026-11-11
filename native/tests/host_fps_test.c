@@ -16,9 +16,10 @@ static uint64_t mock_clock_now(void *ctx) { (void)ctx; return mock_time_ns; }
 static void mock_clock_wait(uint64_t deadline, void *ctx) { (void)ctx; mock_time_ns = deadline; }
 
 static int subtick_calls = 0;
-static void mock_subtick(void *ctx) {
+static uint64_t mock_subtick(uint64_t deadline, void *ctx) {
     int *counter = (int *)ctx;
     if (counter) (*counter)++;
+    return deadline;
 }
 
 static void test_pacing_config_init(void) {
@@ -161,6 +162,7 @@ static void test_sdk_sync_integration(void) {
     VSync(0);
     uint64_t t2 = mock_time_ns;
     CHECK(t2 > t1);
+    CHECK(subtick_calls == 0); /* Custom waits intentionally do not call SDL hooks. */
 
     sdk_sync_subtick_hook(NULL, NULL);
     sdk_sync_bind(NULL, NULL, NULL);
