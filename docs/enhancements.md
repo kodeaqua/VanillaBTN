@@ -365,6 +365,13 @@ changes separate from the matching PS1 reference build.
   rows 0–239 and 240–479. The sidecar preserves each page until actual clear,
   fill, or draw operations change its pixels. Beginning another ordering table
   must not implicitly erase the page currently displayed.
+- The optional high-resolution host surface holds independent samples of
+  GTE-projected polygons at integer multiples of the PS1 raster size. Original
+  320×240 VRAM writes continue unchanged for texture reads and save/display
+  semantics; 2D UI and sprite commands composite into the corresponding host
+  sample blocks at their original positions. Off-screen panorama columns and
+  both framebuffer pages are kept separate. No supersampling occurs at 1x.
+  This is a software rasterizer and is not a claim of GPU-native 4K rendering.
 
 ### World primitives, screen overlays, and authored backgrounds
 

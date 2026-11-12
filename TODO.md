@@ -7,9 +7,10 @@ reference build; see [AGENTS.md](AGENTS.md) and [docs/architecture.md](docs/arch
 
 ## Graphics and display
 
-- [ ] Add actual native-resolution 3D polygon rasterization. The current
-      software renderer expands the horizontal field of view but still uses a
-      240-row internal raster target. Keep original 4:3 presentation available.
+- [x] **Milestone 21: Scalable host 3D raster** — projected polygons are
+      sampled independently at integer multiples of PS1 resolution on a
+      separate host surface. PS1 VRAM, 4:3 geometry, and 2D draw coordinates
+      retain their original resolution. Scale 1 preserves the existing path.
 - [ ] Connect `render_scale` to the render target when scalable rasterization
       is implemented; it currently affects configuration storage only.
 - [x] **Milestone 19: CRT NTSC pixel aspect** — `pixel_aspect_ratio = crt_ntsc`

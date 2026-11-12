@@ -488,6 +488,11 @@ set_target_properties(ps1_raster_seams_test PROPERTIES C_STANDARD 17 C_STANDARD_
 target_link_libraries(ps1_raster_seams_test PRIVATE ps1_video)
 target_compile_options(ps1_raster_seams_test PRIVATE /W4 /UNDEBUG)
 add_test(NAME ps1_raster_shared_edges COMMAND ps1_raster_seams_test)
+add_executable(ps1_hires_raster_test tests/ps1_hires_raster_test.c)
+set_target_properties(ps1_hires_raster_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_link_libraries(ps1_hires_raster_test PRIVATE ps1_video)
+target_compile_options(ps1_hires_raster_test PRIVATE /W4 /UNDEBUG)
+add_test(NAME ps1_high_resolution_3d_raster COMMAND ps1_hires_raster_test)
 
 add_executable(ps1_panorama_test tests/ps1_panorama_test.c)
 set_target_properties(ps1_panorama_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)

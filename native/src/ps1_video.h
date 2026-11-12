@@ -133,6 +133,12 @@ bool ps1_video_get_hd_font(void);
 /* Host-only panoramic sidecar: keeps texture VRAM at its original dimensions.
  * Calling with 4:3 or an unsupported base video mode disables extensions. */
 bool ps1_video_configure_panorama(int base_width, int base_height, float aspect_scale);
+/* The caller chooses the host raster scale before configuring the panorama.
+ * 1x is the original PS1 raster; allocation guards may lower higher scales. */
+void ps1_video_set_render_scale(int scale);
+int ps1_video_get_render_scale(void);
+bool ps1_video_copy_scaled_panorama(const Ps1Video *video, int src_x, int src_y,
+    int base_width, int height, uint32_t *target, size_t stride);
 int ps1_video_panorama_width(int base_width);
 void ps1_video_panorama_begin_frame(void);
 /* A VRAM-wide clear also establishes the clear color of the host-only side

@@ -51,6 +51,70 @@ typedef struct Ps1Panorama {
 
 static Ps1Panorama s_panorama;
 
+/* This is a host presentation surface, never PS1 VRAM. Each projected
+ * polygon gets new samples at the chosen scale; GPU texture/CLUT reads and
+ * framebuffer downloads continue to use the unscaled PS1 arrays. */
+typedef struct Ps1HiRes {
+    Ps1PanoramaPixel *pixels;
+    int width, scale;
+} Ps1HiRes;
+static Ps1HiRes s_hires;
+static int s_requested_render_scale = 1;
+
+/* Bound the host-only allocation rather than letting 16x ultrawide silently
+ * reserve several gigabytes. Failed allocations leave the PS1 path intact. */
+#define PS1_HIRES_PIXEL_LIMIT 12000000u
+static bool hires_resize(void) {
+    int base_width = s_panorama.pixels ? s_panorama.width : 320;
+    int scale = s_requested_render_scale;
+    while (scale > 1 && (uint64_t)base_width * PS1_VRAM_HEIGHT * scale * scale
+                         > PS1_HIRES_PIXEL_LIMIT) --scale;
+    if (scale <= 1) {
+        free(s_hires.pixels);
+        memset(&s_hires, 0, sizeof(s_hires));
+        return true;
+    }
+    if (s_hires.pixels && s_hires.scale == scale
+        && s_hires.width == base_width * scale) return true;
+    for (; scale > 1; --scale) {
+        size_t count = (size_t)base_width * PS1_VRAM_HEIGHT * scale * scale;
+        Ps1PanoramaPixel *pixels = (Ps1PanoramaPixel *)calloc(count, sizeof(*pixels));
+        if (pixels) {
+            free(s_hires.pixels);
+            s_hires = (Ps1HiRes){pixels, base_width * scale, scale};
+            return true;
+        }
+    }
+    free(s_hires.pixels);
+    memset(&s_hires, 0, sizeof(s_hires));
+    return true; /* no impact on the original 1x rasterizer */
+}
+
+void ps1_video_set_render_scale(int scale) {
+    s_requested_render_scale = scale >= 1 && scale <= 16 ? scale : 1;
+}
+
+int ps1_video_get_render_scale(void) {
+    return s_hires.pixels ? s_hires.scale : 1;
+}
+
+/* Copy a pixel modified by an original PS1 2D primitive to its host block.
+ * High-resolution 3D samples are written separately, in the same OT order. */
+static void hires_mirror(int row, int col, uint16_t word, uint32_t color,
+                         float depth, float trans_depth, uint8_t overdraw) {
+    if (!s_hires.pixels || row < 0 || row >= PS1_VRAM_HEIGHT) return;
+    int x = col + (s_panorama.pixels ? s_panorama.left_extra : 0);
+    int scale = s_hires.scale, base_width = s_hires.width / scale;
+    if (x < 0 || x >= base_width) return;
+    for (int sy = 0; sy < scale; ++sy) {
+        Ps1PanoramaPixel *dst = s_hires.pixels
+            + ((size_t)row * scale + sy) * s_hires.width + (size_t)x * scale;
+        for (int sx = 0; sx < scale; ++sx) {
+            dst[sx] = (Ps1PanoramaPixel){word, color, depth, trans_depth, overdraw, 1};
+        }
+    }
+}
+
 bool ps1_video_configure_panorama(int base_width, int base_height, float aspect_scale) {
     /* The original stepped screen fade temporarily switches the display to
      * 640x480 (screen_fade.c), then restores 320x240. This is not a user
@@ -67,12 +131,12 @@ bool ps1_video_configure_panorama(int base_width, int base_height, float aspect_
         || aspect_scale <= 1.00001f) {
         free(s_panorama.pixels);
         memset(&s_panorama, 0, sizeof(s_panorama));
-        return true;
+        return hires_resize();
     }
     if (aspect_scale > 4.0f) aspect_scale = 4.0f;
     int width = (int)lroundf((float)base_width * aspect_scale);
     if (width <= base_width) width = base_width + 1;
-    if (s_panorama.pixels && s_panorama.width == width) return true;
+    if (s_panorama.pixels && s_panorama.width == width) return hires_resize();
     size_t extra_width = (size_t)(width - base_width);
     if (extra_width > SIZE_MAX / PS1_VRAM_HEIGHT / sizeof(Ps1PanoramaPixel)) return false;
     Ps1PanoramaPixel *pixels = (Ps1PanoramaPixel *)calloc(
@@ -83,7 +147,7 @@ bool ps1_video_configure_panorama(int base_width, int base_height, float aspect_
     s_panorama.width = width;
     s_panorama.left_extra = (width - base_width) / 2;
     s_panorama.right_extra = width - base_width - s_panorama.left_extra;
-    return true;
+    return hires_resize();
 }
 
 int ps1_video_panorama_width(int base_width) {
@@ -97,6 +161,19 @@ void ps1_video_panorama_clear_rows(int first_row, int row_count) {
     size_t stride = (size_t)(s_panorama.left_extra + s_panorama.right_extra);
     memset(s_panorama.pixels + (size_t)first_row * stride, 0,
            (size_t)row_count * stride * sizeof(Ps1PanoramaPixel));
+    /* Clearing the sidecar invalidates host samples, too. Leaving touched
+     * black samples would hide the white-canvas fallback on menu fades. */
+    if (s_hires.pixels) {
+        size_t left = (size_t)s_panorama.left_extra * s_hires.scale;
+        size_t right = (size_t)s_panorama.right_extra * s_hires.scale;
+        size_t offset = left + 320u * (size_t)s_hires.scale;
+        for (int row = first_row * s_hires.scale;
+             row < (first_row + row_count) * s_hires.scale; ++row) {
+            Ps1PanoramaPixel *p = s_hires.pixels + (size_t)row * s_hires.width;
+            memset(p, 0, left * sizeof(*p));
+            memset(p + offset, 0, right * sizeof(*p));
+        }
+    }
 }
 
 
@@ -115,6 +192,9 @@ void ps1_video_panorama_fill_rows(int first_row, int row_count, uint32_t rgb24) 
             pixels[x].word = word;
             pixels[x].color = color;
             pixels[x].touched = 1;
+            hires_mirror(y, x < (size_t)s_panorama.left_extra
+                ? (int)x - s_panorama.left_extra : (int)x - s_panorama.left_extra + 320,
+                word, color, 0.0f, 0.0f, 0);
         }
     }
 }
@@ -174,6 +254,11 @@ static Ps1RasterTarget raster_target(Ps1Video *video, int row, int col,
     Ps1PanoramaPixel *p = &s_panorama.pixels[(size_t)row * extra + side_col];
     return (Ps1RasterTarget){ &p->word, &p->color, &p->depth,
                                &p->transparent_depth, &p->overdraw, &p->touched };
+}
+
+static void hires_mirror_target(int row, int col, Ps1RasterTarget dst) {
+    hires_mirror(row, col, *dst.word, *dst.color, *dst.depth,
+                 *dst.transparent_depth, *dst.overdraw);
 }
 
 static uint32_t ps1_video_pixel_argb(const Ps1Video *video, int x, int y) {
@@ -256,6 +341,45 @@ bool ps1_video_copy_panorama(const Ps1Video *video, int src_x, int src_y,
                     target[(size_t)y * stride + x] = white_canvas
                         ? 0xFFFFFFFFu : 0xFF000000u;
                 }
+            }
+        }
+    }
+    return true;
+}
+
+/* The scaled surface contains independently shaded 3D fragments while
+ * untouched pixels retain the original framebuffer or the panorama backdrop. */
+bool ps1_video_copy_scaled_panorama(const Ps1Video *video, int src_x, int src_y,
+    int base_width, int height, uint32_t *target, size_t stride) {
+    if (!s_hires.pixels || !video || !target || base_width != 320
+        || !valid_rect(src_x, src_y, base_width, height)) return false;
+    int scale = s_hires.scale;
+    int width = s_hires.width;
+    if (stride < (size_t)width) return false;
+    int margin = s_panorama.pixels ? s_panorama.left_extra : 0;
+    bool white_canvas = s_panorama.pixels && panorama_has_white_canvas(
+        video, src_x, src_y, base_width, height);
+    for (int y = 0; y < height * scale; ++y) {
+        int base_y = src_y + y / scale;
+        for (int x = 0; x < width; ++x) {
+            int logical_x = x / scale - margin;
+            Ps1PanoramaPixel *p = s_hires.pixels
+                + ((size_t)base_y * scale + y % scale) * width + x;
+            if (p->touched) {
+                target[(size_t)y * stride + x] = s_true_color_32bit && p->color
+                    ? p->color : 0xFF000000u
+                        | ((((p->word & 31u) << 3) | ((p->word & 31u) >> 2)) << 16)
+                        | (((((p->word >> 5) & 31u) << 3) | (((p->word >> 5) & 31u) >> 2)) << 8)
+                        | ((((p->word >> 10) & 31u) << 3) | (((p->word >> 10) & 31u) >> 2));
+            } else if (logical_x >= 0 && logical_x < 320) {
+                target[(size_t)y * stride + x] = ps1_video_pixel_argb(video, src_x + logical_x, base_y);
+            } else {
+                int extra = s_panorama.left_extra + s_panorama.right_extra;
+                int col = logical_x < 0 ? logical_x + margin : margin + logical_x - 320;
+                const Ps1PanoramaPixel *side = &s_panorama.pixels[(size_t)base_y * extra + col];
+                target[(size_t)y * stride + x] = side->touched
+                    ? (side->color ? side->color : 0xFF000000u)
+                    : white_canvas ? 0xFFFFFFFFu : 0xFF000000u;
             }
         }
     }
@@ -385,6 +509,31 @@ static uint32_t blend_color32(uint32_t back, uint32_t front, unsigned blend_mode
         break;
     }
     return 0xFF000000u | (r << 16) | (g << 8) | b;
+}
+
+/* Translucent HUD/fade overlays blend against every high-resolution world
+ * sample, rather than replacing it with the already-blended 240p pixel. */
+static void hires_blend_target(int row, int col, Ps1RasterTarget source,
+                               uint32_t front, unsigned mode) {
+    if (!s_hires.pixels) return;
+    int x = col + (s_panorama.pixels ? s_panorama.left_extra : 0);
+    int scale = s_hires.scale, base_width = s_hires.width / scale;
+    if (row < 0 || row >= PS1_VRAM_HEIGHT || x < 0 || x >= base_width) return;
+    for (int sy = 0; sy < scale; ++sy) {
+        Ps1PanoramaPixel *dst = s_hires.pixels
+            + ((size_t)row * scale + sy) * s_hires.width + (size_t)x * scale;
+        for (int sx = 0; sx < scale; ++sx) {
+            Ps1PanoramaPixel *p = dst + sx;
+            if (p->touched) {
+                p->color = blend_color32(p->color, front, mode);
+                p->word = *source.word;
+                p->overdraw = *source.overdraw;
+            } else {
+                *p = (Ps1PanoramaPixel){*source.word, *source.color,
+                    *source.depth, *source.transparent_depth, *source.overdraw, 1};
+            }
+        }
+    }
 }
 
 static uint32_t blend_color32_under(uint32_t current, uint32_t behind, unsigned blend_mode) {
@@ -540,6 +689,7 @@ void ps1_video_quick_fill(Ps1Video *video, int x, int y, int width, int height,
             video->trans_z[r][c] = 0.0f;
             video->overdraw[r][c] = 0;
             video->clut_vram[r][c] = color;
+            if (c < 320) hires_mirror(r, c, color, c32, 0.0f, 0.0f, 0);
         }
     }
     /* ClearImage/GP0(02) is a VRAM operation, not an OT primitive. An actual
@@ -608,6 +758,8 @@ bool ps1_video_draw_tile(Ps1Video *video, const Ps1DrawState *state, int x, int 
                 ? blend_color32(*dst.color, c32_solid, state->blend_mode) : c32_solid;
             *dst.color = c32;
             if (dst.touched) *dst.touched = 1;
+            if (semi_transparent) hires_blend_target(row, col, dst, c32_solid, state->blend_mode);
+            else hires_mirror_target(row, col, dst);
         }
     }
     return true;
@@ -812,6 +964,168 @@ static uint16_t modulate_texel(uint16_t texel, uint32_t rgb24) {
     return (uint16_t)(red | (green << 5) | (blue << 10) | (texel & 0x8000u));
 }
 
+/* A second, presentation-only raster pass evaluates covered 3D fragments
+ * at sub-PS1-pixel centers. This pass precedes the original GP0 raster so
+ * texture uploads and VRAM reads still see precisely the original target. */
+static void hires_draw_projected_triangle(Ps1Video *video, const Ps1DrawState *state,
+    const Ps1Vertex *v0, const Ps1Vertex *v1, const Ps1Vertex *v2,
+    uint32_t rgb24, unsigned tpage, unsigned clut, bool textured,
+    bool raw_texture, bool semi_transparent, const uint32_t *colors) {
+    if (!s_hires.pixels || !(v0->is_projected || v1->is_projected || v2->is_projected))
+        return;
+    const Ps1Vertex *vertices[3] = {v0, v1, v2};
+    double x[3], y[3], w[3], u[3], v[3];
+    uint32_t shades[3];
+    const bool precise = ps1_pgxp_is_vertex_precision_enabled()
+        && v0->has_subpixel && v1->has_subpixel && v2->has_subpixel;
+    for (int i = 0; i < 3; ++i) {
+        x[i] = (precise ? vertices[i]->sub_x : (float)signed11(vertices[i]->x))
+            + signed11(state->offset_x);
+        y[i] = (precise ? vertices[i]->sub_y : (float)signed11(vertices[i]->y))
+            + signed11(state->offset_y);
+        w[i] = vertices[i]->w > 0.0f ? vertices[i]->w : 1.0;
+        u[i] = vertices[i]->u;
+        v[i] = vertices[i]->v;
+        shades[i] = colors ? colors[i] : rgb24;
+    }
+    double area = edge_function(x[0], y[0], x[1], y[1], x[2], y[2]);
+    if (fabs(area) < 1e-5) return;
+    if (area < 0.0) {
+        double d;
+        uint32_t c;
+#define EXCHANGE_PAIR(a) do { d = a[1]; a[1] = a[2]; a[2] = d; } while (0)
+        EXCHANGE_PAIR(x); EXCHANGE_PAIR(y); EXCHANGE_PAIR(w);
+        EXCHANGE_PAIR(u); EXCHANGE_PAIR(v);
+#undef EXCHANGE_PAIR
+        c = shades[1]; shades[1] = shades[2]; shades[2] = c;
+        area = -area;
+    }
+    const bool extension = panorama_can_extend(state, true);
+    int clip_left = state->left, clip_right = state->right + 1;
+    panorama_clip_x(state, true, &clip_left, &clip_right);
+    const int scale = s_hires.scale;
+    for (int i = 0; i < 3; ++i) {
+        if (!isfinite(x[i]) || !isfinite(y[i]) || !isfinite(w[i])) return;
+    }
+    /* Clip in floating point before converting to integer raster indices;
+     * near-plane projection may have large off-screen coordinates. */
+    double min_x = fmax(fmin(x[0], fmin(x[1], x[2])), (double)clip_left);
+    double max_x = fmin(fmax(x[0], fmax(x[1], x[2])), (double)clip_right);
+    double min_y = fmax(fmin(y[0], fmin(y[1], y[2])), (double)state->top);
+    double max_y = fmin(fmax(y[0], fmax(y[1], y[2])), (double)(state->bottom + 1));
+    if (!(min_x < max_x && min_y < max_y)) return;
+    int left = (int)floor(min_x * scale);
+    int right = (int)ceil(max_x * scale);
+    int top = (int)floor(min_y * scale);
+    int bottom = (int)ceil(max_y * scale);
+    if (right <= left || bottom <= top) return;
+    const bool edge0 = (y[2] < y[1]) || (y[2] == y[1] && x[2] > x[1]);
+    const bool edge1 = (y[0] < y[2]) || (y[0] == y[2] && x[0] > x[2]);
+    const bool edge2 = (y[1] < y[0]) || (y[1] == y[0] && x[1] > x[0]);
+    const bool perspective = textured && ps1_pgxp_is_perspective_texture_enabled()
+        && v0->w > 0.0f && v1->w > 0.0f && v2->w > 0.0f;
+    const float u_min = (float)fmin(u[0], fmin(u[1], u[2]));
+    const float u_max = (float)fmax(u[0], fmax(u[1], u[2]));
+    const float v_min = (float)fmin(v[0], fmin(v[1], v[2]));
+    const float v_max = (float)fmax(v[0], fmax(v[1], v[2]));
+    /* UV derivatives are in output pixels, not PS1 pixels. */
+    const double inv_area = 1.0 / area;
+    const double du_dx = ((y[1]-y[2])*u[0] + (y[2]-y[0])*u[1]
+        + (y[0]-y[1])*u[2]) * inv_area;
+    const double dv_dx = ((y[1]-y[2])*v[0] + (y[2]-y[0])*v[1]
+        + (y[0]-y[1])*v[2]) * inv_area;
+    const double du_dy = ((x[2]-x[1])*u[0] + (x[0]-x[2])*u[1]
+        + (x[1]-x[0])*u[2]) * inv_area;
+    const double dv_dy = ((x[2]-x[1])*v[0] + (x[0]-x[2])*v[1]
+        + (x[1]-x[0])*v[2]) * inv_area;
+    float lod = (float)(fmax(hypot(du_dx, dv_dx), hypot(du_dy, dv_dy)) / scale);
+    int margin = s_panorama.pixels ? s_panorama.left_extra : 0;
+    for (int sy = top; sy < bottom; ++sy) {
+        const double py = ((double)sy + 0.5) / scale;
+        for (int sx = left; sx < right; ++sx) {
+            const double px = ((double)sx + 0.5) / scale;
+            double e0 = edge_function(x[1], y[1], x[2], y[2], px, py);
+            double e1 = edge_function(x[2], y[2], x[0], y[0], px, py);
+            double e2 = edge_function(x[0], y[0], x[1], y[1], px, py);
+            if (!((e0 > 0.0 || (e0 >= -1e-6 && edge0))
+                && (e1 > 0.0 || (e1 >= -1e-6 && edge1))
+                && (e2 > 0.0 || (e2 >= -1e-6 && edge2)))) continue;
+            double l0 = e0 * inv_area, l1 = e1 * inv_area, l2 = e2 * inv_area;
+            double depth = l0 * w[0] + l1 * w[1] + l2 * w[2];
+            size_t index = (size_t)sy * s_hires.width + (size_t)(sx + margin * scale);
+            Ps1PanoramaPixel *dst = &s_hires.pixels[index];
+            /* Lazily copy the pre-polygon low-res background only for the
+             * first fragment at this output sample. 3D never touches VRAM. */
+            if (!dst->touched) {
+                Ps1RasterTarget base = raster_target(video, sy / scale, (int)floor(px), extension);
+                dst->word = *base.word;
+                dst->color = *base.color;
+                dst->depth = *base.depth;
+                dst->transparent_depth = *base.transparent_depth;
+                dst->overdraw = *base.overdraw;
+                dst->touched = 1;
+            }
+            if (state->check_mask && (dst->word & 0x8000u)) continue;
+            float test_depth = (float)depth;
+            if (semi_transparent) test_depth = test_depth * 1.002f + 1e-5f;
+            if (s_true_depth_buffer && test_depth < dst->depth - 1e-6f) continue;
+            if (semi_transparent && s_zero_fillrate_lag && dst->overdraw >= 32) continue;
+            uint32_t shade = rgb24;
+            if (colors) {
+                shade = 0;
+                for (unsigned shift = 0; shift < 24; shift += 8) {
+                    double component = l0 * ((shades[0] >> shift) & 255u)
+                        + l1 * ((shades[1] >> shift) & 255u)
+                        + l2 * ((shades[2] >> shift) & 255u);
+                    if (component < 0.0) component = 0.0;
+                    if (component > 255.0) component = 255.0;
+                    shade |= (uint32_t)(component + 0.5) << shift;
+                }
+            }
+            uint16_t front;
+            uint32_t front32;
+            bool blend = semi_transparent;
+            if (textured) {
+                float uf, vf;
+                if (perspective && depth > 1e-9) {
+                    uf = (float)((l0*u[0]*w[0] + l1*u[1]*w[1] + l2*u[2]*w[2]) / depth);
+                    vf = (float)((l0*v[0]*w[0] + l1*v[1]*w[1] + l2*v[2]*w[2]) / depth);
+                } else {
+                    uf = (float)(l0*u[0] + l1*u[1] + l2*u[2]);
+                    vf = (float)(l0*v[0] + l1*v[1] + l2*v[2]);
+                }
+                uint16_t texel;
+                if (!sample_texel_advanced(video, tpage, clut, uf, vf, lod,
+                        u_min, u_max, v_min, v_max, &texel, &front32,
+                        shade, raw_texture) || !texel) continue;
+                front = raw_texture ? texel : modulate_texel(texel, shade);
+                blend = semi_transparent && (texel & 0x8000u);
+            } else {
+                front = quantize_rgb24(shade, sy / scale, sx / scale, state->dither);
+                front32 = 0xFF000000u | (shade & 0xFFFFFFu);
+            }
+            if (blend) {
+                front = blend_pixel(dst->word, front, state->blend_mode);
+                if (s_oit_transparency && dst->transparent_depth > 0.0f
+                    && depth < dst->transparent_depth - 1e-6f) {
+                    front32 = blend_color32_under(dst->color, front32, state->blend_mode);
+                } else {
+                    front32 = blend_color32(dst->color, front32, state->blend_mode);
+                    dst->transparent_depth = (float)depth;
+                }
+                if (s_zero_fillrate_lag) ++dst->overdraw;
+            }
+            if (s_smooth_fog && depth > 1e-9
+                && (v0->w > 0.0f || v1->w > 0.0f || v2->w > 0.0f)) {
+                front32 = apply_atmospheric_fog(front32, (float)(1.0 / depth));
+            }
+            dst->word = front | (state->force_mask ? 0x8000u : 0u);
+            dst->color = front32;
+            if (s_true_depth_buffer && !semi_transparent) dst->depth = (float)depth;
+        }
+    }
+}
+
 static bool draw_sprite_copy(Ps1Video *video,
                            const Ps1DrawState *state, const Ps1Sprite *sprite,
                            bool is_projected, int shift_x, bool side_only) {
@@ -891,11 +1205,15 @@ static bool draw_sprite_copy(Ps1Video *video,
             }
             *pixel = front | (state->force_mask ? 0x8000u : 0);
 
-            if (sprite->semi_transparent && (texel & 0x8000u)) {
+            uint32_t incoming_color = front_c32;
+            bool blended = sprite->semi_transparent && (texel & 0x8000u);
+            if (blended) {
                 front_c32 = blend_color32(*dst.color, front_c32, state->blend_mode);
             }
             *dst.color = front_c32;
             if (dst.touched) *dst.touched = 1;
+            if (blended) hires_blend_target(row, col, dst, incoming_color, state->blend_mode);
+            else hires_mirror_target(row, col, dst);
         }
     }
     return true;
@@ -1112,6 +1430,9 @@ static bool draw_triangle(Ps1Video *video, const Ps1DrawState *state,
             return true;
         }
     }
+
+    hires_draw_projected_triangle(video, state, v0, v1, v2, rgb24, tpage, clut,
+                                  textured, raw_texture, semi_transparent, colors);
 
     bool use_subpixel = ps1_pgxp_is_vertex_precision_enabled()
                      && v0->has_subpixel && v1->has_subpixel && v2->has_subpixel;
@@ -1340,6 +1661,11 @@ static bool draw_triangle(Ps1Video *video, const Ps1DrawState *state,
                     *pixel = front | (state->force_mask ? 0x8000u : 0);
                     *dst.color = front32;
                     if (dst.touched) *dst.touched = 1;
+                    if (!projected_world) {
+                        if (semi_transparent && !textured)
+                            hires_blend_target(row, col, dst, 0xFF000000u | (shade & 0xFFFFFFu), state->blend_mode);
+                        else hires_mirror_target(row, col, dst);
+                    }
                     if (s_true_depth_buffer && !semi_transparent) {
                         *dst.depth = (float)interp_w;
                     }
@@ -1471,6 +1797,11 @@ static bool draw_triangle(Ps1Video *video, const Ps1DrawState *state,
                 *pixel = front | (state->force_mask ? 0x8000u : 0);
                 *dst.color = front32;
                 if (dst.touched) *dst.touched = 1;
+                    if (!projected_world) {
+                        if (semi_transparent && !textured)
+                            hires_blend_target(row, col, dst, 0xFF000000u | (shade & 0xFFFFFFu), state->blend_mode);
+                        else hires_mirror_target(row, col, dst);
+                    }
             }
         }
     }
@@ -1554,6 +1885,7 @@ bool ps1_video_draw_line(Ps1Video *video, const Ps1DrawState *state,
                     ? blend_color32(*dst.color, c32_solid, state->blend_mode) : c32_solid;
                 *dst.color = c32;
                 if (dst.touched) *dst.touched = 1;
+                hires_mirror_target(y0, x0, dst);
             }
         }
 next_line_pixel:
@@ -1661,6 +1993,17 @@ static void panorama_draw_fullscreen_color(Ps1Video *video,
                 ? blend_color32(p->touched ? p->color : 0xFF000000u,
                                 front_color, state->blend_mode) : front_color;
             p->touched = 1;
+            int col = (int)x < s_panorama.left_extra
+                ? (int)x - s_panorama.left_extra
+                : (int)x - s_panorama.left_extra + 320;
+            if (semi_transparent) {
+                Ps1RasterTarget source = {&p->word, &p->color,
+                    &p->depth, &p->transparent_depth, &p->overdraw, &p->touched};
+                hires_blend_target(y, col, source, front_color, state->blend_mode);
+            } else {
+                hires_mirror(y, col, p->word, p->color,
+                             p->depth, p->transparent_depth, p->overdraw);
+            }
         }
     }
 }
@@ -1887,6 +2230,8 @@ bool ps1_video_upload(Ps1Video *video, int x, int y, int width, int height,
                 | ((red << 3 | red >> 2) << 16)
                 | ((green << 3 | green >> 2) << 8)
                 | (blue << 3 | blue >> 2);
+            if (x + col < 320) hires_mirror(y + row, x + col, pixel,
+                video->color32[y + row][x + col], 0.0f, 0.0f, 0);
         }
     }
     return true;
@@ -2018,6 +2363,14 @@ void ps1_video_clear_zbuffer(Ps1Video *video) {
     memset(video->zbuffer, 0, sizeof(video->zbuffer));
     memset(video->trans_z, 0, sizeof(video->trans_z));
     memset(video->overdraw, 0, sizeof(video->overdraw));
+    if (s_hires.pixels) {
+        size_t count = (size_t)s_hires.width * PS1_VRAM_HEIGHT * s_hires.scale;
+        for (size_t i = 0; i < count; ++i) {
+            s_hires.pixels[i].depth = 0.0f;
+            s_hires.pixels[i].transparent_depth = 0.0f;
+            s_hires.pixels[i].overdraw = 0;
+        }
+    }
 }
 
 void ps1_video_set_near_plane_clipping(bool enabled) {
