@@ -25,6 +25,8 @@ void host_display_set_widescreen_mode(WidescreenMode mode);
 void host_display_set_pixel_aspect_ratio(PixelAspectRatio ratio);
 /* Explicit integer scaling is opt-in; true Hor+ remains output-ratio aware. */
 void host_display_set_integer_scaling(bool enabled);
+/* 0 = match desktop height, 1..16 = requested 3D raster scale. */
+void host_display_set_render_scale(int scale);
 WidescreenMode host_display_get_widescreen_mode(void);
 /* Apply GTE Hor+ and 2D safe-area transforms before the next game frame. */
 bool host_display_update_widescreen(SDL_Renderer *renderer);

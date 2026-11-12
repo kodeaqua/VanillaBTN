@@ -30,8 +30,9 @@ flowchart TD
 ---
 
 The configuration examples below document intended options as well as
-implemented behavior. In particular, `render_scale` does not currently resize
-the software 3D rasterizer. See [TODO.md](../TODO.md) for outstanding work.
+implemented behavior. The host-only `render_scale` samples projected polygons
+at higher integer resolutions; it does not change the authoritative PS1 VRAM.
+See [TODO.md](../TODO.md) for outstanding work.
 
 ## 2. Master Preset System & `vanillabtn.ini` Specification
 
@@ -184,7 +185,8 @@ hd_rumble = auto
 ; Texture filter: nearest (sharp pixel art), bilinear (smooth), xbrz
 texture_filter = nearest
 
-; Reserved render-scale setting: 1..16 or native (not yet a native-res 3D raster)
+; 3D software raster multiplier: 1..16 or native (match display height;
+; automatically reduced when the memory safety limit is reached)
 render_scale = 1
 
 ; Sharp high-resolution text: on, off
@@ -332,10 +334,11 @@ Following the completion of the 35 PS1 flaw fixes, Phase 2 implements modern pla
 - [x] **Milestone 16**: Multi-Backend Renderer Abstraction (`host_renderer.c/h`).
 - [x] **Milestone 17**: HD Font & QoL Features (`ps1_card.c/h`, `ps1_video.c/h`, `sdk_sync.c/h`).
 
-Milestone labels mean the code and synthetic tests exist, not that every option
-is fully effective. Known gaps (`render_scale`, wide-edge actor pop-in) are listed in `TODO.md`; backend
-selection falls back through the chain above, and HD font, turbo and extended
-draw distance options have not been confirmed in the runtime.
+Milestone labels mean code and synthetic tests exist, not that every option
+has undergone hands-on gameplay acceptance. Remaining scene-specific gaps are
+listed in `TODO.md`; renderer backend selection falls back through the chain
+above, and HD font, turbo and extended draw distance options have not been
+confirmed in the runtime.
 
 ---
 
@@ -416,8 +419,16 @@ changes separate from the matching PS1 reference build.
   `render_scale = native` setting through INI save/reload. Malformed sections,
   nonfinite numbers, integer overflow, and truncated paths are rejected
   instead of silently changing another setting.
-- `render_scale` is currently a stored configuration preference, **not** an
-  implemented full-resolution 3D raster target.
+- `render_scale = 1..16` controls the integer multiplier of a host-only
+  software raster target for projected 3D geometry. `render_scale = native`
+  picks the ceiling of SDL output height divided by 240 (up to 16).
+  The allocator reduces the multiplier as needed to stay below 12 million
+  samples across 512 PS1 framebuffer rows, and uses the 1x path on failure.
+  Presentation uses the resulting higher-resolution SDL streaming texture
+  inside the **same** logical 4:3/panoramic canvas; HUD, pixel-aspect correction,
+  framebuffer texture coordinates and PS1 VRAM are not rescaled. This is
+  integer software supersampling, not necessarily one sample per physical
+  monitor pixel, and requires visual/performance validation in the game.
 - `pixel_aspect_ratio = crt_ntsc` applies the NTSC CRT 1.092 horizontal pixel
   aspect at SDL presentation, without changing VRAM resolution, HUD placement,
   game coordinates or polygon projection. Hor+ FOV is calculated from the
@@ -469,9 +480,11 @@ changes separate from the matching PS1 reference build.
   unavoidable, keep the PS1 reference path intact.
 - Asset loading still uses original PS1 game data supplied by the user; no
   proprietary disc files or SDK content belong in the repository.
-- True monitor-resolution 3D polygon rasterization is a separate engine task:
-  a dynamic-width logical framebuffer should not be described as rendering
-  every polygon natively at 1080p/1440p/4K.
+- Higher-resolution 3D polygon rasterization uses separate host-only integer
+  supersamples; an output-limited software rasterizer cannot guarantee
+  exact physical-resolution samples at every display size or refresh rate.
+  Textures, UI sprites and non-projected PS1 primitives remain authored at
+  their original PS1 resolution rather than acquiring new source detail.
 - For active work and outstanding tasks, use [TODO.md](../TODO.md); for build
   instructions, use [building.md](building.md); for the SDK compatibility
   boundary, use [native-sdk.md](native-sdk.md).

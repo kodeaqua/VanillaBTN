@@ -6,6 +6,7 @@
 
 static WidescreenMode s_widescreen_mode = WIDESCREEN_AUTO;
 static bool s_integer_scaling;
+static int s_render_scale = 1;
 static PixelAspectRatio s_pixel_aspect_ratio = PAR_SQUARE;
 
 void host_display_set_pixel_aspect_ratio(PixelAspectRatio ratio) {
@@ -22,6 +23,10 @@ static float s_last_world_fov_scale = 1.0f;
  * 320x240 display page to present that same world panorama through the fade. */
 static SdkDisplay s_last_game_display;
 static bool s_fade_uses_panorama;
+
+void host_display_set_render_scale(int scale) {
+    s_render_scale = scale >= 0 && scale <= 16 ? scale : 1;
+}
 
 void host_display_set_integer_scaling(bool enabled) {
     s_integer_scaling = enabled;
@@ -114,6 +119,12 @@ bool host_display_update_widescreen(SDL_Renderer *renderer) {
         if (display.width == 320 && display.height == 240)
             s_last_game_display = display;
     }
+    /* "native" resolves against the actual renderer output, not the INI's
+     * window dimensions. The host raster may cap the scale for memory safety. */
+    int scale = s_render_scale == 0 ? (output_height + 239) / 240 : s_render_scale;
+    if (scale < 1) scale = 1;
+    if (scale > 16) scale = 16;
+    ps1_video_set_render_scale(scale);
     if (!ps1_video_configure_panorama(display.width, display.height, fov_scale)) {
         return false;
     }
@@ -296,9 +307,12 @@ bool host_present_frame(const Ps1Video *video, SDL_Renderer *renderer, SDL_Textu
 
     const SdkDisplay presented = s_fade_uses_panorama ? s_last_game_display : display;
     int presentation_width = ps1_video_panorama_width(presented.width);
-    if (width != presentation_width || height != presented.height) {
+    int render_scale = presented.width == 320 ? ps1_video_get_render_scale() : 1;
+    if (width != presentation_width * render_scale
+        || height != presented.height * render_scale) {
         SDL_Texture *replacement = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
-            SDL_TEXTUREACCESS_STREAMING, presentation_width, presented.height);
+            SDL_TEXTUREACCESS_STREAMING, presentation_width * render_scale,
+            presented.height * render_scale);
         if (!replacement) return false;
         if (!SDL_SetTextureScaleMode(replacement, SDL_SCALEMODE_NEAREST)) {
             SDL_DestroyTexture(replacement);
@@ -315,8 +329,11 @@ bool host_present_frame(const Ps1Video *video, SDL_Renderer *renderer, SDL_Textu
         SDL_UnlockTexture(*texture);
         return false;
     }
-    copied = ps1_video_copy_panorama(video, presented.x, presented.y, presented.width, presented.height,
-                                     pixels, (size_t)pitch / sizeof(uint32_t));
+    copied = render_scale > 1
+        ? ps1_video_copy_scaled_panorama(video, presented.x, presented.y,
+            presented.width, presented.height, pixels, (size_t)pitch / sizeof(uint32_t))
+        : ps1_video_copy_panorama(video, presented.x, presented.y, presented.width,
+            presented.height, pixels, (size_t)pitch / sizeof(uint32_t));
     SDL_UnlockTexture(*texture);
     /* SDL's logical canvas models the physical width of a PS1 scanline;
      * changing its destination rectangle must never rewrite texture VRAM. */

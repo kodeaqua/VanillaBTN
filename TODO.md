@@ -11,8 +11,10 @@ reference build; see [AGENTS.md](AGENTS.md) and [docs/architecture.md](docs/arch
       sampled independently at integer multiples of PS1 resolution on a
       separate host surface. PS1 VRAM, 4:3 geometry, and 2D draw coordinates
       retain their original resolution. Scale 1 preserves the existing path.
-- [ ] Connect `render_scale` to the render target when scalable rasterization
-      is implemented; it currently affects configuration storage only.
+- [x] **Milestone 22: Host render-scale presentation** — `render_scale =
+      1..16/native` selects the supersampled software target and SDL texture;
+      `native` follows output height, while allocation limits can reduce the
+      effective multiplier. Logical camera and HUD coordinates stay unchanged.
 - [x] **Milestone 19: CRT NTSC pixel aspect** — `pixel_aspect_ratio = crt_ntsc`
       corrects physical presentation width without changing game/HUD coordinates;
       explicit anamorphic `widescreen = stretch` continues to override PAR.

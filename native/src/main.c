@@ -525,6 +525,7 @@ int main(int argc, char **argv) {
     host_display_set_widescreen_mode(host.config.display.widescreen);
     host_display_set_pixel_aspect_ratio(host.config.display.par);
     host_display_set_integer_scaling(host.config.display.integer_scale);
+    host_display_set_render_scale(host.config.graphics.render_scale);
     ps1_video_set_texture_filter(filter_mode);
     ps1_video_set_anti_aliasing(aa_mode);
     ps1_video_set_smooth_fog(smooth_fog);
