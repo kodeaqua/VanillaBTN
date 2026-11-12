@@ -7,7 +7,7 @@ game rules and data formats while replacing these host-facing services:
 | --- | --- | --- |
 | Startup, scenes, timing | `src/main/main.c` initializes PSY-Q, uses VSync, loads one MIPS overlay into a fixed region, and runs its scene handler. `src/main/overlay_regions.c` identifies two regions. | Keep scene handlers as native modules. Select a handler by scene ID; never execute imported MIPS overlays or treat PS1 addresses as host pointers. Preserve the game's simulation cadence. |
 | Disc and archive | `src/main/cd/afile.c` finds `A_FILE.BIN` and `A_FILE.HDT` through `CdSearchFile`, uses 2048-byte sectors, and has synchronous and polled reads. `src/main/cd/cd_audio.c` reads XA streams. | Read imported files by byte offset. Preserve archive member indices and read completion semantics where callers depend on them. Decode XA separately for audio. |
-| Graphics | `src/main/graphics`, `src/main/geometry`, and `main.c` use GPU primitives, ordering tables, GTE, VRAM/CLUT, and scene-specific display modes. | The native slice holds 1024x512 16-bit VRAM words, presents a 320x240 rectangle, handles quick fill, tiles, and basic textured sprites through TPage/CLUT. Texture windows, textured polygons, ordering, GTE, and scene modes still need implementation. |
+| Graphics | `src/main/graphics`, `src/main/geometry`, and `main.c` use GPU primitives, ordering tables, GTE, VRAM/CLUT, and scene-specific display modes. | The native software GPU holds 1024x512 16-bit VRAM words and implements fills, tiles, sprites, flat and textured polygons, ordering tables, and a GTE layer. Texture windows and some scene display modes remain open; see `TODO.md`. |
 | Input | `src/main/input/pad.c` polls two PS1 pads; `pad_vibration.c` drives their actuators. | Map SDL3 input and rumble to the existing pad records and polling rules. |
 | Sound | `src/main/sound/sound.c` uses SPU/VAB/SEQ; `cd_audio.c` controls XA. | Decode and mix game audio to PCM, then submit it through SDL3. |
 | Save/load | `src/overlay/15_saveload/saveload.c` and `src/overlay/31_gf_mcard` use PS1 card operations. | Preserve the original save-file bytes and card UI behavior with virtual slots. |
@@ -35,8 +35,8 @@ before distribution. Imported files remain local and must never be committed.
 ## Graphics slice
 
 The first original graphics module now compiles against native SDK transfers;
-see [Native SDK boundary](native-sdk.md). Scene and primitive submission remain
-unconnected to the host loop.
+see [Native SDK boundary](native-sdk.md). Original scene code submits its
+primitives through the SDK bridge in the host loop.
 
 `native/src/ps1_video.c` implements the tested GP0(02) quick fill and
 GP0(60/62/68/6A) untextured tile rules: 8-to-5-bit color conversion, fill
@@ -50,7 +50,8 @@ only texels with bit 15 when semitransparency is requested, and applies the
 drawing area's clipping and mask rules. Software triangle and quad rasterization
 covers flat and textured polygons (POLY_F3, POLY_FT3, POLY_F4, POLY_FT4).
 Texture windows, flips, and CLUT cache timing remain pending.
-No game scene issues these commands through the native target yet.
+Original scenes issue these commands through the native SDK bridge; fidelity of
+the result is not established by synthetic tests.
 
 `native/src/ps1_ot.c` stores packet IDs behind host-sized links rather than
 the PS1's 24-bit MIPS addresses. A table walks buckets from high to low and
@@ -72,7 +73,7 @@ vector rotation and translation, perspective divide (RTPS/RTPT), normal clipping
 game ticks with an anti-cascade clamp, matching the original `VSync(2)` cadence.
 Exact NTSC hardware drift remains unmodeled. `native/src/main.c` maps SDL3
 keyboard (WASD/arrows, ZXCV, Enter/Space/Esc) and SDL3 Gamepad events directly
-to PS1 controller bits. Scene wiring remains next.
+to PS1 controller bits for the original `pad.c` logic.
 
 ## Audio slice
 

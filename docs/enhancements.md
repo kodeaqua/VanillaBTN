@@ -326,12 +326,18 @@ Following the completion of the 35 PS1 flaw fixes, Phase 2 implements modern pla
 - [x] **Milestone 11**: Zero Fill-rate Bottleneck Architecture — Guarantees solid 60 FPS in heavy rain and festival scenes.
 - [x] **Milestone 12**: Input Subsystem Fixes — Circular analog normalization (diagonal running fix), HD rumble curve, sub-frame raw input polling, and disconnect auto-pause.
 
-### PHASE 2: Modern Graphics & Platform Enhancements - COMPLETE
+### PHASE 2: Modern Graphics & Platform Enhancements - IMPLEMENTED (see limits)
 - [x] **Milestone 13**: Multi-Monitor Discovery & 4 Window Modes (`host_display.c/h`).
 - [x] **Milestone 14**: Decoupled FPS Limiter & Pacing Lock (`host_pacing.c/h`, `sdk_sync.c/h`).
 - [x] **Milestone 15**: True Widescreen Hor+ 3D FOV Expansion (`ps1_gte.c/h`, `host_display.c/h`).
 - [x] **Milestone 16**: Multi-Backend Renderer Abstraction (`host_renderer.c/h`).
 - [x] **Milestone 17**: HD Font & QoL Features (`ps1_card.c/h`, `ps1_video.c/h`, `sdk_sync.c/h`).
+
+Milestone labels mean the code and synthetic tests exist, not that every option
+is fully effective. Known gaps (`render_scale`, `pixel_aspect_ratio = crt_ntsc`,
+`pause_on_unfocus`, wide-edge actor pop-in) are listed in `TODO.md`; backend
+selection falls back through the chain above, and HD font, turbo and extended
+draw distance options have not been confirmed in the runtime.
 
 ---
 

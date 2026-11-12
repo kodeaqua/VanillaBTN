@@ -11,9 +11,10 @@ should be optional and separate from that default experience.
 This repository contains a matching decompilation of the PlayStation USA
 release (`SLUS_011.15`) and a native x64 Windows bringup executable. The
 native executable runs the original startup and scene dispatcher against
-locally imported disc data, featuring complete software GPU/GTE rasterization,
-SPU/VAB/SEQ audio, CD-XA music streaming, dual controller input with rumble, and
-virtual memory card save/load. The PS1 source builds the EXE and its 13 overlays
+locally imported disc data, using a software GPU/GTE rasterizer, SPU/VAB/SEQ
+audio, CD-XA music streaming, dual controller input with rumble, and virtual
+memory card save/load. The bringup is incomplete and gameplay fidelity is not
+established; see [TODO.md](TODO.md). The PS1 source builds the EXE and its 13 overlays
 byte for byte and, given your own copy of the disc, the whole disc image. That build
 remains the reference baseline. Building it with Docker on Windows still produces
 PS1 binaries.

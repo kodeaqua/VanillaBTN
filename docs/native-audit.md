@@ -17,9 +17,15 @@ acceptance remains the developer's responsibility.
   after summing voices, could overflow signed 32-bit arithmetic. These products
   now use 64-bit intermediates. A full-scale XA regression checks the output.
 
-## Remaining bringup blockers
+## Findings at audit time
 
-- `native/src/main.c` creates and presents zeroed VRAM but invokes no game scene,
+These findings describe the code at the audited commits. Native startup now
+calls the original game loop, SDL initializes gamepads, and `ps1_seq.c` and
+`ps1_reverb.c` exist, so several items below are historical. None of them has
+been re-audited against hardware, and none establishes fidelity. Track current
+open work in `TODO.md`.
+
+- `native/src/main.c` created and presents zeroed VRAM but invokes no game scene,
   imports no assets, starts no sounds, and exposes no in-game save flow. This
   explains the black window and silence. Standalone subsystem tests do not
   establish runtime integration.
@@ -39,11 +45,10 @@ acceptance remains the developer's responsibility.
   card, and the game's save bytes need independent fixtures. Existing tests do
   not justify the original compatibility/UI claims.
 
-Milestone completion labels in `TODO.md` now identify these as foundations.
-Finish these blockers in focused changes before returning to scene bringup.
+Re-verify each finding with independent fixtures before treating it as closed.
 
 ## Verification
 
-Both native Debug and Release compile and pass all 12 CTest checks with active
-assertions. The 14-file PS1 code check passes. This does not validate audiovisual
+Both native Debug and Release compile and pass all 72 CTest checks (the count
+grows as tests are added) with active assertions. The PS1 `check` target passes. This does not validate audiovisual
 or gameplay fidelity, and no original assets or SDK files were added.

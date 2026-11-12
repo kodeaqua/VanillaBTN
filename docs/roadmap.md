@@ -38,11 +38,12 @@ fields with explicit 32-bit types, and check structure sizes at compile time.
 
 ## Milestones
 
-Milestones 0 through 5 are fully implemented and verified, covering the native
-toolchain, disc/archive importer, software GPU/GTE rasterizer, input and simulation clock,
-SPU/VAB/SEQ audio and CD-XA streaming, and virtual memory card save/load.
-Milestone 6 provides complete scene coverage, optimized Release packaging, and runtime
-acceptance verified by the developer.
+Milestones 0 through 5 are implemented with code-level and synthetic checks,
+covering the native toolchain, disc/archive importer, software GPU/GTE rasterizer,
+input and simulation clock, SPU/VAB/SEQ audio and CD-XA streaming, and virtual
+memory card save/load. Milestone 6 has Release packaging and original scene
+execution; full scene coverage and actual runtime acceptance remain with the
+developer. The bringup is incomplete; see `TODO.md`.
 
 | Order | Work | Agent's code or synthetic exit check | Developer's actual check |
 | --- | --- | --- | --- |

@@ -40,7 +40,7 @@ timing, visuals, and audio. The PS1 reference build
 keeps its existing compiler settings and SHA-1 checks.
 
 The staged implementation plan and stack decisions are in
-[roadmap.md](roadmap.md). Milestones 0 through 5 are fully implemented and verified,
-with Milestone 6 release packaging and runtime bringup established. The PS1 `check`
+[roadmap.md](roadmap.md). Milestones 0 through 5 are implemented with code-level checks,
+and Milestone 6 has release packaging and runtime bringup in progress. The PS1 `check`
 target verifies byte identity of the reference; the developer validates actual Windows
 gameplay and runtime behavior.
