@@ -475,6 +475,9 @@ changes separate from the matching PS1 reference build.
   This removes an out-of-range memory access shared by dialogue, menus, and
   event text, but does not establish the cause of any particular gameplay crash
   without a reproducing trace. The PS1 reference lookup is unchanged.
+- Empty optional labels no longer read the preceding halfword while drawing
+  or measuring text; the native path also avoids checking the previous glyph
+  when the cursor is at index zero. The reference PS1 code is unaffected.
 
 ### Virtual memory-card reliability
 

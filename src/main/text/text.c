@@ -910,6 +910,9 @@ static u8 *text_draw_string(u_long *ot, u8 *prim, u16 *text, s16 x, s16 y, s32 s
     u16 *child;
     s16 glyphX;
     s16 glyphY;
+#ifdef VANILLABTN_NATIVE
+    u16 *start = text;
+#endif
 
     if (nested == 0)
     {
@@ -1052,7 +1055,12 @@ static u8 *text_draw_string(u_long *ot, u8 *prim, u16 *text, s16 x, s16 y, s32 s
         }
         text++;
     }
+#ifdef VANILLABTN_NATIVE
+    /* Empty optional names are valid; there is no preceding glyph to read. */
+    text_last_code = text == start ? TEXT_END : text[-1];
+#else
     text_last_code = text[-1];
+#endif
     return prim;
 }
 
@@ -1063,7 +1071,11 @@ static s16 text_end_y(void)
     s16 y = text_pen_y;
     u16 index = text_index;
     u16 *p = text_current;
+#ifdef VANILLABTN_NATIVE
+    if (index != 0 && p[index - 1] == TEXT_LINE_BREAK)
+#else
     if (p[index - 1] == TEXT_LINE_BREAK)
+#endif
     {
         s32 next = y - TEXT_LINE_HEIGHT;
         next -= text_spacing_y;
@@ -1369,6 +1381,11 @@ static s32 text_measure(u16 *entries, s32 size, s16 spacing)
     u16 entry;
 
     width = 0;
+#ifdef VANILLABTN_NATIVE
+    /* Centered/right-aligned labels can legitimately be empty. */
+    if (*entries == TEXT_END || *entries == TEXT_LINE_BREAK)
+        return 0;
+#endif
     while (*entries != TEXT_LINE_BREAK && *entries != TEXT_END)
     {
         entry = *entries;

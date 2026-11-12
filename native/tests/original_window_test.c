@@ -171,6 +171,13 @@ int main(void) {
     CHECK(text_window_draw(&ot[2], missing_insert, 30, 168, 0, 48) == TEXT_WINDOW_PRINTING);
     CHECK(text_window_draw(&ot[2], missing_insert, 30, 168, 0, 48) == TEXT_WINDOW_PRINTING);
 
+    /* Empty optional labels must not read a code from before their first word. */
+    extern u16 text_last_code;
+    u16 empty_label[] = {TEXT_END};
+    text_last_code = 0x1234;
+    text_draw_plain(&ot[2], empty_label, 30, 168);
+    CHECK(text_last_code == TEXT_END);
+
     DrawOTag(ot + 31);
     CHECK(sdk_gpu_ok());
     input_pad1 = input_records;

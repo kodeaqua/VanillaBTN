@@ -27,6 +27,9 @@ reference build; see [AGENTS.md](AGENTS.md) and [docs/architecture.md](docs/arch
 
 ## Runtime and input
 
+- [x] **Milestone 26: Empty text safety** — the native shared text renderer
+      and line measurement avoid reading before an empty optional label, and
+      glyph-line backtracking is skipped at index zero. The PS1 path is unchanged.
 - [x] **Milestone 25: Native text-insert source bounds** — the shared
       dialogue, event-text and menu formatter resolves optional source slots
       only inside its 12-entry table; missing or unknown insertion codes are
