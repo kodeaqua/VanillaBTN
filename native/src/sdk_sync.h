@@ -22,6 +22,12 @@ void sdk_sync_subtick_hook(uint64_t (*subtick)(uint64_t deadline, void *), void 
 void sdk_sync_set_turbo(uint32_t multiplier);
 uint32_t sdk_sync_get_turbo(void);
 
+/* Hold the simulation clock. Time between suspend and resume is removed from the
+ * VSync epoch, so the original loop sees no elapsed frames and does not catch up.
+ * Call both from the VSync pump (host thread). Resume without suspend is a no-op. */
+void sdk_sync_suspend(void);
+void sdk_sync_resume(void);
+
 /* Cooperative cancellation allows the original loop to return on window close. */
 void sdk_sync_start(void);
 void sdk_sync_stop(void);

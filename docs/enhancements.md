@@ -31,8 +31,7 @@ flowchart TD
 
 The configuration examples below document intended options as well as
 implemented behavior. In particular, `render_scale` does not currently resize
-the software 3D rasterizer, and `pause_on_unfocus` does not yet implement a
-full simulation pause. See [TODO.md](../TODO.md) for outstanding work.
+the software 3D rasterizer. See [TODO.md](../TODO.md) for outstanding work.
 
 ## 2. Master Preset System & `vanillabtn.ini` Specification
 
@@ -208,7 +207,7 @@ mute_on_unfocus = off
 ; Analog stick deadzone (0.00 - 0.50)
 analog_deadzone = 0.10
 
-; Pause policy switches: on, off (full unfocus simulation pause not yet implemented)
+; Pause policy switches: on, off (unfocus holds the VSync pump and sync clock)
 pause_on_unfocus = off
 pause_on_disconnect = on
 
@@ -335,7 +334,7 @@ Following the completion of the 35 PS1 flaw fixes, Phase 2 implements modern pla
 
 Milestone labels mean the code and synthetic tests exist, not that every option
 is fully effective. Known gaps (`render_scale`, `pixel_aspect_ratio = crt_ntsc`,
-`pause_on_unfocus`, wide-edge actor pop-in) are listed in `TODO.md`; backend
+wide-edge actor pop-in) are listed in `TODO.md`; backend
 selection falls back through the chain above, and HD font, turbo and extended
 draw distance options have not been confirmed in the runtime.
 
@@ -413,8 +412,13 @@ changes separate from the matching PS1 reference build.
   instead of silently changing another setting.
 - `render_scale` is currently a stored configuration preference, **not** an
   implemented full-resolution 3D raster target. Similarly,
-  `pixel_aspect_ratio = crt_ntsc` does not currently modify the presentation,
-  and `pause_on_unfocus` is not a complete simulation pause mechanism.
+  `pixel_aspect_ratio = crt_ntsc` does not currently modify the presentation.
+- `pause_on_unfocus = on` holds the original loop inside the VSync pump while
+  the window is unfocused and clears queued audio. `sdk_sync_suspend` and
+  `sdk_sync_resume` remove the held time from the VSync epoch, so the loop does
+  not catch up afterwards. The synthetic `sdk_vsync_timing` test covers the
+  clock; focus behavior in a real window still needs developer verification.
+  `pause_on_disconnect` still only skips input sampling and does not hold the loop.
 - Frame pacing uses overflow-safe elapsed-time calculations. Adaptive V-Sync
   falls back to standard V-Sync when available. SDL window-mode failures are
   propagated, and toggle hotkeys ignore repeated key-down events.

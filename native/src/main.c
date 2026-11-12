@@ -149,6 +149,7 @@ static bool boot_save_frame(void) {
 static void host_game_pump(void *context) {
     HostGame *host = context;
     SDL_Event event;
+    bool suspended = false;
 #ifdef VANILLABTN_BOOT_TEST
     if (main_scene == SCENE_FARM && (game_state.globalFlags & GLOBAL_FLAG_INPUT_REPLAY))
         host->visited_farm = true;
@@ -166,6 +167,7 @@ static void host_game_pump(void *context) {
         return;
     }
 #endif
+poll_events:
     while (SDL_PollEvent(&event)) {
         if (event.type == SDL_EVENT_QUIT) {
             host->running = false;
@@ -313,6 +315,20 @@ static void host_game_pump(void *context) {
     }
 
     if (!host->running) { sdk_sync_stop(); return; }
+
+    /* pause_on_unfocus: the original loop runs inside VSync, so holding this pump
+     * holds the simulation. Suspending the sync clock keeps the time spent here
+     * from being replayed as elapsed frames. Focus events are handled above. */
+    if (host->config.input.pause_on_unfocus && !host->focused) {
+        if (!suspended) {
+            sdk_sync_suspend();
+            suspended = true;
+            if (audio.stream) SDL_ClearAudioStream(audio.stream);
+        }
+        SDL_DelayNS(16666667);
+        goto poll_events;
+    }
+    if (suspended) sdk_sync_resume();
 
     if (host->paused) {
         bool minimized = host->window != NULL &&

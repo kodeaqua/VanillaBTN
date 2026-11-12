@@ -13,11 +13,20 @@ static void wait_until(uint64_t deadline, void *context) {
 
 static unsigned callbacks, pumps;
 static bool registered = true;
+static Clock *pump_clock;
+static uint64_t pause_ns;
 static void on_vblank(void) { ++callbacks; }
 static void on_pump(void *context) {
     assert(context == &pumps);
     assert(callbacks == pumps + (registered ? 1u : 0u));
     ++pumps;
+    if (pause_ns) {
+        /* Model a host holding the pump (for example while unfocused). */
+        sdk_sync_suspend();
+        pump_clock->now += pause_ns;
+        pause_ns = 0;
+        sdk_sync_resume();
+    }
 }
 
 int main(void) {
@@ -44,10 +53,25 @@ int main(void) {
     assert(clock.now == 216666667 && clock.waits == 5);
     assert(VSync(-1) == 13);
     assert(callbacks == 6 && pumps == 6);
+    /* A suspended pump must not make the loop catch up: five held seconds add no
+     * frames, and the next VSync waits exactly one nominal interval. */
+    sdk_sync_resume();
+    pump_clock = &clock;
+    pause_ns = 5000000000ull;
+    VSync(0);
+    assert(clock.now == 233333334ull + 5000000000ull);
+    assert(VSync(-1) == 14);
+    {
+        uint64_t held_at = clock.now;
+        unsigned waits = clock.waits;
+        VSync(0);
+        assert(clock.waits == waits + 1 && clock.now - held_at == 16666666);
+    }
+    assert(callbacks == 8 && pumps == 8);
     registered = false;
     VSyncCallback(NULL);
     VSync(0);
-    assert(callbacks == 6 && pumps == 7);
+    assert(callbacks == 8 && pumps == 9);
     sdk_sync_pump(NULL, NULL);
     assert(!sdk_sync_bind(now, NULL, &clock));
     assert(sdk_sync_bind(NULL, NULL, NULL));

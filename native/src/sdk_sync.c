@@ -41,6 +41,9 @@ static void (*host_pump)(void *);
 static void *host_context;
 static uint64_t dispatched_tick;
 static bool dispatching;
+static bool suspended;
+static bool shifted;
+static uint64_t suspended_at;
 
 void sdk_sync_pump(void (*pump)(void *), void *context) {
     host_pump = pump;
@@ -81,6 +84,31 @@ static void dispatch_vblank(uint64_t tick) {
     dispatching = false;
 }
 
+void sdk_sync_suspend(void) {
+    if (!initialized || suspended) return;
+    suspended_at = clock_now(clock_context);
+    suspended = true;
+}
+
+void sdk_sync_resume(void) {
+    if (!suspended) return;
+    uint64_t now = clock_now(clock_context);
+    uint64_t held = now > suspended_at ? now - suspended_at : 0;
+    /* Shifting both anchors preserves tick numbering and VSync(1) deltas. */
+    epoch += held;
+    last_wait += held;
+    suspended = false;
+    shifted = true;
+}
+
+/* A pump may have suspended for a long time. The caller's cached timestamp then
+ * predates the shifted epoch, so re-read the clock once after dispatch. */
+static void refresh_after_dispatch(uint64_t *now) {
+    if (!shifted) return;
+    shifted = false;
+    *now = clock_now(clock_context);
+}
+
 static uint64_t units(uint64_t ns, uint64_t rate) {
     return ns / 1000000000 * rate + ns % 1000000000 * rate / 1000000000;
 }
@@ -97,6 +125,7 @@ bool sdk_sync_bind(uint64_t (*now)(void *), void (*wait)(uint64_t, void *), void
     clock_context = context;
     initialized = false;
     dispatched_tick = 0;
+    suspended = shifted = false;
     return true;
 }
 
@@ -134,12 +163,14 @@ int VSync(int mode) {
         now = clock_now(clock_context);
         elapsed_now = now >= epoch ? now - epoch : 0;
         dispatch_vblank(units(elapsed_now, 60));
+        refresh_after_dispatch(&now);
     }
     /* Late work delivers the current boundary once, without replaying stale
      * rendering callbacks or adding another frame delay. Queries stay pure. */
     if (!waited) {
         uint64_t elapsed_final = now >= epoch ? now - epoch : 0;
         dispatch_vblank(units(elapsed_final, 60));
+        refresh_after_dispatch(&now);
     }
     int elapsed = result_units(now >= last_wait ? now - last_wait : 0, 15750);
     last_wait = now;
