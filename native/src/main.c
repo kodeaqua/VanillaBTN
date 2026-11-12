@@ -20,6 +20,7 @@ extern int main_scene;
 #include "host_display.h"
 #include "host_renderer.h"
 #include "host_pacing.h"
+#include "host_audio_policy.h"
 #include "sdk_pad.h"
 #include "sdk_card.h"
 #include "sdk_cd.h"
@@ -46,6 +47,7 @@ typedef struct HostGame {
     SDL_Gamepad *gamepads[2];
     bool running;
     bool paused;
+    bool focused;
     AppConfig config;
     HostPacing pacing;
     uint32_t keyboard_buttons, controller_buttons[2];
@@ -168,7 +170,6 @@ static void host_game_pump(void *context) {
         if (event.type == SDL_EVENT_QUIT) {
             host->running = false;
         } else if (event.type == SDL_EVENT_GAMEPAD_ADDED) {
-            host->paused = false;
             int slot = -1;
             if (host->gamepads[0] == NULL) {
                 slot = 0;
@@ -178,6 +179,7 @@ static void host_game_pump(void *context) {
             if (slot >= 0) {
                 host->gamepads[slot] = SDL_OpenGamepad(event.gdevice.which);
                 if (host->gamepads[slot] != NULL) {
+                    if (slot == 0) host->paused = false;
                     HostPadSnapshot state = host_gamepad_snapshot(host->gamepads[slot]);
                     host->controller_buttons[slot] = state.buttons;
                     host->stick_x[slot] = state.x;
@@ -201,6 +203,11 @@ static void host_game_pump(void *context) {
                 }
             }
         } else if (event.type == SDL_EVENT_WINDOW_FOCUS_LOST) {
+            host->focused = false;
+            /* Remove buffered audible samples immediately, not after the
+             * SDL queue naturally drains. Game audio state still advances. */
+            if (host->config.audio.mute_on_unfocus && audio.stream)
+                SDL_ClearAudioStream(audio.stream);
             host->keyboard_buttons = 0;
             memset(host->keyboard_keys, 0, sizeof(host->keyboard_keys));
             for (int i = 0; i < 2; ++i) {
@@ -209,6 +216,7 @@ static void host_game_pump(void *context) {
                 host->trigger_left[i] = host->trigger_right[i] = 0;
             }
         } else if (event.type == SDL_EVENT_WINDOW_FOCUS_GAINED) {
+            host->focused = true;
             /* Input events need not repeat for controls held while unfocused. */
             int numkeys = 0;
             const bool *keys = SDL_GetKeyboardState(&numkeys);
@@ -233,6 +241,9 @@ static void host_game_pump(void *context) {
                 host->trigger_right[i] = state.right_trigger;
             }
         } else if (event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP) {
+            /* Key state is latched until release. Auto-repeat must not toggle
+             * fullscreen/turbo repeatedly while a hotkey remains pressed. */
+            if (event.type == SDL_EVENT_KEY_DOWN && event.key.repeat) continue;
             if (event.type == SDL_EVENT_KEY_DOWN) {
                 if (((event.key.mod & SDL_KMOD_ALT) && (event.key.key == SDLK_RETURN || event.key.key == SDLK_KP_ENTER))
                     || event.key.key == SDLK_F11) {
@@ -344,6 +355,9 @@ static void host_game_pump(void *context) {
      * interval from the same SDK SPU used by sound.c, not the smoke mixer. */
     int16_t samples[735 * 2];
     sdk_sound_mix(samples, 735);
+    host_audio_apply_volume(samples, sizeof(samples) / sizeof(samples[0]),
+        host->config.audio.master_volume,
+        host->config.audio.mute_on_unfocus && !host->focused);
 #ifdef VANILLABTN_BOOT_TEST
     for (unsigned i = 0; i < 735 * 2; ++i) {
         if (samples[i]) { ++host->audible_frames; break; }
@@ -454,7 +468,11 @@ int main(int argc, char **argv) {
 #endif
         else return 1;
     }
-    config_load(&host.config, config_path);
+    if (!config_load(&host.config, config_path)) {
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "VanillaBTN",
+            "Cannot read the requested configuration or create its directory.", NULL);
+        return 1;
+    }
     bool pgxp_v = config_resolve_bool(host.config.fixes.pgxp_vertex_precision, host.config.preset, true);
     bool pgxp_t = config_resolve_bool(host.config.fixes.pgxp_perspective_texture, host.config.preset, true);
     bool zbuff = config_resolve_bool(host.config.fixes.true_depth_buffer, host.config.preset, true);
@@ -498,6 +516,7 @@ int main(int argc, char **argv) {
     ps1_video_set_alpha_halo_fix(alpha_halo);
     ps1_video_set_mipmapping(mipmap);
     host_display_set_widescreen_mode(host.config.display.widescreen);
+    host_display_set_integer_scaling(host.config.display.integer_scale);
     ps1_video_set_texture_filter(filter_mode);
     ps1_video_set_anti_aliasing(aa_mode);
     ps1_video_set_smooth_fog(smooth_fog);
@@ -556,6 +575,9 @@ disc_ready:
     host.texture = SDL_CreateTexture(host.renderer, SDL_PIXELFORMAT_ARGB8888,
         SDL_TEXTUREACCESS_STREAMING, 320, 240);
     if (!host.texture || !SDL_SetTextureScaleMode(host.texture, SDL_SCALEMODE_NEAREST)) goto done;
+    /* Set the camera and 2D safe-area scales before game_main starts issuing
+     * its first GTE transforms, rather than waiting for the first present. */
+    if (!host_display_update_widescreen(host.renderer)) goto done;
 
     /* Query monitor refresh rate and initialize decoupled presentation pacing */
     {
@@ -567,10 +589,8 @@ disc_ready:
         }
         host_pacing_init(&host.pacing, &host.config.display, monitor_hz);
         sdk_sync_subtick_hook(host_presentation_subtick, &host);
-        int vsync_val = host.config.display.vsync ? SDL_RENDERER_VSYNC_ADAPTIVE : SDL_RENDERER_VSYNC_DISABLED;
-        if (!SDL_SetRenderVSync(host.renderer, vsync_val)) {
-            SDL_SetRenderVSync(host.renderer, SDL_RENDERER_VSYNC_DISABLED);
-        }
+        /* Renderer VSync policy is initialized by host_renderer_create().
+         * Do not override its adaptive -> standard fallback here. */
     }
     ps1_audio_init(&audio);
     ps1_spu_set_polyphony_expansion(&audio.spu, expand_poly);
@@ -590,7 +610,11 @@ disc_ready:
             goto done;
         }
     }
-    ps1_card_manager_init(&card_mgr, card_directory);
+    if (!ps1_card_manager_init(&card_mgr, card_directory)) {
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "VanillaBTN",
+            "Could not initialize the memory-card directory.", host.window);
+        goto done;
+    }
     sdk_card_bind_manager(&card_mgr);
 #else
     /* This probe must never read, recover, create or flush user save files. */
@@ -598,6 +622,7 @@ disc_ready:
 #endif
     sdk_pad_rumble(send_rumble, &host);
     host.running = true;
+    host.focused = (SDL_GetWindowFlags(host.window) & SDL_WINDOW_INPUT_FOCUS) != 0;
     sdk_sync_pump(host_game_pump, &host);
 #ifdef VANILLABTN_BOOT_TEST
     sdk_sync_bind(boot_now, boot_wait, NULL);

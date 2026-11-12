@@ -52,6 +52,7 @@
  * the primitive buffer and the work area. */
 #ifdef VANILLABTN_NATIVE
 #include "sdk_memory.h"
+#include "sdk_gpu.h"
 #include "sdk_sync.h"
 #define WORK_REGION (sdk_main_ram + 0x1BE1B0)
 #define MAIN_RAM_POINTER(address) (sdk_main_ram + ((address) & 0x1FFFFF))
@@ -581,6 +582,11 @@ s32 main_get_region_base(void) {
  * bytes per frame index), clear the tables and rewind the primitive cursor. */
 static void main_frame_begin(void) {
     s32 ot_base;
+
+#ifdef VANILLABTN_NATIVE
+    /* Clear frame-local GTE vertex provenance before packet memory is reused. */
+    sdk_gpu_begin_frame();
+#endif
 
     GsSetWorkBase(current_frame->workBase);
     ot_base = ((frame_index * 3) << 12) + REGION_FRAME_OT_BASE;

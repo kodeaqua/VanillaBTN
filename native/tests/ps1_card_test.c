@@ -51,6 +51,10 @@ static void test_card_file_roundtrip_and_delete(void) {
     ps1_card_init(&card);
     ps1_card_format(&card);
 
+    /* An empty filename cannot be addressed safely by the PS1 directory API. */
+    const uint8_t single = 1;
+    assert(ps1_card_write_file(&card, "", &single, 1) == PS1_CARD_ERR_IO);
+
     /* Create 32 KB synthetic payload */
     uint8_t payload[PS1_CARD_SAVE_SIZE];
     for (size_t i = 0; i < sizeof(payload); i++) {
@@ -207,22 +211,44 @@ static void test_card_manager(void) {
     mkdir(custom_dir, 0777);
 #endif
 
-    Ps1CardManager mgr;
-    bool ok = ps1_card_manager_init(&mgr, custom_dir);
+    /* Never silently truncate a save path and create cards in another
+     * directory. This must fail without touching the filesystem. */
+    char too_long[sizeof(((Ps1CardManager *)0)->base_dir) + 16];
+    memset(too_long, 'x', sizeof(too_long) - 1);
+    too_long[sizeof(too_long) - 1] = '\0';
+    /* Each manager owns two 128 KB images. Four stack instances exceed the
+     * default 1 MB Windows thread stack and crash before assertions run. */
+    Ps1CardManager *oversized = malloc(sizeof(*oversized));
+    Ps1CardManager *missing_dir = malloc(sizeof(*missing_dir));
+    Ps1CardManager *mgr = malloc(sizeof(*mgr));
+    Ps1CardManager *mgr_slash = malloc(sizeof(*mgr_slash));
+    assert(oversized && missing_dir && mgr && mgr_slash);
+    assert(!ps1_card_manager_init(oversized, too_long));
+
+    assert(!ps1_card_manager_init(missing_dir, "test_mc_missing_directory_73915"));
+
+    /* A file path is not a directory, even when it exists. */
+    const char *regular_file = "test_mc_not_a_directory.tmp";
+    FILE *placeholder = fopen(regular_file, "wb");
+    assert(placeholder != NULL);
+    assert(fclose(placeholder) == 0);
+    assert(!ps1_card_manager_init(missing_dir, regular_file));
+    assert(remove(regular_file) == 0);
+
+    bool ok = ps1_card_manager_init(mgr, custom_dir);
     (void)ok;
     assert(ok);
-    assert(mgr.cards[0].present);
-    assert(mgr.cards[1].present);
-    assert(ps1_card_validate(&mgr.cards[0]) == PS1_CARD_OK);
-    assert(ps1_card_validate(&mgr.cards[1]) == PS1_CARD_OK);
-    assert(strstr(mgr.cards[0].filepath, "//") == NULL);
+    assert(mgr->cards[0].present);
+    assert(mgr->cards[1].present);
+    assert(ps1_card_validate(&mgr->cards[0]) == PS1_CARD_OK);
+    assert(ps1_card_validate(&mgr->cards[1]) == PS1_CARD_OK);
+    assert(strstr(mgr->cards[0].filepath, "//") == NULL);
 
-    Ps1CardManager mgr_slash;
-    assert(ps1_card_manager_init(&mgr_slash, "test_mc_dir/"));
-    assert(strcmp(mgr_slash.base_dir, custom_dir) == 0);
-    assert(strstr(mgr_slash.cards[0].filepath, "//") == NULL);
+    assert(ps1_card_manager_init(mgr_slash, "test_mc_dir/"));
+    assert(strcmp(mgr_slash->base_dir, custom_dir) == 0);
+    assert(strstr(mgr_slash->cards[0].filepath, "//") == NULL);
 
-    ps1_card_manager_shutdown(&mgr);
+    ps1_card_manager_shutdown(mgr);
 
     char p0[512], p1[512];
     char b0[512], b1[512];
@@ -235,6 +261,10 @@ static void test_card_manager(void) {
     remove(b0);
     remove(b1);
     rmdir(custom_dir);
+    free(mgr_slash);
+    free(mgr);
+    free(missing_dir);
+    free(oversized);
 }
 
 static void test_failed_replacement_preserves_card(void) {
@@ -349,6 +379,112 @@ static void test_invalid_load_preserves_image(void) {
     free(bytes);
     free(manager);
     free(source);
+}
+
+/* Save interruption after primary -> .bak.hold: recover the most recent
+ * complete image, not an older .bak or a damaged/unfinished .tmp. */
+static void test_interrupted_hold_recovery(void) {
+    const char *path = "test_hold_recovery.mcr";
+    const char *tmp = "test_hold_recovery.mcr.tmp";
+    const char *bak = "test_hold_recovery.mcr.bak";
+    const char *hold = "test_hold_recovery.mcr.bak.hold";
+    remove(path); remove(tmp); remove(bak); remove(hold);
+    Ps1Card *recent = malloc(sizeof(*recent));
+    Ps1Card *older = malloc(sizeof(*older));
+    assert(recent && older);
+    ps1_card_format(recent);
+    ps1_card_format(older);
+    uint8_t payload[16] = {0xBA, 0x5E};
+    assert(ps1_card_write_file(recent, "RECENT", payload, sizeof(payload)) == PS1_CARD_OK);
+    assert(ps1_card_write_file(older, "OLDER", payload, sizeof(payload)) == PS1_CARD_OK);
+    write_image_fixture(hold, recent->data, PS1_CARD_SIZE);
+    write_image_fixture(bak, older->data, PS1_CARD_SIZE);
+    write_image_fixture(tmp, "INCOMPLETE", 10);
+    assert(ps1_card_recover_file(path));
+    check_image_fixture(path, recent->data, PS1_CARD_SIZE);
+    check_image_fixture(bak, older->data, PS1_CARD_SIZE);
+    remove(path); remove(tmp); remove(bak); remove(hold);
+    /* Even a truncated hold image must block implicit blank-card creation.
+     * Otherwise missing/invalid recovery candidates are silently ignored. */
+    write_image_fixture(hold, "INCOMPLETE", 10);
+    Ps1Card *loaded = malloc(sizeof(*loaded));
+    assert(loaded);
+    assert(!ps1_card_load_from_file(loaded, path));
+    assert(!loaded->present);
+    check_image_fixture(hold, (const uint8_t *)"INCOMPLETE", 10);
+    free(loaded);
+    remove(hold);
+    free(recent); free(older);
+}
+
+static void test_committed_save_finalizes_held_backup(void) {
+    const char *path = "test_hold_committed.mcr";
+    const char *hold = "test_hold_committed.mcr.bak.hold";
+    const char *bak = "test_hold_committed.mcr.bak";
+    const char *bak1 = "test_hold_committed.mcr.bak.1";
+    remove(path); remove(hold); remove(bak); remove(bak1);
+    Ps1Card *current = malloc(sizeof(*current));
+    Ps1Card *held = malloc(sizeof(*held));
+    Ps1Card *previous = malloc(sizeof(*previous));
+    assert(current && held && previous);
+    ps1_card_format(current);
+    ps1_card_format(held);
+    ps1_card_format(previous);
+    uint8_t value[] = {5, 7, 11};
+    assert(ps1_card_write_file(current, "LATEST", value, sizeof(value)) == PS1_CARD_OK);
+    assert(ps1_card_write_file(held, "HELD", value, sizeof(value)) == PS1_CARD_OK);
+    assert(ps1_card_write_file(previous, "PREVIOUS", value, sizeof(value)) == PS1_CARD_OK);
+    write_image_fixture(path, current->data, PS1_CARD_SIZE);
+    write_image_fixture(hold, held->data, PS1_CARD_SIZE);
+    write_image_fixture(bak, previous->data, PS1_CARD_SIZE);
+    assert(ps1_card_recover_file(path));
+    check_image_fixture(path, current->data, PS1_CARD_SIZE);
+    check_image_fixture(bak, held->data, PS1_CARD_SIZE);
+    check_image_fixture(bak1, previous->data, PS1_CARD_SIZE);
+    FILE *file = fopen(hold, "rb");
+    assert(!file);
+    assert(ps1_card_save_to_file(current, path));
+    check_image_fixture(path, current->data, PS1_CARD_SIZE);
+    check_image_fixture(bak, current->data, PS1_CARD_SIZE);
+    check_image_fixture(bak1, held->data, PS1_CARD_SIZE);
+    remove(path); remove(hold); remove(bak); remove(bak1);
+    remove("test_hold_committed.mcr.bak.2");
+    free(current); free(held); free(previous);
+}
+
+/* Backup generations must be usable when the newest backup is damaged.
+ * An invalid older candidate must never be replaced by a new blank card. */
+static void test_generational_backup_recovery(void) {
+    const char *path = "test_generation_recovery.mcr";
+    const char *bak = "test_generation_recovery.mcr.bak";
+    const char *bak1 = "test_generation_recovery.mcr.bak.1";
+    const char *bak5 = "test_generation_recovery.mcr.bak.5";
+    remove(path); remove(bak); remove(bak1); remove(bak5);
+
+    Ps1Card *saved = malloc(sizeof(*saved));
+    Ps1Card *loaded = malloc(sizeof(*loaded));
+    assert(saved && loaded);
+    ps1_card_format(saved);
+    uint8_t payload[] = {3, 1, 4, 1, 5};
+    assert(ps1_card_write_file(saved, "OLDSAVE", payload, sizeof(payload)) == PS1_CARD_OK);
+    write_image_fixture(bak, "CORRUPT", 7);
+    write_image_fixture(bak1, saved->data, PS1_CARD_SIZE);
+    assert(ps1_card_recover_file(path));
+    check_image_fixture(path, saved->data, PS1_CARD_SIZE);
+    assert(ps1_card_load_from_file(loaded, path));
+    assert(ps1_card_find_file(loaded, "OLDSAVE", NULL) > 0);
+    remove(path); remove(bak); remove(bak1);
+
+    /* A damaged last-generation backup is still user data; do not make a
+     * formatted replacement when there is no valid recovery candidate. */
+    write_image_fixture(bak5, "CORRUPT", 7);
+    assert(!ps1_card_load_from_file(loaded, path));
+    assert(!loaded->present);
+    check_image_fixture(bak5, (const uint8_t *)"CORRUPT", 7);
+    FILE *unexpected = fopen(path, "rb");
+    assert(unexpected == NULL);
+    remove(bak5);
+    free(loaded); free(saved);
 }
 
 static void test_recovery_validates_directory(void) {
@@ -506,6 +642,9 @@ int main(void) {
     test_external_block_chains();
     test_invalid_load_preserves_image();
     test_recovery_validates_directory();
+    test_interrupted_hold_recovery();
+    test_generational_backup_recovery();
+    test_committed_save_finalizes_held_backup();
     test_failed_replacement_preserves_card();
     test_card_format_and_validate();
     test_card_file_roundtrip_and_delete();

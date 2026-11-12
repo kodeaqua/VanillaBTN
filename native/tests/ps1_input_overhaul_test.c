@@ -94,6 +94,15 @@ static void test_circular_stick_normalization(void) {
     printf("test_circular_stick_normalization passed.\n");
 }
 
+/* Guard the public input helper against a nonfinite deadzone. A bad
+ * value must not become undefined float-to-integer conversion. */
+static void test_nonfinite_deadzone(void) {
+    uint8_t expected_x = 0, expected_y = 0, actual_x = 0, actual_y = 0;
+    ps1_input_normalize_stick(16000, -7000, 0.0f, true, &expected_x, &expected_y);
+    ps1_input_normalize_stick(16000, -7000, NAN, true, &actual_x, &actual_y);
+    TEST_ASSERT(actual_x == expected_x && actual_y == expected_y);
+}
+
 /* 2. Test HD Rumble & Haptic Curve (Flaw 34) */
 static void test_hd_rumble_curve(void) {
     /* Large motor: test gamma 1.4 response curve.
@@ -150,6 +159,7 @@ static void test_subframe_input(void) {
 }
 
 int main(void) {
+    test_nonfinite_deadzone();
 #ifdef _WIN32
     _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
     _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);

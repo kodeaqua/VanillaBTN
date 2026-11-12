@@ -122,7 +122,7 @@ typedef struct Ps1FixesConfig {
 
 typedef struct GraphicsConfig {
     TextureFilterMode texture_filter;
-    int render_scale;       /* 1, 2, 4, 8, or 0 for native display resolution */
+    int render_scale;       /* Parsed/saved (0 = native); 3D raster scaling is not yet wired. */
     TriState hd_font;
     TriState extended_draw_distance;
 } GraphicsConfig;

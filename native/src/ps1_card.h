@@ -143,13 +143,16 @@ bool ps1_card_save_to_file(const Ps1Card *card, const char *filepath);
 /* Rotates multi-generational backups up to max_backups */
 bool ps1_card_rotate_backups(const char *filepath, int max_backups);
 
-/* Checks for leftover .tmp or .bak files from interrupted writes and recovers */
+/* Recovers the most recent valid .tmp, .bak.hold or .bak card. If these are
+ * missing/damaged, tries rotated .bak.1 through .bak.5 in newest-first order.
+ * Unrecoverable backup generations block implicit blank-card creation. */
 bool ps1_card_recover_file(const char *filepath);
 
 /* -------------------------------------------------------------------------
  * Card Manager Lifecycle
  * ---------------------------------------------------------------------- */
-/* Initialize manager with base directory (NULL uses SDL_GetPrefPath) */
+/* Initialize manager with an existing custom directory, or use SDL_GetPrefPath
+ * when custom_dir is NULL/empty. An unusable explicit directory is rejected. */
 bool ps1_card_manager_init(Ps1CardManager *mgr, const char *custom_dir);
 
 /* Flush dirty cards and shutdown */

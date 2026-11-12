@@ -42,7 +42,11 @@ For release packaging with application icons and manifests into a standalone `.z
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/package-release.ps1 -Configuration Release
 ```
 
-See [building instructions](docs/building.md) for Debug profile options and testing. The native build does not use Docker, WSL, or MSYS.
+See [enhancement implementation notes](docs/enhancements.md#6-native-enhancement-implementation-notes)
+for panoramic rendering, title composition, scene transitions, configuration,
+and memory-card behavior. See [building instructions](docs/building.md) for
+Debug profile options and testing. The native build does not use Docker, WSL,
+or MSYS.
 
 ### PS1 Reference Build
 

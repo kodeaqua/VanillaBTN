@@ -35,11 +35,14 @@ bool host_pacing_should_present(HostPacing *pacing, uint64_t now_ns) {
     if (pacing->frames_presented == 0) return true; /* First frame */
 
     /* Allow a small margin (0.5 ms) to prevent jitter from pushing a frame to next cycle */
-    uint64_t margin = 500000ULL; /* 0.5 ms */
-    if (pacing->frame_interval_ns > margin) {
-        return (now_ns + margin >= pacing->last_present_time_ns + pacing->frame_interval_ns);
-    }
-    return (now_ns >= pacing->last_present_time_ns + pacing->frame_interval_ns);
+    const uint64_t margin = 500000ULL; /* 0.5 ms */
+    /* Compare elapsed time instead of adding absolute timestamps. A huge
+     * uptime or mock timestamp near UINT64_MAX must not wrap the deadline. */
+    if (now_ns < pacing->last_present_time_ns) return true;
+    uint64_t elapsed = now_ns - pacing->last_present_time_ns;
+    uint64_t threshold = pacing->frame_interval_ns > margin
+        ? pacing->frame_interval_ns - margin : pacing->frame_interval_ns;
+    return elapsed >= threshold;
 }
 
 void host_pacing_record_presentation(HostPacing *pacing, uint64_t now_ns) {
@@ -60,7 +63,10 @@ uint64_t host_pacing_next_wait_deadline(const HostPacing *pacing, uint64_t now_n
     if (pacing->frames_presented == 0) {
         return simulation_deadline;
     }
-    uint64_t next_present = pacing->last_present_time_ns + pacing->frame_interval_ns;
+    /* Saturate the absolute deadline rather than wrapping to an early time. */
+    uint64_t next_present = UINT64_MAX - pacing->last_present_time_ns
+        < pacing->frame_interval_ns ? UINT64_MAX
+        : pacing->last_present_time_ns + pacing->frame_interval_ns;
     if (next_present > now_ns && next_present < simulation_deadline) {
         return next_present;
     }

@@ -56,7 +56,18 @@ typedef struct Ps1Vertex {
     float sub_x, sub_y;
     float z, w;
     bool has_subpixel;
+    bool is_projected; /* GTE provenance: excludes 3D from 2D safe-area transforms. */
 } Ps1Vertex;
+
+void ps1_video_set_widescreen_scale(float scale, float center_x);
+float ps1_video_get_widescreen_scale(void);
+/* Draw 2D background layers at full presentation width while preserving the
+ * default 4:3 safe-area transform for ordinary HUD and menu primitives. */
+void ps1_video_set_2d_widescreen_expansion(bool enabled);
+/* Authored 2D backdrops that already tile beyond x=0..319 must not be
+ * duplicated at +/-320: their translucent tiles would blend twice in margins. */
+void ps1_video_set_2d_widescreen_repeat(bool enabled);
+bool ps1_video_get_2d_widescreen_expansion(void);
 
 void ps1_video_set_pgxp_vertex_precision(bool enabled);
 void ps1_video_set_pgxp_perspective_texture(bool enabled);
@@ -119,6 +130,25 @@ bool ps1_video_get_extended_draw_distance(void);
 void ps1_video_set_hd_font(bool enabled);
 bool ps1_video_get_hd_font(void);
 
+/* Host-only panoramic sidecar: keeps texture VRAM at its original dimensions.
+ * Calling with 4:3 or an unsupported base video mode disables extensions. */
+bool ps1_video_configure_panorama(int base_width, int base_height, float aspect_scale);
+int ps1_video_panorama_width(int base_width);
+void ps1_video_panorama_begin_frame(void);
+/* A VRAM-wide clear also establishes the clear color of the host-only side
+ * columns. The original VRAM still owns all center pixels and texture data. */
+void ps1_video_panorama_fill_rows(int first_row, int row_count, uint32_t rgb24);
+/* True while replaying the depth-sorted game-world ordering table. It keeps
+ * non-GTE, camera-positioned sprite packets visible beyond x=0..319. */
+void ps1_video_set_world_primitive_context(bool enabled);
+bool ps1_video_get_world_primitive_context(void);
+/* The game double-buffers at VRAM y=0..239 and y=240..479. Clear only the
+ * destination buffer being redrawn; the other buffer may still be displayed. */
+void ps1_video_panorama_clear_rows(int first_row, int row_count);
+bool ps1_video_copy_panorama(const Ps1Video *video, int src_x, int src_y,
+                             int base_width, int height,
+                             uint32_t *target, size_t target_stride);
+
 /* Preserve raw PS1 BGR555 words, including the high mask/semitransparency bit. */
 bool ps1_video_upload(Ps1Video *video, int x, int y, int width, int height,
                       const uint16_t *source, size_t source_stride);
@@ -144,6 +174,11 @@ bool ps1_video_sample_texel(const Ps1Video *video, unsigned tpage, unsigned clut
 /* Draw a textured PS1 rectangle with raw or modulated color. */
 bool ps1_video_draw_sprite(Ps1Video *video, const Ps1DrawState *state,
                            const Ps1Sprite *sprite);
+/* Only sprites with GTE/PGXP packet provenance may extend the world viewport;
+ * ordinary title, fade, inventory and HUD sprites must stay at PS1 bounds. */
+bool ps1_video_draw_sprite_with_provenance(Ps1Video *video,
+                           const Ps1DrawState *state, const Ps1Sprite *sprite,
+                           bool is_projected);
 
 /* Draw a flat or textured PS1 triangle. */
 bool ps1_video_draw_triangle(Ps1Video *video, const Ps1DrawState *state,

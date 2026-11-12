@@ -38,9 +38,9 @@ static int test_near_plane_culling_all_behind(void) {
     ps1_video_set_near_plane_clipping(true);
 
     /* Triangle completely behind near plane (Z < 8.0f) */
-    Ps1Vertex v0 = {10, 10, 0, 0, 10.0f, 10.0f, -20.0f, -0.05f, true};
-    Ps1Vertex v1 = {30, 10, 0, 0, 30.0f, 10.0f, -10.0f, -0.10f, true};
-    Ps1Vertex v2 = {10, 30, 0, 0, 10.0f, 30.0f,   2.0f,  0.50f, true};
+    Ps1Vertex v0 = {10, 10, 0, 0, 10.0f, 10.0f, -20.0f, -0.05f, true, true};
+    Ps1Vertex v1 = {30, 10, 0, 0, 30.0f, 10.0f, -10.0f, -0.10f, true, true};
+    Ps1Vertex v2 = {10, 30, 0, 0, 10.0f, 30.0f,   2.0f,  0.50f, true, true};
 
     if (!ps1_video_draw_triangle(&video, &draw, &v0, &v1, &v2,
                                  0xFF0000, 0, 0, false, false, false)) return 10;
@@ -60,9 +60,9 @@ static int test_near_plane_one_vertex_in_front(void) {
     ps1_video_set_near_plane_clipping(true);
 
     /* v0 is in front (Z = 100), v1 and v2 are behind (Z = -20, Z = -40) */
-    Ps1Vertex v0 = {160, 120, 0, 0, 160.0f, 120.0f, 100.0f, 0.01f, true};
-    Ps1Vertex v1 = {260, 120, 0, 0, 260.0f, 120.0f, -20.0f, -0.05f, true};
-    Ps1Vertex v2 = {160, 220, 0, 0, 160.0f, 220.0f, -40.0f, -0.025f, true};
+    Ps1Vertex v0 = {160, 120, 0, 0, 160.0f, 120.0f, 100.0f, 0.01f, true, true};
+    Ps1Vertex v1 = {260, 120, 0, 0, 260.0f, 120.0f, -20.0f, -0.05f, true, true};
+    Ps1Vertex v2 = {160, 220, 0, 0, 160.0f, 220.0f, -40.0f, -0.025f, true, true};
 
     if (!ps1_video_draw_triangle(&video, &draw, &v0, &v1, &v2,
                                  0xFF0000, 0, 0, false, false, false)) return 20;
@@ -84,9 +84,9 @@ static int test_near_plane_two_vertices_in_front(void) {
     ps1_video_set_near_plane_clipping(true);
 
     /* v0 and v1 are in front (Z = 100, Z = 80), v2 is behind (Z = -20) */
-    Ps1Vertex v0 = {150, 110, 0, 0, 150.0f, 110.0f, 100.0f, 0.01f, true};
-    Ps1Vertex v1 = {180, 110, 0, 0, 180.0f, 110.0f,  80.0f, 0.0125f, true};
-    Ps1Vertex v2 = {165, 200, 0, 0, 165.0f, 200.0f, -20.0f, -0.05f, true};
+    Ps1Vertex v0 = {150, 110, 0, 0, 150.0f, 110.0f, 100.0f, 0.01f, true, true};
+    Ps1Vertex v1 = {180, 110, 0, 0, 180.0f, 110.0f,  80.0f, 0.0125f, true, true};
+    Ps1Vertex v2 = {165, 200, 0, 0, 165.0f, 200.0f, -20.0f, -0.05f, true, true};
 
     if (!ps1_video_draw_triangle(&video, &draw, &v0, &v1, &v2,
                                  0x00FF00, 0, 0, false, false, false)) return 30;
@@ -108,10 +108,10 @@ static int test_quad_subdivision(void) {
     ps1_video_set_quad_subdivision(true);
 
     /* Large non-planar quad (64x64) */
-    Ps1Vertex v0 = {20, 20, 0, 0, 20.0f, 20.0f, 100.0f, 0.01f, true};
-    Ps1Vertex v1 = {84, 20, 0, 0, 84.0f, 20.0f, 120.0f, 1.0f / 120.0f, true};
-    Ps1Vertex v2 = {20, 84, 0, 0, 20.0f, 84.0f, 130.0f, 1.0f / 130.0f, true};
-    Ps1Vertex v3 = {84, 84, 0, 0, 84.0f, 84.0f, 180.0f, 1.0f / 180.0f, true};
+    Ps1Vertex v0 = {20, 20, 0, 0, 20.0f, 20.0f, 100.0f, 0.01f, true, true};
+    Ps1Vertex v1 = {84, 20, 0, 0, 84.0f, 20.0f, 120.0f, 1.0f / 120.0f, true, true};
+    Ps1Vertex v2 = {20, 84, 0, 0, 20.0f, 84.0f, 130.0f, 1.0f / 130.0f, true, true};
+    Ps1Vertex v3 = {84, 84, 0, 0, 84.0f, 84.0f, 180.0f, 1.0f / 180.0f, true, true};
 
     if (!ps1_video_draw_quad(&video, &draw, &v0, &v1, &v2, &v3,
                              0x0000FF, 0, 0, false, false, false)) return 40;

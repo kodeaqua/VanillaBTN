@@ -7,6 +7,7 @@
 #include "ps1_gpu.h"
 #include "ps1_video.h"
 #include "ps1_pgxp.h"
+#include "sdk_gpu.h"
 #include <libgpu.h>
 #include <libgte.h>
 
@@ -16,6 +17,7 @@
 
 static Ps1Video video;
 static Ps1DrawState draw;
+static uint32_t pgxp_stress_words[24000];
 
 static uint32_t pack_coords(int16_t x, int16_t y) {
     return (uint32_t)(uint16_t)x | ((uint32_t)(uint16_t)y << 16);
@@ -84,15 +86,55 @@ static int test_pgxp_cache(void) {
     return 0;
 }
 
+/* Test 2b: a full busy-scene packet arena must not evict unrelated vertices.
+ * The old 8,192-entry/four-probe cache silently replaced a colliding base slot;
+ * after enough projected vertices this made some 3D primitives look like 2D
+ * packets, shifting props and leaving polygon holes. */
+static int test_pgxp_cache_stress(void) {
+    const size_t count = sizeof(pgxp_stress_words) / sizeof(pgxp_stress_words[0]);
+    ps1_pgxp_init();
+    ps1_pgxp_set_enabled(true, true);
+
+    for (size_t i = 0; i < count; ++i) {
+        uint32_t raw = pack_coords((int16_t)(i & 0x7FFFu),
+                                   (int16_t)((i * 3u) & 0x7FFFu));
+        ps1_pgxp_register(&pgxp_stress_words[i], (float)i + 0.25f,
+                          (float)i + 0.5f, 500.0f, 1.0f / 500.0f, raw);
+    }
+
+    for (size_t i = 0; i < count; ++i) {
+        uint32_t raw = pack_coords((int16_t)(i & 0x7FFFu),
+                                   (int16_t)((i * 3u) & 0x7FFFu));
+        const Ps1PgxpVertex *entry = ps1_pgxp_lookup(&pgxp_stress_words[i], raw);
+        if (entry == NULL) return 14;
+        if (fabsf(entry->x - ((float)i + 0.25f)) > 1e-4f) return 15;
+        if (fabsf(entry->y - ((float)i + 0.5f)) > 1e-4f) return 16;
+    }
+
+    ps1_pgxp_clear();
+    if (ps1_pgxp_lookup(&pgxp_stress_words[0],
+            pack_coords(0, 0)) != NULL) return 17;
+
+    /* The host begins each game frame by clearing provenance and resetting
+     * temporary 2D background mode. */
+    ps1_pgxp_register(&pgxp_stress_words[0], 0.25f, 0.5f, 500.0f,
+                      1.0f / 500.0f, pack_coords(0, 0));
+    ps1_video_set_2d_widescreen_expansion(true);
+    sdk_gpu_begin_frame();
+    if (ps1_pgxp_lookup(&pgxp_stress_words[0], pack_coords(0, 0)) != NULL) return 18;
+    if (ps1_video_get_2d_widescreen_expansion()) return 19;
+    return 0;
+}
+
 /* Test 3: Subpixel precision rasterization edge shifting (anti-wobble) */
 static int test_subpixel_rasterization(void) {
     memset(&video, 0, sizeof(video));
     ps1_draw_state_reset(&draw);
 
     /* Base integer triangle */
-    Ps1Vertex v0 = {10, 10, 0, 0, 10.0f, 10.0f, 100.0f, 0.01f, true};
-    Ps1Vertex v1 = {20, 10, 0, 0, 20.0f, 10.0f, 100.0f, 0.01f, true};
-    Ps1Vertex v2 = {10, 20, 0, 0, 10.0f, 20.0f, 100.0f, 0.01f, true};
+    Ps1Vertex v0 = {10, 10, 0, 0, 10.0f, 10.0f, 100.0f, 0.01f, true, true};
+    Ps1Vertex v1 = {20, 10, 0, 0, 20.0f, 10.0f, 100.0f, 0.01f, true, true};
+    Ps1Vertex v2 = {10, 20, 0, 0, 10.0f, 20.0f, 100.0f, 0.01f, true, true};
 
     ps1_video_set_pgxp_vertex_precision(true);
     if (!ps1_video_draw_triangle(&video, &draw, &v0, &v1, &v2,
@@ -111,9 +153,9 @@ static int test_subpixel_rasterization(void) {
      * In PGXP subpixel rasterization, the subpixel center evaluation causes
      * pixels on right/bottom edges to become lit while top/left turn off. */
     memset(&video, 0, sizeof(video));
-    Ps1Vertex v0_s = {10, 10, 0, 0, 10.4f, 10.4f, 100.0f, 0.01f, true};
-    Ps1Vertex v1_s = {20, 10, 0, 0, 20.4f, 10.4f, 100.0f, 0.01f, true};
-    Ps1Vertex v2_s = {10, 20, 0, 0, 10.4f, 20.4f, 100.0f, 0.01f, true};
+    Ps1Vertex v0_s = {10, 10, 0, 0, 10.4f, 10.4f, 100.0f, 0.01f, true, true};
+    Ps1Vertex v1_s = {20, 10, 0, 0, 20.4f, 10.4f, 100.0f, 0.01f, true, true};
+    Ps1Vertex v2_s = {10, 20, 0, 0, 10.4f, 20.4f, 100.0f, 0.01f, true, true};
 
     if (!ps1_video_draw_triangle(&video, &draw, &v0_s, &v1_s, &v2_s,
                                  0xFFFFFF, 0, 0, false, false, false)) return 22;
@@ -148,9 +190,9 @@ static int test_perspective_texturing(void) {
     }
 
     /* Oblique triangle: Vertex 0 near (Z=100, W=0.01), Vertices 1 & 2 far (Z=500, W=0.002) */
-    Ps1Vertex v0 = {10,  10,   0, 0, 10.0f,  10.0f, 100.0f, 0.010f, true};
-    Ps1Vertex v1 = {50,  10, 200, 0, 50.0f,  10.0f, 500.0f, 0.002f, true};
-    Ps1Vertex v2 = {50,  50, 200, 0, 50.0f,  50.0f, 500.0f, 0.002f, true};
+    Ps1Vertex v0 = {10,  10,   0, 0, 10.0f,  10.0f, 100.0f, 0.010f, true, true};
+    Ps1Vertex v1 = {50,  10, 200, 0, 50.0f,  10.0f, 500.0f, 0.002f, true, true};
+    Ps1Vertex v2 = {50,  50, 200, 0, 50.0f,  50.0f, 500.0f, 0.002f, true, true};
 
     /* First, render with perspective correction enabled. TPage 0x0110 = 15-bit direct color at Y=256 */
     ps1_video_set_pgxp_perspective_texture(true);
@@ -184,9 +226,22 @@ static int test_toggles(void) {
     if (ps1_pgxp_is_vertex_precision_enabled()) return 40;
     if (ps1_pgxp_is_perspective_texture_enabled()) return 41;
 
+    POLY_FT3 poly;
+    memset(&poly, 0, sizeof(poly));
+    poly.x0 = 25;
+    poly.y0 = 35;
+    uint32_t raw_sxy = pack_coords(25, 35);
+    ps1_pgxp_set_enabled(false, true);
+    ps1_pgxp_register(&poly.x0, 25.75f, 35.25f, 400.0f, 1.0f / 400.0f, raw_sxy);
+    const Ps1PgxpVertex *integer_only = ps1_pgxp_lookup(&poly.x0, raw_sxy);
+    if (integer_only == NULL || !integer_only->valid) return 44;
+    if (integer_only->has_subpixel) return 45;
+    if (integer_only->x != 25.0f || integer_only->y != 35.0f) return 46;
+
     ps1_pgxp_set_enabled(true, true);
     if (!ps1_pgxp_is_vertex_precision_enabled()) return 42;
     if (!ps1_pgxp_is_perspective_texture_enabled()) return 43;
+    if (ps1_pgxp_lookup(&poly.x0, raw_sxy) != NULL) return 47;
 
     return 0;
 }
@@ -199,6 +254,10 @@ int main(void) {
     }
     if ((r = test_pgxp_cache()) != 0) {
         fprintf(stderr, "test_pgxp_cache failed: %d\n", r);
+        return r;
+    }
+    if ((r = test_pgxp_cache_stress()) != 0) {
+        fprintf(stderr, "test_pgxp_cache_stress failed: %d\n", r);
         return r;
     }
     if ((r = test_subpixel_rasterization()) != 0) {

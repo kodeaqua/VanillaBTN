@@ -862,11 +862,40 @@ done:
     model_frame->primCursor.bytes = prim;
 }
 
-/* The clip bands reach this far left of the screen: the tests add it to x. */
 #define CLIP_BAND_MARGIN 19
 
-/* Screen clip tests on the x of a packed XY word (its low halfword). The drawing band is
- * x in [-19, 320), the wide band [-19, 400). */
+#ifdef VANILLABTN_NATIVE
+/* Geometry outside the old 4:3 band must survive model-side rejection. */
+#include "ps1_gte.h"
+
+/* A primitive can cross the viewport even when none of its vertices is inside
+ * it. Testing only individual vertices incorrectly drops those triangles and
+ * quads, leaving visible holes at the screen edges. The rasterizer performs the
+ * exact polygon clipping, so this stage only needs a conservative X interval. */
+static s32 model_clip_x_interval(s32 x0, s32 x1, s32 x2, s32 x3, s32 count) {
+    s32 min_x = (s16)x0;
+    s32 max_x = min_x;
+    s32 x_values[3] = { (s16)x1, (s16)x2, (s16)x3 };
+
+    for (s32 i = 0; i < count - 1; ++i) {
+        if (x_values[i] < min_x) min_x = x_values[i];
+        if (x_values[i] > max_x) max_x = x_values[i];
+    }
+
+    float scale = ps1_gte_get_widescreen_scale();
+    s32 pad = (s32)((320.0f * (scale - 1.0f)) * 0.5f + 1.0f);
+    return max_x >= -CLIP_BAND_MARGIN - pad && min_x < 320 + pad;
+}
+
+static s32 model_clip_test3(s32 a, s32 b, s32 c) {
+    return model_clip_x_interval(a, b, c, 0, 3);
+}
+
+static s32 model_clip_test4(s32 x0, s32 x1, s32 x2, s32 x3) {
+    return model_clip_x_interval(x0, x1, x2, x3, 4);
+}
+#else
+/* Keep the original PS1 reference-build clip tests byte-for-byte equivalent. */
 static inline s32 near_x(s16 x) {
     return (u16)(x + CLIP_BAND_MARGIN) < 320 + CLIP_BAND_MARGIN;
 }
@@ -903,6 +932,7 @@ static s32 model_clip_test4(s32 x0, s32 x1, s32 x2, s32 x3) {
     x = x3;
     return near_x(x);
 }
+#endif
 
 /* Build the four side planes of the view frustum from the eye and target. */
 static void camera_frustum_setup(VECTOR *eye, VECTOR *target) {
@@ -925,8 +955,20 @@ static void camera_frustum_setup(VECTOR *eye, VECTOR *target) {
     view_direction.vz = eye->vz - normal.vz * 2;
     m[2] = GsIDMATRIX;
     m[3] = GsIDMATRIX;
+    /* Keep object-level culling in sync with the GTE Hor+ projection. Without
+     * widening these side planes, objects outside the old 4:3 cone are removed
+     * before the expanded camera can render them. */
+#ifdef VANILLABTN_NATIVE
+    /* The host widens the horizontal culling planes with the GTE Hor+ scale.
+     * Keep the PS1 reference build on its original four frustum angles: the
+     * helper below is a native-only extension, not part of PSY-Q. */
+    s32 horizontal_half_angle = (s32)GetGeomWidescreenHalfAngle(-frustum_angles[1]);
+    RotMatrixY(2048 + horizontal_half_angle, &m[0]);
+    RotMatrixY(-horizontal_half_angle, &m[1]);
+#else
     RotMatrixY(frustum_angles[0], &m[0]);
     RotMatrixY(frustum_angles[1], &m[1]);
+#endif
     RotMatrixX(frustum_angles[2], &m[2]);
     RotMatrixX(frustum_angles[3], &m[3]);
     PushMatrix();

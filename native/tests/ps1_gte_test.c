@@ -2,6 +2,7 @@
  * ps1_gte_test: synthetic checks for the GTE compatibility layer.
  */
 #include "ps1_gte.h"
+#include <math.h>
 
 int main(void) {
     Ps1Gte gte;
@@ -146,5 +147,23 @@ int main(void) {
     Ps1Vector3 reciprocal_edge = {1, 0, 0x7F20, 0};
     if (!ps1_gte_rtps(&gte, &reciprocal_edge) || gte.flag != 0
         || gte.sxy[2].x != 1) return 35;
+
+    /* Hor+ expands the camera frustum but never shifts projected world positions. */
+    ps1_gte_set_widescreen_scale(1.0f);
+    if (ps1_gte_scale_frustum_half_angle(108) != 108) return 36;
+    const float widescreen_scale = 4.0f / 3.0f;
+    ps1_gte_set_widescreen_scale(widescreen_scale);
+    if (ps1_gte_scale_frustum_half_angle(108) <= 108) return 37;
+    ps1_gte_init(&gte);
+    ps1_gte_set_geom_offset(&gte, 160, 120);
+    ps1_gte_set_geom_screen(&gte, 1000);
+    Ps1Vector3 widescreen_point = {30, 20, 1000, 0};
+    if (!ps1_gte_rtps(&gte, &widescreen_point)) return 38;
+    Ps1SubpixelCoord widescreen_projection;
+    ps1_gte_get_sub_sxy(&gte, 2, &widescreen_projection);
+    if (!widescreen_projection.valid) return 39;
+    if (fabsf(widescreen_projection.x - 190.0f) > 0.1f) return 40;
+    if (fabsf(widescreen_projection.y - 140.0f) > 0.1f) return 41;
+    ps1_gte_set_widescreen_scale(1.0f);
     return 0;
 }

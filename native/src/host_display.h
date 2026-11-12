@@ -21,7 +21,11 @@ bool host_display_toggle_fullscreen(SDL_Window *window, DisplayConfig *config);
 
 /* Configure and query widescreen presentation mode */
 void host_display_set_widescreen_mode(WidescreenMode mode);
+/* Explicit integer scaling is opt-in; true Hor+ remains output-ratio aware. */
+void host_display_set_integer_scaling(bool enabled);
 WidescreenMode host_display_get_widescreen_mode(void);
+/* Apply GTE Hor+ and 2D safe-area transforms before the next game frame. */
+bool host_display_update_widescreen(SDL_Renderer *renderer);
 
 /* Present the SDK-selected VRAM rectangle, retaining original internal size.
  * Replaces the owned streaming texture when the game changes display size. */

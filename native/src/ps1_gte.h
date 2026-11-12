@@ -68,6 +68,7 @@ void ps1_gte_set_float_math(bool enabled);
 bool ps1_gte_get_float_math(void);
 void ps1_gte_set_widescreen_scale(float scale);
 float ps1_gte_get_widescreen_scale(void);
+int32_t ps1_gte_scale_frustum_half_angle(int32_t base_half_angle);
 void ps1_gte_set_geom_offset(Ps1Gte *gte, int32_t ofx, int32_t ofy);
 void ps1_gte_set_geom_screen(Ps1Gte *gte, int32_t h);
 void ps1_gte_set_rot_matrix(Ps1Gte *gte, const int16_t m[3][3]);

@@ -28,3 +28,11 @@ This is a project-specific per-commit version policy. [SemVer 2.0.0](https://sem
 normally reserves PATCH increments for compatible bug fixes, while VanillaBTN
 also increments PATCH for documentation and other atomic commits. Do not treat
 these development versions as a claim that every PATCH contains only a bug fix.
+
+## Source ZIPs without Git metadata
+
+A source snapshot without `.git` cannot supply a real patch or minor history.
+`tools/package-release.ps1` therefore labels such packages
+`<VERSION_MAJOR>.0.0+source`. This is an **unversioned source build**, not a
+claim that it corresponds to a release tag. `tools/version.py` itself remains
+strictly commit-derived and unchanged.

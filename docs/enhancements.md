@@ -11,7 +11,7 @@ This document defines the comprehensive master architectural blueprint for Vanil
 
 ```mermaid
 flowchart TD
-    OriginalSrc["src/ (Original PS1 Decomp)"] --- |"100% UNTOUCHED (Byte-Exact SHA1 Baseline)"| PS1Build["PS1 Reference Target"]
+    OriginalSrc["src/ (Original PS1 Decomp)"] --- |"PS1 branch retains original code (SHA-1 recheck pending)"| PS1Build["PS1 Reference Target"]
     
     subgraph Execution_Order["Project Execution Order"]
         Step1["Phase 1: Comprehensive Fixes for 35 PS1 Hardware Flaws (HIGHEST PRIORITY)"]
@@ -29,17 +29,26 @@ flowchart TD
 
 ---
 
+The configuration examples below document intended options as well as
+implemented behavior. In particular, `render_scale` does not currently resize
+the software 3D rasterizer, and `pause_on_unfocus` does not yet implement a
+full simulation pause. See [TODO.md](../TODO.md) for outstanding work.
+
 ## 2. Master Preset System & `vanillabtn.ini` Specification
 
 Configuration module: `native/src/config.h` & `native/src/config.c`.
-Search order:
-1. Beside the executable (`./vanillabtn.ini`).
-2. User preferences directory (`SDL_GetPrefPath("VanillaBTN", "VanillaBTN")`).
+Current configuration lookup order (in `config_resolve_path`):
+1. `vanillabtn.ini` in the **working directory**, if present.
+2. `vanillabtn.ini` beside the executable (`SDL_GetBasePath()`), if present.
+3. Otherwise create/use `vanillabtn.ini` in the working directory.
+
+This is distinct from the memory-card default folder, which uses
+`SDL_GetPrefPath()`. `--config` selects an explicit INI path.
 
 ### Master Preset Behavior:
-- **`mode = modern`** (Recommended Default): All settings configured as `auto` automatically resolve to **`on` / optimal**, instantly eliminating PS1 hardware flaws without manual configuration.
-- **`mode = authentic_ps1`**: All settings configured as `auto` resolve to **`off` / native**, preserving 100% authentic 1999 console behavior for retro purists.
-- **`mode = custom`**: Bypasses presets and strictly follows individual toggle values.
+- **`mode = modern`** (default): `auto` values use the modern defaults assigned by each feature's resolver.
+- **`mode = authentic_ps1`**: `auto` feature toggles resolve to the authentic/default-off path where implemented.
+- **`mode = custom`**: Explicit switches take precedence; unresolved `auto` entries still use the feature resolver's default rather than universally turning off.
 
 ### Default `vanillabtn.ini`:
 ```ini
@@ -73,14 +82,14 @@ fullscreen_hz = 0
 ; Graphics backend: auto, vulkan, opengl, d3d11, d3d12, software
 backend = auto
 
-; V-Sync: on, off, adaptive
+; V-Sync: on, off (on attempts adaptive first, then ordinary V-Sync)
 vsync = on
 
 ; FPS Limiter: 30, 60, monitor (matches active monitor Hz), unlocked, or custom integer (e.g. 144)
 fps_limit = monitor
 
 ; Widescreen: auto, off, on, stretch
-; - auto: automatically enables if aspect ratio >= 1.55 (16:9, 16:10, 21:9)
+; - auto: enables Hor+ when output aspect is wider than 4:3 by a small margin
 ; - off: authentic 4:3 pillarbox
 ; - on: TRUE WIDESCREEN (expands 3D horizontal FOV without stretching; 2D HUD remains centered)
 ; - stretch: anamorphic full-screen stretch
@@ -176,7 +185,7 @@ hd_rumble = auto
 ; Texture filter: nearest (sharp pixel art), bilinear (smooth), xbrz
 texture_filter = nearest
 
-; Internal render resolution multiplier: 1, 2, 4, 8, native
+; Reserved render-scale setting: 1..16 or native (not yet a native-res 3D raster)
 render_scale = 1
 
 ; Sharp high-resolution text: on, off
@@ -199,7 +208,7 @@ mute_on_unfocus = off
 ; Analog stick deadzone (0.00 - 0.50)
 analog_deadzone = 0.10
 
-; Pause when window is unfocused / controller disconnected: on, off
+; Pause policy switches: on, off (full unfocus simulation pause not yet implemented)
 pause_on_unfocus = off
 pause_on_disconnect = on
 
@@ -280,9 +289,10 @@ turbo_speed = 3.0
 Following the completion of the 35 PS1 flaw fixes, Phase 2 implements modern platform capabilities:
 
 1. **True Widescreen (Hor+ 3D FOV Expansion)**:
-   - Expands horizontal 3D camera FOV in GTE proportionally to display aspect ratio ($1.333\times$ for 16:9, $1.777\times$ for 21:9 ultrawide), revealing more of the farm and town without stretching.
+   - Expands horizontal 3D camera FOV in GTE proportionally to display aspect ratio ($1.333\times$ for 16:9, $1.75\times$ for 21:9 ultrawide), revealing more of the farm and town without stretching.
    - Extends native culling bands so objects at widescreen boundaries do not prematurely pop out.
-   - Anchors 2D HUD, dialogue boxes, stamina, and clock within a pillarbox safe area without distortion.
+   - Anchors 2D HUD, dialogue boxes, stamina, clock, sprites, tiles, lines, and screen-space polygons within a centered 4:3 safe area without distortion; sprite UVs are resampled across the compressed destination width.
+   - Resolves the output aspect before the first game frame and refreshes it on presentation, keeping GTE projection, native culling, and 2D safe-area transforms synchronized. Explicit stretch mode remains available for intentional anamorphic output; forced Hor+ on displays narrower than 4:3 falls back to aspect-preserving letterboxing.
 2. **Multi-Backend Graphics (`Ps1HostRenderer`)**:
    - Automatic fallback chain: `Vulkan` $\rightarrow$ `Direct3D 11` $\rightarrow$ `OpenGL` $\rightarrow$ `Software (CPU)`.
 3. **Multi-Monitor & 4 Window Modes**:
@@ -325,11 +335,113 @@ Following the completion of the 35 PS1 flaw fixes, Phase 2 implements modern pla
 
 ---
 
-## 6. Verification Status & Pull Request
-- **Pull Request**: [#3 (feat/ps1-fixes-and-enhancements)](https://github.com/kodeaqua/VanillaBTN/pull/3)
-- **Branch**: `feat/ps1-fixes-and-enhancements`
-- **Tests**:
-  - `CTest (Debug)`: 54 / 54 tests passing (100%)
-  - `CTest (Release)`: 54 / 54 tests passing (100%)
-  - `Python unit tests`: 9 / 9 tests passing (100%)
-- **Baseline Integrity**: All decompiled PS1 sources in `src/` remain completely untouched (0 bytes changed). Reference PS1 matching SHA-1 baseline is fully preserved.
+## 6. Native Enhancement Implementation Notes
+
+This section describes implementation details and compatibility boundaries of
+optional native enhancements. The original game remains authoritative for
+scenes, assets, events, timing, and save semantics. Keep native compatibility
+changes separate from the matching PS1 reference build.
+
+### Dynamic presentation and true Hor+ widescreen
+
+- `native/src/host_display.c` derives the effective horizontal aspect from
+  the active SDL renderer output. `widescreen = auto` selects Hor+ for output
+  wider than 4:3; `off` retains 4:3 letterboxing; `stretch` is an explicit
+  anamorphic presentation mode. Resizing the window updates the presentation.
+- The native software rasterizer retains the original PS1 VRAM layout, texture
+  pages, and CLUT. `native/src/ps1_video.c` allocates a *separate panoramic
+  sidecar* for columns outside the original 320-pixel display area; it does not
+  write widescreen pixels into texture VRAM. The dynamically calculated logical
+  canvas widens horizontally, while its normal PS1 height remains 240 rows.
+- GTE-projected geometry can be rasterized into the extension without changing
+  original world positions. Native frustum/culling adjustments are guarded by
+  `VANILLABTN_NATIVE`. Ordinary screen-space HUD and UI primitives stay in the
+  original centered 4:3 area.
+- PS1 draw and display environments use **two distinct frame pages**, at VRAM
+  rows 0–239 and 240–479. The sidecar preserves each page until actual clear,
+  fill, or draw operations change its pixels. Beginning another ordering table
+  must not implicitly erase the page currently displayed.
+
+### World primitives, screen overlays, and authored backgrounds
+
+- PGXP provenance identifies projected 3D primitives; the SDK adapter also
+  recognizes world packets from the depth ordering table, including sprites
+  whose screen coordinates were calculated by the game instead of emitted
+  directly by GTE. UI ordering tables do not automatically gain world clipping.
+- Explicitly marked 2D backgrounds may extend into panorama margins. The
+  classification is attached to queued GP0 packets so it cannot leak across
+  frames or be guessed from a later global draw state. Polygon, sprite, tile,
+  and line paths preserve their normal depth, texture, mask, and blend rules.
+- Repeated 24-pixel menu backgrounds (Load/Save and Toolbox) use their actual
+  four-tile **96-pixel** period. Repeated copies affect only sidecar columns;
+  they must not redraw the original central 4:3 frame or duplicate UI.
+- The title's scrolling background is already authored as tiled sprite fields.
+  Its OT backdrop layers are allowed to reach the margins, but already-tiled
+  title sprites must **not** receive extra shifted copies: double-drawing
+  semitransparent sprites changes their color. Logo/UI layers remain separate.
+- Map-like pages with a plain white canvas can extend that background without
+  repeating map artwork. An uncovered side area must not be filled by mirrored
+  or scanline-smeared copies of the central image; only actual background/world
+  drawing or an intentional neutral canvas belongs there.
+
+### Scene transitions and framebuffer fidelity
+
+- Explicit `ClearImage` and GP0 fill operations update the corresponding
+  panoramic page. Fullscreen fade quads/tiles apply the same ordering, blending,
+  and mask behavior to both the original display and its side margins.
+- Original stepped fades temporarily select a 640×480 PS1 display mode. For
+  that specific transition, the host preserves the last valid panoramic
+  320×240 display page and its Hor+ presentation; the fullscreen fade is
+  composited across the panorama rather than snapping the window to a 4:3
+  logical canvas. This is **not** a general widescreen extension for arbitrary
+  640×480 artwork or display modes.
+- PGXP shared-edge rasterization computes edge deltas in double precision,
+  avoiding float-first rounding disagreement between adjacent polygons.
+  Quad vertex provenance is kept consistent through clipping/subdivision.
+
+### Configuration and host lifecycle
+
+- `native/src/config.c` preserves custom numeric FPS limits and the literal
+  `render_scale = native` setting through INI save/reload. Malformed sections,
+  nonfinite numbers, integer overflow, and truncated paths are rejected
+  instead of silently changing another setting.
+- `render_scale` is currently a stored configuration preference, **not** an
+  implemented full-resolution 3D raster target. Similarly,
+  `pixel_aspect_ratio = crt_ntsc` does not currently modify the presentation,
+  and `pause_on_unfocus` is not a complete simulation pause mechanism.
+- Frame pacing uses overflow-safe elapsed-time calculations. Adaptive V-Sync
+  falls back to standard V-Sync when available. SDL window-mode failures are
+  propagated, and toggle hotkeys ignore repeated key-down events.
+- Native output-side master volume and focus mute do not rewrite the game's
+  underlying PS1 mixer state. Nonfinite analog deadzones are sanitized before
+  float-to-integer conversion.
+
+### Virtual memory-card reliability
+
+- Card writes preserve the prior image on failure. Backups rotate through
+  `.bak` and `.bak.1`–`.bak.5`, and interrupted writes can be recovered from
+  `.bak.hold` and `.tmp` as appropriate. Recovery also searches older valid
+  backup generations instead of initializing a blank card while unresolved
+  candidates remain.
+- Explicit card directories must exist and be directories. Empty filenames,
+  truncated paths, invalid allocation chains, and short 128 KiB card-image
+  reads fail safely. Block-chain lookups validate once and still bounds-check
+  the indices used by subsequent reads.
+- Memory-card test fixtures allocate their large card-manager objects on the
+  heap instead of the limited Windows executable stack. This change is
+  test-only and does not alter the production save format.
+
+### Scope and boundaries
+
+- `src/` remains the original game source and should not be modified for
+  cosmetic widescreen presentation. Native compatibility code belongs in
+  the adapter/host layer whenever possible; if a native-only source branch is
+  unavoidable, keep the PS1 reference path intact.
+- Asset loading still uses original PS1 game data supplied by the user; no
+  proprietary disc files or SDK content belong in the repository.
+- True monitor-resolution 3D polygon rasterization is a separate engine task:
+  a dynamic-width logical framebuffer should not be described as rendering
+  every polygon natively at 1080p/1440p/4K.
+- For active work and outstanding tasks, use [TODO.md](../TODO.md); for build
+  instructions, use [building.md](building.md); for the SDK compatibility
+  boundary, use [native-sdk.md](native-sdk.md).

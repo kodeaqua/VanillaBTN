@@ -20,10 +20,13 @@ typedef struct Ps1PgxpVertex {
     float z;           /* Camera-space depth Z */
     float w;           /* Reciprocal depth (1.0f / z) */
     uint32_t raw_sxy;  /* Packed integer coordinate for memory validation */
+    bool has_subpixel; /* False when this entry only marks a GTE-projected vertex. */
     bool valid;
 } Ps1PgxpVertex;
 
-/* Initialize or reset the PGXP subsystem and clear cache entries. */
+/* Initialize or reset the PGXP subsystem and clear cache entries. The native
+ * host also clears it at the beginning of each frame because packet addresses
+ * are recycled by the original frame arenas. */
 void ps1_pgxp_init(void);
 void ps1_pgxp_clear(void);
 
@@ -32,11 +35,12 @@ void ps1_pgxp_set_enabled(bool vertex_precision, bool perspective_texture);
 bool ps1_pgxp_is_vertex_precision_enabled(void);
 bool ps1_pgxp_is_perspective_texture_enabled(void);
 
-/* Register a vertex into the PGXP cache by destination memory address. */
+/* Register a GTE-projected vertex by destination address. When precision is
+ * disabled, the entry still records the projection origin for 2D/3D separation. */
 void ps1_pgxp_register(const void *dest_addr, float x, float y, float z, float w, uint32_t raw_sxy);
 
-/* Look up a vertex from the PGXP cache by source memory address and expected integer SXY.
- * Returns NULL if the address is not registered, or if raw_sxy does not match. */
+/* Look up a GTE-projected vertex by source address and expected integer SXY.
+ * Entries without subpixel precision still identify the primitive as 3D. */
 const Ps1PgxpVertex *ps1_pgxp_lookup(const void *src_addr, uint32_t expected_raw_sxy);
 
 #endif /* VANILLABTN_PS1_PGXP_H */

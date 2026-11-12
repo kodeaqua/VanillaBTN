@@ -22,6 +22,8 @@ long ratan2(long y, long x);
 
 void SetGeomOffset(long ofx, long ofy);
 void SetGeomScreen(long h);
+/* Host extension: scale a PS1 GTE half-angle for horizontal Hor+ culling. */
+long GetGeomWidescreenHalfAngle(long base_half_angle);
 void SetFogNear(long a, long h);
 void SetFarColor(long rfc, long gfc, long bfc);
 void PushMatrix(void);

@@ -2,6 +2,7 @@
  * ps1_clock_test: synthetic checks for fixed simulation timing cadence.
  */
 #include "ps1_clock.h"
+#include <stddef.h>
 
 int main(void) {
     Ps1Clock clock;
@@ -42,7 +43,12 @@ int main(void) {
     if (ticks != 4) return 16;
     if (clock.total_ticks != 11) return 17;
 
-    /* 6. NULL pointer safety */
+    /* 6. Saturated tick budget must not wrap on extreme clock parameters. */
+    ps1_clock_init(&clock, UINT64_MAX, UINT32_MAX);
+    if (ps1_clock_advance(&clock, UINT64_MAX) != 1) return 18;
+    if (clock.total_ticks != 1) return 19;
+
+    /* 7. NULL pointer safety */
     if (ps1_clock_advance(NULL, 10000000ull) != 0) return 14;
 
     return 0;

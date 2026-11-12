@@ -7,6 +7,14 @@
  * bind NULL before destroying it. Transfers currently complete synchronously. */
 void sdk_gpu_bind(Ps1Video *video);
 
+/* Begin a new original-game frame. The game reuses its packet arenas, so PGXP
+ * provenance from the previous frame must not survive into the next one. */
+void sdk_gpu_begin_frame(void);
+
+/* Temporarily draw a known 2D background in the full 16:9 presentation width
+ * instead of the centered 4:3 HUD safe area. */
+void sdk_gpu_set_2d_widescreen_expansion(bool enabled);
+
 /* Frame-local mappings preserve 24-bit links without truncating host pointers.
  * Prefer registering complete packet arenas before primitives are linked.
  * SDK calls also map module-owned OTs/private static packets lazily.

@@ -16,6 +16,8 @@ configures, builds, and runs CTest for each profile. It downloads the pinned
 on first configure and checks its SHA-256. The output is
 `build/native/<profile>/vanillabtn.exe`; the build tree is ignored by Git.
 No WSL, MSYS, Docker, or Python is needed for this native target.
+The CTest count changes as native regression tests are added; run
+`ctest --test-dir build/native/Release -N` to list the tests in a local build.
 
 The executable runs original startup and scene handlers using locally imported
 assets. The `native_startup` CTest checks executable linkage with `--check-build`;
@@ -32,7 +34,10 @@ To assemble a standalone distribution archive for Windows with embedded applicat
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/package-release.ps1 -Configuration Release
 ```
 
-This compiles the optimized `Release` executable, embeds the application icon (`vanillabtn.ico`), version resource, and DPI awareness manifest, validates all 38 CTests and 9 Python tool tests, and packages a ready-to-distribute standalone folder and `.zip` archive into `dist/VanillaBTN-v<version>-win64.zip`.
+This compiles the optimized `Release` executable, embeds the application icon (`vanillabtn.ico`), version resource, and DPI awareness manifest, runs the registered CTest suite and Python tool tests, and packages a ready-to-distribute standalone folder and `.zip` archive into `dist/VanillaBTN-v<version>-win64.zip`.
+For a source ZIP without `.git`, packaging uses an explicitly unversioned
+`<major>.0.0+source` label rather than inventing a release history. Keep a
+normal Git checkout for authoritative commit-derived version numbers.
 
 ## Importing game data on Windows
 
@@ -95,6 +100,14 @@ Empty cards correctly report no loadable game until the original game saves a
 farm. Older experimental images with one-based allocation links are preserved
 as damaged; fixing those links alone does not validate their game payload.
 The option does not migrate, reset or overwrite the default preference cards.
+
+An explicit `--card-dir` must refer to an existing directory; a missing path or
+regular file is rejected instead of silently starting without cards. Card
+recovery checks `.tmp`, `.bak.hold`, `.bak`, and then older generations
+`.bak.1` through `.bak.5`. An invalid backup is left in place. If all
+candidates are invalid or inaccessible, VanillaBTN refuses to create a blank
+card over unresolved recovery files. Back up the entire card directory before
+manually deleting or restoring recovery images.
 
 
 Existing invalid cards are kept unchanged; loading them does not format or mark

@@ -84,7 +84,10 @@ SDL_Renderer *host_renderer_create(SDL_Window *window, BackendType backend, bool
     if (renderer) {
         SDL_SetRenderLogicalPresentation(renderer, 320, 240, SDL_LOGICAL_PRESENTATION_LETTERBOX);
         int vsync_mode = vsync ? SDL_RENDERER_VSYNC_ADAPTIVE : SDL_RENDERER_VSYNC_DISABLED;
-        if (!SDL_SetRenderVSync(renderer, vsync_mode)) {
+        if (!SDL_SetRenderVSync(renderer, vsync_mode) &&
+            (!vsync || !SDL_SetRenderVSync(renderer, 1))) {
+            /* Some backends reject adaptive VSync but support ordinary VSync.
+             * Do not silently disable it before trying the standard mode. */
             SDL_SetRenderVSync(renderer, SDL_RENDERER_VSYNC_DISABLED);
         }
     }

@@ -143,6 +143,30 @@ static void test_unlocked_pacing(void) {
     CHECK(next_wait == 16666666ULL);
 }
 
+static void test_timestamp_boundaries(void) {
+    HostPacing pacing;
+    DisplayConfig cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.fps_limit = 60;
+    host_pacing_init(&pacing, &cfg, 60.0f);
+    uint64_t interval = pacing.frame_interval_ns;
+    host_pacing_record_presentation(&pacing, UINT64_MAX - interval / 2);
+
+    /* The due timestamp cannot wrap to a small number. */
+    CHECK(!host_pacing_should_present(&pacing, UINT64_MAX - interval / 2 + 1));
+    CHECK(host_pacing_next_wait_deadline(&pacing,
+        UINT64_MAX - interval / 2, UINT64_MAX) == UINT64_MAX);
+    CHECK(host_pacing_should_present(&pacing, UINT64_MAX - 1) == false);
+    /* A restarted/non-monotonic mock clock should not stall presentation. */
+    CHECK(host_pacing_should_present(&pacing, 0));
+
+    host_pacing_record_presentation(&pacing, 2000000000ULL);
+    CHECK(!host_pacing_should_present(&pacing, 2000000000ULL));
+    CHECK(host_pacing_should_present(&pacing, 2000000000ULL + interval));
+    CHECK(host_pacing_next_wait_deadline(&pacing, 2000000000ULL,
+        2000000000ULL + 2 * interval) == 2000000000ULL + interval);
+}
+
 static void test_sdk_sync_integration(void) {
     mock_time_ns = 1000000ULL;
     CHECK(sdk_sync_bind(mock_clock_now, mock_clock_wait, NULL));
@@ -174,6 +198,7 @@ int main(void) {
     test_fps_limit_60_cadence();
     test_decoupled_high_refresh();
     test_unlocked_pacing();
+    test_timestamp_boundaries();
     test_sdk_sync_integration();
 
     printf("host_fps_test: All decoupled FPS and simulation pacing tests passed successfully.\n");

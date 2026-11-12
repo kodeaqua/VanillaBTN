@@ -55,7 +55,9 @@ void ps1_input_normalize_stick(int16_t host_x, int16_t host_y, float deadzone,
 
     float r = sqrtf(nx * nx + ny * ny);
 
-    if (deadzone < 0.0f) deadzone = 0.0f;
+    /* Public callers may supply a nonfinite deadzone even though the INI
+     * parser rejects one. Normalize it before arithmetic and int casts. */
+    if (!isfinite(deadzone) || deadzone < 0.0f) deadzone = 0.0f;
     if (deadzone > 0.9f) deadzone = 0.9f;
 
     if (r <= deadzone) {

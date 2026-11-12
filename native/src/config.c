@@ -4,6 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <errno.h>
+#include <limits.h>
+#include <math.h>
 #include <windows.h>
 #include <SDL3/SDL.h>
 
@@ -131,6 +134,32 @@ static bool parse_bool(const char *val, bool def) {
     return def;
 }
 
+/* Invalid or overflowed INI numbers must not alter runtime settings. atoi()
+ * silently accepts malformed values, and atof("nan") can corrupt input
+ * normalization or the frame limiter. */
+static bool parse_int_value(const char *text, int *value) {
+    if (!text || !*text || !value) return false;
+    errno = 0;
+    char *end;
+    long parsed = strtol(text, &end, 10);
+    if (errno == ERANGE || end == text || *end != '\0'
+        || parsed < INT_MIN || parsed > INT_MAX) return false;
+    *value = (int)parsed;
+    return true;
+}
+
+static bool parse_float_value(const char *text, float *value) {
+    if (!text || !*text || !value) return false;
+    errno = 0;
+    char *end;
+    double parsed = strtod(text, &end);
+    if (errno == ERANGE || end == text || *end != '\0'
+        || !isfinite(parsed) || parsed > 3.402823466e38
+        || parsed < -3.402823466e38) return false;
+    *value = (float)parsed;
+    return true;
+}
+
 static TriState parse_tristate(const char *val) {
     if (!val) return TRISTATE_AUTO;
     if (str_equals_case(val, "auto")) return TRISTATE_AUTO;
@@ -153,32 +182,34 @@ static const char *tristate_str(TriState s) {
 bool config_resolve_path(char *out_path, size_t out_size, const char *custom_path) {
     if (!out_path || out_size == 0) return false;
     if (custom_path && *custom_path) {
-        snprintf(out_path, out_size, "%s", custom_path);
-        return true;
+        int written = snprintf(out_path, out_size, "%s", custom_path);
+        return written >= 0 && (size_t)written < out_size;
     }
 
     /* 1. Try local directory first (portable application folder). */
     FILE *f = fopen(CONFIG_FILENAME, "rb");
     if (f) {
         fclose(f);
-        snprintf(out_path, out_size, "%s", CONFIG_FILENAME);
-        return true;
+        int written = snprintf(out_path, out_size, "%s", CONFIG_FILENAME);
+        return written >= 0 && (size_t)written < out_size;
     }
 
     /* 2. Try application base path if available from SDL. */
     const char *base = SDL_GetBasePath();
     if (base && *base) {
-        snprintf(out_path, out_size, "%s%s", base, CONFIG_FILENAME);
-        f = fopen(out_path, "rb");
-        if (f) {
-            fclose(f);
-            return true;
+        int written = snprintf(out_path, out_size, "%s%s", base, CONFIG_FILENAME);
+        if (written >= 0 && (size_t)written < out_size) {
+            f = fopen(out_path, "rb");
+            if (f) {
+                fclose(f);
+                return true;
+            }
         }
     }
 
     /* 3. Fallback to default local filename. */
-    snprintf(out_path, out_size, "%s", CONFIG_FILENAME);
-    return true;
+    int written = snprintf(out_path, out_size, "%s", CONFIG_FILENAME);
+    return written >= 0 && (size_t)written < out_size;
 }
 
 static void parse_kv(AppConfig *config, const char *section, const char *key, const char *val) {
@@ -199,19 +230,29 @@ static void parse_kv(AppConfig *config, const char *section, const char *key, co
             else if (str_equals_case(val, "maximized")) config->display.window_mode = WINDOW_MODE_MAXIMIZED;
             else config->display.window_mode = WINDOW_MODE_WINDOWED;
         } else if (str_equals_case(key, "monitor")) {
-            config->display.monitor = atoi(val);
+            int index;
+            if (parse_int_value(val, &index) && index >= 0 && index <= 64)
+                config->display.monitor = index;
         } else if (str_equals_case(key, "window_width")) {
-            int w = atoi(val);
-            if (w >= 320) config->display.window_width = w;
+            int w;
+            if (parse_int_value(val, &w) && w >= 320 && w <= 16384)
+                config->display.window_width = w;
         } else if (str_equals_case(key, "window_height")) {
-            int h = atoi(val);
-            if (h >= 240) config->display.window_height = h;
+            int h;
+            if (parse_int_value(val, &h) && h >= 240 && h <= 16384)
+                config->display.window_height = h;
         } else if (str_equals_case(key, "fullscreen_width")) {
-            config->display.fullscreen_width = atoi(val);
+            int w;
+            if (parse_int_value(val, &w) && w >= 0 && w <= 16384)
+                config->display.fullscreen_width = w;
         } else if (str_equals_case(key, "fullscreen_height")) {
-            config->display.fullscreen_height = atoi(val);
+            int h;
+            if (parse_int_value(val, &h) && h >= 0 && h <= 16384)
+                config->display.fullscreen_height = h;
         } else if (str_equals_case(key, "fullscreen_hz")) {
-            config->display.fullscreen_hz = atoi(val);
+            int hz;
+            if (parse_int_value(val, &hz) && hz >= 0 && hz <= 1000)
+                config->display.fullscreen_hz = hz;
         } else if (str_equals_case(key, "backend")) {
             if (str_equals_case(val, "vulkan") || str_equals_case(val, "vk")) config->display.backend = BACKEND_VULKAN;
             else if (str_equals_case(val, "opengl") || str_equals_case(val, "gl")) config->display.backend = BACKEND_OPENGL;
@@ -224,7 +265,11 @@ static void parse_kv(AppConfig *config, const char *section, const char *key, co
         } else if (str_equals_case(key, "fps_limit")) {
             if (str_equals_case(val, "monitor")) config->display.fps_limit = 0;
             else if (str_equals_case(val, "unlocked") || str_equals_case(val, "none")) config->display.fps_limit = -1;
-            else config->display.fps_limit = atoi(val);
+            else {
+                int fps;
+                if (parse_int_value(val, &fps) && fps >= 1 && fps <= 1000)
+                    config->display.fps_limit = fps;
+            }
         } else if (str_equals_case(key, "widescreen")) {
             if (str_equals_case(val, "off")) config->display.widescreen = WIDESCREEN_OFF;
             else if (str_equals_case(val, "on")) config->display.widescreen = WIDESCREEN_ON;
@@ -280,8 +325,9 @@ static void parse_kv(AppConfig *config, const char *section, const char *key, co
         } else if (str_equals_case(key, "render_scale")) {
             if (str_equals_case(val, "native")) config->graphics.render_scale = 0;
             else {
-                int scale = atoi(val);
-                if (scale >= 1 && scale <= 16) config->graphics.render_scale = scale;
+                int scale;
+                if (parse_int_value(val, &scale) && scale >= 1 && scale <= 16)
+                    config->graphics.render_scale = scale;
             }
         } else if (str_equals_case(key, "hd_font")) {
             config->graphics.hd_font = parse_tristate(val);
@@ -295,19 +341,23 @@ static void parse_kv(AppConfig *config, const char *section, const char *key, co
             else if (str_equals_case(val, "cubic")) config->audio.spu_interpolation = SPU_INTERP_CUBIC;
             else config->audio.spu_interpolation = SPU_INTERP_AUTO;
         } else if (str_equals_case(key, "master_volume")) {
-            int vol = atoi(val);
-            if (vol < 0) vol = 0;
-            if (vol > 100) vol = 100;
-            config->audio.master_volume = vol;
+            int vol;
+            if (parse_int_value(val, &vol)) {
+                if (vol < 0) vol = 0;
+                if (vol > 100) vol = 100;
+                config->audio.master_volume = vol;
+            }
         } else if (str_equals_case(key, "mute_on_unfocus")) {
             config->audio.mute_on_unfocus = parse_bool(val, false);
         }
     } else if (str_equals_case(section, "Input_QoL")) {
         if (str_equals_case(key, "analog_deadzone")) {
-            float dz = (float)atof(val);
-            if (dz < 0.0f) dz = 0.0f;
-            if (dz > 0.50f) dz = 0.50f;
-            config->input.analog_deadzone = dz;
+            float dz;
+            if (parse_float_value(val, &dz)) {
+                if (dz < 0.0f) dz = 0.0f;
+                if (dz > 0.50f) dz = 0.50f;
+                config->input.analog_deadzone = dz;
+            }
         } else if (str_equals_case(key, "pause_on_unfocus")) {
             config->input.pause_on_unfocus = parse_bool(val, false);
         } else if (str_equals_case(key, "pause_on_disconnect")) {
@@ -316,10 +366,12 @@ static void parse_kv(AppConfig *config, const char *section, const char *key, co
             strncpy(config->input.turbo_hotkey, val, sizeof(config->input.turbo_hotkey) - 1);
             config->input.turbo_hotkey[sizeof(config->input.turbo_hotkey) - 1] = '\0';
         } else if (str_equals_case(key, "turbo_speed")) {
-            float spd = (float)atof(val);
-            if (spd < 1.0f) spd = 1.0f;
-            if (spd > 10.0f) spd = 10.0f;
-            config->input.turbo_speed = spd;
+            float spd;
+            if (parse_float_value(val, &spd)) {
+                if (spd < 1.0f) spd = 1.0f;
+                if (spd > 10.0f) spd = 10.0f;
+                config->input.turbo_speed = spd;
+            }
         }
     }
 }
@@ -333,15 +385,27 @@ bool config_load(AppConfig *config, const char *custom_path) {
 
     FILE *f = fopen(filepath, "r");
     if (!f) {
-        /* File doesn't exist: generate a default commented configuration file. */
-        config_save(config, filepath);
-        return true;
+        /* A pre-existing but unreadable INI is not an absent configuration.
+         * Do not silently run with defaults when the user requested one. */
+        if (errno != ENOENT) return false;
+        bool created = config_save(config, filepath);
+        /* The implicit first-run INI is optional on read-only installs.
+         * An explicit --config path, however, must be usable. */
+        return created || !custom_path || !*custom_path;
     }
 
     char line[512];
     char current_section[64] = "";
 
     while (fgets(line, sizeof(line), f)) {
+        size_t length = strlen(line);
+        if (length && line[length - 1] != '\n' && !feof(f)) {
+            /* Discard overlong lines as a unit, rather than parsing a
+             * truncated key and the remainder as another setting. */
+            int ch;
+            while ((ch = fgetc(f)) != EOF && ch != '\n') {}
+            continue;
+        }
         trim_inplace(line);
         if (line[0] == '\0' || line[0] == ';' || line[0] == '#') continue;
 
@@ -352,6 +416,10 @@ bool config_load(AppConfig *config, const char *custom_path) {
                 strncpy(current_section, line + 1, sizeof(current_section) - 1);
                 current_section[sizeof(current_section) - 1] = '\0';
                 trim_inplace(current_section);
+            } else {
+                /* Never parse subsequent keys in the previous section after
+                 * a broken header. */
+                current_section[0] = '\0';
             }
             continue;
         }
@@ -373,8 +441,9 @@ bool config_load(AppConfig *config, const char *custom_path) {
         }
     }
 
-    fclose(f);
-    return true;
+    bool read_failed = ferror(f) != 0;
+    if (fclose(f) != 0) read_failed = true;
+    return !read_failed;
 }
 
 bool config_save(const AppConfig *config, const char *path) {
@@ -399,6 +468,15 @@ bool config_save(const AppConfig *config, const char *path) {
         "mode = %s\n\n",
         config->preset == PRESET_AUTHENTIC_PS1 ? "authentic_ps1" :
         config->preset == PRESET_CUSTOM ? "custom" : "modern");
+
+    char fps_limit_str[32];
+    if (config->display.fps_limit == 0) {
+        snprintf(fps_limit_str, sizeof(fps_limit_str), "monitor");
+    } else if (config->display.fps_limit == -1) {
+        snprintf(fps_limit_str, sizeof(fps_limit_str), "unlocked");
+    } else {
+        snprintf(fps_limit_str, sizeof(fps_limit_str), "%d", config->display.fps_limit);
+    }
 
     fprintf(f,
         "[Display]\n"
@@ -437,8 +515,7 @@ bool config_save(const AppConfig *config, const char *path) {
         config->display.backend == BACKEND_D3D12 ? "d3d12" :
         config->display.backend == BACKEND_SOFTWARE ? "software" : "auto",
         config->display.vsync ? "on" : "off",
-        config->display.fps_limit == 0 ? "monitor" :
-        config->display.fps_limit == -1 ? "unlocked" : "60",
+        fps_limit_str,
         config->display.widescreen == WIDESCREEN_OFF ? "off" :
         config->display.widescreen == WIDESCREEN_ON ? "on" :
         config->display.widescreen == WIDESCREEN_STRETCH ? "stretch" : "auto",
@@ -509,15 +586,18 @@ bool config_save(const AppConfig *config, const char *path) {
         tristate_str(config->fixes.fix_diagonal_running),
         tristate_str(config->fixes.hd_rumble));
 
+    char render_scale_str[16];
+    snprintf(render_scale_str, sizeof(render_scale_str), "%d", config->graphics.render_scale);
+
     fprintf(f,
         "[Graphics_Enhancements]\n"
         "texture_filter = %s\n"
-        "render_scale = %d\n"
+        "render_scale = %s\n"
         "hd_font = %s\n"
         "extended_draw_distance = %s\n\n",
         config->graphics.texture_filter == FILTER_BILINEAR ? "bilinear" :
         config->graphics.texture_filter == FILTER_XBRZ ? "xbrz" : "nearest",
-        config->graphics.render_scale,
+        config->graphics.render_scale == 0 ? "native" : render_scale_str,
         tristate_str(config->graphics.hd_font),
         tristate_str(config->graphics.extended_draw_distance));
 

@@ -3,6 +3,7 @@
 #include <sys/types.h>
 #ifdef VANILLABTN_NATIVE
 #include <string.h>
+#include "sdk_gpu.h"
 #endif
 #include <libgte.h>
 #include <libgpu.h>
@@ -3295,6 +3296,12 @@ static void title_draw_bg_scroll(void) {
     s16 top;
     s16 left;
 
+#ifdef VANILLABTN_NATIVE
+    /* The two 3x3 animated layers are the title background. Expand these
+     * background sprites to the full presentation width; keep the logo and
+     * interactive title UI in the centered 4:3 safe area. */
+    sdk_gpu_set_2d_widescreen_expansion(true);
+#endif
     band_a = title_scroll_a / 240;
     top = band_a * 240 - title_scroll_a;
     left = 320 - band_a * 80;
@@ -3331,6 +3338,10 @@ static void title_draw_bg_scroll(void) {
     title_scroll_b++;
     laps_b = title_scroll_b / 960;
     title_scroll_b -= laps_b * 960;
+#ifdef VANILLABTN_NATIVE
+    sdk_gpu_set_2d_widescreen_expansion(false);
+#endif
+    /* Keep the final cursor/title overlay in the normal 4:3 UI safe area. */
     anim_draw_sprt_cursor(&current_frame->otTags[0][37], &title_cursor_anim, 0x1D, 0, 0, 0);
 }
 

@@ -19,8 +19,22 @@ if (-not $SkipBuild) {
     if ($LASTEXITCODE -ne 0) { throw 'Tool tests failed.' }
 }
 
-$version = (& python (Join-Path $PSScriptRoot 'version.py')).Trim()
-if (-not $version) { throw 'Could not determine version.' }
+# Source ZIPs do not contain .git, so tools/version.py cannot read the
+# commit-derived version. Label such builds as unversioned source snapshots,
+# without inventing a PATCH/MINOR or changing VERSION_MAJOR.
+if (Test-Path -LiteralPath (Join-Path $repoRoot '.git')) {
+    $version = (& python (Join-Path $PSScriptRoot 'version.py')).Trim()
+    if ($LASTEXITCODE -ne 0 -or -not $version) {
+        throw 'Could not determine Git version.'
+    }
+} else {
+    $major = (Get-Content -LiteralPath (Join-Path $repoRoot 'VERSION_MAJOR') -Raw).Trim()
+    if ($major -notmatch '^(0|[1-9][0-9]*)$') {
+        throw 'Invalid VERSION_MAJOR in unversioned source archive.'
+    }
+    $version = "$major.0.0+source"
+    Write-Warning "No Git metadata: packaging unversioned source snapshot ($version)."
+}
 
 $packageName = "VanillaBTN-v$version-win64"
 $distRoot = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutDir)

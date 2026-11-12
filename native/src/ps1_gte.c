@@ -27,6 +27,19 @@ float ps1_gte_get_widescreen_scale(void) {
     return s_widescreen_scale;
 }
 
+int32_t ps1_gte_scale_frustum_half_angle(int32_t base_half_angle) {
+    if (base_half_angle <= 0) return 0;
+    if (s_widescreen_scale <= 1.00001f) return base_half_angle;
+
+    const double units_per_radian = 4096.0 / (2.0 * 3.14159265358979323846);
+    const double base_radians = (double)base_half_angle / units_per_radian;
+    const double scaled_radians = atan(tan(base_radians) * (double)s_widescreen_scale);
+    long scaled_units = lround(scaled_radians * units_per_radian);
+    if (scaled_units < 0) scaled_units = 0;
+    if (scaled_units > 1023) scaled_units = 1023;
+    return (int32_t)scaled_units;
+}
+
 void ps1_gte_init(Ps1Gte *gte) {
     if (gte == NULL) return;
     memset(gte, 0, sizeof(*gte));
@@ -129,9 +142,6 @@ static void transform_vertex(const Ps1Gte *gte, const Ps1Vector3 *v,
     projection_ir(cz, 22, flags);
     uint32_t quotient = perspective_quotient((uint16_t)gte->h, (uint16_t)*out_sz, flags);
     int64_t proj_ir_x = (int64_t)ir_x * quotient;
-    if (s_widescreen_scale != 1.0f && s_widescreen_scale > 0.0f) {
-        proj_ir_x = (int64_t)((float)proj_ir_x / s_widescreen_scale);
-    }
     int64_t screen_x = (int64_t)gte->ofx * 65536 + proj_ir_x;
     int64_t screen_y = (int64_t)gte->ofy * 65536 + (int64_t)ir_y * quotient;
     if (screen_x > INT32_MAX || screen_y > INT32_MAX) *flags |= 1u << 16;
@@ -174,29 +184,23 @@ static void transform_vertex(const Ps1Gte *gte, const Ps1Vector3 *v,
 
             if (cz_fl > 0.001f) {
                 float proj_x = (cx_fl * (float)gte->h) / cz_fl;
-                if (s_widescreen_scale != 1.0f && s_widescreen_scale > 0.0f) {
-                    proj_x /= s_widescreen_scale;
-                }
                 sub_x = (float)gte->ofx + proj_x;
                 sub_y = (float)gte->ofy + (cy_fl * (float)gte->h) / cz_fl;
                 sub_z = cz_fl;
             } else {
                 float proj_x = (float)(screen_x - (int64_t)gte->ofx * 65536) / 65536.0f;
-                /* screen_x already includes the Hor+ scale above. */
+                /* Screen coordinates remain the original PS1 camera projection. */
                 sub_x = (float)gte->ofx + proj_x;
                 sub_y = (float)screen_y / 65536.0f;
             }
         } else if (cz > 0) {
             float proj_x = (float)(screen_x - (int64_t)gte->ofx * 65536) / 65536.0f;
-            /* screen_x already includes the Hor+ scale above. */
+            /* Screen coordinates remain the original PS1 camera projection. */
             sub_x = (float)gte->ofx + proj_x;
             sub_y = (float)screen_y / 65536.0f;
         } else {
             float z_denom = (cz < -1) ? (float)cz : -1.0f;
             float proj_x = (float)(cx * gte->h) / z_denom;
-            if (s_widescreen_scale != 1.0f && s_widescreen_scale > 0.0f) {
-                proj_x /= s_widescreen_scale;
-            }
             sub_x = (float)gte->ofx + proj_x;
             sub_y = (float)gte->ofy + (float)(cy * gte->h) / z_denom;
         }

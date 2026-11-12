@@ -200,6 +200,10 @@ void SetGeomScreen(long h) {
     ps1_gte_set_geom_screen(&g_sdk_gte, (int32_t)h);
 }
 
+long GetGeomWidescreenHalfAngle(long base_half_angle) {
+    return (long)ps1_gte_scale_frustum_half_angle((int32_t)base_half_angle);
+}
+
 void SetFogNear(long a, long h) {
     g_gte_fog_near = (int32_t)a;
     g_gte_fog_h = (int32_t)h;
@@ -538,7 +542,7 @@ void gte_stsxy(void *out) {
     if (!out) return;
     uint32_t val = pack_sxy(g_sdk_gte.sxy[2]);
     *(uint32_t *)out = val;
-    if (ps1_pgxp_is_vertex_precision_enabled()) {
+    {
         const Ps1SubpixelCoord *c = &g_sdk_gte.sub_sxy[2];
         ps1_pgxp_register(out, c->x, c->y, c->z, c->w, val);
     }
@@ -548,7 +552,7 @@ void gte_stsxy2(void *out) {
     if (!out) return;
     uint32_t val = pack_sxy(g_sdk_gte.sxy[2]);
     *(uint32_t *)out = val;
-    if (ps1_pgxp_is_vertex_precision_enabled()) {
+    {
         const Ps1SubpixelCoord *c = &g_sdk_gte.sub_sxy[2];
         ps1_pgxp_register(out, c->x, c->y, c->z, c->w, val);
     }
@@ -563,7 +567,7 @@ void gte_stsxy3_f3(void *packet) {
     *(uint32_t *)(p + 0x08) = s0;
     *(uint32_t *)(p + 0x0C) = s1;
     *(uint32_t *)(p + 0x10) = s2;
-    if (ps1_pgxp_is_vertex_precision_enabled()) {
+    {
         const Ps1SubpixelCoord *c0 = &g_sdk_gte.sub_sxy[0];
         const Ps1SubpixelCoord *c1 = &g_sdk_gte.sub_sxy[1];
         const Ps1SubpixelCoord *c2 = &g_sdk_gte.sub_sxy[2];
@@ -582,7 +586,7 @@ void gte_stsxy3_g3(void *packet) {
     *(uint32_t *)(p + 0x08) = s0;
     *(uint32_t *)(p + 0x10) = s1;
     *(uint32_t *)(p + 0x18) = s2;
-    if (ps1_pgxp_is_vertex_precision_enabled()) {
+    {
         const Ps1SubpixelCoord *c0 = &g_sdk_gte.sub_sxy[0];
         const Ps1SubpixelCoord *c1 = &g_sdk_gte.sub_sxy[1];
         const Ps1SubpixelCoord *c2 = &g_sdk_gte.sub_sxy[2];
@@ -601,7 +605,7 @@ void gte_stsxy3_ft3(void *packet) {
     *(uint32_t *)(p + 0x08) = s0;
     *(uint32_t *)(p + 0x10) = s1;
     *(uint32_t *)(p + 0x18) = s2;
-    if (ps1_pgxp_is_vertex_precision_enabled()) {
+    {
         const Ps1SubpixelCoord *c0 = &g_sdk_gte.sub_sxy[0];
         const Ps1SubpixelCoord *c1 = &g_sdk_gte.sub_sxy[1];
         const Ps1SubpixelCoord *c2 = &g_sdk_gte.sub_sxy[2];
@@ -620,7 +624,7 @@ void gte_stsxy3_gt3(void *packet) {
     *(uint32_t *)(p + 0x08) = s0;
     *(uint32_t *)(p + 0x14) = s1;
     *(uint32_t *)(p + 0x20) = s2;
-    if (ps1_pgxp_is_vertex_precision_enabled()) {
+    {
         const Ps1SubpixelCoord *c0 = &g_sdk_gte.sub_sxy[0];
         const Ps1SubpixelCoord *c1 = &g_sdk_gte.sub_sxy[1];
         const Ps1SubpixelCoord *c2 = &g_sdk_gte.sub_sxy[2];

@@ -150,7 +150,11 @@ static void exec_sprite(Ps1Video *video, const Ps1DrawState *state,
         sprite.width  = (unsigned)gp0_x(words[3]);
         sprite.height = (unsigned)gp0_y(words[3]);
     }
-    ps1_video_draw_sprite(video, state, &sprite);
+    /* The XY packet word can carry a GTE-produced world-space sprite. Keep
+     * ordinary 2D/HUD sprites clipped to the original 4:3 display. */
+    const Ps1PgxpVertex *source = ps1_pgxp_lookup(&words[1], words[1]);
+    ps1_video_draw_sprite_with_provenance(video, state, &sprite,
+        (source != NULL && source->valid) || ps1_video_get_world_primitive_context());
 }
 
 /* Helper to initialize vertex with PGXP subpixel float precision if available. */
@@ -165,16 +169,20 @@ static Ps1Vertex make_poly_vertex(int x, int y, unsigned u, unsigned v, const ui
     vert.z = 1.0f;
     vert.w = 1.0f;
     vert.has_subpixel = false;
+    vert.is_projected = ps1_video_get_world_primitive_context();
 
-    if (ps1_pgxp_is_vertex_precision_enabled() && word_addr != NULL) {
+    if (word_addr != NULL) {
         uint32_t raw_sxy = *word_addr;
         const Ps1PgxpVertex *pgxp = ps1_pgxp_lookup(word_addr, raw_sxy);
         if (pgxp != NULL && pgxp->valid) {
-            vert.sub_x = pgxp->x;
-            vert.sub_y = pgxp->y;
-            vert.z = pgxp->z;
-            vert.w = pgxp->w;
-            vert.has_subpixel = true;
+            vert.is_projected = true;
+            if (ps1_pgxp_is_vertex_precision_enabled() && pgxp->has_subpixel) {
+                vert.sub_x = pgxp->x;
+                vert.sub_y = pgxp->y;
+                vert.z = pgxp->z;
+                vert.w = pgxp->w;
+                vert.has_subpixel = true;
+            }
         }
     }
     return vert;
