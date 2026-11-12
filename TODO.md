@@ -26,9 +26,9 @@ reference build; see [AGENTS.md](AGENTS.md) and [docs/architecture.md](docs/arch
 
 ## Save compatibility
 
-- [ ] Determine whether persistent memory-card unformat is required for the
-      original card utility; current disk-backed unformat requests are not
-      implemented. Preserve original save-image compatibility if added.
+- [x] **Milestone 20: Persistent card unformat** — the original card utility
+      can explicitly unformat a virtual card. Its raw image remains unformatted
+      across restarts and prior saves remain in the rotated backup chain.
 
 ## Audio fidelity
 

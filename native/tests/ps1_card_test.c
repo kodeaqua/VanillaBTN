@@ -46,6 +46,26 @@ static void test_card_format_and_validate(void) {
     assert(ps1_card_validate(&card) == PS1_CARD_ERR_DAMAGED);
 }
 
+static void test_unformat_marks_only_signature(void) {
+    Ps1Card *card = malloc(sizeof(*card));
+    uint8_t *before = malloc(PS1_CARD_SIZE);
+    assert(card && before);
+    ps1_card_format(card);
+    assert(ps1_card_write_file(card, "DIARY", "SAVE", 4) == PS1_CARD_OK);
+    memcpy(before, card->data, PS1_CARD_SIZE);
+    card->dirty = false;
+    assert(ps1_card_unformat(card));
+    assert(card->dirty && ps1_card_is_unformatted(card));
+    assert(ps1_card_validate(card) == PS1_CARD_ERR_UNFORMATTED);
+    assert(!ps1_card_unformat(card));
+    assert(card->data[0] == 0 && card->data[1] == 0);
+    assert(memcmp(card->data + 2, before + 2, PS1_CARD_SIZE - 2) == 0);
+    card->data[PS1_CARD_FRAME_SIZE + 127] ^= 1;
+    assert(!ps1_card_is_unformatted(card));
+    free(before);
+    free(card);
+}
+
 static void test_card_file_roundtrip_and_delete(void) {
     Ps1Card card;
     ps1_card_init(&card);
@@ -647,6 +667,7 @@ int main(void) {
     test_committed_save_finalizes_held_backup();
     test_failed_replacement_preserves_card();
     test_card_format_and_validate();
+    test_unformat_marks_only_signature();
     test_card_file_roundtrip_and_delete();
     test_card_farm_slot_header_and_checksum();
     test_atomic_save_and_crash_recovery();

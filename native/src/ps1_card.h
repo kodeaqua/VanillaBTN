@@ -74,6 +74,14 @@ void ps1_card_init(Ps1Card *card);
 /* Formats card image with valid Frame 0 ("MC") and 15 free directory frames */
 void ps1_card_format(Ps1Card *card);
 
+/* Invalidate only the card signature, leaving files intact for a future
+ * raw-image recovery. Returns false for missing/invalid/already blank cards. */
+bool ps1_card_unformat(Ps1Card *card);
+
+/* True only for an explicitly unformatted image whose original directory
+ * and checksum would validate if the two signature bytes were restored. */
+bool ps1_card_is_unformatted(const Ps1Card *card);
+
 /* Validate magic, checksums, chain ownership, links and allocation states. */
 Ps1CardStatus ps1_card_validate(const Ps1Card *card);
 
@@ -127,6 +135,7 @@ Ps1CardStatus ps1_card_read_slot_header(const Ps1Card *card, int slot_idx,
  * File persistence, atomic write, and crash recovery
  * ---------------------------------------------------------------------- */
 /* Load an exact raw card image. Only a missing file creates a fresh card.
+ * Explicitly unformatted images are accepted and stay unformatted.
  * Invalid existing images remain unchanged and clean; unreadable/wrong-size
  * images are unavailable. Creation failure is reported, never fabricated. */
 bool ps1_card_load_from_file(Ps1Card *card, const char *filepath);
@@ -143,7 +152,8 @@ bool ps1_card_save_to_file(const Ps1Card *card, const char *filepath);
 /* Rotates multi-generational backups up to max_backups */
 bool ps1_card_rotate_backups(const char *filepath, int max_backups);
 
-/* Recovers the most recent valid .tmp, .bak.hold or .bak card. If these are
+/* Recovers the most recent valid or explicitly unformatted .tmp, .bak.hold
+ * or .bak card. If these are
  * missing/damaged, tries rotated .bak.1 through .bak.5 in newest-first order.
  * Unrecoverable backup generations block implicit blank-card creation. */
 bool ps1_card_recover_file(const char *filepath);

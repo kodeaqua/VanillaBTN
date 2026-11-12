@@ -445,6 +445,14 @@ changes separate from the matching PS1 reference build.
 - Memory-card test fixtures allocate their large card-manager objects on the
   heap instead of the limited Windows executable stack. This change is
   test-only and does not alter the production save format.
+- The original card utility's `MemCardUnformat` now invalidates only the raw
+  card signature and persists the result through the same staged write and
+  backup rotation as formatting. Existing file bytes remain on disk and the
+  last formatted image remains in `.bak` (and later backup generations).
+  An intentional unformat is recognized by verifying the original card would
+  be structurally valid with its signature restored. Recovery does not
+  silently format it or restore an older backup; damaged images without this
+  proof are still rejected. Explicit `MemCardFormat` starts a fresh card.
 
 ### Scope and boundaries
 

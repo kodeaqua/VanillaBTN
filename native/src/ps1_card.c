@@ -142,6 +142,30 @@ Ps1CardStatus ps1_card_validate(const Ps1Card *card) {
     return owned == allocated ? PS1_CARD_OK : PS1_CARD_ERR_DAMAGED;
 }
 
+/* PS1 unformat invalidates the signature, not the file data. Verify the
+ * hypothetical original image before allowing these bytes to be persisted:
+ * arbitrary corrupt cards must still be rejected by backup/recovery. */
+bool ps1_card_is_unformatted(const Ps1Card *card) {
+    if (!card || card->data[0] != 0 || card->data[1] != 0) return false;
+    Ps1Card *restored = malloc(sizeof(*restored));
+    if (!restored) return false;
+    *restored = *card;
+    restored->data[0] = 'M';
+    restored->data[1] = 'C';
+    bool valid = ps1_card_validate(restored) == PS1_CARD_OK;
+    free(restored);
+    return valid;
+}
+
+bool ps1_card_unformat(Ps1Card *card) {
+    if (!card || !card->present || ps1_card_validate(card) != PS1_CARD_OK)
+        return false;
+    card->data[0] = 0;
+    card->data[1] = 0;
+    card->dirty = true;
+    return true;
+}
+
 int ps1_card_get_free_blocks(const Ps1Card *card) {
     if (!card || ps1_card_validate(card) != PS1_CARD_OK) return 0;
 
@@ -396,7 +420,7 @@ static bool is_valid_mcr_file(const char *filepath) {
     if (!file) return false;
     Ps1Card *card = malloc(sizeof(*card));
     bool valid = card && read_card_image(file, card) &&
-        ps1_card_validate(card) == PS1_CARD_OK;
+        (ps1_card_validate(card) == PS1_CARD_OK || ps1_card_is_unformatted(card));
     if (fclose(file) != 0) valid = false;
     free(card);
     return valid;
@@ -518,7 +542,8 @@ bool ps1_card_load_from_file(Ps1Card *card, const char *filepath) {
      * Only an explicit format request may replace it; shutdown must not. */
     card->present = true;
     card->dirty = false;
-    return ps1_card_validate(card) == PS1_CARD_OK;
+    return ps1_card_validate(card) == PS1_CARD_OK ||
+        ps1_card_is_unformatted(card);
 }
 
 bool ps1_card_rotate_backups(const char *filepath, int max_backups) {
@@ -545,7 +570,8 @@ bool ps1_card_rotate_backups(const char *filepath, int max_backups) {
 
 bool ps1_card_save_to_file(const Ps1Card *card, const char *filepath) {
     if (!card || !filepath || !card->present ||
-        ps1_card_validate(card) != PS1_CARD_OK) return false;
+        (ps1_card_validate(card) != PS1_CARD_OK &&
+         !ps1_card_is_unformatted(card))) return false;
 
     char tmp_path[540];
     char bak_path[540];
