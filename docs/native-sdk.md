@@ -581,9 +581,9 @@ but declarations alone do not implement that linkage. The archive compiles in
 Debug/Release. It is linked into the host executable through `game_main`, and
 the native `original_boot_test --cycle` probe reaches the farm and returns to
 the title with in-memory cards. This is a synthetic scene-execution check, not
-proof of playable fidelity. A Debug build still reports two x64 pointer-width
-warnings that need review: `event_script.c` (C4311, `u32 *` to `u32`) and
-`player.c` (C4312, `s32` to `FarmNearbyAction *`).
+proof of playable fidelity. The two former x64 pointer-width warnings (`event_script.c` C4311 and
+`player.c` C4312) are resolved with `VANILLABTN_NATIVE`-guarded casts; the PS1
+branches are unchanged and still match the reference hashes.
 
 ### Bounded memory-card file transfers
 

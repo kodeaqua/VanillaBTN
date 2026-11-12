@@ -802,7 +802,12 @@ static s32 event_chunk_checksum(u32 *src, u32 size)
 {
     u32 i;
     s32 sum;
+#ifdef VANILLABTN_NATIVE
+    /* Check alignment of the full host pointer; (u32) would truncate it on x64. */
+    if ((unsigned long long)src & 3)
+#else
     if ((u32)src & 3)
+#endif
     {
         SystemError(0x43, 0x190);
     }
