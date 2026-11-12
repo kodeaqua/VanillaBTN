@@ -417,7 +417,8 @@ changes separate from the matching PS1 reference build.
   the window is unfocused and clears queued audio. `sdk_sync_suspend` and
   `sdk_sync_resume` remove the held time from the VSync epoch, so the loop does
   not catch up afterwards. The synthetic `sdk_vsync_timing` test covers the
-  clock; focus behavior in a real window still needs developer verification.
+  clock. The developer confirmed in a real window that the game freezes and
+  resumes without fast-forwarding; audio silence while paused was not reported.
   `pause_on_disconnect` still only skips input sampling and does not hold the loop.
 - Frame pacing uses overflow-safe elapsed-time calculations. Adaptive V-Sync
   falls back to standard V-Sync when available. SDL window-mode failures are

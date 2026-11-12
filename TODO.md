@@ -20,9 +20,6 @@ reference build; see [AGENTS.md](AGENTS.md) and [docs/architecture.md](docs/arch
 
 ## Runtime and input
 
-- [ ] Developer to verify `pause_on_unfocus = on` in a real window: the game
-      should freeze on focus loss and resume without fast-forwarding. Code and
-      the synthetic clock test are done; runtime behavior is unverified.
 - [ ] `pause_on_disconnect` sets `paused`, which skips input sampling but does
       not hold the original loop. Decide whether it should share the unfocus hold.
 
