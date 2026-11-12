@@ -1743,6 +1743,7 @@ static void event_actors_load_sprites(FarmEventBlock *block)
 #define PENDING_RESULT_NONE -1
 #define PENDING_RESULT_COUNT 5
 
+#ifndef VANILLABTN_NATIVE
 typedef struct FarmCopyWords {
     u32 words[12];
 } FarmCopyWords;
@@ -1750,21 +1751,31 @@ typedef struct FarmCopyRecord {
     FarmCopyWords copy;
     u8 pad[0x1D4 - 0x30];
 } FarmCopyRecord;
+#endif
 /* Copy each villager's sprite80 over its sprite, and call villager_load_request for
  * each one when the request is 0x82. */
 void villager_sprites_copy(void) {
+#ifndef VANILLABTN_NATIVE
     FarmCopyRecord *destination;
     FarmCopyRecord *source;
     FarmCopyWords *source_words;
     FarmCopyWords *destination_words;
+#endif
     s32 index;
     index = 0;
     do {
+#ifdef VANILLABTN_NATIVE
+        /* PS1's 0x30-byte copy and 0x1D4 record stride truncate x64 pointers.
+         * Use the actual native layout so event sprites keep their ANI tables. */
+        memcpy(&game_state.villagers[index].sprite, &game_state.villagers[index].sprite80,
+               sizeof(game_state.villagers[index].sprite));
+#else
         destination = (FarmCopyRecord *)&game_state.villagers[0].sprite;
         source = (FarmCopyRecord *)&((FarmCopyWords *)destination)[-1];
         source_words = &source[index].copy;
         destination_words = &destination[index].copy;
         *destination_words = *source_words;
+#endif
         if (game_state.request->args[0] == 0x82) {
             villager_load_request((s16)index, &game_state.villagers[index].sprite);
         }

@@ -438,8 +438,17 @@ changes separate from the matching PS1 reference build.
   state, in a temporary text file, without storing asset bytes or saves.
   The Release binary does not link the handler or DbgHelp.
 - This exposes failures that synthetic text/menu fixtures cannot reproduce.
-  It is a diagnostic step, **not** a fix for the known NPC conversation crash;
-  the runtime failure still requires a real Debug stack trace.
+  A Windows Debug report localized the NPC conversation failure to a
+  low-address read in `sprite_draw_frame`; this diagnostic alone cannot prove
+  which earlier state transition damaged the animation pointer.
+
+- Native farm event entry now copies each villager's complete `AnimState`
+  from `sprite80` to `sprite` by typed record access. The reference routine
+  assumes 48-byte animation states and 0x1D4-byte villager records; these
+  offsets do not hold when host pointers are 64-bit. The native path preserves
+  animation table pointers across the event transition while leaving the PS1
+  byte-matching routine unchanged. The original NPC crash still requires
+  real-gameplay verification after applying this correction.
 
 ### Configuration and host lifecycle
 

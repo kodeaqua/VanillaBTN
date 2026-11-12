@@ -27,11 +27,13 @@ reference build; see [AGENTS.md](AGENTS.md) and [docs/architecture.md](docs/arch
 
 ## Runtime and input
 
-- [ ] **NPC dialogue crash (native gameplay)** — conversations still crash in
-      Windows gameplay after the text bounds/empty-label fixes. Reproduce in
-      the Debug executable, capture the exception and call stack, identify the
-      failing original/native function, then add a targeted regression test and
-      fix. Passing CTest alone does not close this issue.
+- [ ] **NPC dialogue crash (native gameplay)** — the Debug report captured a
+      `0xC0000005` read at address `0x2` in `sprite_draw_frame`. Milestone 28
+      corrects one concrete x64 sprite-state corruption in event entry, but the
+      conversation must be retested in Windows before closing this issue.
+- [x] **Milestone 28: Native event villager sprite-state copy** — use the real
+      `FarmVillager` stride and full `AnimState` size on x64, rather than the
+      PS1-only 48-byte copy at a fixed `0x1D4` stride; keep reference code intact.
 - [x] **Milestone 27: Native Debug crash reports** — the game executable now
       records exceptions, explicit `SystemError` codes and numeric menu/dialog
       state in a local crash report, with call-stack symbols when available.
