@@ -97,6 +97,9 @@ if(NOT VANILLABTN_EXECUTABLE_NAME MATCHES "^[A-Za-z0-9][A-Za-z0-9_-]*$")
     message(FATAL_ERROR "VANILLABTN_EXECUTABLE_NAME must be a simple executable name")
 endif()
 add_executable(vanillabtn WIN32 src/main.c res/vanillabtn.rc res/vanillabtn.manifest)
+# Diagnostic code and DbgHelp are linked only into the Debug executable.
+target_sources(vanillabtn PRIVATE $<$<CONFIG:Debug>:src/host_crash.c>)
+target_link_libraries(vanillabtn PRIVATE $<$<CONFIG:Debug>:Dbghelp>)
 set_target_properties(vanillabtn PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES
     OUTPUT_NAME "${VANILLABTN_EXECUTABLE_NAME}")
 target_include_directories(vanillabtn PRIVATE res)

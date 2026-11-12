@@ -2,6 +2,16 @@
 #include <SDL3/SDL_main.h>
 
 #include <string.h>
+#if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
+#include <stdio.h>
+#include "farm_state.h"
+#include "host_crash.h"
+#include "sdk_error.h"
+extern int main_scene;
+extern u32 menu_id;
+extern s32 menu_data_index;
+extern s32 menu_phase;
+#endif
 #ifdef VANILLABTN_BOOT_TEST
 #include <stdio.h>
 #include "farm_state.h"
@@ -432,6 +442,18 @@ static void boot_wait(uint64_t deadline, void *context) {
 }
 #endif
 
+#if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
+/* These numeric state fields identify which dialog path was active without
+ * exposing save data, message text, disc data or machine-specific paths. */
+static void native_crash_state(FILE *output) {
+    fprintf(output, "state: scene=%d frame=%u entry=%u menu_state=%u menu_id=%u "
+        "menu_data_index=%d menu_phase=%d work_sector_busy=%u\n",
+        main_scene, game_state.frameCount, game_state.progress.entryStep,
+        game_state.system.menuState, menu_id, menu_data_index, menu_phase,
+        game_state.system.workSectorBusy);
+}
+#endif
+
 int game_main(void);
 
 int main(int argc, char **argv) {
@@ -446,6 +468,10 @@ int main(int argc, char **argv) {
     host.vblank_limit = 900;
 #endif
     if (argc == 2 && strcmp(argv[1], "--check-build") == 0) return 0;
+#if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
+    host_crash_install(native_crash_state);
+    sdk_error_set_hook(host_crash_note_system_error);
+#endif
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--data") == 0 && i + 1 < argc) disc = argv[++i];
         else if (strcmp(argv[i], "--card-dir") == 0 && i + 1 < argc) card_directory = argv[++i];

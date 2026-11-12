@@ -26,6 +26,30 @@ visual, audio and gameplay acceptance remains with the developer.
 To inspect the Debug window, run `& .\build\native\Debug\vanillabtn.exe` and
 close it with the window's close button.
 
+### Diagnosing a gameplay crash (Debug only)
+
+Run the **Debug** game executable with your existing imported disc data and
+reproduce the crash (for example, by talking to the same NPC). The game writes
+`VanillaBTN-crash.txt` to the Windows temporary directory; in PowerShell:
+
+```powershell
+Get-Content (Join-Path $env:TEMP 'VanillaBTN-crash.txt')
+```
+
+If that file cannot be created, the handler tries the current working
+directory instead. The report includes the exception code, call stack and
+numeric scene/menu/dialog state; deliberate `SystemError` aborts also include
+their type and error code. Keep the Debug `.pdb` next to the executable to
+resolve more function names. This report is **not** a memory dump and does not
+include game-text, assets, card contents or absolute source paths. Share the
+report text with the NPC and location that trigger the crash; do not upload
+save images or copyrighted disc data. An OS termination that bypasses the
+unhandled-exception handler may produce no report.
+
+These diagnostics do not run in Release and do not establish that the NPC bug
+is fixed. The crash itself remains open until a failing stack trace identifies
+its actual cause.
+
 ## Release packaging
 
 To assemble a standalone distribution archive for Windows with embedded application metadata and icon:

@@ -27,6 +27,17 @@ reference build; see [AGENTS.md](AGENTS.md) and [docs/architecture.md](docs/arch
 
 ## Runtime and input
 
+- [ ] **NPC dialogue crash (native gameplay)** — conversations still crash in
+      Windows gameplay after the text bounds/empty-label fixes. Reproduce in
+      the Debug executable, capture the exception and call stack, identify the
+      failing original/native function, then add a targeted regression test and
+      fix. Passing CTest alone does not close this issue.
+- [x] **Milestone 27: Native Debug crash reports** — the game executable now
+      records exceptions, explicit `SystemError` codes and numeric menu/dialog
+      state in a local crash report, with call-stack symbols when available.
+      The handler and its DbgHelp dependency are absent from Release; gameplay
+      and the PS1 reference paths are unchanged.
+
 - [x] **Milestone 26: Empty text safety** — the native shared text renderer
       and line measurement avoid reading before an empty optional label, and
       glyph-line backtracking is skipped at index zero. The PS1 path is unchanged.

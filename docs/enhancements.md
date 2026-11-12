@@ -430,6 +430,17 @@ changes separate from the matching PS1 reference build.
   available; objective hardware traces and listening checks remain necessary
   for a fidelity claim.
 
+### Native Debug failure diagnostics
+
+- The native Debug game installs a Windows exception/abort handler and connects
+  the original `SystemError` abort path to a diagnostic hook. It records only
+  call-stack names/relative offsets, exception codes and numeric game/menu
+  state, in a temporary text file, without storing asset bytes or saves.
+  The Release binary does not link the handler or DbgHelp.
+- This exposes failures that synthetic text/menu fixtures cannot reproduce.
+  It is a diagnostic step, **not** a fix for the known NPC conversation crash;
+  the runtime failure still requires a real Debug stack trace.
+
 ### Configuration and host lifecycle
 
 - `native/src/config.c` preserves custom numeric FPS limits and the literal
