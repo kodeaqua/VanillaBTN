@@ -23,6 +23,10 @@ reference build; see [AGENTS.md](AGENTS.md) and [docs/architecture.md](docs/arch
 - [ ] Implement complete `pause_on_unfocus` simulation suspension through the
       native SDK timing path, preserving focus-mute and existing input behavior.
 
+- [ ] Review the two remaining x64 pointer-width warnings in original farm code:
+      `event_script.c` (C4311, `u32 *` to `u32`) and `player.c` (C4312, `s32`
+      to `FarmNearbyAction *`). Fix them natively without changing PS1 output.
+
 ## Save compatibility
 
 - [ ] Determine whether persistent memory-card unformat is required for the

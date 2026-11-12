@@ -265,8 +265,9 @@ LOW/HIGH data offsets as the reference linker configuration, within that one
 allocation. Their pointer subtraction is valid on the host. PS1 builds retain
 their linker-defined symbols. These are data destinations; native scene
 functions still need separate linkage and dispatch. Imported MIPS code is
-never executed or cast to a host function pointer. This does not yet connect
-original global-state initialization, startup or the game loop.
+never executed or cast to a host function pointer. The native host now links
+the original game code and calls `game_main()`; see
+[Farm source compilation](#farm-source-compilation).
 
 ## Display environments
 
@@ -577,11 +578,12 @@ reference code hashes. Existing interrupted shop/helper/utility edits are kept.
 The farm target rejects implicit function declarations (`/we4013`). Remaining
 GS light descriptors and matrix-entry declarations match the installed SDK,
 but declarations alone do not implement that linkage. The archive compiles in
-Debug/Release and the existing 27 synthetic checks pass. It is not linked into
-the host executable and is not a playable farm: unresolved host/runtime entry
-points and serialized/host pointer boundaries still need work. In particular,
-the source build still reports pointer truncations in animal actions, event
-scripts/cue history and player code; those must be resolved before execution.
+Debug/Release. It is linked into the host executable through `game_main`, and
+the native `original_boot_test --cycle` probe reaches the farm and returns to
+the title with in-memory cards. This is a synthetic scene-execution check, not
+proof of playable fidelity. A Debug build still reports two x64 pointer-width
+warnings that need review: `event_script.c` (C4311, `u32 *` to `u32`) and
+`player.c` (C4312, `s32` to `FarmNearbyAction *`).
 
 ### Bounded memory-card file transfers
 

@@ -11,7 +11,7 @@ This document defines the comprehensive master architectural blueprint for Vanil
 
 ```mermaid
 flowchart TD
-    OriginalSrc["src/ (Original PS1 Decomp)"] --- |"PS1 branch retains original code (SHA-1 recheck pending)"| PS1Build["PS1 Reference Target"]
+    OriginalSrc["src/ (Original PS1 Decomp)"] --- |"PS1 branch retains original code (SHA-1 check target)"| PS1Build["PS1 Reference Target"]
     
     subgraph Execution_Order["Project Execution Order"]
         Step1["Phase 1: Comprehensive Fixes for 35 PS1 Hardware Flaws (HIGHEST PRIORITY)"]
