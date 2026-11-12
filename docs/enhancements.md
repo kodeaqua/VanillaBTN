@@ -416,6 +416,20 @@ changes separate from the matching PS1 reference build.
   avoiding float-first rounding disagreement between adjacent polygons.
   Quad vertex provenance is kept consistent through clipping/subdivision.
 
+### SPU envelope and reverb compatibility
+
+- The authentic SPU reverb clock continues to alternate left/right at 22.05 kHz,
+  apply the 39-tap half-band FIR, and use the original reverb RAM tap layout.
+  Its clock and envelope rates are not changed by high-resolution graphics.
+- With `hifi_reverb = on`, both reverb channels are stepped on every 44.1 kHz
+  output sample using the configured reverb RAM and effect registers, without
+  the authentic half-rate FIR. Only the wet reverb path is affected; normal
+  ADSR attack/decay/sustain/release clocks still advance once per SPU sample.
+  Toggling this mode changes the reverb's character and is not a claim of
+  PlayStation hardware equivalence. Authentic mode and game audio pacing stay
+  available; objective hardware traces and listening checks remain necessary
+  for a fidelity claim.
+
 ### Configuration and host lifecycle
 
 - `native/src/config.c` preserves custom numeric FPS limits and the literal

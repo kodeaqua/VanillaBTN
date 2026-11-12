@@ -38,8 +38,12 @@ reference build; see [AGENTS.md](AGENTS.md) and [docs/architecture.md](docs/arch
 
 ## Audio fidelity
 
-- [ ] Continue SPU envelope/reverb behavior review where exact hardware
-      equivalence matters; avoid changing established gameplay audio timing.
+- [x] **Milestone 24: Optional full-rate stereo Hi-Fi reverb** — the existing
+      `hifi_reverb` flag now selects a 44.1 kHz stereo wet path, while the
+      authentic 22.05 kHz alternating/FIR path remains unchanged. Existing ADSR
+      clock/step regression cases were reviewed without changing envelope
+      timing; exact hardware-waveform equivalence still requires reference
+      traces and developer listening acceptance.
 
 ## References
 
