@@ -316,10 +316,10 @@ poll_events:
 
     if (!host->running) { sdk_sync_stop(); return; }
 
-    /* pause_on_unfocus: the original loop runs inside VSync, so holding this pump
-     * holds the simulation. Suspending the sync clock keeps the time spent here
-     * from being replayed as elapsed frames. Focus events are handled above. */
-    if (host->config.input.pause_on_unfocus && !host->focused) {
+    /* Both focus loss and primary-pad disconnect must hold the original VSync
+     * pump, not merely skip pad sampling while the farm clock keeps running.
+     * Resume only when every requested pause condition has cleared. */
+    if ((host->config.input.pause_on_unfocus && !host->focused) || host->paused) {
         if (!suspended) {
             sdk_sync_suspend();
             suspended = true;
@@ -329,15 +329,6 @@ poll_events:
         goto poll_events;
     }
     if (suspended) sdk_sync_resume();
-
-    if (host->paused) {
-        bool minimized = host->window != NULL &&
-            (SDL_GetWindowFlags(host->window) & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) != 0;
-        if (!minimized) {
-            host_present_frame(&video, host->renderer, &host->texture);
-        }
-        return;
-    }
 
     /* Supply raw samples only: original pad.c owns the analog/repeat rules
      * in the original game. Do not feed folded stick bits. */

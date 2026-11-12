@@ -419,7 +419,8 @@ changes separate from the matching PS1 reference build.
   not catch up afterwards. The synthetic `sdk_vsync_timing` test covers the
   clock. The developer confirmed in a real window that the game freezes and
   resumes without fast-forwarding; audio silence while paused was not reported.
-  `pause_on_disconnect` still only skips input sampling and does not hold the loop.
+  `pause_on_disconnect` now shares the VSync hold: removing the primary controller
+  suspends simulation until reconnection; if unfocused, the focus hold remains active.
 - Frame pacing uses overflow-safe elapsed-time calculations. Adaptive V-Sync
   falls back to standard V-Sync when available. SDL window-mode failures are
   propagated, and toggle hotkeys ignore repeated key-down events.

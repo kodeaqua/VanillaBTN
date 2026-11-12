@@ -20,8 +20,8 @@ reference build; see [AGENTS.md](AGENTS.md) and [docs/architecture.md](docs/arch
 
 ## Runtime and input
 
-- [ ] `pause_on_disconnect` sets `paused`, which skips input sampling but does
-      not hold the original loop. Decide whether it should share the unfocus hold.
+- [x] **Milestone 18: Disconnect hold** — `pause_on_disconnect` now holds
+      the original VSync loop and excludes held time, sharing unfocus suspension.
 
 ## Save compatibility
 
