@@ -466,6 +466,16 @@ changes separate from the matching PS1 reference build.
   underlying PS1 mixer state. Nonfinite analog deadzones are sanitized before
   float-to-integer conversion.
 
+### Dialogue and shared text safety
+
+- Native text-insert expansion now checks the 12-slot dynamic-source table
+  before resolving unknown or absent script inserts. The renderer, line
+  counter, entry counter, and text measurement use the same bounded fallback;
+  scripted names and other known inserts retain their existing behavior.
+  This removes an out-of-range memory access shared by dialogue, menus, and
+  event text, but does not establish the cause of any particular gameplay crash
+  without a reproducing trace. The PS1 reference lookup is unchanged.
+
 ### Virtual memory-card reliability
 
 - Card writes preserve the prior image on failure. Backups rotate through

@@ -27,6 +27,11 @@ reference build; see [AGENTS.md](AGENTS.md) and [docs/architecture.md](docs/arch
 
 ## Runtime and input
 
+- [x] **Milestone 25: Native text-insert source bounds** — the shared
+      dialogue, event-text and menu formatter resolves optional source slots
+      only inside its 12-entry table; missing or unknown insertion codes are
+      skipped rather than indexing host memory beyond the table.
+
 - [x] **Milestone 18: Disconnect hold** — `pause_on_disconnect` now holds
       the original VSync loop and excludes held time, sharing unfocus suspension.
 
