@@ -12,8 +12,9 @@ reference build; see [AGENTS.md](AGENTS.md) and [docs/architecture.md](docs/arch
       240-row internal raster target. Keep original 4:3 presentation available.
 - [ ] Connect `render_scale` to the render target when scalable rasterization
       is implemented; it currently affects configuration storage only.
-- [ ] Implement `pixel_aspect_ratio = crt_ntsc` presentation semantics without
-      changing game geometry or stretching HUD elements.
+- [x] **Milestone 19: CRT NTSC pixel aspect** — `pixel_aspect_ratio = crt_ntsc`
+      corrects physical presentation width without changing game/HUD coordinates;
+      explicit anamorphic `widescreen = stretch` continues to override PAR.
 - [ ] Address world actor/sprite pop-in at very wide viewport edges. The game
       can reject actors before they reach the native renderer; any adaptation
       must preserve original collision, object positions, and the PS1 path.

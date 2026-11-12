@@ -333,8 +333,7 @@ Following the completion of the 35 PS1 flaw fixes, Phase 2 implements modern pla
 - [x] **Milestone 17**: HD Font & QoL Features (`ps1_card.c/h`, `ps1_video.c/h`, `sdk_sync.c/h`).
 
 Milestone labels mean the code and synthetic tests exist, not that every option
-is fully effective. Known gaps (`render_scale`, `pixel_aspect_ratio = crt_ntsc`,
-wide-edge actor pop-in) are listed in `TODO.md`; backend
+is fully effective. Known gaps (`render_scale`, wide-edge actor pop-in) are listed in `TODO.md`; backend
 selection falls back through the chain above, and HD font, turbo and extended
 draw distance options have not been confirmed in the runtime.
 
@@ -411,8 +410,12 @@ changes separate from the matching PS1 reference build.
   nonfinite numbers, integer overflow, and truncated paths are rejected
   instead of silently changing another setting.
 - `render_scale` is currently a stored configuration preference, **not** an
-  implemented full-resolution 3D raster target. Similarly,
-  `pixel_aspect_ratio = crt_ntsc` does not currently modify the presentation.
+  implemented full-resolution 3D raster target.
+- `pixel_aspect_ratio = crt_ntsc` applies the NTSC CRT 1.092 horizontal pixel
+  aspect at SDL presentation, without changing VRAM resolution, HUD placement,
+  game coordinates or polygon projection. Hor+ FOV is calculated from the
+  corrected physical output aspect so the HUD stays in its original centered
+  safe area. `widescreen = stretch` remains an explicit anamorphic override.
 - `pause_on_unfocus = on` holds the original loop inside the VSync pump while
   the window is unfocused and clears queued audio. `sdk_sync_suspend` and
   `sdk_sync_resume` remove the held time from the VSync epoch, so the loop does

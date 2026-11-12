@@ -132,6 +132,55 @@ int main(void) {
         logical_mode != SDL_LOGICAL_PRESENTATION_STRETCH) return 15;
     SDL_DestroyRenderer(scaled_renderer);
     SDL_DestroySurface(scaled_surface);
+    /* CRT NTSC pixels are ~9.2% wider than square pixels. The physical
+     * correction must not expand the camera or move 2D HUD coordinates. */
+    {
+        SDL_Surface *crt_surface = SDL_CreateSurface(640, 480, SDL_PIXELFORMAT_ARGB8888);
+        if (!crt_surface) return 26;
+        SDL_Renderer *crt_renderer = SDL_CreateSoftwareRenderer(crt_surface);
+        if (!crt_renderer) return 27;
+        host_display_set_pixel_aspect_ratio(PAR_CRT_NTSC);
+        host_display_set_widescreen_mode(WIDESCREEN_AUTO);
+        if (!host_display_update_widescreen(crt_renderer) ||
+            !SDL_GetRenderLogicalPresentation(crt_renderer, &logical_w, &logical_h, &logical_mode) ||
+            logical_w != 349 || logical_h != 240 ||
+            logical_mode != SDL_LOGICAL_PRESENTATION_LETTERBOX ||
+            ps1_video_panorama_width(320) != 320 ||
+            fabsf(ps1_gte_get_widescreen_scale() - 1.0f) > 1e-5f) return 28;
+        SDL_Texture *crt_texture = SDL_CreateTexture(crt_renderer,
+            SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, 320, 240);
+        if (!crt_texture || !host_present_frame(&video, crt_renderer, &crt_texture)) return 29;
+        uint8_t r = 0, g = 0, b = 0, a = 0;
+        if (!SDL_ReadSurfacePixel(crt_surface, 320, 0, &r, &g, &b, &a) ||
+            r != 0 || g != 0 || b != 0 || a != 255) return 30;
+        SDL_DestroyTexture(crt_texture);
+        SDL_DestroyRenderer(crt_renderer);
+        SDL_DestroySurface(crt_surface);
+    }
+    {
+        SDL_Surface *crt_surface = SDL_CreateSurface(1280, 720, SDL_PIXELFORMAT_ARGB8888);
+        if (!crt_surface) return 31;
+        SDL_Renderer *crt_renderer = SDL_CreateSoftwareRenderer(crt_surface);
+        if (!crt_renderer) return 32;
+        host_display_set_widescreen_mode(WIDESCREEN_ON);
+        float expected = (1280.0f / 720.0f) / (4.0f / 3.0f) / 1.092f;
+        if (!host_display_update_widescreen(crt_renderer) ||
+            fabsf(ps1_gte_get_widescreen_scale() - expected) > 1e-4f ||
+            ps1_video_panorama_width(320) != 391 ||
+            !SDL_GetRenderLogicalPresentation(crt_renderer, &logical_w, &logical_h, &logical_mode) ||
+            logical_w != 427 || logical_h != 240 ||
+            logical_mode != SDL_LOGICAL_PRESENTATION_STRETCH) return 33;
+        /* The legacy stretch mode explicitly overrides CRT correction. */
+        host_display_set_widescreen_mode(WIDESCREEN_STRETCH);
+        if (!host_display_update_widescreen(crt_renderer) ||
+            !SDL_GetRenderLogicalPresentation(crt_renderer, &logical_w, &logical_h, &logical_mode) ||
+            logical_w != 320 || logical_h != 240 ||
+            ps1_video_panorama_width(320) != 320) return 34;
+        host_display_set_pixel_aspect_ratio(PAR_SQUARE);
+        host_display_set_widescreen_mode(WIDESCREEN_AUTO);
+        SDL_DestroyRenderer(crt_renderer);
+        SDL_DestroySurface(crt_surface);
+    }
     ps1_video_configure_panorama(0,0,1.0f);
     sdk_gpu_bind(NULL);
     SDL_Quit();

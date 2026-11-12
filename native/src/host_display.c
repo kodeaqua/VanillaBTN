@@ -2,9 +2,16 @@
 #include "sdk_gpu.h"
 #include "ps1_gte.h"
 #include <string.h>
+#include <math.h>
 
 static WidescreenMode s_widescreen_mode = WIDESCREEN_AUTO;
 static bool s_integer_scaling;
+static PixelAspectRatio s_pixel_aspect_ratio = PAR_SQUARE;
+
+void host_display_set_pixel_aspect_ratio(PixelAspectRatio ratio) {
+    s_pixel_aspect_ratio = ratio == PAR_CRT_NTSC ? PAR_CRT_NTSC : PAR_SQUARE;
+}
+
 /* The stepped PS1 screen fade uses a temporary 640x480 display mode. Keep
  * Hor+ projection for the next 320x240 scene frame while that mode is active;
  * otherwise one frame is projected at 4:3 before the host restores Hor+. */
@@ -31,7 +38,7 @@ WidescreenMode host_display_get_widescreen_mode(void) {
 /* The viewport width follows the current renderer output, not a hard-coded
  * 16:9 preset. World XY projection retains original 4:3 pixel coordinates;
  * only the frustum and panoramic clipping extend left/right. UI stays at the
- * original 320x240 centered safe area, with zero horizontal resampling. */
+ * original 320x240 centered safe area; CRT PAR correction is output-only. */
 bool host_display_update_widescreen(SDL_Renderer *renderer) {
     if (!renderer) return false;
 
@@ -56,9 +63,15 @@ bool host_display_update_widescreen(SDL_Renderer *renderer) {
         output_aspect = (float)output_width / (float)output_height;
     }
 
+    /* CRT pixels are wider than square pixels. Compute the Hor+ camera from
+     * the aspect available in *PS1 pixels*, while leaving every game and HUD
+     * coordinate unchanged. Explicit anamorphic stretch overrides CRT PAR. */
+    float pixel_aspect = s_pixel_aspect_ratio == PAR_CRT_NTSC &&
+        s_widescreen_mode != WIDESCREEN_STRETCH ? 1.092f : 1.0f;
+    float ps1_output_aspect = output_aspect / pixel_aspect;
     WidescreenMode effective_mode = s_widescreen_mode;
     if (effective_mode == WIDESCREEN_AUTO) {
-        effective_mode = output_aspect > (4.0f / 3.0f) + 0.01f
+        effective_mode = ps1_output_aspect > (4.0f / 3.0f) + 0.01f
             ? WIDESCREEN_ON : WIDESCREEN_OFF;
     }
 
@@ -67,9 +80,9 @@ bool host_display_update_widescreen(SDL_Renderer *renderer) {
     if (effective_mode == WIDESCREEN_STRETCH) {
         /* Explicit legacy anamorphic mode, not true widescreen. */
         presentation = SDL_LOGICAL_PRESENTATION_STRETCH;
-    } else if (effective_mode == WIDESCREEN_ON && output_aspect > 4.0f / 3.0f
+    } else if (effective_mode == WIDESCREEN_ON && ps1_output_aspect > 4.0f / 3.0f
                && display.width == 320 && display.height == 240) {
-        fov_scale = output_aspect / (4.0f / 3.0f);
+        fov_scale = ps1_output_aspect / (4.0f / 3.0f);
         if (fov_scale > 4.0f) fov_scale = 4.0f;
         /* The logical canvas itself expands to the real aspect. The final
          * sub-pixel stretch compensates only for integer width rounding:
@@ -112,18 +125,21 @@ bool host_display_update_widescreen(SDL_Renderer *renderer) {
     const SdkDisplay presented = s_fade_uses_panorama ? s_last_game_display : display;
     int canvas_width = ps1_video_panorama_width(presented.width);
     int canvas_height = presented.height;
+    /* Presentation-only correction: the texture stays at its PS1 raster size,
+     * and the centered HUD does not undergo any extra Hor+ camera transform. */
+    int logical_width = (int)lroundf((float)canvas_width * pixel_aspect);
     int active_width = 0, active_height = 0;
     SDL_RendererLogicalPresentation active_presentation;
     /* Setting the logical viewport on every present is expensive on some
      * SDL renderer backends. Resize only when the game or output changes. */
     if (SDL_GetRenderLogicalPresentation(renderer, &active_width, &active_height,
                                          &active_presentation)
-        && active_width == canvas_width && active_height == canvas_height
+        && active_width == logical_width && active_height == canvas_height
         && active_presentation == presentation) {
         return true;
     }
     return SDL_SetRenderLogicalPresentation(renderer,
-        canvas_width, canvas_height, presentation);
+        logical_width, canvas_height, presentation);
 }
 
 /* Query connected displays count */
@@ -302,7 +318,14 @@ bool host_present_frame(const Ps1Video *video, SDL_Renderer *renderer, SDL_Textu
     copied = ps1_video_copy_panorama(video, presented.x, presented.y, presented.width, presented.height,
                                      pixels, (size_t)pitch / sizeof(uint32_t));
     SDL_UnlockTexture(*texture);
+    /* SDL's logical canvas models the physical width of a PS1 scanline;
+     * changing its destination rectangle must never rewrite texture VRAM. */
+    const float pixel_aspect = s_pixel_aspect_ratio == PAR_CRT_NTSC &&
+        s_widescreen_mode != WIDESCREEN_STRETCH ? 1.092f : 1.0f;
+    SDL_FRect dest = {0.0f, 0.0f,
+        (float)lroundf((float)presentation_width * pixel_aspect),
+        (float)presented.height};
     return copied && SDL_RenderClear(renderer)
-        && SDL_RenderTexture(renderer, *texture, NULL, NULL)
+        && SDL_RenderTexture(renderer, *texture, NULL, &dest)
         && SDL_RenderPresent(renderer);
 }

@@ -21,6 +21,8 @@ bool host_display_toggle_fullscreen(SDL_Window *window, DisplayConfig *config);
 
 /* Configure and query widescreen presentation mode */
 void host_display_set_widescreen_mode(WidescreenMode mode);
+/* CRT NTSC adjusts output pixel shape, not game-space coordinates. */
+void host_display_set_pixel_aspect_ratio(PixelAspectRatio ratio);
 /* Explicit integer scaling is opt-in; true Hor+ remains output-ratio aware. */
 void host_display_set_integer_scaling(bool enabled);
 WidescreenMode host_display_get_widescreen_mode(void);
