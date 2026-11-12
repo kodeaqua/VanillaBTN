@@ -18,9 +18,12 @@ reference build; see [AGENTS.md](AGENTS.md) and [docs/architecture.md](docs/arch
 - [x] **Milestone 19: CRT NTSC pixel aspect** — `pixel_aspect_ratio = crt_ntsc`
       corrects physical presentation width without changing game/HUD coordinates;
       explicit anamorphic `widescreen = stretch` continues to override PAR.
-- [ ] Address world actor/sprite pop-in at very wide viewport edges. The game
-      can reject actors before they reach the native renderer; any adaptation
-      must preserve original collision, object positions, and the PS1 path.
+- [x] **Milestone 23: Farm-world sprite culling in Hor+** — the native-only
+      farm visibility band includes the additional Hor+ view on both edges,
+      allowing farm actors/objects and weather sprites through the original
+      screen-box rejection. The vertical range, coordinates, collision and PS1
+      reference path are unchanged. Other scenes need runtime inspection for
+      separate game-side visibility gates.
 
 ## Runtime and input
 

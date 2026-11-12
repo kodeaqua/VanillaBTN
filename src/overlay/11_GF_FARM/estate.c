@@ -32,6 +32,9 @@
 #include "status_pages.h"
 #include "text.h"
 #include "villager.h"
+#ifdef VANILLABTN_NATIVE
+#include "ps1_gte.h"
+#endif
 
 #define NPC(n) (game_state.villagers[n])
 
@@ -1785,7 +1788,14 @@ static s32 estate_season_bit(void) {
 /* Whether a projected point lies inside the screen box that the sprites are drawn in. */
 int estate_point_on_screen(s32 x, s32 y) {
     int result = 0;
+#ifdef VANILLABTN_NATIVE
+    /* Farm item and weather sprite rejection must use the same Hor+ margins
+     * as the native model frustum. Keep the vertical band and PS1 path exact. */
+    if (ps1_gte_screen_band_contains(x, ESTATE_SCREEN_BOX_LEFT, ESTATE_SCREEN_BOX_WIDTH))
+        result = (u32)(y - ESTATE_SCREEN_BOX_TOP) < ESTATE_SCREEN_BOX_HEIGHT;
+#else
     if ((u32)(x - ESTATE_SCREEN_BOX_LEFT) < ESTATE_SCREEN_BOX_WIDTH) result = (u32)(y - ESTATE_SCREEN_BOX_TOP) < ESTATE_SCREEN_BOX_HEIGHT;
+#endif
     return result;
 }
 

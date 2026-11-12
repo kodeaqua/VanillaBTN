@@ -27,6 +27,15 @@ float ps1_gte_get_widescreen_scale(void) {
     return s_widescreen_scale;
 }
 
+bool ps1_gte_screen_band_contains(int32_t x, int32_t left, int32_t width) {
+    if (width <= 0) return false;
+    /* Projected X is unchanged by Hor+. The camera shows extra columns on
+     * either side, so expand only the visibility test, not the coordinates. */
+    int32_t extra = (int32_t)floorf(160.0f * (s_widescreen_scale - 1.0f) + 0.5f);
+    return (int64_t)x >= (int64_t)left - extra
+        && (int64_t)x < (int64_t)left + width + extra;
+}
+
 int32_t ps1_gte_scale_frustum_half_angle(int32_t base_half_angle) {
     if (base_half_angle <= 0) return 0;
     if (s_widescreen_scale <= 1.00001f) return base_half_angle;

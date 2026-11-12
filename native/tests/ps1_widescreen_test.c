@@ -34,6 +34,25 @@ static void test_widescreen_scale_get_set(void) {
     CHECK(fabsf(ps1_gte_get_widescreen_scale() - 1.0f) < 1e-5f);
 }
 
+static void test_projected_sprite_visibility_band(void) {
+    ps1_gte_set_widescreen_scale(1.0f);
+    CHECK(ps1_gte_screen_band_contains(-49, -49, 419));
+    CHECK(ps1_gte_screen_band_contains(369, -49, 419));
+    CHECK(!ps1_gte_screen_band_contains(-50, -49, 419));
+    CHECK(!ps1_gte_screen_band_contains(370, -49, 419));
+
+    ps1_gte_set_widescreen_scale(4.0f / 3.0f);
+    CHECK(ps1_gte_screen_band_contains(-100, -49, 419));
+    CHECK(ps1_gte_screen_band_contains(420, -49, 419));
+    CHECK(!ps1_gte_screen_band_contains(-103, -49, 419));
+    CHECK(!ps1_gte_screen_band_contains(423, -49, 419));
+
+    ps1_gte_set_widescreen_scale(4.0f);
+    CHECK(ps1_gte_screen_band_contains(-529, -49, 419));
+    CHECK(!ps1_gte_screen_band_contains(-530, -49, 419));
+    ps1_gte_set_widescreen_scale(1.0f);
+}
+
 static void test_hor_plus_3d_projection(void) {
     Ps1Gte gte;
     ps1_gte_init(&gte);
@@ -180,6 +199,7 @@ static void test_host_display_widescreen_modes(void) {
 
 int main(void) {
     test_widescreen_scale_get_set();
+    test_projected_sprite_visibility_band();
     test_hor_plus_3d_projection();
     test_fixed_point_hor_plus_projection();
     test_horizontal_frustum_expands_with_output_aspect();

@@ -362,8 +362,11 @@ changes separate from the matching PS1 reference build.
   canvas widens horizontally, while its normal PS1 height remains 240 rows.
 - GTE-projected geometry can be rasterized into the extension without changing
   original world positions. Native frustum/culling adjustments are guarded by
-  `VANILLABTN_NATIVE`. Ordinary screen-space HUD and UI primitives stay in the
-  original centered 4:3 area.
+  `VANILLABTN_NATIVE`. The farm's `estate_point_on_screen` keeps its existing
+  vertical rejection band but widens horizontal visibility to include the Hor+
+  margins for farm actors, objects and weather. Other scene-specific culling
+  still requires hands-on checks on ultrawide displays. Ordinary screen-space
+  HUD and UI primitives stay in the original centered 4:3 area.
 - PS1 draw and display environments use **two distinct frame pages**, at VRAM
   rows 0–239 and 240–479. The sidecar preserves each page until actual clear,
   fill, or draw operations change its pixels. Beginning another ordering table
