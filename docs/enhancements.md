@@ -443,9 +443,13 @@ changes separate from the matching PS1 reference build.
   This one-time reserve can absorb a brief loading stall around the title
   music's initial playback; it does not generate extra game/SPU samples,
   alter voice state, or keep growing latency on subsequent ticks. The
-  existing upper queue bound still applies. Windows listening confirmed
-  the initial onset improved. Later title music degradation still requires
-  Windows listening acceptance of the host sample-clock correction.
+  SDL queue budgeting now includes that initial reserve before admitting the
+  generated PCM. If a delayed callback generates more samples than will fit,
+  only the newest PCM frames are submitted, while the original SPU is still
+  mixed for the full elapsed time. This limits queued host latency to four
+  ticks instead of permitting a catch-up packet to overflow the previous
+  eight-tick gate. It cannot eliminate underruns caused by a blocked game
+  thread; native Windows listening acceptance is still open.
 
 ### Optional native title-stall timing
 

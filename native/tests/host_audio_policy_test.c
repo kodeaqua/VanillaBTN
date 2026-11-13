@@ -57,6 +57,39 @@ static void test_music_onset_reserves_only_at_first_pcm(void) {
     CHECK(host_audio_music_onset_padding(&onset, true, true, -1, tick_bytes) == 0);
 }
 
+static void test_audio_queue_does_not_replay_stale_samples(void) {
+    const int tick_bytes = HOST_AUDIO_TICK_FRAMES * 2 * (int)sizeof(int16_t);
+    int first = -1;
+
+    CHECK(host_audio_queue_frames(0, HOST_AUDIO_TICK_FRAMES, &first) == 735);
+    CHECK(first == 0);
+    CHECK(host_audio_queue_frames(3 * tick_bytes, HOST_AUDIO_MAX_FRAMES, &first) == 735);
+    CHECK(first == 2205); /* Keep newest tick from a four-tick catch-up. */
+    CHECK(host_audio_queue_frames(4 * tick_bytes, HOST_AUDIO_TICK_FRAMES, &first) == 0);
+    CHECK(host_audio_queue_frames(4 * tick_bytes - 1, HOST_AUDIO_TICK_FRAMES, &first) == 0);
+    CHECK(host_audio_queue_frames(0, HOST_AUDIO_MAX_FRAMES, &first) == HOST_AUDIO_MAX_FRAMES);
+    CHECK(first == 0);
+    CHECK(host_audio_queue_frames(-1, HOST_AUDIO_TICK_FRAMES, &first) == 0);
+    CHECK(first == 0);
+    CHECK(host_audio_queue_frames(0, 0, &first) == 0);
+    CHECK(host_audio_queue_frames(0, HOST_AUDIO_TICK_FRAMES, NULL) == 0);
+
+    /* A music-onset reserve must be counted before submitting actual music. */
+    CHECK(host_audio_queue_frames(2 * tick_bytes, HOST_AUDIO_MAX_FRAMES, &first) == 1470);
+    CHECK(first == 1470);
+
+    /* Even repeated catch-up bursts cannot grow the SDL queue past its cap. */
+    int queued = 0;
+    for (int i = 0; i < 100; ++i) {
+        int consumed = queued > tick_bytes / 2 ? tick_bytes / 2 : queued;
+        queued -= consumed;
+        int count = host_audio_queue_frames(queued, HOST_AUDIO_MAX_FRAMES, &first);
+        CHECK(count >= 0 && first + count == HOST_AUDIO_MAX_FRAMES);
+        queued += count * 2 * (int)sizeof(int16_t);
+        CHECK(queued <= HOST_AUDIO_QUEUE_LIMIT_FRAMES * 2 * (int)sizeof(int16_t));
+    }
+}
+
 static void test_audio_clock_matches_host_elapsed_time(void) {
     HostAudioClock clock = {0};
     const uint64_t tick_ns = 1000000000ULL / 60;
@@ -109,6 +142,7 @@ int main(void) {
     test_default_is_bit_exact();
     test_master_volume_and_focus_mute();
     test_music_onset_reserves_only_at_first_pcm();
+    test_audio_queue_does_not_replay_stale_samples();
     test_audio_clock_matches_host_elapsed_time();
     puts("host_audio_policy_test: passed");
     return 0;

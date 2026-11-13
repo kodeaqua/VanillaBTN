@@ -17,6 +17,23 @@ void host_audio_apply_volume(int16_t *samples, size_t count, int volume_percent,
     }
 }
 
+int host_audio_queue_frames(int queued_bytes, int generated_frames, int *start_frame) {
+    if (start_frame) *start_frame = 0;
+    if (queued_bytes < 0 || generated_frames <= 0 || !start_frame) return 0;
+
+    /* Round up if SDL reports a partial sample frame: never overrun the cap. */
+    int queued_frames = queued_bytes / (int)(2 * sizeof(int16_t));
+    if (queued_bytes % (int)(2 * sizeof(int16_t))) ++queued_frames;
+    int room = HOST_AUDIO_QUEUE_LIMIT_FRAMES - queued_frames;
+    if (room <= 0) return 0;
+
+    int count = generated_frames < room ? generated_frames : room;
+    /* When catch-up produces more PCM than SDL can consume, discard the
+     * oldest new frames rather than replaying stale audio behind the game. */
+    *start_frame = generated_frames - count;
+    return count;
+}
+
 void host_audio_clock_reset(HostAudioClock *clock) {
     if (clock) memset(clock, 0, sizeof(*clock));
 }

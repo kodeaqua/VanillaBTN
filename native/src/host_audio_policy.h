@@ -17,6 +17,12 @@ void host_audio_apply_volume(int16_t *samples, size_t count, int volume_percent,
  * Turbo intentionally keeps one game-tick of sound per accelerated tick. */
 #define HOST_AUDIO_TICK_FRAMES 735
 #define HOST_AUDIO_MAX_FRAMES (HOST_AUDIO_TICK_FRAMES * 4)
+/* Bound stream latency even when a delayed callback emits multiple ticks. */
+#define HOST_AUDIO_QUEUE_LIMIT_FRAMES (HOST_AUDIO_TICK_FRAMES * 4)
+
+/* Select the newest generated frames that fit the remaining SDL queue room.
+ * Mixing still advances the original SPU by the full generated frame count. */
+int host_audio_queue_frames(int queued_bytes, int generated_frames, int *start_frame);
 
 typedef struct HostAudioClock {
     uint64_t last_ns;

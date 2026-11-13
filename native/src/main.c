@@ -502,17 +502,25 @@ poll_events:
         /* SDL copies stream data immediately. Do not advance the music
          * sequencer to synthesize this reserve: it would shift gameplay audio. */
         int16_t silence[HOST_AUDIO_TICK_FRAMES * 2 * 2] = {0};
-        SDL_PutAudioStreamData(audio.stream, silence, (int)onset_padding);
+        if (SDL_PutAudioStreamData(audio.stream, silence, (int)onset_padding)) {
+            queued += (int)onset_padding;
+        }
     }
 #if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
     int submit_status = 0;
 #endif
-    if (audio.stream && frames > 0 && queued >= 0 &&
-        queued < (int)(HOST_AUDIO_TICK_FRAMES * 2 * sizeof(int16_t) * 8)) {
+    int first_frame = 0;
+    int submit_frames = audio.stream
+        ? host_audio_queue_frames(queued, frames, &first_frame) : 0;
+    if (submit_frames > 0) {
+        /* Full PCM has already advanced the PS1 SPU. Keep only the newest
+         * frames if an unusually late VSync would build up host latency. */
+        int16_t *to_submit = samples + first_frame * 2;
+        int submit_bytes = submit_frames * 2 * (int)sizeof(int16_t);
 #if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
-        submit_status = SDL_PutAudioStreamData(audio.stream, samples, frames * 2 * (int)sizeof(int16_t)) ? 1 : -1;
+        submit_status = SDL_PutAudioStreamData(audio.stream, to_submit, submit_bytes) ? 1 : -1;
 #else
-        SDL_PutAudioStreamData(audio.stream, samples, frames * 2 * (int)sizeof(int16_t));
+        SDL_PutAudioStreamData(audio.stream, to_submit, submit_bytes);
 #endif
     }
 #if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)

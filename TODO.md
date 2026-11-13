@@ -78,9 +78,14 @@ reference build; see [AGENTS.md](AGENTS.md) and [docs/architecture.md](docs/arch
       events, input, audio and presentation. `DebugOptimized` retains Debug
       diagnostics while using `/O2`; normal Release excludes all tracing.
 - [ ] **Title-screen music continuity (Windows acceptance)** — music can
-      degrade after several seconds while graphics remain smooth. Confirm
-      whether clock-paced PCM delivery in Milestone 37 resolves this on
-      native Windows; a long blocked event pump still needs separate study.
+      degrade after several seconds while graphics remain smooth. Recheck
+      playback on native Windows with Milestone 38's bounded SDL queue;
+      investigate remaining dropouts and blocked event pumps separately.
+- [x] **Milestone 38: Bound SDL catch-up queue depth** — a four-tick audio
+      catch-up could push the SDL queue beyond its old eight-tick threshold,
+      delaying playback before later submissions were skipped. Account for
+      onset reserve bytes and trim catch-up submissions to four queued ticks,
+      retaining the newest PCM while the SPU always advances in full.
 - [x] **Milestone 37: Native output sample-clock pacing** — generate host PCM
       for elapsed wall time rather than assuming every VSync callback arrives
       on schedule. Cap catch-up at four ticks, preserve accelerated turbo
