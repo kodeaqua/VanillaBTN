@@ -12,8 +12,7 @@ baseline and must continue to match their original SHA-1 hashes.
 - [TODO.md](TODO.md) tracks active work and next steps. Check it before edits.
 - [docs/architecture.md](docs/architecture.md) maps the runtime and build layout.
 - [docs/building.md](docs/building.md) gives the build and verification commands.
-- [docs/porting.md](docs/porting.md) states the Windows port direction and fidelity rules.
-- [docs/roadmap.md](docs/roadmap.md) orders the native Windows bringup work.
+- [docs/porting.md](docs/porting.md) states the Windows port direction and fidelity rules, and holds the native bringup roadmap and audit.
 - [docs/versioning.md](docs/versioning.md) defines the project's version increments.
 
 ## Engineering approach

@@ -213,7 +213,8 @@ analog_deadzone = 0.10
 pause_on_unfocus = off
 pause_on_disconnect = on
 
-; Turbo button (fast-forward cutscenes): Tab, R2, or none
+; Turbo button (fast-forward cutscenes): Tab or none. F10 always toggles turbo;
+; a gamepad button such as R2 is not wired.
 turbo_hotkey = Tab
 turbo_speed = 3.0
 ```
@@ -337,8 +338,10 @@ Following the completion of the 35 PS1 flaw fixes, Phase 2 implements modern pla
 Milestone labels mean code and synthetic tests exist, not that every option
 has undergone hands-on gameplay acceptance. Remaining scene-specific gaps are
 listed in `TODO.md`; renderer backend selection falls back through the chain
-above, and HD font, turbo and extended draw distance options have not been
-confirmed in the runtime.
+above, and the developer has confirmed the HD font and extended draw distance on
+Windows. Turbo works, but its audio is not heard accelerating even though the
+code produces one tick of PCM per accelerated tick and the bounded SDL queue
+drops what does not fit; this behavior is unresolved.
 
 ---
 

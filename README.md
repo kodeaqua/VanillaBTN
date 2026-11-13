@@ -19,7 +19,7 @@ byte for byte and, given your own copy of the disc, the whole disc image. That b
 remains the reference baseline. Building it with Docker on Windows still produces
 PS1 binaries.
 
-The [Windows roadmap](docs/roadmap.md) orders the bringup work, and the
+The [Windows roadmap](docs/porting.md#native-windows-roadmap) orders the bringup work, and the
 [enhancement blueprint](docs/enhancements.md) defines the post-bringup modernization roadmap.
 The [porting rules](docs/porting.md) define its fidelity boundaries. The
 [architecture guide](docs/architecture.md) maps the current code.

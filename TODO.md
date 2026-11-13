@@ -27,7 +27,7 @@ reference build; see [AGENTS.md](AGENTS.md) and [docs/architecture.md](docs/arch
 
 ## Runtime and input
 
-- [x] **NPC dialogue crash (native gameplay)** — the Debug report captured a
+- [ ] **Turbo audio** — with turbo on, audio is not heard speeding up. The host\n      mixes one tick of PCM per accelerated tick and the bounded SDL queue drops\n      the excess, so playback drifts from the game state. Decide whether to keep\n      this, mute audio during turbo, or resample; verify by ear on Windows.\n- [ ] **Default preset policy** — mode = modern is the default and enables the\n      enhancements, while docs/porting.md says the default experience stays\n      faithful. The developer decides which default applies.\n- [x] **NPC dialogue crash (native gameplay)** — the Debug report captured a
       `0xC0000005` read at address `0x2` in `sprite_draw_frame`. Milestone 28
       corrected the x64 sprite-state corruption in event entry; the developer
       retested the conversation in Windows and confirmed the crash is fixed.
@@ -131,5 +131,5 @@ reference build; see [AGENTS.md](AGENTS.md) and [docs/architecture.md](docs/arch
 ## References
 
 - [Enhancements](docs/enhancements.md) — implemented features and limitations.
-- [Roadmap](docs/roadmap.md) — longer-term port architecture.
+- [Roadmap](docs/porting.md#native-windows-roadmap) — longer-term port architecture.
 - [Building](docs/building.md) — Windows build and verification commands.

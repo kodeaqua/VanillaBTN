@@ -16,6 +16,10 @@ configures, builds, and runs CTest for each profile. It downloads the pinned
 on first configure and checks its SHA-256. The output is
 `build/native/<profile>/vanillabtn.exe`; the build tree is ignored by Git.
 No WSL, MSYS, Docker, or Python is needed for this native target.
+`-Configuration DebugOptimized` keeps the Debug diagnostics but compiles with `/O2`,
+which helps when timing matters (for example `--trace-stalls`). Unoptimized
+Debug is noticeably slower because the GPU and GTE paths are software; judge
+performance in Release.
 The CTest count changes as native regression tests are added; run
 `ctest --test-dir build/native/Release -N` to list the tests in a local build.
 
@@ -46,9 +50,9 @@ report text with the NPC and location that trigger the crash; do not upload
 save images or copyrighted disc data. An OS termination that bypasses the
 unhandled-exception handler may produce no report.
 
-These diagnostics do not run in Release and do not establish that the NPC bug
-is fixed. The crash itself remains open until a failing stack trace identifies
-its actual cause.
+These diagnostics do not run in Release. The NPC dialogue crash that motivated
+them was corrected in Milestone 28 and confirmed fixed by the developer on
+Windows; keep this workflow for any new crash.
 
 ## Release packaging
 
