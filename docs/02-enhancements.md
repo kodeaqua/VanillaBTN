@@ -532,6 +532,8 @@ changes separate from the matching PS1 reference build.
   GTE compatibility code and audio mixer were prohibitively slow under MSVC's
   default `/Od`; optimized debugging retains diagnostics while making runtime
   investigation practical. Release still compiles all developer logging out.
+- The developer confirmed the separate game and logger windows work as expected
+  and that the logger remains available after forcibly ending the game process.
 - This exposes failures that synthetic text/menu fixtures cannot reproduce.
   A Windows Debug report localized the NPC conversation failure to a
   low-address read in `sprite_draw_frame`; this diagnostic alone cannot prove

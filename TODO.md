@@ -12,14 +12,6 @@ recorded in [Work 02](docs/02-enhancements.md).
 - [ ] **Photo-map marker bounds** — verify native photo-map navigation with the
       dog indoors and outdoors, including locations that have no map marker.
 
-## Debug acceptance
-
-- [ ] **Persistent Debug logger** — launch the Debug game with imported assets,
-      confirm the game and logger open as separate windows, then reproduce or
-      deliberately trigger a game crash and confirm the logger remains open.
-      Review that the real-time categories are useful without introducing an
-      observable gameplay hitch.
-
 ## Audio acceptance
 
 - [ ] **Hi-Fi reverb fidelity** — compare the optional full-rate stereo reverb
