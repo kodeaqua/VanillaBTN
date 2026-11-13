@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('Debug', 'Release')]
+    [ValidateSet('Debug', 'DebugOptimized', 'Release')]
     [string]$Configuration = 'Debug',
     [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9_-]*$')]
     [string]$ExecutableName = 'vanillabtn'

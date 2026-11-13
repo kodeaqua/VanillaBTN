@@ -18,6 +18,14 @@ void sdk_sync_pump(void (*pump)(void *), void *context);
  * no extra presentation is due. */
 void sdk_sync_subtick_hook(uint64_t (*subtick)(uint64_t deadline, void *), void *context);
 
+#ifdef _DEBUG
+/* Optional host timing probe; only active when explicitly installed. The
+ * first callback kind measures work between VSync calls; the second measures
+ * individual waits. Neither changes the authoritative simulation clock. */
+void sdk_sync_stall_hook(void (*hook)(bool waiting, uint64_t duration_ns, void *),
+                         void *context);
+#endif
+
 /* Turbo speed multiplier (1 = normal 60 Hz simulation, 2 = 2x, 3 = 3x, etc.) */
 void sdk_sync_set_turbo(uint32_t multiplier);
 uint32_t sdk_sync_get_turbo(void);

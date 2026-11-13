@@ -5,6 +5,7 @@
 #if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
 #include <stdio.h>
 #include "farm_state.h"
+#include "host_stall_trace.h"
 #include "host_crash.h"
 #include "sdk_error.h"
 extern int main_scene;
@@ -61,6 +62,10 @@ typedef struct HostGame {
     AppConfig config;
     HostPacing pacing;
     HostAudioMusicOnset music_onset;
+#if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
+    HostStallTrace stall_trace;
+    uint64_t previous_pump_end_ns;
+#endif
     uint32_t keyboard_buttons, controller_buttons[2];
     uint16_t keyboard_keys[SDL_SCANCODE_COUNT];
     int16_t stick_x[2], stick_y[2];
@@ -111,6 +116,25 @@ static void host_debug_audio_report(const HostGame *host, bool nonzero,
         submit_error[0] ? submit_error : "none");
     fclose(file);
 }
+#endif
+
+#if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
+/* The trace is opt-in, and confined to developer builds. To approximate
+ * Release timing, DebugOptimized applies /O2 without shipping diagnostics. */
+static void host_record_stall(HostGame *host, HostStallStage stage,
+                              uint64_t when, uint64_t duration, int queued) {
+    if (!host->stall_trace.enabled || duration < HOST_STALL_TRACE_THRESHOLD_NS) return;
+    host_stall_trace_record(&host->stall_trace, stage, when, duration,
+        main_scene, game_state.progress.entryStep, queued,
+        ps1_video_get_render_scale());
+}
+
+static void host_vsync_stall(bool waiting, uint64_t duration, void *context) {
+    HostGame *host = (HostGame *)context;
+    host_record_stall(host, waiting ? HOST_STALL_VSYNC_WAIT : HOST_STALL_GAME,
+        SDL_GetTicksNS(), duration, -1);
+}
+
 #endif
 
 static void send_rumble(unsigned slot, uint8_t small, uint8_t large, void *context) {
@@ -203,6 +227,9 @@ static void host_game_pump(void *context) {
     HostGame *host = context;
     SDL_Event event;
     bool suspended = false;
+#if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
+    uint64_t trace_start = host->stall_trace.enabled ? SDL_GetTicksNS() : 0;
+#endif
 #ifdef VANILLABTN_BOOT_TEST
     if (main_scene == SCENE_FARM && (game_state.globalFlags & GLOBAL_FLAG_INPUT_REPLAY))
         host->visited_farm = true;
@@ -381,7 +408,17 @@ poll_events:
         SDL_DelayNS(16666667);
         goto poll_events;
     }
-    if (suspended) sdk_sync_resume();
+    if (suspended) {
+        sdk_sync_resume();
+        /* A user-initiated pause must not be misreported as a frame hitch. */
+#if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
+        host->previous_pump_end_ns = 0;
+        if (host->stall_trace.enabled) trace_start = SDL_GetTicksNS();
+#endif
+    }
+#if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
+    uint64_t events_end = host->stall_trace.enabled ? SDL_GetTicksNS() : 0;
+#endif
 
     /* Supply raw samples only: original pad.c owns the analog/repeat rules
      * in the original game. Do not feed folded stick bits. */
@@ -413,6 +450,9 @@ poll_events:
 
     /* Original game timing owns the cadence. Submit exactly one 60 Hz audio
      * interval from the same SDK SPU used by sound.c, not the smoke mixer. */
+#if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
+    uint64_t audio_begin = host->stall_trace.enabled ? SDL_GetTicksNS() : 0;
+#endif
     int16_t samples[735 * 2];
     sdk_sound_mix(samples, 735);
     host_audio_apply_volume(samples, sizeof(samples) / sizeof(samples[0]),
@@ -464,11 +504,18 @@ poll_events:
 #endif
     }
 #if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
-    bool nonzero = false;
-    for (size_t i = 0; i < sizeof(samples) / sizeof(samples[0]); ++i) {
-        if (samples[i] != 0) { nonzero = true; break; }
+    /* Periodic audio file writes can manufacture a frame hitch during a
+     * timing investigation. Keep the normal Debug report otherwise. */
+    if (!host->stall_trace.enabled) {
+        bool nonzero = false;
+        for (size_t i = 0; i < sizeof(samples) / sizeof(samples[0]); ++i) {
+            if (samples[i] != 0) { nonzero = true; break; }
+        }
+        host_debug_audio_report(host, nonzero, queued, submit_status);
     }
-    host_debug_audio_report(host, nonzero, queued, submit_status);
+#endif
+#if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
+    uint64_t audio_end = host->stall_trace.enabled ? SDL_GetTicksNS() : 0;
 #endif
     host_pacing_record_tick(&host->pacing);
     uint64_t now = SDL_GetTicksNS();
@@ -480,6 +527,23 @@ poll_events:
         }
         host_pacing_record_presentation(&host->pacing, now);
     }
+#if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
+    if (host->stall_trace.enabled) {
+        uint64_t done_ns = SDL_GetTicksNS();
+        if (host->previous_pump_end_ns && trace_start >= host->previous_pump_end_ns)
+            host_record_stall(host, HOST_STALL_PUMP_GAP, trace_start,
+                trace_start - host->previous_pump_end_ns, queued);
+        host_record_stall(host, HOST_STALL_EVENTS, events_end,
+            events_end - trace_start, queued);
+        host_record_stall(host, HOST_STALL_INPUT, audio_begin,
+            audio_begin - events_end, queued);
+        host_record_stall(host, HOST_STALL_AUDIO, audio_end,
+            audio_end - audio_begin, queued);
+        host_record_stall(host, HOST_STALL_PRESENT, done_ns,
+            done_ns - audio_end, queued);
+        host->previous_pump_end_ns = done_ns;
+    }
+#endif
 }
 
 /* Wake independently of simulation ticks when the configured presentation
@@ -495,6 +559,13 @@ static uint64_t host_presentation_subtick(uint64_t simulation_deadline, void *co
             host_present_frame(&video, host->renderer, &host->texture);
         }
         host_pacing_record_presentation(&host->pacing, now);
+#if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
+        if (host->stall_trace.enabled) {
+            uint64_t finished = SDL_GetTicksNS();
+            host_record_stall(host, HOST_STALL_PRESENT, finished,
+                finished - now, -1);
+        }
+#endif
     }
     return host_pacing_next_wait_deadline(&host->pacing, now, simulation_deadline);
 }
@@ -534,6 +605,9 @@ int main(int argc, char **argv) {
     const char *disc = "build/game-data/disc";
     const char *card_directory = NULL;
     const char *config_path = NULL;
+#if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
+    bool trace_stalls = false;
+#endif
 #ifdef VANILLABTN_BOOT_TEST
     (void)card_directory;
     boot_fault_install(boot_fault_state);
@@ -548,6 +622,9 @@ int main(int argc, char **argv) {
         if (strcmp(argv[i], "--data") == 0 && i + 1 < argc) disc = argv[++i];
         else if (strcmp(argv[i], "--card-dir") == 0 && i + 1 < argc) card_directory = argv[++i];
         else if (strcmp(argv[i], "--config") == 0 && i + 1 < argc) config_path = argv[++i];
+#if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
+        else if (strcmp(argv[i], "--trace-stalls") == 0) trace_stalls = true;
+#endif
         else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "VanillaBTN",
                 "VanillaBTN - Native Windows Port\n\n"
@@ -557,6 +634,9 @@ int main(int argc, char **argv) {
                 "  --data <path>      Path to disc directory containing A_FILE.BIN and A_FILE.HDT\n"
                 "  --card-dir <path>  Path to directory containing card1.mcr and card2.mcr\n"
                 "  --config <path>    Path to custom vanillabtn.ini configuration file\n"
+#if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
+                "  --trace-stalls     Record >33 ms stalls on normal exit (Debug only)\n"
+#endif
                 "  --help, -h         Show this help information", NULL);
             return 0;
         }
@@ -738,6 +818,12 @@ disc_ready:
 #endif
     sdk_pad_rumble(send_rumble, &host);
     host.running = true;
+#if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
+    if (trace_stalls) {
+        host_stall_trace_start(&host.stall_trace, SDL_GetTicksNS());
+        sdk_sync_stall_hook(host_vsync_stall, &host);
+    }
+#endif
     host.focused = (SDL_GetWindowFlags(host.window) & SDL_WINDOW_INPUT_FOCUS) != 0;
     sdk_sync_pump(host_game_pump, &host);
 #ifdef VANILLABTN_BOOT_TEST
@@ -762,6 +848,12 @@ disc_ready:
 #endif
 
 done:
+#if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
+    /* Write only once after gameplay; logging mid-frame would itself cause a hitch. */
+    if (host.stall_trace.enabled)
+        host_stall_trace_write(&host.stall_trace, "VanillaBTN-stalls.txt");
+    sdk_sync_stall_hook(NULL, NULL);
+#endif
     sdk_sync_subtick_hook(NULL, NULL);
     sdk_sync_stop();
     sdk_sync_pump(NULL, NULL);

@@ -438,8 +438,27 @@ changes separate from the matching PS1 reference build.
   This one-time reserve can absorb a brief loading stall around the title
   music's initial playback; it does not generate extra game/SPU samples,
   alter voice state, or keep growing latency on subsequent ticks. The
-  existing upper queue bound still applies. A Windows Release listening
-  check is needed to determine whether the title stutter is eliminated.
+  existing upper queue bound still applies. Windows listening confirmed
+  the initial onset improved, but a later joint graphics/audio hitch remains.
+
+### Optional native title-stall timing
+
+- `--trace-stalls` enables a low-overhead timer only in native Debug. The
+  `DebugOptimized` preset builds an optimized Debug executable with `/O2`,
+  useful for diagnosing a stall that is harder to isolate in ordinary Debug.
+  Release compiles out all tracing and does not accept this flag.
+  It retains only the most recent 128 outliers longer than 33.3 ms, including
+  game work between VSync calls, host waits, SDL events, input, audio mixing
+  and frame presentation. Each record includes numeric scene/entry, effective
+  render scale and sampled SDL audio queue depth. No music, save or disc bytes
+  are captured. The periodic Debug audio-status report is suppressed while
+  this probe is active, to avoid introducing artificial two-second file I/O
+  stalls. No file is written during gameplay: on a normal exit, the
+  trace is saved as `VanillaBTN-stalls.txt` in the working directory.
+- Both graphics and music briefly pause together several seconds into the
+  title. The initial silence reserve alone cannot explain or fix a blocked
+  host game thread. Until a trace identifies its time-consuming phase, leave
+  game pacing, SPU mixing and the queue budget unchanged.
 
 ### Native Debug failure diagnostics
 

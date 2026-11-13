@@ -96,6 +96,16 @@ set(VANILLABTN_EXECUTABLE_NAME "vanillabtn" CACHE STRING "Native runtime output 
 if(NOT VANILLABTN_EXECUTABLE_NAME MATCHES "^[A-Za-z0-9][A-Za-z0-9_-]*$")
     message(FATAL_ERROR "VANILLABTN_EXECUTABLE_NAME must be a simple executable name")
 endif()
+add_library(host_stall_trace STATIC src/host_stall_trace.c)
+set_target_properties(host_stall_trace PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_include_directories(host_stall_trace PUBLIC src)
+target_compile_options(host_stall_trace PRIVATE /W4)
+add_executable(host_stall_trace_test tests/host_stall_trace_test.c)
+set_target_properties(host_stall_trace_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_link_libraries(host_stall_trace_test PRIVATE host_stall_trace)
+target_compile_options(host_stall_trace_test PRIVATE /W4 /UNDEBUG)
+add_test(NAME host_stall_trace COMMAND host_stall_trace_test)
+
 add_executable(vanillabtn WIN32 src/main.c res/vanillabtn.rc res/vanillabtn.manifest)
 # Diagnostic code and DbgHelp are linked only into the Debug executable.
 target_sources(vanillabtn PRIVATE $<$<CONFIG:Debug>:src/host_crash.c>)
@@ -103,7 +113,7 @@ target_link_libraries(vanillabtn PRIVATE $<$<CONFIG:Debug>:Dbghelp>)
 set_target_properties(vanillabtn PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES
     OUTPUT_NAME "${VANILLABTN_EXECUTABLE_NAME}")
 target_include_directories(vanillabtn PRIVATE res)
-target_link_libraries(vanillabtn PRIVATE SDL3::SDL3 ps1_video ps1_input ps1_clock ps1_audio ps1_card app_config ps1_pgxp)
+target_link_libraries(vanillabtn PRIVATE $<$<CONFIG:Debug>:host_stall_trace> SDL3::SDL3 ps1_video ps1_input ps1_clock ps1_audio ps1_card app_config ps1_pgxp)
 target_compile_options(vanillabtn PRIVATE /W4 $<$<CONFIG:Release>:/O2 /Oi /Gy /GF>)
 target_link_options(vanillabtn PRIVATE $<$<CONFIG:Release>:/OPT:REF /OPT:ICF>)
 

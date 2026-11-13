@@ -73,19 +73,26 @@ reference build; see [AGENTS.md](AGENTS.md) and [docs/architecture.md](docs/arch
 
 ## Audio fidelity
 
+- [x] **Milestone 36: Optimized Debug stall trace** — `--trace-stalls`
+      records in-memory timing outliers across VSync game work, waits, SDL
+      events, input, audio and presentation. `DebugOptimized` retains Debug
+      diagnostics while using `/O2`; normal Release excludes all tracing.
+- [ ] **Title-screen joint graphics/audio hitch (Windows acceptance)** — a
+      brief stutter remains several seconds into the title, affecting both
+      frame delivery and music. Capture the Milestone 36 optimized Debug trace
+      before changing render allocations, archive I/O or audio buffering.
+
 - [x] **Milestone 35: Music-onset SDL queue reserve** — when a newly
       playing music sequence first produces audible PCM, prefill at most two
       60 Hz ticks of silence before its first sample to tolerate a short
       title-loading stall. Later ticks are unchanged, and game/SPU clocks
       are not advanced for the reserve.
-- [ ] **Title-screen music onset stutter (Windows acceptance)** — confirm in
-      Release whether the one-time queue reserve eliminates the brief pause
-      when title music starts; if not, capture a targeted timing/underrun
-      trace before changing scheduling or buffer depth further.
+- [x] **Music onset reserve (Windows initial check)** — the audio onset itself
+      improved after Milestone 35; a later, simultaneous frame/audio hitch
+      remains tracked separately above.
 
-- [ ] **Silent native playback** — verify the actual output device and PCM
-      production on Windows. The Debug report can distinguish mixer silence
-      from an SDL transport failure; runtime acceptance is still required.
+- [x] **Silent native playback** — Windows Release playback has been confirmed
+      audible; the later one-off title hitch is tracked separately.
 - [x] **Milestone 34: MSVC Debug audio report compilation** — isolate the
       Windows temporary-file API in the Debug crash-report module so PS1
       `RECT` and Windows SDK declarations do not collide in `main.c`.

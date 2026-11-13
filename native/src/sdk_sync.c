@@ -11,6 +11,19 @@ static uint64_t sdl_now(void *context) {
 
 static uint64_t (*host_subtick_hook)(uint64_t deadline, void *);
 static void *host_subtick_context;
+#ifdef _DEBUG
+static void (*host_stall_hook)(bool waiting, uint64_t duration_ns, void *);
+static void *host_stall_context;
+static uint64_t last_vsync_exit_ns;
+
+void sdk_sync_stall_hook(void (*hook)(bool waiting, uint64_t duration_ns, void *),
+                         void *context) {
+    host_stall_hook = hook;
+    host_stall_context = context;
+    last_vsync_exit_ns = 0;
+}
+#endif
+
 
 void sdk_sync_subtick_hook(uint64_t (*subtick)(uint64_t deadline, void *), void *context) {
     host_subtick_hook = subtick;
@@ -93,6 +106,9 @@ void sdk_sync_suspend(void) {
 void sdk_sync_resume(void) {
     if (!suspended) return;
     uint64_t now = clock_now(clock_context);
+#ifdef _DEBUG
+    if (host_stall_hook) last_vsync_exit_ns = now;
+#endif
     uint64_t held = now > suspended_at ? now - suspended_at : 0;
     /* Shifting both anchors preserves tick numbering and VSync(1) deltas. */
     epoch += held;
@@ -125,6 +141,9 @@ bool sdk_sync_bind(uint64_t (*now)(void *), void (*wait)(uint64_t, void *), void
     clock_context = context;
     initialized = false;
     dispatched_tick = 0;
+#ifdef _DEBUG
+    last_vsync_exit_ns = 0;
+#endif
     suspended = shifted = false;
     return true;
 }
@@ -145,6 +164,10 @@ int VSync(int mode) {
     uint64_t now = clock_now(clock_context);
     if (mode < 0) return result_units(now >= epoch ? now - epoch : 0, 60);
     if (mode == 1) return result_units(now >= last_wait ? now - last_wait : 0, 15750);
+#ifdef _DEBUG
+    if (host_stall_hook && last_vsync_exit_ns && now >= last_vsync_exit_ns)
+        host_stall_hook(false, now - last_vsync_exit_ns, host_stall_context);
+#endif
     uint64_t base = (mode == 0 ? now : last_wait);
     uint64_t elapsed_base = base >= epoch ? base - epoch : 0;
     uint64_t tick = units(elapsed_base, 60);
@@ -159,8 +182,15 @@ int VSync(int mode) {
          * original loading-screen and draw callbacks at the final deadline. */
         uint64_t elapsed_now = now >= epoch ? now - epoch : 0;
         uint64_t next = units(elapsed_now, 60) + 1;
+#ifdef _DEBUG
+        uint64_t before_wait = now;
+#endif
         clock_wait(tick_deadline(next), clock_context);
         now = clock_now(clock_context);
+#ifdef _DEBUG
+        if (host_stall_hook && now >= before_wait)
+            host_stall_hook(true, now - before_wait, host_stall_context);
+#endif
         elapsed_now = now >= epoch ? now - epoch : 0;
         dispatch_vblank(units(elapsed_now, 60));
         refresh_after_dispatch(&now);
@@ -174,6 +204,9 @@ int VSync(int mode) {
     }
     int elapsed = result_units(now >= last_wait ? now - last_wait : 0, 15750);
     last_wait = now;
+#ifdef _DEBUG
+    if (host_stall_hook) last_vsync_exit_ns = clock_now(clock_context);
+#endif
     return elapsed;
 }
 

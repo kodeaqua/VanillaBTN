@@ -8,3 +8,6 @@ __pycache__/
 /objdiff.json
 vanillabtn.ini
 *.ini
+
+# Optional host frame-timing diagnostics (generated at runtime).
+VanillaBTN-stalls.txt

@@ -1,6 +1,7 @@
 #include "sdk_sync.h"
 #include <libetc.h>
 #include <assert.h>
+#include <stddef.h>
 
 typedef struct Clock { uint64_t now; unsigned waits; } Clock;
 static uint64_t now(void *context) { return ((Clock *)context)->now; }
@@ -15,6 +16,18 @@ static unsigned callbacks, pumps;
 static bool registered = true;
 static Clock *pump_clock;
 static uint64_t pause_ns;
+#ifdef _DEBUG
+static unsigned game_spans, wait_spans;
+static uint64_t longest_game_span;
+static void on_stall(bool waiting, uint64_t duration_ns, void *context) {
+    assert(context == &game_spans);
+    if (waiting) ++wait_spans;
+    else {
+        ++game_spans;
+        if (duration_ns > longest_game_span) longest_game_span = duration_ns;
+    }
+}
+#endif
 static void on_vblank(void) { ++callbacks; }
 static void on_pump(void *context) {
     assert(context == &pumps);
@@ -32,10 +45,16 @@ static void on_pump(void *context) {
 int main(void) {
     Clock clock = {0};
     assert(sdk_sync_bind(now, wait_until, &clock));
+#ifdef _DEBUG
+    sdk_sync_stall_hook(on_stall, &game_spans);
+#endif
     assert(ResetCallback() == 0);
     assert(VSyncCallback(on_vblank) == 0);
     sdk_sync_pump(on_pump, &pumps);
     assert(VSync(-1) == 0 && VSync(1) == 0);
+#ifdef _DEBUG
+    assert(game_spans == 0 && wait_spans == 0); /* Queries are pure. */
+#endif
     VSync(2);
     assert(clock.now == 33333334 && clock.waits == 2);
     assert(VSync(-1) == 2);
@@ -45,12 +64,18 @@ int main(void) {
     VSync(2);
     assert(clock.now == 66666667 && clock.waits == 4);
     assert(callbacks == 4 && pumps == 4);
+#ifdef _DEBUG
+    assert(wait_spans == 4 && game_spans >= 1);
+#endif
     /* When work is late, VSync(n) does not add another n vblanks of delay. */
     clock.now = 200000000;
     VSync(2);
     assert(clock.now == 200000000 && clock.waits == 4);
     VSync(0);
     assert(clock.now == 216666667 && clock.waits == 5);
+#ifdef _DEBUG
+    assert(longest_game_span >= 100000000);
+#endif
     assert(VSync(-1) == 13);
     assert(callbacks == 6 && pumps == 6);
     /* A suspended pump must not make the loop catch up: five held seconds add no
@@ -73,6 +98,9 @@ int main(void) {
     VSync(0);
     assert(callbacks == 8 && pumps == 9);
     sdk_sync_pump(NULL, NULL);
+#ifdef _DEBUG
+    sdk_sync_stall_hook(NULL, NULL);
+#endif
     assert(!sdk_sync_bind(now, NULL, &clock));
     assert(sdk_sync_bind(NULL, NULL, NULL));
     assert(SetVideoMode(0) == 0);
