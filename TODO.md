@@ -19,14 +19,6 @@ recorded in [Work 02](docs/02-enhancements.md).
       listening checks. Existing synthetic tests establish code behavior, not
       PlayStation hardware equivalence or perceived audio quality.
 
-## Turbo acceptance
-
-- [ ] **Consistent turbo cadence** — toggle turbo after several minutes of
-      runtime and compare the farm, Popuri's area, church, interiors, events,
-      and transitions. Moving simulation must use the configured multiplier;
-      places where the original game stops its clock must remain stopped.
-      Confirm audio is silent during turbo and resumes cleanly afterward.
-
 ## References
 
 - [Work 02](docs/02-enhancements.md) — completed enhancements, implementation

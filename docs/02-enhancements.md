@@ -548,6 +548,9 @@ changes separate from the matching PS1 reference build.
   and that the logger remains available after forcibly ending the game process.
 - The developer confirmed the 1280×720 integer-scale fallback and Hor+ weather
   coverage fixes in a real game window.
+- The developer confirmed turbo uses one consistent accelerated cadence across
+  the farm, Popuri's area, church, interiors, events and transitions; original
+  clock-stop rules remain intact, and muted audio resumes cleanly afterward.
 - This exposes failures that synthetic text/menu fixtures cannot reproduce.
   A Windows Debug report localized the NPC conversation failure to a
   low-address read in `sprite_draw_frame`; this diagnostic alone cannot prove
