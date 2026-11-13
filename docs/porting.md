@@ -16,7 +16,7 @@ developer:
 - **Fixes and enhancements (PR #3, current):** the port also fixes PS1 hardware
   flaws and adds modern features such as widescreen, higher render scale,
   HD font, extended draw distance, turbo and backup rotation. They are
-  enabled by default (mode = modern). mode = authentic_ps1 resolves them to
+  enabled by default (`mode = modern`). `mode = authentic_ps1` resolves them to
   the original behavior where implemented.
 
 A later major change may set a different vision; update this section when it does.
@@ -28,7 +28,7 @@ A later major change may set a different vision; update this section when it doe
   replacement scene flows, dialogs, menus, or game rules to imitate the game.
   Limit original-code changes to compatibility needs and preserve behavior.
 - Follow the vision above for default behavior. Keep every enhancement behind
-  a configuration switch so the uthentic_ps1 preset reproduces the original
+  a configuration switch so the `authentic_ps1` preset reproduces the original
   rules, pacing and presentation, and do not change gameplay balance or
   replace game content without a developer decision.
 - Keep community-mod style changes separate from the fixes and enhancements

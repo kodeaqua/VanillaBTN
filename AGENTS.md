@@ -11,7 +11,7 @@ reference baseline and must continue to match their original SHA-1 hashes.
 The vision depends on the major change currently being worked on, and the
 developer decides it. The baseline bringup (PR #2) was an as-is port. The
 current phase (PR #3) adds PS1 flaw fixes and modern enhancements, enabled by
-default through the modern preset, while the uthentic_ps1 preset keeps the
+default through the `modern` preset, while the `authentic_ps1` preset keeps the
 original behavior. When the developer starts a new major change, ask for its
 vision before assuming either rule, and update this section and
 [docs/porting.md](docs/porting.md) to match.
@@ -75,7 +75,7 @@ for this repository's agent workflow:
 - Keep native Windows port work separate from the PS1 matching build. Preserve
   the reference hashes as a guardrail; do not weaken them to make port code fit.
   Follow the project vision above for default behavior. Keep each enhancement
-  behind a configuration switch so the uthentic_ps1 preset can resolve it to
+  behind a configuration switch so the `authentic_ps1` preset can resolve it to
   the original behavior, and keep gameplay fixes distinct from optional extras.
 - Document new or changed code so its purpose and non-obvious behavior are
   clear. Put concise comments near tricky logic and constraints; use separate
