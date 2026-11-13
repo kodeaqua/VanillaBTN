@@ -76,6 +76,10 @@ reference build; see [AGENTS.md](AGENTS.md) and [docs/architecture.md](docs/arch
       write mixer/queue counters to `%TEMP%/VanillaBTN-audio.txt` only in Debug.
       Preserve headless test behavior and keep the PS1 reference untouched.
 
+- [x] **Milestone 32: Hi-Fi dry audio regression** — verify the native SPU
+      produces the same nonzero dry PCM with authentic or Hi-Fi reverb when
+      reverb sends are disabled; this does not validate a Windows output device.
+
 - [x] **Milestone 24: Optional full-rate stereo Hi-Fi reverb** — the existing
       `hifi_reverb` flag now selects a 44.1 kHz stereo wet path, while the
       authentic 22.05 kHz alternating/FIR path remains unchanged. Existing ADSR
