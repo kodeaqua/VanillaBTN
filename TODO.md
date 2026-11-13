@@ -51,6 +51,11 @@ reference build; see [AGENTS.md](AGENTS.md) and [docs/architecture.md](docs/arch
 - [x] **Milestone 18: Disconnect hold** — `pause_on_disconnect` now holds
       the original VSync loop and excludes held time, sharing unfocus suspension.
 
+- [x] **Milestone 29: Native chicken slot clearing** — replace the original
+      0xB4-byte PS1 clear with a full `FarmChicken` clear in native builds,
+      avoiding stale host pointers in freed chicken slots. The PS1 path retains
+      its original constant; the native farm regression checks the whole record.
+
 ## Save compatibility
 
 - [x] **Milestone 20: Persistent card unformat** — the original card utility

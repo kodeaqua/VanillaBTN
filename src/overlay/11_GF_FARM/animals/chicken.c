@@ -337,7 +337,13 @@ s32 farm_actor_dispatch_state(FarmActor *object, s32 state) {
 }
 
 void chicken_clear(FarmChicken *p) {
+#ifdef VANILLABTN_NATIVE
+    /* The original 0xB4-byte PS1 record is larger on x64 because its
+     * embedded animation holds native pointers. Clear the entire slot. */
+    memset(p, 0, sizeof(*p));
+#else
     memset(p, 0, 0xB4);
+#endif
     p->actor.kind = 0;
 }
 

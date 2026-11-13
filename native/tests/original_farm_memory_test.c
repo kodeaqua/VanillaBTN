@@ -4,6 +4,7 @@
 #include "sdk_gpu.h"
 #include "sdk_memory.h"
 #include "scene.h"
+#include "chicken.h"
 #include "farm_probe.h"
 #include "model.h"
 #include <stdio.h>
@@ -142,5 +143,15 @@ int main(void) {
             CHECK(((const u8 *)&villager->cue)[j] == 0x5A);
     }
     game_state.request = NULL;
+
+    /* Removing a chicken must clear the entire host-sized actor, not only
+     * the original 0xB4-byte PS1 layout (which predates 64-bit ANI pointers). */
+    struct { FarmChicken record; u32 after; } chicken_guard = {0};
+    memset(&chicken_guard.record, 0x7B, sizeof(chicken_guard.record));
+    chicken_guard.after = 0xDAC0FFEEu;
+    chicken_clear(&chicken_guard.record);
+    for (size_t i = 0; i < sizeof(chicken_guard.record); i++)
+        CHECK(((const u8 *)&chicken_guard.record)[i] == 0);
+    CHECK(chicken_guard.after == 0xDAC0FFEEu);
     return 0;
 }
