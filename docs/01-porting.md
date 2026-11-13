@@ -119,8 +119,9 @@ design, configuration and implemented-feature notes live in
 
 ## Verification
 
-Both native Debug and Release compile and pass all 74 CTest checks (the count
-grows as tests are added) with active assertions. The PS1 `check` target passes.
+Native Debug compiles and passes all 75 CTest checks; Release compiles and
+passes all 74 checks (the Debug-only console adds one check). Assertions remain
+active in both profiles. The PS1 `check` target passes.
 This does not validate audiovisual or gameplay fidelity, and no original assets
 or SDK files were added.
 

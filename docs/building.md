@@ -16,10 +16,11 @@ configures, builds, and runs CTest for each profile. It downloads the pinned
 on first configure and checks its SHA-256. The output is
 `build/native/<profile>/vanillabtn.exe`; the build tree is ignored by Git.
 No WSL, MSYS, Docker, or Python is needed for this native target.
-`-Configuration DebugOptimized` keeps the Debug diagnostics but compiles with `/O2`,
-which helps when timing matters (for example `--trace-stalls`). Unoptimized
-Debug is noticeably slower because the GPU and GTE paths are software; judge
-performance in Release.
+Debug uses `/O2 /Zo` with debug symbols because the GPU/GTE rasterizer and audio
+mixer run substantial work on the CPU; compiling those paths with MSVC's `/Od`
+makes gameplay substantially slower. `-Configuration DebugOptimized` remains
+as a compatibility alias with the same optimization policy. Release still
+removes developer diagnostics and uses its separate runtime settings.
 The CTest count changes as native regression tests are added; run
 `ctest --test-dir build/native/Release -N` to list the tests in a local build.
 
@@ -27,8 +28,13 @@ The executable runs original startup and scene handlers using locally imported
 assets. The `native_startup` CTest checks executable linkage with `--check-build`;
 other tests check SDK and rendering behavior with synthetic fixtures. Actual
 visual, audio and gameplay acceptance remains with the developer.
-To inspect the Debug window, run `& .\build\native\Debug\vanillabtn.exe` and
-close it with the window's close button.
+To inspect the Debug build, run `& .\build\native\Debug\vanillabtn.exe`. It
+opens the game window and a separate `VanillaBTN Debug Log` console. The console
+shows timestamped lifecycle, configuration, data, renderer, graphics, audio,
+input, save, timing and game-error events. It intentionally avoids per-pixel,
+per-sample and ordinary per-frame logging. Close the game with its window close
+button. The console remains open after a normal exit or crash so its final
+messages can be reviewed; press Enter there to close it.
 
 ### Diagnosing a gameplay crash (Debug only)
 
@@ -49,6 +55,10 @@ include game-text, assets, card contents or absolute source paths. Share the
 report text with the NPC and location that trigger the crash; do not upload
 save images or copyrighted disc data. An OS termination that bypasses the
 unhandled-exception handler may produce no report.
+
+The separate Debug Log console also remains open when the game process crashes.
+An access violation may only appear as an unexpected pipe disconnect there, so
+use the text crash report for the call stack and numeric game state.
 
 These diagnostics do not run in Release. The NPC dialogue crash that motivated
 them was corrected in Milestone 28 and confirmed fixed by the developer on

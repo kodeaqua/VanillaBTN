@@ -374,6 +374,7 @@ behavior and limitations are retained in the implementation notes below.
 | **37** | Pace native PCM generation from elapsed output sample time. |
 | **38** | Bound SDL catch-up submissions to a four-tick queue. |
 | **39** | Skip native photo-map actor markers for locations without map spots. |
+| **40** | Add a persistent Debug logger console and optimize symbol-rich Debug builds for CPU-heavy native emulation. |
 
 ## Verification
 
@@ -497,9 +498,9 @@ changes separate from the matching PS1 reference build.
 ### Optional native title-stall timing
 
 - `--trace-stalls` enables a low-overhead timer only in native Debug. The
-  `DebugOptimized` preset builds an optimized Debug executable with `/O2`,
-  useful for diagnosing a stall that is harder to isolate in ordinary Debug.
-  Release compiles out all tracing and does not accept this flag.
+  Debug and compatibility `DebugOptimized` presets use `/O2 /Zo` with symbols,
+  making the CPU-heavy software renderer practical to investigate. Release
+  compiles out all tracing and does not accept this flag.
   It retains only the most recent 128 outliers longer than 33.3 ms, including
   game work between VSync calls, host waits, SDL events, input, audio mixing
   and frame presentation. Each record includes numeric scene/entry, effective
@@ -522,6 +523,15 @@ changes separate from the matching PS1 reference build.
   call-stack names/relative offsets, exception codes and numeric game/menu
   state, in a temporary text file, without storing asset bytes or saves.
   The Release binary does not link the handler or DbgHelp.
+- Debug starts a separate console process and streams timestamped host lifecycle,
+  renderer, graphics, audio, input, save, timing and original-game error events
+  through a named pipe. If the game crashes, Windows closes the game side of the
+  pipe while the console remains open for inspection. Logging is limited to
+  state transitions and failures rather than hot raster or mixer loops.
+- Debug compiles with `/O2 /Zo` and PDB symbols. The native software rasterizer,
+  GTE compatibility code and audio mixer were prohibitively slow under MSVC's
+  default `/Od`; optimized debugging retains diagnostics while making runtime
+  investigation practical. Release still compiles all developer logging out.
 - This exposes failures that synthetic text/menu fixtures cannot reproduce.
   A Windows Debug report localized the NPC conversation failure to a
   low-address read in `sprite_draw_frame`; this diagnostic alone cannot prove

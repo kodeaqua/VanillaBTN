@@ -1,4 +1,5 @@
 #include "host_renderer.h"
+#include "host_debug.h"
 #include <string.h>
 
 int host_renderer_get_driver_count(void) {
@@ -43,7 +44,10 @@ const char *host_renderer_driver_for_backend(BackendType backend) {
 }
 
 SDL_Renderer *host_renderer_create(SDL_Window *window, BackendType backend, bool vsync) {
-    if (!window) return NULL;
+    if (!window) {
+        HOST_DEBUG_ERROR("RENDER", "Renderer creation received no window");
+        return NULL;
+    }
 
     const char *primary = host_renderer_driver_for_backend(backend);
     const char *fallback_chain[5];
@@ -75,10 +79,16 @@ SDL_Renderer *host_renderer_create(SDL_Window *window, BackendType backend, bool
         }
         if (duplicate) continue;
 
+        HOST_DEBUG_INFO("RENDER", "Trying SDL renderer backend: %s",
+            target ? target : "default");
         renderer = SDL_CreateRenderer(window, target);
         if (renderer != NULL) {
+            HOST_DEBUG_INFO("RENDER", "Selected SDL renderer backend: %s",
+                SDL_GetRendererName(renderer));
             break;
         }
+        HOST_DEBUG_WARN("RENDER", "Backend %s failed: %s",
+            target ? target : "default", SDL_GetError());
     }
 
     if (renderer) {
@@ -89,8 +99,10 @@ SDL_Renderer *host_renderer_create(SDL_Window *window, BackendType backend, bool
             /* Some backends reject adaptive VSync but support ordinary VSync.
              * Do not silently disable it before trying the standard mode. */
             SDL_SetRenderVSync(renderer, SDL_RENDERER_VSYNC_DISABLED);
+            HOST_DEBUG_WARN("RENDER", "Requested VSync mode unavailable; VSync disabled");
         }
     }
+    if (!renderer) HOST_DEBUG_ERROR("RENDER", "All renderer backends failed");
     return renderer;
 }
 

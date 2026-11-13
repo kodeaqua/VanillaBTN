@@ -6,7 +6,8 @@
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/../build/native/Debug",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_FLAGS_DEBUG": "/MDd /Zi /O2 /Zo /D_DEBUG"
       }
     },
     {
@@ -15,7 +16,7 @@
       "binaryDir": "${sourceDir}/../build/native/DebugOptimized",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_C_FLAGS_DEBUG": "/MDd /Zi /O2 /D_DEBUG"
+        "CMAKE_C_FLAGS_DEBUG": "/MDd /Zi /O2 /Zo /D_DEBUG"
       }
     },
     {

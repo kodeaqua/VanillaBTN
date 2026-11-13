@@ -107,9 +107,24 @@ target_compile_options(host_stall_trace_test PRIVATE /W4 /UNDEBUG)
 add_test(NAME host_stall_trace COMMAND host_stall_trace_test)
 
 add_executable(vanillabtn WIN32 src/main.c res/vanillabtn.rc res/vanillabtn.manifest)
-# Diagnostic code and DbgHelp are linked only into the Debug executable.
-target_sources(vanillabtn PRIVATE $<$<CONFIG:Debug>:src/host_crash.c>)
-target_link_libraries(vanillabtn PRIVATE $<$<CONFIG:Debug>:Dbghelp>)
+# Diagnostic code and its persistent console companion exist only in Debug
+# configurations. Release does not compile or link either implementation.
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_library(host_debug STATIC src/host_debug.c)
+    set_target_properties(host_debug PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+    target_include_directories(host_debug PUBLIC src)
+    target_compile_options(host_debug PRIVATE /W4)
+
+    add_executable(vanillabtn_debug_console src/debug_console.c)
+    set_target_properties(vanillabtn_debug_console PROPERTIES
+        C_STANDARD 17 C_STANDARD_REQUIRED YES)
+    target_compile_options(vanillabtn_debug_console PRIVATE /W4)
+
+    target_sources(vanillabtn PRIVATE src/host_crash.c)
+    target_link_libraries(vanillabtn PRIVATE host_debug Dbghelp)
+    target_link_libraries(ps1_audio PUBLIC host_debug)
+    add_dependencies(vanillabtn vanillabtn_debug_console)
+endif()
 set_target_properties(vanillabtn PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES
     OUTPUT_NAME "${VANILLABTN_EXECUTABLE_NAME}")
 target_include_directories(vanillabtn PRIVATE res)
@@ -118,6 +133,9 @@ target_compile_options(vanillabtn PRIVATE /W4 $<$<CONFIG:Release>:/O2 /Oi /Gy /G
 target_link_options(vanillabtn PRIVATE $<$<CONFIG:Release>:/OPT:REF /OPT:ICF>)
 
 enable_testing()
+if(TARGET vanillabtn_debug_console)
+    add_test(NAME debug_console_startup COMMAND vanillabtn_debug_console --check-build)
+endif()
 add_library(game_texture_pack STATIC ../src/main/graphics/texture_pack.c)
 set_target_properties(game_texture_pack PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_include_directories(game_texture_pack PUBLIC compat ../src/include ../src/main/graphics)
@@ -157,6 +175,9 @@ target_include_directories(game_anim PRIVATE ../src/main/geometry)
 set_target_properties(game_anim PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_link_libraries(game_anim PUBLIC game_prim)
 target_compile_options(game_anim PRIVATE /W4 /Gy)
+if(TARGET host_debug)
+    target_link_libraries(game_anim PUBLIC host_debug)
+endif()
 add_executable(original_anim_test tests/original_anim_test.c)
 set_target_properties(original_anim_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_link_libraries(original_anim_test PRIVATE game_anim)
@@ -311,6 +332,9 @@ set_target_properties(host_renderer PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED
 target_include_directories(host_renderer PUBLIC src)
 target_link_libraries(host_renderer PUBLIC app_config SDL3::SDL3)
 target_compile_options(host_renderer PRIVATE /W4)
+if(TARGET host_debug)
+    target_link_libraries(host_renderer PUBLIC host_debug)
+endif()
 target_link_libraries(vanillabtn PRIVATE host_renderer)
 
 add_executable(host_renderer_test tests/host_renderer_test.c)

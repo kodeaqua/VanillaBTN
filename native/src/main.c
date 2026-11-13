@@ -32,6 +32,7 @@ extern int main_scene;
 #include "host_renderer.h"
 #include "host_pacing.h"
 #include "host_audio_policy.h"
+#include "host_debug.h"
 #include "sdk_pad.h"
 #include "sdk_card.h"
 #include "sdk_cd.h"
@@ -120,8 +121,8 @@ static void host_debug_audio_report(const HostGame *host, bool nonzero,
 #endif
 
 #if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
-/* The trace is opt-in, and confined to developer builds. To approximate
- * Release timing, DebugOptimized applies /O2 without shipping diagnostics. */
+/* The trace is opt-in and confined to developer builds. Debug uses /O2 so the
+ * CPU-heavy software renderer and audio mixer remain practical to profile. */
 static void host_record_stall(HostGame *host, HostStallStage stage,
                               uint64_t when, uint64_t duration, int queued) {
     if (!host->stall_trace.enabled || duration < HOST_STALL_TRACE_THRESHOLD_NS) return;
@@ -251,6 +252,7 @@ static void host_game_pump(void *context) {
 poll_events:
     while (SDL_PollEvent(&event)) {
         if (event.type == SDL_EVENT_QUIT) {
+            HOST_DEBUG_INFO("HOST", "Window close requested");
             host->running = false;
         } else if (event.type == SDL_EVENT_GAMEPAD_ADDED) {
             int slot = -1;
@@ -262,6 +264,7 @@ poll_events:
             if (slot >= 0) {
                 host->gamepads[slot] = SDL_OpenGamepad(event.gdevice.which);
                 if (host->gamepads[slot] != NULL) {
+                    HOST_DEBUG_INFO("INPUT", "Gamepad connected in slot %d", slot + 1);
                     if (slot == 0) host->paused = false;
                     HostPadSnapshot state = host_gamepad_snapshot(host->gamepads[slot]);
                     host->controller_buttons[slot] = state.buttons;
@@ -281,11 +284,15 @@ poll_events:
                     host->trigger_left[i] = host->trigger_right[i] = 0;
                     if (i == 0 && host->config.input.pause_on_disconnect) {
                         host->paused = true;
+                        HOST_DEBUG_WARN("INPUT", "Primary gamepad disconnected; simulation paused");
+                    } else {
+                        HOST_DEBUG_INFO("INPUT", "Gamepad disconnected from slot %d", i + 1);
                     }
                     break;
                 }
             }
         } else if (event.type == SDL_EVENT_WINDOW_FOCUS_LOST) {
+            HOST_DEBUG_INFO("HOST", "Game window lost focus");
             host->focused = false;
             /* Remove buffered audible samples immediately, not after the
              * SDL queue naturally drains. Game audio state still advances. */
@@ -299,6 +306,7 @@ poll_events:
                 host->trigger_left[i] = host->trigger_right[i] = 0;
             }
         } else if (event.type == SDL_EVENT_WINDOW_FOCUS_GAINED) {
+            HOST_DEBUG_INFO("HOST", "Game window gained focus");
             host->focused = true;
             /* Input events need not repeat for controls held while unfocused. */
             int numkeys = 0;
@@ -345,6 +353,8 @@ poll_events:
                     uint32_t cur = sdk_sync_get_turbo();
                     uint32_t target_spd = (uint32_t)(host->config.input.turbo_speed >= 2.0f ? host->config.input.turbo_speed : 3.0f);
                     sdk_sync_set_turbo(cur == 1 ? target_spd : 1);
+                    HOST_DEBUG_INFO("SYNC", "Turbo changed from %ux to %ux", cur,
+                        sdk_sync_get_turbo());
                     continue;
                 }
             }
@@ -635,6 +645,8 @@ int main(int argc, char **argv) {
 #endif
     if (argc == 2 && strcmp(argv[1], "--check-build") == 0) return 0;
 #if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
+    host_debug_start();
+    HOST_DEBUG_INFO("HOST", "VanillaBTN Debug startup");
     host_crash_install(native_crash_state);
     sdk_error_set_hook(host_crash_note_system_error);
 #endif
@@ -658,6 +670,7 @@ int main(int argc, char **argv) {
                 "  --trace-stalls     Record >33 ms stalls on normal exit (Debug only)\n"
 #endif
                 "  --help, -h         Show this help information", NULL);
+            host_debug_stop(0);
             return 0;
         }
 #ifdef VANILLABTN_BOOT_TEST
@@ -671,13 +684,22 @@ int main(int argc, char **argv) {
             host.cycle_required = true;
         }
 #endif
-        else return 1;
+        else {
+            HOST_DEBUG_ERROR("CONFIG", "Unknown or incomplete command-line option at argument %d", i);
+            host_debug_stop(1);
+            return 1;
+        }
     }
     if (!config_load(&host.config, config_path)) {
+        HOST_DEBUG_ERROR("CONFIG", "Configuration load failed");
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "VanillaBTN",
             "Cannot read the requested configuration or create its directory.", NULL);
+        host_debug_stop(1);
         return 1;
     }
+    HOST_DEBUG_INFO("CONFIG", "Configuration loaded: preset=%d render_scale=%d widescreen=%d backend=%d",
+        host.config.preset, host.config.graphics.render_scale,
+        host.config.display.widescreen, host.config.display.backend);
     bool pgxp_v = config_resolve_bool(host.config.fixes.pgxp_vertex_precision, host.config.preset, true);
     bool pgxp_t = config_resolve_bool(host.config.fixes.pgxp_perspective_texture, host.config.preset, true);
     bool zbuff = config_resolve_bool(host.config.fixes.true_depth_buffer, host.config.preset, true);
@@ -744,11 +766,20 @@ int main(int argc, char **argv) {
     sdk_cd_set_seamless_loop(seamless_cd);
     sdk_sound_set_hifi_reverb(hifi_rev);
     sdk_sound_set_equal_power_panning(hifi_rev);
+    HOST_DEBUG_INFO("GRAPHICS", "Features: pgxp=%d/%d depth=%d clipping=%d scale=%d true_color=%d",
+        pgxp_v, pgxp_t, zbuff, w_clip, host.config.graphics.render_scale, true_color);
+    HOST_DEBUG_INFO("AUDIO", "Features: polyphony=%d seamless_xa=%d pop=%d float_mix=%d hifi_reverb=%d",
+        expand_poly, seamless_cd, pop_suppress, float_mix, hifi_rev);
 #ifdef VANILLABTN_BOOT_TEST
     SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "dummy");
     SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "dummy");
 #endif
-    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD)) return 1;
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD)) {
+        HOST_DEBUG_ERROR("SDL", "SDL initialization failed: %s", SDL_GetError());
+        host_debug_stop(1);
+        return 1;
+    }
+    HOST_DEBUG_INFO("SDL", "Video, audio, and gamepad subsystems initialized");
     CdlFILE required;
     if (!sdk_cd_mount(disc) ||
         !CdSearchFile(&required, "\\A_FILE.HDT;1") ||
@@ -758,12 +789,14 @@ int main(int argc, char **argv) {
                 CdSearchFile(&required, "\\A_FILE.HDT;1") &&
                 CdSearchFile(&required, "\\A_FILE.BIN;1")) {
                 disc = "disc";
+                HOST_DEBUG_INFO("DATA", "Using fallback disc directory");
                 goto disc_ready;
             }
             if (sdk_cd_mount("data") &&
                 CdSearchFile(&required, "\\A_FILE.HDT;1") &&
                 CdSearchFile(&required, "\\A_FILE.BIN;1")) {
                 disc = "data";
+                HOST_DEBUG_INFO("DATA", "Using fallback data directory");
                 goto disc_ready;
             }
         }
@@ -772,19 +805,38 @@ int main(int argc, char **argv) {
         goto done;
     }
 disc_ready:
+    HOST_DEBUG_INFO("DATA", "Required A_FILE archives found");
     host.window = host_display_create_window(&host.config.display);
-    if (!host.window) goto done;
+    if (!host.window) {
+        HOST_DEBUG_ERROR("DISPLAY", "Window creation failed: %s", SDL_GetError());
+        goto done;
+    }
+    HOST_DEBUG_INFO("DISPLAY", "Game window created");
     host.renderer = host_renderer_create(host.window, host.config.display.backend, host.config.display.vsync);
-    if (!host.renderer) goto done;
+    if (!host.renderer) {
+        HOST_DEBUG_ERROR("RENDER", "Renderer creation failed: %s", SDL_GetError());
+        goto done;
+    }
+    HOST_DEBUG_INFO("RENDER", "Active SDL renderer: %s",
+        host_renderer_get_active_name(host.renderer));
     sdk_memory_clear();
     sdk_gpu_bind(&video);
-    if (!sdk_gpu_map(sdk_main_ram, SDK_RAM_SIZE)) goto done;
+    if (!sdk_gpu_map(sdk_main_ram, SDK_RAM_SIZE)) {
+        HOST_DEBUG_ERROR("GRAPHICS", "PS1 RAM/GPU mapping failed");
+        goto done;
+    }
     host.texture = SDL_CreateTexture(host.renderer, SDL_PIXELFORMAT_ARGB8888,
         SDL_TEXTUREACCESS_STREAMING, 320, 240);
-    if (!host.texture || !SDL_SetTextureScaleMode(host.texture, SDL_SCALEMODE_NEAREST)) goto done;
+    if (!host.texture || !SDL_SetTextureScaleMode(host.texture, SDL_SCALEMODE_NEAREST)) {
+        HOST_DEBUG_ERROR("GRAPHICS", "Streaming texture setup failed: %s", SDL_GetError());
+        goto done;
+    }
     /* Set the camera and 2D safe-area scales before game_main starts issuing
      * its first GTE transforms, rather than waiting for the first present. */
-    if (!host_display_update_widescreen(host.renderer)) goto done;
+    if (!host_display_update_widescreen(host.renderer)) {
+        HOST_DEBUG_ERROR("DISPLAY", "Initial presentation layout failed: %s", SDL_GetError());
+        goto done;
+    }
 
     /* Query monitor refresh rate and initialize decoupled presentation pacing */
     {
@@ -800,6 +852,8 @@ disc_ready:
          * Do not override its adaptive -> standard fallback here. */
     }
     ps1_audio_init(&audio);
+    HOST_DEBUG_INFO("AUDIO", "Audio mixer initialized; output=%s",
+        audio.has_output ? "active" : "unavailable");
 #ifndef VANILLABTN_BOOT_TEST
     if (!audio.has_output) {
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING, "VanillaBTN audio",
@@ -823,14 +877,17 @@ disc_ready:
             || !SDL_GetPathInfo(card_directory, &info) || info.type != SDL_PATHTYPE_DIRECTORY) {
             SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "VanillaBTN",
                 "Choose an existing folder for --card-dir.", host.window);
+            HOST_DEBUG_ERROR("SAVE", "Custom memory-card directory is invalid");
             goto done;
         }
     }
     if (!ps1_card_manager_init(&card_mgr, card_directory)) {
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "VanillaBTN",
             "Could not initialize the memory-card directory.", host.window);
+        HOST_DEBUG_ERROR("SAVE", "Memory-card manager initialization failed");
         goto done;
     }
+    HOST_DEBUG_INFO("SAVE", "Virtual memory-card manager initialized");
     sdk_card_bind_manager(&card_mgr);
 #else
     /* This probe must never read, recover, create or flush user save files. */
@@ -850,7 +907,9 @@ disc_ready:
     sdk_sync_bind(boot_now, boot_wait, NULL);
 #endif
     sdk_sync_start();
+    HOST_DEBUG_INFO("GAME", "Entering original game loop");
     result = game_main();
+    HOST_DEBUG_INFO("GAME", "Original game loop returned %d", result);
 #ifdef VANILLABTN_BOOT_TEST
     fprintf(stderr, "boot: vblanks=%u scene=%d gpu=%d colored=%u audible=%u\n",
         host.vblanks, main_scene, sdk_gpu_ok(), host.colored_frames, host.audible_frames);
@@ -868,6 +927,7 @@ disc_ready:
 #endif
 
 done:
+    HOST_DEBUG_INFO("HOST", "Shutting down native subsystems");
 #if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
     /* Write only once after gameplay; logging mid-frame would itself cause a hitch. */
     if (host.stall_trace.enabled)
@@ -894,5 +954,6 @@ done:
     if (host.renderer) SDL_DestroyRenderer(host.renderer);
     if (host.window) SDL_DestroyWindow(host.window);
     SDL_Quit();
+    host_debug_stop(result);
     return result;
 }

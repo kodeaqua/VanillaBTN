@@ -1,6 +1,7 @@
 /* Native Debug crash reports, separate from gameplay and the PS1 build.
  * Do not record absolute paths, original asset bytes or card contents. */
 #include "host_crash.h"
+#include "host_debug.h"
 
 #include <Windows.h>
 #include <DbgHelp.h>
@@ -140,6 +141,8 @@ void host_crash_note_system_error(char type, long code) {
     has_system_error = 1;
     system_error_type = (unsigned char)type;
     system_error_code = code;
+    HOST_DEBUG_ERROR("GAME", "SystemError type=0x%02X code=0x%lX",
+        (unsigned char)type, code);
 }
 
 void host_crash_install(void (*state_writer)(FILE *)) {
