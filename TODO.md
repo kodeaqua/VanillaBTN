@@ -77,10 +77,14 @@ reference build; see [AGENTS.md](AGENTS.md) and [docs/architecture.md](docs/arch
       records in-memory timing outliers across VSync game work, waits, SDL
       events, input, audio and presentation. `DebugOptimized` retains Debug
       diagnostics while using `/O2`; normal Release excludes all tracing.
-- [ ] **Title-screen joint graphics/audio hitch (Windows acceptance)** — a
-      brief stutter remains several seconds into the title, affecting both
-      frame delivery and music. Capture the Milestone 36 optimized Debug trace
-      before changing render allocations, archive I/O or audio buffering.
+- [ ] **Title-screen music continuity (Windows acceptance)** — music can
+      degrade after several seconds while graphics remain smooth. Confirm
+      whether clock-paced PCM delivery in Milestone 37 resolves this on
+      native Windows; a long blocked event pump still needs separate study.
+- [x] **Milestone 37: Native output sample-clock pacing** — generate host PCM
+      for elapsed wall time rather than assuming every VSync callback arrives
+      on schedule. Cap catch-up at four ticks, preserve accelerated turbo
+      audio, reset after suspension and keep the PS1 sound state authoritative.
 
 - [x] **Milestone 35: Music-onset SDL queue reserve** — when a newly
       playing music sequence first produces audible PCM, prefill at most two

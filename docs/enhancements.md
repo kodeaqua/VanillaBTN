@@ -432,14 +432,20 @@ changes separate from the matching PS1 reference build.
 
 ### Native SDL music-onset buffering
 
-- The native game produces 735 stereo PCM frames per 60 Hz game tick.
-  At the first nonzero output of a newly playing music sequence, the SDL
+- At a regular 60 Hz callback, the native game produces 735 stereo PCM frames.
+  The native host now tracks elapsed time at the 44.1 kHz sample rate so a
+  delayed/skipped VSync does not permanently omit PCM; catch-up is limited
+  to four ticks per callback, turbo keeps its accelerated per-tick audio,
+  and suspended time is excluded. This only changes native PCM delivery;
+  it does not rewrite the original game audio state or PS1 build.
+- At the first nonzero output of a newly playing music sequence, the SDL
   stream gets up to two ticks of silent headroom before the real samples.
   This one-time reserve can absorb a brief loading stall around the title
   music's initial playback; it does not generate extra game/SPU samples,
   alter voice state, or keep growing latency on subsequent ticks. The
   existing upper queue bound still applies. Windows listening confirmed
-  the initial onset improved, but a later joint graphics/audio hitch remains.
+  the initial onset improved. Later title music degradation still requires
+  Windows listening acceptance of the host sample-clock correction.
 
 ### Optional native title-stall timing
 
@@ -455,10 +461,12 @@ changes separate from the matching PS1 reference build.
   this probe is active, to avoid introducing artificial two-second file I/O
   stalls. No file is written during gameplay: on a normal exit, the
   trace is saved as `VanillaBTN-stalls.txt` in the working directory.
-- Both graphics and music briefly pause together several seconds into the
-  title. The initial silence reserve alone cannot explain or fix a blocked
-  host game thread. Until a trace identifies its time-consuming phase, leave
-  game pacing, SPU mixing and the queue budget unchanged.
+- A stall trace can expose long event dispatch or VSync gaps, but the SDL
+  queued-byte reading is not a reliable measurement of samples already held
+  by the playback device. The native PCM sample-clock correction therefore
+  does not use queue depth to accelerate the mixer or grow a buffer. Very long
+  blocked host callbacks may still cause output underruns and require a
+  separate investigation if reproduced after the pacing correction.
 
 ### Native Debug failure diagnostics
 

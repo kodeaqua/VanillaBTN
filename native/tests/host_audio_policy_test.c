@@ -57,10 +57,59 @@ static void test_music_onset_reserves_only_at_first_pcm(void) {
     CHECK(host_audio_music_onset_padding(&onset, true, true, -1, tick_bytes) == 0);
 }
 
+static void test_audio_clock_matches_host_elapsed_time(void) {
+    HostAudioClock clock = {0};
+    const uint64_t tick_ns = 1000000000ULL / 60;
+    uint64_t now = 1000000000ULL;
+    CHECK(host_audio_clock_frames(&clock, now, false) == HOST_AUDIO_TICK_FRAMES);
+    CHECK(host_audio_clock_frames(&clock, now, false) == 0);
+
+    /* At a steady 60 Hz, fractional sample remainders do not accumulate
+     * long-term speed or pitch drift. */
+    unsigned frames = 0;
+    for (int i = 0; i < 600; ++i) {
+        now += tick_ns + (i % 3 == 0);
+        frames += (unsigned)host_audio_clock_frames(&clock, now, false);
+    }
+    CHECK(frames >= 440990 && frames <= 441010);
+
+    /* A skipped VSync boundary consumes the actual elapsed audio time,
+     * rather than permanently losing one tick of PCM. */
+    now += 2 * tick_ns;
+    CHECK(host_audio_clock_frames(&clock, now, false) >= 1469);
+    CHECK(host_audio_clock_frames(&clock, now + tick_ns, false) >= 734);
+
+    /* Interleaved short and long callbacks still cover the same total time. */
+    host_audio_clock_reset(&clock);
+    now = 1000000000ULL;
+    CHECK(host_audio_clock_frames(&clock, now, false) == 735);
+    now += 5000000ULL;
+    int short_frames = host_audio_clock_frames(&clock, now, false);
+    now += 11666667ULL;
+    int long_frames = host_audio_clock_frames(&clock, now, false);
+    CHECK(short_frames + long_frames == 735);
+
+    /* A huge OS stall is bounded, with no subsequent compensation burst. */
+    now += 2000000000ULL;
+    CHECK(host_audio_clock_frames(&clock, now, false) == HOST_AUDIO_MAX_FRAMES);
+    CHECK(host_audio_clock_frames(&clock, now + tick_ns, false) >= 734);
+
+    /* Turbo retains the original accelerated-tick SPU pacing. */
+    now += 4 * tick_ns;
+    CHECK(host_audio_clock_frames(&clock, now, true) == 735);
+    CHECK(host_audio_clock_frames(&clock, now + tick_ns / 4, true) == 735);
+    CHECK(host_audio_clock_frames(&clock, now + tick_ns, false) >= 550);
+
+    host_audio_clock_reset(&clock); /* Pause/resume must not catch up silence. */
+    CHECK(host_audio_clock_frames(&clock, now + 10000000000ULL, false) == 735);
+    CHECK(host_audio_clock_frames(NULL, now, false) == 735);
+}
+
 int main(void) {
     test_default_is_bit_exact();
     test_master_volume_and_focus_mute();
     test_music_onset_reserves_only_at_first_pcm();
+    test_audio_clock_matches_host_elapsed_time();
     puts("host_audio_policy_test: passed");
     return 0;
 }

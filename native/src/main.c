@@ -62,6 +62,7 @@ typedef struct HostGame {
     AppConfig config;
     HostPacing pacing;
     HostAudioMusicOnset music_onset;
+    HostAudioClock audio_clock;
 #if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
     HostStallTrace stall_trace;
     uint64_t previous_pump_end_ns;
@@ -402,6 +403,7 @@ poll_events:
     if ((host->config.input.pause_on_unfocus && !host->focused) || host->paused) {
         if (!suspended) {
             sdk_sync_suspend();
+            host_audio_clock_reset(&host->audio_clock);
             suspended = true;
             if (audio.stream) SDL_ClearAudioStream(audio.stream);
         }
@@ -448,18 +450,27 @@ poll_events:
             ps1_input_trigger_buttons(host->trigger_left[1], host->trigger_right[1])),
         stick1_x, stick1_y);
 
-    /* Original game timing owns the cadence. Submit exactly one 60 Hz audio
-     * interval from the same SDK SPU used by sound.c, not the smoke mixer. */
+    /* Original sound.c owns the SPU state; the host supplies PCM in elapsed
+     * sample-clock intervals, independently of late VSync callbacks. */
 #if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
     uint64_t audio_begin = host->stall_trace.enabled ? SDL_GetTicksNS() : 0;
 #endif
-    int16_t samples[735 * 2];
-    sdk_sound_mix(samples, 735);
-    host_audio_apply_volume(samples, sizeof(samples) / sizeof(samples[0]),
+    /* VSync may miss a boundary even when video presentation looks smooth.
+     * Match host PCM production to elapsed output time so the SPU stream
+     * does not progressively fall behind the SDL playback device. */
+#ifdef VANILLABTN_BOOT_TEST
+    int frames = HOST_AUDIO_TICK_FRAMES;
+#else
+    int frames = host_audio_clock_frames(&host->audio_clock, SDL_GetTicksNS(),
+        sdk_sync_get_turbo() != 1);
+#endif
+    int16_t samples[HOST_AUDIO_MAX_FRAMES * 2];
+    if (frames != 0) sdk_sound_mix(samples, frames);
+    host_audio_apply_volume(samples, (size_t)frames * 2,
         host->config.audio.master_volume,
         host->config.audio.mute_on_unfocus && !host->focused);
 #ifdef VANILLABTN_BOOT_TEST
-    for (unsigned i = 0; i < 735 * 2; ++i) {
+    for (unsigned i = 0; i < (unsigned)frames * 2; ++i) {
         if (samples[i]) { ++host->audible_frames; break; }
     }
     SdkDisplay output = sdk_gpu_display();
@@ -480,27 +491,28 @@ poll_events:
     bool music_playing = sdk_sound_status().playing_seq_count > 0;
     bool music_pcm_nonzero = false;
     if (music_playing && !host->music_onset.primed) {
-        for (size_t i = 0; i < sizeof(samples) / sizeof(samples[0]); ++i) {
+        for (size_t i = 0; i < (size_t)frames * 2; ++i) {
             if (samples[i] != 0) { music_pcm_nonzero = true; break; }
         }
     }
     size_t onset_padding = host_audio_music_onset_padding(&host->music_onset,
-        music_playing, music_pcm_nonzero, queued, sizeof(samples));
+        music_playing, music_pcm_nonzero, queued,
+        HOST_AUDIO_TICK_FRAMES * 2 * sizeof(int16_t));
     if (audio.stream && onset_padding != 0) {
         /* SDL copies stream data immediately. Do not advance the music
          * sequencer to synthesize this reserve: it would shift gameplay audio. */
-        int16_t silence[735 * 2 * 2] = {0};
+        int16_t silence[HOST_AUDIO_TICK_FRAMES * 2 * 2] = {0};
         SDL_PutAudioStreamData(audio.stream, silence, (int)onset_padding);
     }
 #if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
     int submit_status = 0;
 #endif
-    if (audio.stream && queued >= 0 &&
-        queued < (int)(sizeof(samples) * 8)) {
+    if (audio.stream && frames > 0 && queued >= 0 &&
+        queued < (int)(HOST_AUDIO_TICK_FRAMES * 2 * sizeof(int16_t) * 8)) {
 #if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
-        submit_status = SDL_PutAudioStreamData(audio.stream, samples, sizeof(samples)) ? 1 : -1;
+        submit_status = SDL_PutAudioStreamData(audio.stream, samples, frames * 2 * (int)sizeof(int16_t)) ? 1 : -1;
 #else
-        SDL_PutAudioStreamData(audio.stream, samples, sizeof(samples));
+        SDL_PutAudioStreamData(audio.stream, samples, frames * 2 * (int)sizeof(int16_t));
 #endif
     }
 #if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
@@ -508,7 +520,7 @@ poll_events:
      * timing investigation. Keep the normal Debug report otherwise. */
     if (!host->stall_trace.enabled) {
         bool nonzero = false;
-        for (size_t i = 0; i < sizeof(samples) / sizeof(samples[0]); ++i) {
+        for (size_t i = 0; i < (size_t)frames * 2; ++i) {
             if (samples[i] != 0) { nonzero = true; break; }
         }
         host_debug_audio_report(host, nonzero, queued, submit_status);

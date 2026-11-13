@@ -17,6 +17,36 @@ void host_audio_apply_volume(int16_t *samples, size_t count, int volume_percent,
     }
 }
 
+void host_audio_clock_reset(HostAudioClock *clock) {
+    if (clock) memset(clock, 0, sizeof(*clock));
+}
+
+int host_audio_clock_frames(HostAudioClock *clock, uint64_t now_ns, bool turbo) {
+    if (!clock) return HOST_AUDIO_TICK_FRAMES;
+    if (!clock->initialized || now_ns < clock->last_ns || turbo) {
+        clock->initialized = true;
+        clock->last_ns = now_ns;
+        clock->remainder = 0;
+        return HOST_AUDIO_TICK_FRAMES;
+    }
+
+    if (now_ns == clock->last_ns) return 0;
+    uint64_t elapsed = now_ns - clock->last_ns;
+    clock->last_ns = now_ns;
+    /* Cap catch-up at four ticks; never let an OS pause turn into seconds of
+     * heavy SPU mixing or a large SDL queue. The remainder is discarded after
+     * a truncated gap so the next normal tick starts with a clean clock. */
+    const uint64_t max_ns = 1000000000ULL * HOST_AUDIO_MAX_FRAMES / 44100ULL;
+    if (elapsed >= max_ns) {
+        clock->remainder = 0;
+        return HOST_AUDIO_MAX_FRAMES;
+    }
+    uint64_t scaled = elapsed * 44100ULL + clock->remainder;
+    int frames = (int)(scaled / 1000000000ULL);
+    clock->remainder = scaled % 1000000000ULL;
+    return frames;
+}
+
 size_t host_audio_music_onset_padding(HostAudioMusicOnset *onset,
                                       bool sequence_playing, bool pcm_nonzero,
                                       int queued_bytes, size_t tick_bytes) {
