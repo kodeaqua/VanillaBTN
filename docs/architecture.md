@@ -133,8 +133,9 @@ vector rotation and translation, perspective divide (RTPS/RTPT), normal clipping
 `native/src/ps1_input.c` emulates the `InputRecord` semantics from `pad.c`:
 `held`, `pressed`, and dual auto-repeat channels (`triggered` and `triggered2`).
 The original game loop is paced by `native/src/sdk_sync.c`, which emits 60 Hz
-VBlank ticks from the host clock (multiplied by the optional turbo setting) and
-runs the game's VSync callback. `native/src/ps1_clock.c` is a separate
+VBlank ticks from the host clock. Turbo rebases that clock at the toggle instant
+and dispatches the callback and host pump at the multiplied virtual rate, without
+catching up against the old rate. `native/src/ps1_clock.c` is a separate
 standalone helper that accumulates host nanoseconds into nominal 30 Hz ticks
 with an anti-cascade clamp; the running game does not pace itself with it.
 Exact NTSC hardware drift remains unmodeled. `native/src/main.c` maps SDL3
@@ -165,7 +166,8 @@ when no audio output hardware is present. `ps1_audio_tick` is its standalone
 30 Hz path (1470 frames per tick). In the running game, `native/src/main.c`,
 through `sdk_sound_mix`, mixes 735 stereo frames per 60 Hz VBlank tick, derives
 PCM from elapsed time when a tick is late (capped at four ticks), keeps the SDL
-queue within four ticks and still produces one tick of audio per turbo tick;
+queue within four ticks. Turbo still advances one SPU tick per simulation tick
+but suppresses accelerated PCM at the output device;
 see [Work 02](02-enhancements.md#native-sdl-music-onset-buffering).
 
 ### Save and memory-card slice

@@ -47,7 +47,7 @@ static void sdl_wait(uint64_t deadline, void *context) {
 static uint64_t (*clock_now)(void *) = sdl_now;
 static void (*clock_wait)(uint64_t, void *) = sdl_wait;
 static void *clock_context;
-static uint64_t epoch, last_wait;
+static uint64_t pace_anchor_ns, pace_anchor_tick, last_wait;
 static bool initialized;
 static void (*vblank_callback)(void);
 static void (*host_pump)(void *);
@@ -69,13 +69,19 @@ int VSyncCallback(void (*callback)(void)) {
 }
 
 static uint32_t s_turbo_multiplier = 1;
+static uint64_t units(uint64_t ns, uint64_t rate);
 
 void sdk_sync_set_turbo(uint32_t multiplier) {
-    if (multiplier >= 1 && multiplier <= 8) {
-        s_turbo_multiplier = multiplier;
-    } else {
-        s_turbo_multiplier = 1;
+    uint32_t next = multiplier >= 1 && multiplier <= 8 ? multiplier : 1;
+    if (next == s_turbo_multiplier) return;
+    if (initialized) {
+        uint64_t now = clock_now(clock_context);
+        uint64_t elapsed = now >= pace_anchor_ns ? now - pace_anchor_ns : 0;
+        uint64_t rate = 60ULL * (uint64_t)s_turbo_multiplier;
+        pace_anchor_tick += units(elapsed, rate);
+        pace_anchor_ns = now;
     }
+    s_turbo_multiplier = next;
 }
 
 uint32_t sdk_sync_get_turbo(void) {
@@ -84,8 +90,14 @@ uint32_t sdk_sync_get_turbo(void) {
 
 static uint64_t tick_deadline(uint64_t tick) {
     uint64_t rate = 60ULL * (uint64_t)s_turbo_multiplier;
-    return epoch + tick / rate * 1000000000
-        + (tick % rate * 1000000000 + rate - 1) / rate;
+    uint64_t delta = tick > pace_anchor_tick ? tick - pace_anchor_tick : 0;
+    return pace_anchor_ns + delta / rate * 1000000000
+        + (delta % rate * 1000000000 + rate - 1) / rate;
+}
+
+static uint64_t current_tick(uint64_t now) {
+    uint64_t elapsed = now >= pace_anchor_ns ? now - pace_anchor_ns : 0;
+    return pace_anchor_tick + units(elapsed, 60ULL * (uint64_t)s_turbo_multiplier);
 }
 
 static void dispatch_vblank(uint64_t tick) {
@@ -111,7 +123,7 @@ void sdk_sync_resume(void) {
 #endif
     uint64_t held = now > suspended_at ? now - suspended_at : 0;
     /* Shifting both anchors preserves tick numbering and VSync(1) deltas. */
-    epoch += held;
+    pace_anchor_ns += held;
     last_wait += held;
     suspended = false;
     shifted = true;
@@ -153,7 +165,8 @@ int ResetCallback(void) {
      * platform timing source must not rewind the clock on every file read.
      * Registration survives these repeated archive-read resets. */
     if (!initialized) {
-        epoch = last_wait = clock_now(clock_context);
+        pace_anchor_ns = last_wait = clock_now(clock_context);
+        pace_anchor_tick = 0;
         initialized = true;
     }
     return 0;
@@ -162,15 +175,17 @@ int ResetCallback(void) {
 int VSync(int mode) {
     ResetCallback();
     uint64_t now = clock_now(clock_context);
-    if (mode < 0) return result_units(now >= epoch ? now - epoch : 0, 60);
+    if (mode < 0) {
+        uint64_t tick = current_tick(now);
+        return tick > INT_MAX ? INT_MAX : (int)tick;
+    }
     if (mode == 1) return result_units(now >= last_wait ? now - last_wait : 0, 15750);
 #ifdef _DEBUG
     if (host_stall_hook && last_vsync_exit_ns && now >= last_vsync_exit_ns)
         host_stall_hook(false, now - last_vsync_exit_ns, host_stall_context);
 #endif
     uint64_t base = (mode == 0 ? now : last_wait);
-    uint64_t elapsed_base = base >= epoch ? base - epoch : 0;
-    uint64_t tick = units(elapsed_base, 60);
+    uint64_t tick = current_tick(base);
     tick += mode == 0 ? 1 : (unsigned)mode;
     /* Round upward so an integral-nanosecond deadline never falls before the
      * nominal vblank boundary; preserve phase rather than accumulating drift. */
@@ -180,8 +195,7 @@ int VSync(int mode) {
         waited = true;
         /* Service each intervening vblank, so VSync(2/3) does not batch the
          * original loading-screen and draw callbacks at the final deadline. */
-        uint64_t elapsed_now = now >= epoch ? now - epoch : 0;
-        uint64_t next = units(elapsed_now, 60) + 1;
+        uint64_t next = current_tick(now) + 1;
 #ifdef _DEBUG
         uint64_t before_wait = now;
 #endif
@@ -191,15 +205,13 @@ int VSync(int mode) {
         if (host_stall_hook && now >= before_wait)
             host_stall_hook(true, now - before_wait, host_stall_context);
 #endif
-        elapsed_now = now >= epoch ? now - epoch : 0;
-        dispatch_vblank(units(elapsed_now, 60));
+        dispatch_vblank(current_tick(now));
         refresh_after_dispatch(&now);
     }
     /* Late work delivers the current boundary once, without replaying stale
      * rendering callbacks or adding another frame delay. Queries stay pure. */
     if (!waited) {
-        uint64_t elapsed_final = now >= epoch ? now - epoch : 0;
-        dispatch_vblank(units(elapsed_final, 60));
+        dispatch_vblank(current_tick(now));
         refresh_after_dispatch(&now);
     }
     int elapsed = result_units(now >= last_wait ? now - last_wait : 0, 15750);

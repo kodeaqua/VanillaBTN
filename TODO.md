@@ -8,8 +8,7 @@ recorded in [Work 02](docs/02-enhancements.md).
 
 - [ ] **Hor+ scene coverage** — inspect scenes outside the farm for game-side
       visibility gates that still reject actors, objects, weather, or other
-      world content inside the expanded horizontal view. Recheck rain, storm,
-      snow, and blizzard coverage after their native spawn range was widened.
+      world content inside the expanded horizontal view.
 - [ ] **Photo-map marker bounds** — verify native photo-map navigation with the
       dog indoors and outdoors, including locations that have no map marker.
 
@@ -19,6 +18,14 @@ recorded in [Work 02](docs/02-enhancements.md).
       against objective hardware traces where available and perform developer
       listening checks. Existing synthetic tests establish code behavior, not
       PlayStation hardware equivalence or perceived audio quality.
+
+## Turbo acceptance
+
+- [ ] **Consistent turbo cadence** — toggle turbo after several minutes of
+      runtime and compare the farm, Popuri's area, church, interiors, events,
+      and transitions. Moving simulation must use the configured multiplier;
+      places where the original game stops its clock must remain stopped.
+      Confirm audio is silent during turbo and resumes cleanly afterward.
 
 ## References
 

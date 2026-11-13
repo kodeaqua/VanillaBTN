@@ -353,6 +353,12 @@ poll_events:
                     uint32_t cur = sdk_sync_get_turbo();
                     uint32_t target_spd = (uint32_t)(host->config.input.turbo_speed >= 2.0f ? host->config.input.turbo_speed : 3.0f);
                     sdk_sync_set_turbo(cur == 1 ? target_spd : 1);
+                    /* Turbo advances the authoritative SPU with simulation,
+                     * but audible accelerated PCM is harsh and cannot remain
+                     * synchronized at normal pitch without time stretching. */
+                    host_audio_clock_reset(&host->audio_clock);
+                    memset(&host->music_onset, 0, sizeof(host->music_onset));
+                    if (audio.stream) SDL_ClearAudioStream(audio.stream);
                     HOST_DEBUG_INFO("SYNC", "Turbo changed from %ux to %ux", cur,
                         sdk_sync_get_turbo());
                     continue;
@@ -471,8 +477,8 @@ poll_events:
 #ifdef VANILLABTN_BOOT_TEST
     int frames = HOST_AUDIO_TICK_FRAMES;
 #else
-    int frames = host_audio_clock_frames(&host->audio_clock, SDL_GetTicksNS(),
-        sdk_sync_get_turbo() != 1);
+    bool turbo = sdk_sync_get_turbo() != 1;
+    int frames = host_audio_clock_frames(&host->audio_clock, SDL_GetTicksNS(), turbo);
 #endif
     int16_t samples[HOST_AUDIO_MAX_FRAMES * 2];
     if (frames != 0) sdk_sound_mix(samples, frames);
@@ -497,7 +503,12 @@ poll_events:
     }
     if (colored) ++host->colored_frames;
 #endif
-    int queued = audio.stream ? SDL_GetAudioStreamQueued(audio.stream) : -1;
+    /* Keep the original mixer/sequence state synchronized with accelerated
+     * simulation, but do not submit pitch-shifted turbo PCM to the device. */
+#ifdef VANILLABTN_BOOT_TEST
+    bool turbo = false;
+#endif
+    int queued = audio.stream && !turbo ? SDL_GetAudioStreamQueued(audio.stream) : -1;
     bool music_playing = sdk_sound_status().playing_seq_count > 0;
     bool music_pcm_nonzero = false;
     if (music_playing && !host->music_onset.primed) {

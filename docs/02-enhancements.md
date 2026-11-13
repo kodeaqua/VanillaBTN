@@ -376,6 +376,7 @@ behavior and limitations are retained in the implementation notes below.
 | **39** | Skip native photo-map actor markers for locations without map spots. |
 | **40** | Add a persistent Debug logger console and optimize symbol-rich Debug builds for CPU-heavy native emulation. |
 | **41** | Preserve near-integer 16:9 presentation at 1280×720 and distribute native weather particles across Hor+ margins. |
+| **42** | Rebase turbo timing at runtime, dispatch every accelerated VBlank consistently, and mute accelerated audio output. |
 
 ## Verification
 
@@ -486,9 +487,12 @@ changes separate from the matching PS1 reference build.
 - At a regular 60 Hz callback, the native game produces 735 stereo PCM frames.
   The native host now tracks elapsed time at the 44.1 kHz sample rate so a
   delayed/skipped VSync does not permanently omit PCM; catch-up is limited
-  to four ticks per callback, turbo keeps its accelerated per-tick audio,
-  and suspended time is excluded. This only changes native PCM delivery;
-  it does not rewrite the original game audio state or PS1 build.
+  to four ticks per callback and suspended time is excluded. Turbo continues
+  to advance the SPU and music sequencer once per accelerated simulation tick,
+  but does not submit the pitch-shifted PCM to SDL. Entering or leaving turbo
+  clears queued output, so normal-pitch audio resumes without stale samples.
+  This only changes native PCM delivery; it does not rewrite the original game
+  audio state or PS1 build.
 - At the first nonzero output of a newly playing music sequence, the SDL
   stream gets up to two ticks of silent headroom before the real samples.
   This one-time reserve can absorb a brief loading stall around the title
@@ -542,6 +546,8 @@ changes separate from the matching PS1 reference build.
   investigation practical. Release still compiles all developer logging out.
 - The developer confirmed the separate game and logger windows work as expected
   and that the logger remains available after forcibly ending the game process.
+- The developer confirmed the 1280×720 integer-scale fallback and Hor+ weather
+  coverage fixes in a real game window.
 - This exposes failures that synthetic text/menu fixtures cannot reproduce.
   A Windows Debug report localized the NPC conversation failure to a
   low-address read in `sprite_draw_frame`; this diagnostic alone cannot prove

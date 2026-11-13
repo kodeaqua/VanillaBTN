@@ -98,6 +98,32 @@ int main(void) {
     VSync(0);
     assert(callbacks == 8 && pumps == 9);
     sdk_sync_pump(NULL, NULL);
+
+    /* Turbo can be toggled after the timing epoch has been running. Rebase at
+     * the toggle instant: every accelerated VSync still dispatches exactly one
+     * callback/pump, with no unbounded catch-up against the old epoch. */
+    clock = (Clock){0};
+    callbacks = pumps = 0;
+    registered = true;
+    sdk_sync_set_turbo(1);
+    assert(sdk_sync_bind(now, wait_until, &clock));
+    assert(ResetCallback() == 0);
+    assert(VSyncCallback(on_vblank) == 0);
+    sdk_sync_pump(on_pump, &pumps);
+    VSync(0);
+    assert(clock.now == 16666667 && callbacks == 1 && pumps == 1);
+    sdk_sync_set_turbo(3);
+    VSync(0);
+    assert(clock.now == 22222223 && callbacks == 2 && pumps == 2);
+    VSync(0);
+    VSync(0);
+    assert(clock.now == 33333334 && callbacks == 4 && pumps == 4);
+    assert(VSync(-1) == 4);
+    sdk_sync_set_turbo(1);
+    VSync(0);
+    assert(clock.now == 50000001 && callbacks == 5 && pumps == 5);
+    sdk_sync_pump(NULL, NULL);
+    VSyncCallback(NULL);
 #ifdef _DEBUG
     sdk_sync_stall_hook(NULL, NULL);
 #endif
