@@ -60,6 +60,11 @@ reference build; see [AGENTS.md](AGENTS.md) and [docs/architecture.md](docs/arch
       0xB0-byte PS1 clear with `sizeof(FarmAction)` in native builds; ensure
       freed action records discard all x64 animation pointers before reuse.
 
+- [x] **Milestone 33: Empty `.ANI` part lists in native drawing** — avoid
+      forming a pointer before the part array when a sprite, text sprite or
+      SPRT builder sees zero/negative part count. PS1 draw logic stays intact;
+      animation packet fixtures cover each native builder.
+
 ## Save compatibility
 
 - [x] **Milestone 20: Persistent card unformat** — the original card utility
