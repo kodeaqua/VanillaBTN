@@ -83,10 +83,10 @@ reference build; see [AGENTS.md](AGENTS.md) and [docs/architecture.md](docs/arch
       records in-memory timing outliers across VSync game work, waits, SDL
       events, input, audio and presentation. `DebugOptimized` retains Debug
       diagnostics while using `/O2`; normal Release excludes all tracing.
-- [ ] **Title-screen music continuity (Windows acceptance)** — music can
-      degrade after several seconds while graphics remain smooth. Recheck
-      playback on native Windows with Milestone 38's bounded SDL queue;
-      investigate remaining dropouts and blocked event pumps separately.
+- [x] **Title-screen music continuity** — the observed audio lag/dropouts
+      are resolved after Milestone 38's bounded SDL catch-up queue. New
+      dropouts should be investigated separately rather than expanding the
+      queue or altering the game/SPU clock without evidence.
 - [x] **Milestone 38: Bound SDL catch-up queue depth** — a four-tick audio
       catch-up could push the SDL queue beyond its old eight-tick threshold,
       delaying playback before later submissions were skipped. Account for

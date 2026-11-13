@@ -448,8 +448,9 @@ changes separate from the matching PS1 reference build.
   only the newest PCM frames are submitted, while the original SPU is still
   mixed for the full elapsed time. This limits queued host latency to four
   ticks instead of permitting a catch-up packet to overflow the previous
-  eight-tick gate. It cannot eliminate underruns caused by a blocked game
-  thread; native Windows listening acceptance is still open.
+  eight-tick gate. The previously reported title playback dropouts are no
+  longer observed with the bounded queue. A blocked game thread could still
+  cause future underruns; that remains a separate issue if reproduced.
 
 ### Optional native title-stall timing
 
