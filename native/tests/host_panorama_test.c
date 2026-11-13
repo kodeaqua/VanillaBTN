@@ -132,6 +132,23 @@ int main(void) {
         logical_mode != SDL_LOGICAL_PRESENTATION_STRETCH) return 15;
     SDL_DestroyRenderer(scaled_renderer);
     SDL_DestroySurface(scaled_surface);
+    /* 16:9 produces a rounded 427px canvas. At exactly 1280x720, strict 3x
+     * would need 1281px; tolerate that rounding pixel instead of dropping to
+     * 2x and surrounding the game with a large black border. */
+    {
+        host_display_set_integer_scaling(true);
+        SDL_Surface *hd_surface = SDL_CreateSurface(1280, 720, SDL_PIXELFORMAT_ARGB8888);
+        if (!hd_surface) return 35;
+        SDL_Renderer *hd_renderer = SDL_CreateSoftwareRenderer(hd_surface);
+        if (!hd_renderer || !host_display_update_widescreen(hd_renderer)
+            || !SDL_GetRenderLogicalPresentation(hd_renderer, &logical_w, &logical_h,
+                                                  &logical_mode)
+            || logical_w != 427 || logical_h != 240
+            || logical_mode != SDL_LOGICAL_PRESENTATION_STRETCH) return 36;
+        host_display_set_integer_scaling(false);
+        SDL_DestroyRenderer(hd_renderer);
+        SDL_DestroySurface(hd_surface);
+    }
     /* CRT NTSC pixels are ~9.2% wider than square pixels. The physical
      * correction must not expand the camera or move 2D HUD coordinates. */
     {

@@ -375,6 +375,7 @@ behavior and limitations are retained in the implementation notes below.
 | **38** | Bound SDL catch-up submissions to a four-tick queue. |
 | **39** | Skip native photo-map actor markers for locations without map spots. |
 | **40** | Add a persistent Debug logger console and optimize symbol-rich Debug builds for CPU-heavy native emulation. |
+| **41** | Preserve near-integer 16:9 presentation at 1280×720 and distribute native weather particles across Hor+ margins. |
 
 ## Verification
 
@@ -407,9 +408,16 @@ changes separate from the matching PS1 reference build.
   original world positions. Native frustum/culling adjustments are guarded by
   `VANILLABTN_NATIVE`. The farm's `estate_point_on_screen` keeps its existing
   vertical rejection band but widens horizontal visibility to include the Hor+
-  margins for farm actors, objects and weather. Other scene-specific culling
-  still requires hands-on checks on ultrawide displays. Ordinary screen-space
-  HUD and UI primitives stay in the original centered 4:3 area.
+  margins for farm actors, objects and weather. Native rain, storm, snow and
+  blizzard particles also use those margins when choosing their horizontal
+  spawn range; their count and random-call cadence remain unchanged. Other
+  scene-specific culling still requires hands-on checks on ultrawide displays.
+  Ordinary screen-space HUD and UI primitives stay in the original centered
+  4:3 area.
+- Integer scaling remains strict unless the rounded Hor+ canvas misses an exact
+  output multiple by at most one scale factor. In particular, 427×240 at 3×
+  needs 1281×720; a 1280×720 output tolerates that rounding pixel instead of
+  falling back to 2× with a large black border.
 - PS1 draw and display environments use **two distinct frame pages**, at VRAM
   rows 0–239 and 240–479. The sidecar preserves each page until actual clear,
   fill, or draw operations change its pixels. Beginning another ordering table

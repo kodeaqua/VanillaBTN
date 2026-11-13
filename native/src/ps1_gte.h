@@ -68,6 +68,8 @@ void ps1_gte_set_float_math(bool enabled);
 bool ps1_gte_get_float_math(void);
 void ps1_gte_set_widescreen_scale(float scale);
 float ps1_gte_get_widescreen_scale(void);
+/* Extra screen-space columns visible on each side of the original 320px view. */
+int32_t ps1_gte_widescreen_margin(void);
 /* Conservative screen-space sprite visibility, expanded for the Hor+ margins. */
 bool ps1_gte_screen_band_contains(int32_t x, int32_t left, int32_t width);
 int32_t ps1_gte_scale_frustum_half_angle(int32_t base_half_angle);

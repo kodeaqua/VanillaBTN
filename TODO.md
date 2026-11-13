@@ -8,7 +8,8 @@ recorded in [Work 02](docs/02-enhancements.md).
 
 - [ ] **Hor+ scene coverage** — inspect scenes outside the farm for game-side
       visibility gates that still reject actors, objects, weather, or other
-      world content inside the expanded horizontal view.
+      world content inside the expanded horizontal view. Recheck rain, storm,
+      snow, and blizzard coverage after their native spawn range was widened.
 - [ ] **Photo-map marker bounds** — verify native photo-map navigation with the
       dog indoors and outdoors, including locations that have no map marker.
 

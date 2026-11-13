@@ -131,6 +131,7 @@ static void test_horizontal_frustum_expands_with_output_aspect(void) {
     ps1_gte_set_widescreen_scale(1.0f);
     CHECK(ps1_gte_scale_frustum_half_angle(base_half_angle) == base_half_angle);
     ps1_gte_set_widescreen_scale(scale);
+    CHECK(ps1_gte_widescreen_margin() == 53);
     int32_t wide_half_angle = ps1_gte_scale_frustum_half_angle(base_half_angle);
     CHECK(wide_half_angle > base_half_angle);
     double wide_radians = (double)wide_half_angle / units_per_radian;

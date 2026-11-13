@@ -139,6 +139,17 @@ bool host_display_update_widescreen(SDL_Renderer *renderer) {
     /* Presentation-only correction: the texture stays at its PS1 raster size,
      * and the centered HUD does not undergo any extra Hor+ camera transform. */
     int logical_width = (int)lroundf((float)canvas_width * pixel_aspect);
+    if (presentation == SDL_LOGICAL_PRESENTATION_INTEGER_SCALE && canvas_height > 0) {
+        int vertical_scale = output_height / canvas_height;
+        int width_error = output_width - logical_width * vertical_scale;
+        if (vertical_scale > 0 && output_height == canvas_height * vertical_scale
+            && width_error >= -vertical_scale && width_error <= vertical_scale) {
+            /* A rounded Hor+ canvas is 427px at 16:9, so 3x needs 1281px.
+             * Do not let a one-physical-pixel mismatch make SDL fall back to
+             * 2x with a large black border on a 1280x720 output. */
+            presentation = SDL_LOGICAL_PRESENTATION_STRETCH;
+        }
+    }
     int active_width = 0, active_height = 0;
     SDL_RendererLogicalPresentation active_presentation;
     /* Setting the logical viewport on every present is expensive on some
