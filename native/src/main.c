@@ -7,8 +7,6 @@
 #include "farm_state.h"
 #include "host_crash.h"
 #include "sdk_error.h"
-#include <Windows.h>
-#include <wchar.h>
 extern int main_scene;
 extern u32 menu_id;
 extern s32 menu_data_index;
@@ -92,15 +90,7 @@ static void host_debug_audio_report(const HostGame *host, bool nonzero,
     if (now < next_report) return;
     next_report = now + 2000;
 
-    wchar_t path[MAX_PATH];
-    static const wchar_t name[] = L"VanillaBTN-audio.txt";
-    DWORD length = GetTempPathW(MAX_PATH, path);
-    FILE *file = NULL;
-    if (length > 0 && length + sizeof(name) / sizeof(name[0]) <= MAX_PATH) {
-        wcscat_s(path, MAX_PATH, name);
-        _wfopen_s(&file, path, L"w");
-    }
-    if (!file) fopen_s(&file, "VanillaBTN-audio.txt", "w");
+    FILE *file = host_crash_open_audio_report();
     if (!file) return;
 
     SdkSoundStatus state = sdk_sound_status();

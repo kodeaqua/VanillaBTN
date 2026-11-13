@@ -76,6 +76,10 @@ reference build; see [AGENTS.md](AGENTS.md) and [docs/architecture.md](docs/arch
 - [ ] **Silent native playback** — verify the actual output device and PCM
       production on Windows. The Debug report can distinguish mixer silence
       from an SDL transport failure; runtime acceptance is still required.
+- [x] **Milestone 34: MSVC Debug audio report compilation** — isolate the
+      Windows temporary-file API in the Debug crash-report module so PS1
+      `RECT` and Windows SDK declarations do not collide in `main.c`.
+
 - [x] **Milestone 31: Debug audio transport diagnostics** — check audio stream
       resume status, show a warning when device playback cannot start, and
       write mixer/queue counters to `%TEMP%/VanillaBTN-audio.txt` only in Debug.

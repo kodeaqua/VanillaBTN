@@ -15,21 +15,30 @@ static int has_system_error;
 static unsigned char system_error_type;
 static long system_error_code;
 
-static FILE *open_crash_report(void) {
-    static const wchar_t name[] = L"VanillaBTN-crash.txt";
+/* The Windows API belongs in this diagnostic-only translation unit: game
+ * headers define PS1 types (including RECT) that collide with windef.h. */
+static FILE *open_report(const wchar_t *name, const char *fallback) {
     wchar_t path[MAX_PATH];
     DWORD length = GetTempPathW(MAX_PATH, path);
     FILE *file = NULL;
 
     if (length > 0 && length < MAX_PATH &&
-        length + sizeof(name) / sizeof(name[0]) <= MAX_PATH) {
+        length + wcslen(name) + 1 <= MAX_PATH) {
         wcscat_s(path, MAX_PATH, name);
         if (_wfopen_s(&file, path, L"w") == 0) return file;
     }
     /* Read-only installation directories need not be writable; the temporary
      * folder is preferred, with the working directory as a last resort. */
-    fopen_s(&file, "VanillaBTN-crash.txt", "w");
+    fopen_s(&file, fallback, "w");
     return file;
+}
+
+static FILE *open_crash_report(void) {
+    return open_report(L"VanillaBTN-crash.txt", "VanillaBTN-crash.txt");
+}
+
+FILE *host_crash_open_audio_report(void) {
+    return open_report(L"VanillaBTN-audio.txt", "VanillaBTN-audio.txt");
 }
 
 static LONG WINAPI host_crash_exception(EXCEPTION_POINTERS *fault) {
