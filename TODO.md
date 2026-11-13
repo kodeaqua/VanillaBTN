@@ -65,6 +65,12 @@ reference build; see [AGENTS.md](AGENTS.md) and [docs/architecture.md](docs/arch
       SPRT builder sees zero/negative part count. PS1 draw logic stays intact;
       animation packet fixtures cover each native builder.
 
+- [x] **Milestone 39: Native photo-map marker bounds** — when the player or
+      dog has a location without a map spot, skip that marker instead of
+      dereferencing `photo_map_spots[-1]`. The cursor and known locations are
+      unchanged; the PS1 reference path is preserved. Verify the map with the
+      dog indoors/outdoors in native gameplay.
+
 ## Save compatibility
 
 - [x] **Milestone 20: Persistent card unformat** — the original card utility

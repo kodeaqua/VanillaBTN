@@ -492,6 +492,12 @@ changes separate from the matching PS1 reference build.
   byte-matching routine unchanged. The original NPC crash still requires
   real-gameplay verification after applying this correction.
 
+- The native farm photo map now omits the player or dog marker if the
+  corresponding place ID is absent from its map lookup table. The lookup uses
+  `-1` for unknown places; previously both actor markers indexed the position
+  table with that value. Valid map spots and the original PS1 path are unchanged.
+  Actual photo-map navigation still needs native gameplay validation.
+
 ### Configuration and host lifecycle
 
 - `native/src/config.c` preserves custom numeric FPS limits and the literal

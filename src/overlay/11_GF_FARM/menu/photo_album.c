@@ -379,13 +379,27 @@ static void photo_map_draw(void) {
     anim_draw_ft4_advance(&(*state_address)->otTags[0][25], &photo_sprites[0],
                   HWD0 / 2, VWD0 / 2);
     spot = farm_map_spot_for_place(game_state.player.place.location);
+#ifdef VANILLABTN_NATIVE
+    /* A player or pet may have no mapped location. Skip its marker instead of
+     * indexing photo_map_spots[-1]; retain the original PS1 drawing path. */
+    if (spot >= 0) {
+#endif
     anim_draw_ft4_advance(&(*state_address)->otTags[0][23], &photo_sprites[1],
                   photo_map_spots[spot].x - 16,
                   photo_map_spots[spot].y);
+#ifdef VANILLABTN_NATIVE
+    }
+#endif
     spot = farm_map_spot_for_place(game_state.animals.dog.actor.place.location);
+#ifdef VANILLABTN_NATIVE
+    if (spot >= 0) {
+#endif
     anim_draw_ft4_advance(&(*state_address)->otTags[0][23], &photo_sprites[2],
                   photo_map_spots[spot].x + 16,
                   photo_map_spots[spot].y);
+#ifdef VANILLABTN_NATIVE
+    }
+#endif
     spot = photo_map_spot;
     ui_draw_icon_0b_1(&(*state_address)->otTags[0][22], photo_map_spots[spot].x,
                   photo_map_spots[spot].y);
