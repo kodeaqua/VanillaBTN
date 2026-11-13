@@ -5,6 +5,7 @@
 #include "sdk_memory.h"
 #include "scene.h"
 #include "chicken.h"
+#include "animal_actions.h"
 #include "farm_probe.h"
 #include "model.h"
 #include <stdio.h>
@@ -153,5 +154,15 @@ int main(void) {
     for (size_t i = 0; i < sizeof(chicken_guard.record); i++)
         CHECK(((const u8 *)&chicken_guard.record)[i] == 0);
     CHECK(chicken_guard.after == 0xDAC0FFEEu);
+
+    /* An action slot has the same x64 sprite-pointer expansion as a chicken.
+     * A neighbor sentinel catches writes beyond the intended native slot. */
+    struct { FarmAction record; u32 after; } action_guard = {0};
+    memset(&action_guard.record, 0x6C, sizeof(action_guard.record));
+    action_guard.after = 0xAA5500FFu;
+    farm_action_clear(&action_guard.record);
+    for (size_t i = 0; i < sizeof(action_guard.record); i++)
+        CHECK(((const u8 *)&action_guard.record)[i] == 0);
+    CHECK(action_guard.after == 0xAA5500FFu);
     return 0;
 }

@@ -56,6 +56,10 @@ reference build; see [AGENTS.md](AGENTS.md) and [docs/architecture.md](docs/arch
       avoiding stale host pointers in freed chicken slots. The PS1 path retains
       its original constant; the native farm regression checks the whole record.
 
+- [x] **Milestone 30: Native farm action slot clearing** — replace the original
+      0xB0-byte PS1 clear with `sizeof(FarmAction)` in native builds; ensure
+      freed action records discard all x64 animation pointers before reuse.
+
 ## Save compatibility
 
 - [x] **Milestone 20: Persistent card unformat** — the original card utility
