@@ -20,10 +20,16 @@ bool ps1_audio_init(Ps1Audio *audio) {
     spec.freq = PS1_SPU_SAMPLE_RATE;
 
     audio->stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, NULL, NULL);
-    if (audio->stream) {
-        SDL_ResumeAudioStreamDevice(audio->stream);
+    if (audio->stream && SDL_ResumeAudioStreamDevice(audio->stream)) {
         audio->has_output = true;
     } else {
+        /* A created stream does not guarantee that its device resumed.
+         * Retain headless mixing, but report the actual playback failure. */
+        SDL_strlcpy(audio->output_error, SDL_GetError(), sizeof(audio->output_error));
+        if (audio->stream) {
+            SDL_DestroyAudioStream(audio->stream);
+            audio->stream = NULL;
+        }
         audio->has_output = false;
     }
 

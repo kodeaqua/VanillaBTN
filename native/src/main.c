@@ -7,6 +7,8 @@
 #include "farm_state.h"
 #include "host_crash.h"
 #include "sdk_error.h"
+#include <Windows.h>
+#include <wchar.h>
 extern int main_scene;
 extern u32 menu_id;
 extern s32 menu_data_index;
@@ -69,6 +71,56 @@ typedef struct HostGame {
     bool cycle_required, visited_farm, returned_title, new_game_required;
 #endif
 } HostGame;
+
+#if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
+/* Only the developer build writes the host audio transport snapshot. This
+ * separates silence in the game mixer from failure to reach SDL playback. */
+static void host_debug_audio_report(const HostGame *host, bool nonzero,
+                                    int queued, int submit_status) {
+    static uint64_t next_report;
+    static unsigned long long ticks, audible, submitted, rejected, failed;
+    static char submit_error[192];
+    uint64_t now = SDL_GetTicks();
+    ++ticks;
+    if (nonzero) ++audible;
+    if (submit_status > 0) ++submitted;
+    if (submit_status == 0) ++rejected;
+    if (submit_status < 0) {
+        ++failed;
+        SDL_strlcpy(submit_error, SDL_GetError(), sizeof(submit_error));
+    }
+    if (now < next_report) return;
+    next_report = now + 2000;
+
+    wchar_t path[MAX_PATH];
+    static const wchar_t name[] = L"VanillaBTN-audio.txt";
+    DWORD length = GetTempPathW(MAX_PATH, path);
+    FILE *file = NULL;
+    if (length > 0 && length + sizeof(name) / sizeof(name[0]) <= MAX_PATH) {
+        wcscat_s(path, MAX_PATH, name);
+        _wfopen_s(&file, path, L"w");
+    }
+    if (!file) fopen_s(&file, "VanillaBTN-audio.txt", "w");
+    if (!file) return;
+
+    SdkSoundStatus state = sdk_sound_status();
+    fprintf(file, "VanillaBTN Debug audio report\n");
+    fprintf(file, "device_stream=%d resumed=%d init_error=%s\n",
+        audio.stream != NULL, audio.has_output,
+        audio.output_error[0] ? audio.output_error : "none");
+    fprintf(file, "master_volume=%d focus=%d mute_on_unfocus=%d\n",
+        host->config.audio.master_volume, host->focused,
+        host->config.audio.mute_on_unfocus);
+    fprintf(file, "mixer_initialized=%d mixer_running=%d vabs=%d sequences=%d playing=%d spu_master=%d,%d\n",
+        state.initialized, state.running, state.open_vab_count,
+        state.open_seq_count, state.playing_seq_count,
+        state.master_vol_left, state.master_vol_right);
+    fprintf(file, "pcm_ticks=%llu nonzero_ticks=%llu submitted=%llu queue_skipped=%llu submit_failures=%llu queued_bytes=%d submit_error=%s\n",
+        ticks, audible, submitted, rejected, failed, queued,
+        submit_error[0] ? submit_error : "none");
+    fclose(file);
+}
+#endif
 
 static void send_rumble(unsigned slot, uint8_t small, uint8_t large, void *context) {
     HostGame *host = (HostGame *)context;
@@ -394,10 +446,24 @@ poll_events:
     if (colored) ++host->colored_frames;
 #endif
     int queued = audio.stream ? SDL_GetAudioStreamQueued(audio.stream) : -1;
+#if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
+    int submit_status = 0;
+#endif
     if (audio.stream && queued >= 0 &&
         queued < (int)(sizeof(samples) * 8)) {
+#if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
+        submit_status = SDL_PutAudioStreamData(audio.stream, samples, sizeof(samples)) ? 1 : -1;
+#else
         SDL_PutAudioStreamData(audio.stream, samples, sizeof(samples));
+#endif
     }
+#if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
+    bool nonzero = false;
+    for (size_t i = 0; i < sizeof(samples) / sizeof(samples[0]); ++i) {
+        if (samples[i] != 0) { nonzero = true; break; }
+    }
+    host_debug_audio_report(host, nonzero, queued, submit_status);
+#endif
     host_pacing_record_tick(&host->pacing);
     uint64_t now = SDL_GetTicksNS();
     if (host_pacing_should_present(&host->pacing, now)) {
@@ -628,6 +694,15 @@ disc_ready:
          * Do not override its adaptive -> standard fallback here. */
     }
     ps1_audio_init(&audio);
+#ifndef VANILLABTN_BOOT_TEST
+    if (!audio.has_output) {
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING, "VanillaBTN audio",
+            "SDL could not open or resume the default audio output. "
+            "Game audio will be silent. Check the Windows playback device; "
+            "a Debug build also writes an audio status report to the temporary directory.",
+            host.window);
+    }
+#endif
     ps1_spu_set_polyphony_expansion(&audio.spu, expand_poly);
     ps1_spu_set_pop_suppression(&audio.spu, pop_suppress);
     ps1_spu_set_vag_crossfade(&audio.spu, vag_cross);

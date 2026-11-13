@@ -68,6 +68,14 @@ reference build; see [AGENTS.md](AGENTS.md) and [docs/architecture.md](docs/arch
 
 ## Audio fidelity
 
+- [ ] **Silent native playback** — verify the actual output device and PCM
+      production on Windows. The Debug report can distinguish mixer silence
+      from an SDL transport failure; runtime acceptance is still required.
+- [x] **Milestone 31: Debug audio transport diagnostics** — check audio stream
+      resume status, show a warning when device playback cannot start, and
+      write mixer/queue counters to `%TEMP%/VanillaBTN-audio.txt` only in Debug.
+      Preserve headless test behavior and keep the PS1 reference untouched.
+
 - [x] **Milestone 24: Optional full-rate stereo Hi-Fi reverb** — the existing
       `hifi_reverb` flag now selects a 44.1 kHz stereo wet path, while the
       authentic 22.05 kHz alternating/FIR path remains unchanged. Existing ADSR

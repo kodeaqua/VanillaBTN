@@ -25,6 +25,7 @@ typedef struct {
     Ps1Seq                  sequence;
     struct SDL_AudioStream *stream;
     bool                    has_output;
+    char                    output_error[192]; /* Empty if SDL playback started. */
 } Ps1Audio;
 
 /* Initialize the audio system.

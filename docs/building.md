@@ -228,3 +228,21 @@ The code-only target checks 14 files against `disc/binaries.sha1`. With
 `disc.bin` from `disc/disc.sha1`. A nonzero exit means at least one file failed
 to build or did not match the reference SHA-1. `disc.cue` is generated alongside
 `disc.bin` but is not in the SHA-1 lists.
+
+### Diagnosing missing native audio (Debug)
+
+If the game is silent, first check Windows' application volume mixer and the
+selected playback device. Make sure `master_volume = 100` and
+`mute_on_unfocus = false` in the configuration. A Debug executable writes
+`VanillaBTN-audio.txt` to the temporary directory (or the working directory
+if temporary storage is unavailable). In PowerShell:
+
+```powershell
+Get-Content (Join-Path $env:TEMP 'VanillaBTN-audio.txt')
+```
+
+`nonzero_ticks` counts VSync intervals whose post-volume PCM is nonzero;
+`submitted` counts successful SDL queue writes. When the first is zero,
+investigate game/SPU state; when it is nonzero but SDL cannot open/resume or
+submit, investigate the Windows playback endpoint. Nonzero PCM and successful
+submission do not prove that a speaker is audible.
