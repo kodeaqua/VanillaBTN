@@ -2,10 +2,10 @@
 
 ## Status
 
-Work 02 is the current major change in PR #3. Its implemented milestones and
-known limitations are recorded here; active follow-up items are tracked in
-[TODO.md](../TODO.md). Code and synthetic checks do not establish complete
-gameplay or audiovisual fidelity.
+Work 02 is the current major change in PR #3. Its implementation milestones are
+complete and their known limitations are recorded here. Outstanding developer
+acceptance is tracked in [TODO.md](../TODO.md). Code and synthetic checks do not
+establish complete gameplay or audiovisual fidelity.
 
 ## Vision
 
@@ -34,13 +34,13 @@ flowchart TD
 ```
 
 - **Protected Baseline Source**: Native-only compatibility conditionals in `src/` are compiled exclusively with `VANILLABTN_NATIVE`; the PS1 reference target retains its original behavior and SHA-1 checks.
-- **Master Preset ("Best of Both Worlds")**: A single master switch `[Preset] mode = modern` enables all 35 fixes automatically. Granular toggles remain available with default `auto` values for advanced users seeking custom per-feature tuning.
+- **Master Preset ("Best of Both Worlds")**: A single master switch `[Preset] mode = modern` resolves implemented fix toggles to their modern defaults. Granular toggles remain available with default `auto` values for advanced users seeking custom per-feature tuning.
 - **Authoritative Simulation Pacing**: Game simulation (villager AI, clock/calendar, seasons, character movement speed, audio streaming) **remains strictly locked to real wall-clock time** (60 virtual vblanks/second). High-refresh-rate presentation never accelerates game time.
 
 The configuration examples below document intended options as well as
 implemented behavior. The host-only `render_scale` samples projected polygons
 at higher integer resolutions; it does not change the authoritative PS1 VRAM.
-See [TODO.md](../TODO.md) for outstanding work.
+See [TODO.md](../TODO.md) for outstanding developer acceptance.
 
 ## Architecture and approach
 
@@ -68,7 +68,7 @@ This is distinct from the memory-card default folder, which uses
 
 [Preset]
 ; Master preset mode: modern, authentic_ps1, custom
-; - modern: ALL 35 PS1 flaw fixes are automatically enabled (Recommended!)
+; - modern: implemented PS1 fix toggles use their modern defaults (Recommended!)
 ; - authentic_ps1: 100% authentic 1999 console experience (all fixes OFF)
 ; - custom: strictly follows individual switches below
 mode = modern
@@ -298,7 +298,7 @@ turbo_speed = 3.0
 
 ### Modern graphics and platform features in Phase 2
 
-Following the completion of the 35 PS1 flaw fixes, Phase 2 implements modern platform capabilities:
+Alongside the Phase 1 fix implementations, Phase 2 adds modern platform capabilities:
 
 1. **True Widescreen (Hor+ 3D FOV Expansion)**:
    - Expands horizontal 3D camera FOV in GTE proportionally to display aspect ratio ($1.333\times$ for 16:9, $1.75\times$ for 21:9 ultrawide), revealing more of the farm and town without stretching.
@@ -324,7 +324,7 @@ Following the completion of the 35 PS1 flaw fixes, Phase 2 implements modern pla
 
 ## Work plan
 
-### Phase 1: Configuration foundation and PS1 flaw fixes — complete
+### Phase 1: Configuration foundation and PS1 flaw fixes — implementation complete
 - [x] **Milestone 1**: `vanillabtn.ini` configuration subsystem (`config.c/h`) with Master Preset System (`mode = modern / authentic_ps1 / custom`).
 - [x] **Milestone 2**: PGXP Precision Pipeline — GTE subpixel float vertex precision (anti-wobble) and perspective-correct texturing (anti-warp).
 - [x] **Milestone 3**: True Depth Buffer & Shadow Bias — Eliminates polygon Z-fighting and sunken character shadows.
@@ -335,21 +335,51 @@ Following the completion of the 35 PS1 flaw fixes, Phase 2 implements modern pla
 - [x] **Milestone 8**: Anti-Aliasing (MSAA/SMAA) & Smooth Atmospheric Fog — Smooths polygon edges and eliminates concentric fog rings.
 - [x] **Milestone 9**: Audio Subsystem Overhaul — Expanded 64-voice polyphony, seamless CD-XA looping, micro-fade pop suppression, VAG loop crossfading, and 32-bit float mixing.
 - [x] **Milestone 10**: Hi-Fi Reverb & Full-Spectrum Audio — Eliminates metallic comb filtering and high-frequency roll-off.
-- [x] **Milestone 11**: Zero Fill-rate Bottleneck Architecture — Guarantees solid 60 FPS in heavy rain and festival scenes.
+- [x] **Milestone 11**: Zero Fill-rate Bottleneck Architecture — Removes the emulated PS1 fill-rate bottleneck from heavy overdraw.
 - [x] **Milestone 12**: Input Subsystem Fixes — Circular analog normalization (diagonal running fix), HD rumble curve, sub-frame raw input polling, and disconnect auto-pause.
 
-### Phase 2: Modern graphics and platform enhancements — implemented with limits
+### Phase 2: Modern graphics and platform enhancements — implementation complete with limits
 - [x] **Milestone 13**: Multi-Monitor Discovery & 4 Window Modes (`host_display.c/h`).
 - [x] **Milestone 14**: Decoupled FPS Limiter & Pacing Lock (`host_pacing.c/h`, `sdk_sync.c/h`).
 - [x] **Milestone 15**: True Widescreen Hor+ 3D FOV Expansion (`ps1_gte.c/h`, `host_display.c/h`).
 - [x] **Milestone 16**: Multi-Backend Renderer Abstraction (`host_renderer.c/h`).
 - [x] **Milestone 17**: HD Font & QoL Features (`ps1_card.c/h`, `ps1_video.c/h`, `sdk_sync.c/h`).
 
+### Completed follow-up milestones
+
+These milestones extended and hardened the two planned phases. Their detailed
+behavior and limitations are retained in the implementation notes below.
+
+| Milestone | Completed implementation |
+| --- | --- |
+| **18** | Hold the VSync loop on primary-controller disconnect without clock catch-up. |
+| **19** | Add optional NTSC CRT pixel-aspect correction at presentation. |
+| **20** | Persist intentional virtual memory-card unformat operations and backup rotation. |
+| **21** | Rasterize projected 3D polygons into a scalable host-only surface. |
+| **22** | Present the selected `render_scale` without changing logical game or HUD coordinates. |
+| **23** | Extend farm-world horizontal visibility gates for Hor+ presentation. |
+| **24** | Add optional full-rate stereo Hi-Fi reverb while retaining the authentic path. |
+| **25** | Bound native dynamic text-insert source lookups. |
+| **26** | Make native empty-label rendering and measurement safe. |
+| **27** | Add native Debug crash reports that are absent from Release. |
+| **28** | Copy native villager animation state using host structure sizes. |
+| **29** | Clear complete native chicken records before slot reuse. |
+| **30** | Clear complete native farm-action records before slot reuse. |
+| **31** | Add Debug-only audio transport diagnostics. |
+| **32** | Cover dry SPU output under authentic and Hi-Fi reverb settings. |
+| **33** | Handle empty native `.ANI` part lists without forming invalid pointers. |
+| **34** | Isolate Windows Debug audio-report declarations from PS1 SDK types. |
+| **35** | Reserve bounded SDL queue headroom when music first becomes audible. |
+| **36** | Add optimized Debug stall tracing while excluding diagnostics from Release. |
+| **37** | Pace native PCM generation from elapsed output sample time. |
+| **38** | Bound SDL catch-up submissions to a four-tick queue. |
+| **39** | Skip native photo-map actor markers for locations without map spots. |
+
 ## Verification
 
-Milestone labels mean code and synthetic tests exist, not that every option
-has undergone hands-on gameplay acceptance. Remaining scene-specific gaps are
-listed in `TODO.md`; renderer backend selection falls back through the chain
+Milestone labels mean implementation and synthetic tests exist, not that every
+option has undergone hands-on gameplay acceptance. Remaining acceptance tasks
+are listed in `TODO.md`; renderer backend selection falls back through the chain
 above, and the developer has confirmed the HD font and extended draw distance on
 Windows. Turbo works. Its audio is not heard accelerating, because the bounded SDL
 queue drops PCM beyond four ticks; the developer chose to leave this as is.
@@ -502,8 +532,8 @@ changes separate from the matching PS1 reference build.
   assumes 48-byte animation states and 0x1D4-byte villager records; these
   offsets do not hold when host pointers are 64-bit. The native path preserves
   animation table pointers across the event transition while leaving the PS1
-  byte-matching routine unchanged. The original NPC crash still requires
-  real-gameplay verification after applying this correction.
+  byte-matching routine unchanged. The developer retested the original NPC
+  conversation on Windows and confirmed that the crash is fixed.
 
 - The native farm photo map now omits the player or dog marker if the
   corresponding place ID is absent from its map lookup table. The lookup uses
@@ -596,6 +626,6 @@ changes separate from the matching PS1 reference build.
   exact physical-resolution samples at every display size or refresh rate.
   Textures, UI sprites and non-projected PS1 primitives remain authored at
   their original PS1 resolution rather than acquiring new source detail.
-- For active work and outstanding tasks, use [TODO.md](../TODO.md); for build
+- For outstanding developer acceptance, use [TODO.md](../TODO.md); for build
   instructions, use [building.md](building.md); for the SDK compatibility
   boundary, use [native-sdk.md](native-sdk.md).
