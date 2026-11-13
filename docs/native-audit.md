@@ -49,6 +49,6 @@ Re-verify each finding with independent fixtures before treating it as closed.
 
 ## Verification
 
-Both native Debug and Release compile and pass all 72 CTest checks (the count
+Both native Debug and Release compile and pass all 74 CTest checks (the count
 grows as tests are added) with active assertions. The PS1 `check` target passes. This does not validate audiovisual
 or gameplay fidelity, and no original assets or SDK files were added.
