@@ -339,9 +339,8 @@ Milestone labels mean code and synthetic tests exist, not that every option
 has undergone hands-on gameplay acceptance. Remaining scene-specific gaps are
 listed in `TODO.md`; renderer backend selection falls back through the chain
 above, and the developer has confirmed the HD font and extended draw distance on
-Windows. Turbo works, but its audio is not heard accelerating even though the
-code produces one tick of PCM per accelerated tick and the bounded SDL queue
-drops what does not fit; this behavior is unresolved.
+Windows. Turbo works. Its audio is not heard accelerating, because the bounded SDL
+queue drops PCM beyond four ticks; the developer chose to leave this as is.
 
 ---
 

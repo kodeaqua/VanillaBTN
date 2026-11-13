@@ -1,21 +1,38 @@
 # Windows port direction
 
-VanillaBTN's current target is a native Windows port of *Harvest Moon: Back to
-Nature* that preserves the original experience. The repository builds a native
+VanillaBTN's target is a native Windows port of *Harvest Moon: Back to
+Nature*. The repository builds a native
 x64 Windows executable that runs the original game code, startup, and scene dispatcher. Its matching PS1
 decompilation is the behavioral and data-layout reference for that work.
 
-## Fidelity rules
+## Vision
+
+The vision depends on the major change in progress and is decided by the
+developer:
+
+- **Baseline bringup (PR #2):** an as-is port. The original gameplay, pacing,
+  content and audiovisual presentation were preserved, and no enhancements
+  were added.
+- **Fixes and enhancements (PR #3, current):** the port also fixes PS1 hardware
+  flaws and adds modern features such as widescreen, higher render scale,
+  HD font, extended draw distance, turbo and backup rotation. They are
+  enabled by default (mode = modern). mode = authentic_ps1 resolves them to
+  the original behavior where implemented.
+
+A later major change may set a different vision; update this section when it does.
+
+## Engineering rules
 
 - Bring up the existing game code through native platform and SDK interfaces.
   This is not a reconstruction of scenes, code, or gameplay. Do not implement
   replacement scene flows, dialogs, menus, or game rules to imitate the game.
   Limit original-code changes to compatibility needs and preserve behavior.
-- Preserve the original gameplay rules, pacing, content, and audiovisual
-  presentation in the default experience. Avoid balance changes, replacement
-  assets, or quality-of-life features in the baseline port.
-- Keep optional modifications separate and opt-in if mod support is added.
-  Creative mods should not change the default game experience.
+- Follow the vision above for default behavior. Keep every enhancement behind
+  a configuration switch so the uthentic_ps1 preset reproduces the original
+  rules, pacing and presentation, and do not change gameplay balance or
+  replace game content without a developer decision.
+- Keep community-mod style changes separate from the fixes and enhancements
+  above if mod support is added.
 - Keep the PS1 reference build independently reproducible and byte matching.
   Native platform changes must not weaken its SHA-1 checks.
 - Do not distribute the original disc data or proprietary SDK. Use a player-
@@ -47,11 +64,11 @@ Bringup means running the original game code through native platform services,
 not reconstructing its scenes, code, or gameplay. Each milestone must connect
 the original implementation rather than substitute a hand-written game flow.
 
-Bring up an **x64 native Windows executable** of the USA PS1 game before adding
-enhancements. Keep the original gameplay, timing, internal display modes,
+This section records the baseline bringup (PR #2). Bring up an **x64 native
+Windows executable** of the USA PS1 game before adding enhancements. Keep the original gameplay, timing, internal display modes,
 aspect ratio, texture behavior, audio, and save data. No high-resolution
 rendering, widescreen, PGXP-style geometry fixes, filters, replacement assets,
-or balance changes in this first port. Scaling the original pixels to a
+or balance changes in that first port. Scaling the original pixels to a
 window is presentation only; it must not change the internal render size.
 
 The current source is a matching PS1 build, not Windows-ready C: it calls
@@ -103,11 +120,8 @@ actual Windows and gameplay testing.
 
 ### Post-Bringup Roadmap: Enhancement & Modernization
 
-Enhancement and modernization work builds on the native baseline. The native executable currently defaults to `mode = modern`, which turns the
-enhancements on; `mode = authentic_ps1` resolves them to original behavior
-where implemented. This differs from the fidelity rule above that the default
-experience stay faithful, so treat it as an open policy decision for the
-developer. Their design, configuration and implemented-feature notes live in
+The fixes-and-enhancements phase (PR #3) builds on the native baseline. Its
+design, configuration and implemented-feature notes live in
 [enhancements.md](enhancements.md), and open work is tracked in [TODO.md](../TODO.md).
 
 ## Native bringup audit
