@@ -60,6 +60,7 @@ typedef struct HostGame {
     bool focused;
     AppConfig config;
     HostPacing pacing;
+    HostAudioMusicOnset music_onset;
     uint32_t keyboard_buttons, controller_buttons[2];
     uint16_t keyboard_keys[SDL_SCANCODE_COUNT];
     int16_t stick_x[2], stick_y[2];
@@ -436,6 +437,21 @@ poll_events:
     if (colored) ++host->colored_frames;
 #endif
     int queued = audio.stream ? SDL_GetAudioStreamQueued(audio.stream) : -1;
+    bool music_playing = sdk_sound_status().playing_seq_count > 0;
+    bool music_pcm_nonzero = false;
+    if (music_playing && !host->music_onset.primed) {
+        for (size_t i = 0; i < sizeof(samples) / sizeof(samples[0]); ++i) {
+            if (samples[i] != 0) { music_pcm_nonzero = true; break; }
+        }
+    }
+    size_t onset_padding = host_audio_music_onset_padding(&host->music_onset,
+        music_playing, music_pcm_nonzero, queued, sizeof(samples));
+    if (audio.stream && onset_padding != 0) {
+        /* SDL copies stream data immediately. Do not advance the music
+         * sequencer to synthesize this reserve: it would shift gameplay audio. */
+        int16_t silence[735 * 2 * 2] = {0};
+        SDL_PutAudioStreamData(audio.stream, silence, (int)onset_padding);
+    }
 #if defined(_DEBUG) && !defined(VANILLABTN_BOOT_TEST)
     int submit_status = 0;
 #endif

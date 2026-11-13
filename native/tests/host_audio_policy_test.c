@@ -36,9 +36,31 @@ static void test_master_volume_and_focus_mute(void) {
     CHECK(samples[0] == INT16_MIN); /* Defensive range handling */
 }
 
+static void test_music_onset_reserves_only_at_first_pcm(void) {
+    HostAudioMusicOnset onset = {0};
+    const size_t tick_bytes = 735 * 2 * sizeof(int16_t);
+    CHECK(host_audio_music_onset_padding(&onset, false, false, 0, tick_bytes) == 0);
+    CHECK(host_audio_music_onset_padding(&onset, true, false, 0, tick_bytes) == 0);
+    CHECK(!onset.primed); /* Music may spend several ticks loading or fading. */
+    CHECK(host_audio_music_onset_padding(&onset, true, true, 0, tick_bytes) == tick_bytes * 2);
+    CHECK(onset.primed);
+    CHECK(host_audio_music_onset_padding(&onset, true, true, 0, tick_bytes) == 0);
+    CHECK(host_audio_music_onset_padding(&onset, false, false, 0, tick_bytes) == 0);
+    CHECK(!onset.primed);
+    CHECK(host_audio_music_onset_padding(&onset, true, true, (int)tick_bytes,
+                                         tick_bytes) == tick_bytes);
+    CHECK(host_audio_music_onset_padding(&onset, true, true, 0, tick_bytes) == 0);
+    CHECK(host_audio_music_onset_padding(&onset, false, false, 0, tick_bytes) == 0);
+    CHECK(host_audio_music_onset_padding(&onset, true, true, (int)(tick_bytes * 3),
+                                         tick_bytes) == 0);
+    CHECK(host_audio_music_onset_padding(NULL, true, true, 0, tick_bytes) == 0);
+    CHECK(host_audio_music_onset_padding(&onset, true, true, -1, tick_bytes) == 0);
+}
+
 int main(void) {
     test_default_is_bit_exact();
     test_master_volume_and_focus_mute();
+    test_music_onset_reserves_only_at_first_pcm();
     puts("host_audio_policy_test: passed");
     return 0;
 }

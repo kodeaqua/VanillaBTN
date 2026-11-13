@@ -430,6 +430,17 @@ changes separate from the matching PS1 reference build.
   available; objective hardware traces and listening checks remain necessary
   for a fidelity claim.
 
+### Native SDL music-onset buffering
+
+- The native game produces 735 stereo PCM frames per 60 Hz game tick.
+  At the first nonzero output of a newly playing music sequence, the SDL
+  stream gets up to two ticks of silent headroom before the real samples.
+  This one-time reserve can absorb a brief loading stall around the title
+  music's initial playback; it does not generate extra game/SPU samples,
+  alter voice state, or keep growing latency on subsequent ticks. The
+  existing upper queue bound still applies. A Windows Release listening
+  check is needed to determine whether the title stutter is eliminated.
+
 ### Native Debug failure diagnostics
 
 - The native Debug game installs a Windows exception/abort handler and connects

@@ -73,6 +73,16 @@ reference build; see [AGENTS.md](AGENTS.md) and [docs/architecture.md](docs/arch
 
 ## Audio fidelity
 
+- [x] **Milestone 35: Music-onset SDL queue reserve** — when a newly
+      playing music sequence first produces audible PCM, prefill at most two
+      60 Hz ticks of silence before its first sample to tolerate a short
+      title-loading stall. Later ticks are unchanged, and game/SPU clocks
+      are not advanced for the reserve.
+- [ ] **Title-screen music onset stutter (Windows acceptance)** — confirm in
+      Release whether the one-time queue reserve eliminates the brief pause
+      when title music starts; if not, capture a targeted timing/underrun
+      trace before changing scheduling or buffer depth further.
+
 - [ ] **Silent native playback** — verify the actual output device and PCM
       production on Windows. The Debug report can distinguish mixer silence
       from an SDL transport failure; runtime acceptance is still required.

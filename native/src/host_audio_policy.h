@@ -11,4 +11,14 @@
 void host_audio_apply_volume(int16_t *samples, size_t count, int volume_percent,
                              bool muted);
 
+/* Add a small output reserve only when a newly playing music sequence first
+ * produces PCM. Silent loading ticks must not consume the one-time reserve. */
+typedef struct HostAudioMusicOnset {
+    bool primed;
+} HostAudioMusicOnset;
+
+size_t host_audio_music_onset_padding(HostAudioMusicOnset *onset,
+                                      bool sequence_playing, bool pcm_nonzero,
+                                      int queued_bytes, size_t tick_bytes);
+
 #endif
