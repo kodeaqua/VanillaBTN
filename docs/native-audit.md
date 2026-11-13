@@ -19,33 +19,19 @@ acceptance remains the developer's responsibility.
 
 ## Findings at audit time
 
-These findings describe the code at the audited commits. Native startup now
-calls the original game loop, SDL initializes gamepads, and `ps1_seq.c` and
-`ps1_reverb.c` exist, so several items below are historical. None of them has
-been re-audited against hardware, and none establishes fidelity. Track current
-open work in `TODO.md`.
+These findings describe the code at the audited commits. They were rechecked
+against the current source by reading code and tests only; none was verified
+against hardware or runtime playback, and none establishes fidelity. Track
+current open work in `TODO.md`.
 
-- `native/src/main.c` created and presents zeroed VRAM but invokes no game scene,
-  imports no assets, starts no sounds, and exposes no in-game save flow. This
-  explains the black window and silence. Standalone subsystem tests do not
-  establish runtime integration.
-- SDL initializes video/audio only and does not open gamepads. The gamepad event
-  mapping therefore does not establish controller support yet.
-- `ps1_xa.c` ignores sector coding-info when selecting sample rate and channel
-  layout. Its single prediction history and mono sample buffer cannot reproduce
-  stereo XA. Rate is fixed to 18.9 kHz. Independent mono/stereo fixtures are
-  required before treating XA playback as faithful.
-- `ps1_spu.c` provides sample voices but no SEQ event scheduler, ADSR envelopes,
-  or reverb. The roadmap's music milestone is incomplete.
-- `ps1_gte.c` is a mathematical approximation: perspective division, register
-  saturation/flags, and average-depth scaling still need hardware-oriented
-  fixtures. Primitive coverage also needs shared-edge transparency checks.
-- Card read/write round-trips only prove agreement with this implementation.
-  Directory chain encoding, malformed chains, recovery validation of the entire
-  card, and the game's save bytes need independent fixtures. Existing tests do
-  not justify the original compatibility/UI claims.
-
-Re-verify each finding with independent fixtures before treating it as closed.
+| Finding at audit time | Current source state | Still open |
+|---|---|---|
+| `main.c` presented zeroed VRAM and ran no scene | Startup calls the original game loop and dispatcher | Runtime fidelity is the developer's to judge |
+| SDL opened video/audio only | `SDL_Init` includes `SDL_INIT_GAMEPAD`; two slots and rumble are wired | Hands-on controller check |
+| XA ignored coding info, mono history, fixed 18.9 kHz | `ps1_xa.c` reads the sector coding byte for stereo and rate; stereo decode keeps per-channel history; `ps1_xa_test.c` has a stereo fixture | Mono-versus-stereo fixtures cover one sector shape; listening check |
+| No SEQ scheduler, ADSR or reverb | `ps1_seq.c` and `ps1_reverb.c` exist with tests, and `ps1_spu.c` has an ADSR generator | Accuracy against hardware is unmeasured |
+| GTE was an approximation | Perspective divide uses the hardware UNR table and sets flag bits on saturation | Wider register and flag fixtures; shared-edge transparency checks |
+| Card tests only proved self-agreement | Tests corrupt magic, checksums, directory frames and recovery files | Independent fixtures for chain encoding, malformed chains and real save bytes |
 
 ## Verification
 
