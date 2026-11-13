@@ -13,8 +13,9 @@ developer decides it. The baseline bringup (PR #2) was an as-is port. The
 current phase (PR #3) adds PS1 flaw fixes and modern enhancements, enabled by
 default through the `modern` preset, while the `authentic_ps1` preset keeps the
 original behavior. When the developer starts a new major change, ask for its
-vision before assuming either rule, and update this section and
-[docs/porting.md](docs/porting.md) to match.
+vision before assuming either rule, and update this section and the applicable
+numbered work document under `docs/` to match. Start from
+[docs/work-template.md](docs/work-template.md) for a new major work item.
 
 ## Read first
 
@@ -22,7 +23,10 @@ vision before assuming either rule, and update this section and
 - [TODO.md](TODO.md) tracks active work and next steps. Check it before edits.
 - [docs/architecture.md](docs/architecture.md) maps the runtime and build layout.
 - [docs/building.md](docs/building.md) gives the build and verification commands.
-- [docs/porting.md](docs/porting.md) states the Windows port direction and fidelity rules, and holds the native bringup roadmap and audit.
+- [docs/01-porting.md](docs/01-porting.md) records the as-is Windows baseline,
+  fidelity rules, bringup roadmap, and audit.
+- [docs/02-enhancements.md](docs/02-enhancements.md) records the current PS1
+  fixes and modern-enhancement work.
 - [docs/versioning.md](docs/versioning.md) defines the project's version increments.
 
 ## Engineering approach

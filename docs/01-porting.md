@@ -1,44 +1,36 @@
-# Windows port direction
+# Work 01: Native Windows baseline port
 
-VanillaBTN's target is a native Windows port of *Harvest Moon: Back to
-Nature*. The repository builds a native
-x64 Windows executable that runs the original game code, startup, and scene dispatcher. Its matching PS1
-decompilation is the behavioral and data-layout reference for that work.
+## Status
+
+Baseline bringup from PR #2 is implemented. The native executable starts the
+original game loop and scene dispatcher, but source and synthetic checks do not
+establish full gameplay or audiovisual fidelity. Remaining active work belongs
+to [Work 02](02-enhancements.md) and [TODO.md](../TODO.md).
 
 ## Vision
 
-The vision depends on the major change in progress and is decided by the
-developer:
+Work 01 brings *Harvest Moon: Back to Nature* to a native x64 Windows
+executable as-is. It runs the original game code through native platform
+services while preserving gameplay, pacing, content, audiovisual presentation,
+and save data. The matching PS1 decompilation remains the behavioral and
+data-layout reference.
 
-- **Baseline bringup (PR #2):** an as-is port. The original gameplay, pacing,
-  content and audiovisual presentation were preserved, and no enhancements
-  were added.
-- **Fixes and enhancements (PR #3, current):** the port also fixes PS1 hardware
-  flaws and adds modern features such as widescreen, higher render scale,
-  HD font, extended draw distance, turbo and backup rotation. They are
-  enabled by default (`mode = modern`). `mode = authentic_ps1` resolves them to
-  the original behavior where implemented.
-
-A later major change may set a different vision; update this section when it does.
-
-## Engineering rules
+## Scope and boundaries
 
 - Bring up the existing game code through native platform and SDK interfaces.
   This is not a reconstruction of scenes, code, or gameplay. Do not implement
   replacement scene flows, dialogs, menus, or game rules to imitate the game.
   Limit original-code changes to compatibility needs and preserve behavior.
-- Follow the vision above for default behavior. Keep every enhancement behind
-  a configuration switch so the `authentic_ps1` preset reproduces the original
-  rules, pacing and presentation, and do not change gameplay balance or
-  replace game content without a developer decision.
-- Keep community-mod style changes separate from the fixes and enhancements
-  above if mod support is added.
+- Enhancements are outside this work and are documented in
+  [Work 02](02-enhancements.md).
 - Keep the PS1 reference build independently reproducible and byte matching.
   Native platform changes must not weaken its SHA-1 checks.
 - Do not distribute the original disc data or proprietary SDK. Use a player-
   supplied copy of the game for any assets the port needs.
 
-## Native build profiles
+## Architecture and approach
+
+### Native build profiles
 
 The Windows target has distinct `Debug` and `Release` builds.
 `Debug` should prioritize short compile times and useful diagnostic symbols.
@@ -56,7 +48,7 @@ developer performs actual runtime and gameplay testing to judge behavior,
 timing, visuals, and audio. The PS1 reference build
 keeps its existing compiler settings and SHA-1 checks.
 
-## Native Windows roadmap
+## Work plan
 
 ### Target
 
@@ -118,19 +110,29 @@ smallest vertical slice of each early; do not equate a compiled `.exe` with a
 playable port. Agents provide code-level evidence, while the developer owns
 actual Windows and gameplay testing.
 
-### Post-Bringup Roadmap: Enhancement & Modernization
+### Handoff to Work 02
 
 The fixes-and-enhancements phase (PR #3) builds on the native baseline. Its
 design, configuration and implemented-feature notes live in
-[enhancements.md](enhancements.md), and open work is tracked in [TODO.md](../TODO.md).
+[Work 02](02-enhancements.md), and open work is tracked in
+[TODO.md](../TODO.md).
 
-## Native bringup audit
+## Verification
+
+Both native Debug and Release compile and pass all 74 CTest checks (the count
+grows as tests are added) with active assertions. The PS1 `check` target passes.
+This does not validate audiovisual or gameplay fidelity, and no original assets
+or SDK files were added.
+
+## Implementation notes
+
+### Native bringup audit
 
 Reviewed the native work from `fb5cfd8` through `3895816`, the current runtime,
 tests, and repository guidance. This is a source and synthetic audit; gameplay
 acceptance remains the developer's responsibility.
 
-### Corrected defects
+#### Corrected defects
 
 - Release defined `NDEBUG`, disabling assertion-based checks in several native
   tests. Test executables now explicitly undefine it while linking optimized
@@ -143,7 +145,7 @@ acceptance remains the developer's responsibility.
   after summing voices, could overflow signed 32-bit arithmetic. These products
   now use 64-bit intermediates. A full-scale XA regression checks the output.
 
-### Findings at audit time
+#### Findings at audit time
 
 These findings describe the code at the audited commits. They were rechecked
 against the current source by reading code and tests only; none was verified
@@ -158,9 +160,3 @@ current open work in `TODO.md`.
 | No SEQ scheduler, ADSR or reverb | `ps1_seq.c` and `ps1_reverb.c` exist with tests, and `ps1_spu.c` has an ADSR generator | Accuracy against hardware is unmeasured |
 | GTE was an approximation | Perspective divide uses the hardware UNR table and sets flag bits on saturation | Wider register and flag fixtures; shared-edge transparency checks |
 | Card tests only proved self-agreement | Tests corrupt magic, checksums, directory frames and recovery files | Independent fixtures for chain encoding, malformed chains and real save bytes |
-
-### Verification
-
-Both native Debug and Release compile and pass all 74 CTest checks (the count
-grows as tests are added) with active assertions. The PS1 `check` target passes. This does not validate audiovisual
-or gameplay fidelity, and no original assets or SDK files were added.

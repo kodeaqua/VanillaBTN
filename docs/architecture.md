@@ -3,7 +3,8 @@
 VanillaBTN has a matching PS1 reference build and an incomplete native Windows
 port that runs the original startup and scene dispatcher. SDL supplies the
 window, device input, presentation and audio output; SDK bridges supply the
-platform services. Imported MIPS overlay bytes are data, never executed. See [porting.md](porting.md) for the port direction and
+platform services. Imported MIPS overlay bytes are data, never executed. See
+[Work 01](01-porting.md) for the baseline port direction and
 roadmap, and [PS1 to Windows boundaries](#ps1-to-windows-boundaries) below for the
 service map. The PS1 sections come first and describe the PS1 source.
 
@@ -143,7 +144,7 @@ to PS1 controller bits for the original `pad.c` logic.
 ### Audio slice
 
 `native/src/ps1_spu.c` provides the host-side SPU mixer (24 voices as on hardware; an optional
-expansion to 64 voices is described in [enhancements.md](enhancements.md)):
+expansion to 64 voices is described in [Work 02](02-enhancements.md)):
 - Decodes 16-byte PS1 ADPCM blocks with the 5 hardware IIR prediction filters
   and loop start/repeat/end semantics.
 - Parses Sony PSY-Q VAB headers (magic `pBAV`), 128-program ProgAtr tables,
@@ -165,7 +166,7 @@ when no audio output hardware is present. `ps1_audio_tick` is its standalone
 through `sdk_sound_mix`, mixes 735 stereo frames per 60 Hz VBlank tick, derives
 PCM from elapsed time when a tick is late (capped at four ticks), keeps the SDL
 queue within four ticks and still produces one tick of audio per turbo tick;
-see [enhancements.md](enhancements.md#native-sdl-music-onset-buffering).
+see [Work 02](02-enhancements.md#native-sdl-music-onset-buffering).
 
 ### Save and memory-card slice
 

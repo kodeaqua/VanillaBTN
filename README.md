@@ -19,9 +19,10 @@ byte for byte and, given your own copy of the disc, the whole disc image. That b
 remains the reference baseline. Building it with Docker on Windows still produces
 PS1 binaries.
 
-The [Windows roadmap](docs/porting.md#native-windows-roadmap) orders the bringup work, and the
-[enhancement blueprint](docs/enhancements.md) defines the post-bringup modernization roadmap.
-The [porting rules](docs/porting.md) define its fidelity boundaries. The
+The [baseline port work](docs/01-porting.md) records the as-is Windows bringup,
+and the [enhancement work](docs/02-enhancements.md) defines the subsequent PS1
+fixes and modernization roadmap. The baseline document also defines the port's
+fidelity boundaries. The
 [architecture guide](docs/architecture.md) maps the current code.
 [AGENTS.md](AGENTS.md) records repository rules for coding agents.
 The [versioning policy](docs/versioning.md) explains the project's development
@@ -43,7 +44,7 @@ For release packaging with application icons and manifests into a standalone `.z
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/package-release.ps1 -Configuration Release
 ```
 
-See [enhancement implementation notes](docs/enhancements.md#6-native-enhancement-implementation-notes)
+See [enhancement implementation notes](docs/02-enhancements.md#implementation-notes)
 for panoramic rendering, title composition, scene transitions, configuration,
 and memory-card behavior. See [building instructions](docs/building.md) for
 Debug profile options and testing. The native build does not use Docker, WSL,

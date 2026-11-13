@@ -1,13 +1,23 @@
-# VanillaBTN: Enhancement & Modernization Master Blueprint
+# Work 02: PS1 fixes and modern enhancements
 
-This document defines the comprehensive master architectural blueprint for VanillaBTN's **Enhancement & Modernization** phase. Based on core project priorities:
+## Status
+
+Work 02 is the current major change in PR #3. Its implemented milestones and
+known limitations are recorded here; active follow-up items are tracked in
+[TODO.md](../TODO.md). Code and synthetic checks do not establish complete
+gameplay or audiovisual fidelity.
+
+## Vision
+
+Build on the as-is native baseline from [Work 01](01-porting.md), fixing PS1
+hardware flaws and adding optional modern capabilities without weakening the
+matching PS1 reference build. The priorities are:
+
 1. **PHASE 1 (HIGHEST PRIORITY)**: Fix all 35 inherent hardware flaws, bottlenecks, and visual/audio artifacts of the original PlayStation 1 first (*PS1 Inherent Flaws & Bottlenecks Fixes*).
 2. **PHASE 2 (SECOND PRIORITY)**: Implement modern graphics, widescreen, and platform capabilities (*Modern Hardware & Display Enhancements*).
 3. **Master Preset Architecture**: Casual users are not burdened by dozens of individual settings. A single master preset (`mode = modern`) automatically activates all fixes and optimizations.
 
----
-
-## 1. Core Principles & System Boundaries
+## Scope and boundaries
 
 ```mermaid
 flowchart TD
@@ -27,14 +37,14 @@ flowchart TD
 - **Master Preset ("Best of Both Worlds")**: A single master switch `[Preset] mode = modern` enables all 35 fixes automatically. Granular toggles remain available with default `auto` values for advanced users seeking custom per-feature tuning.
 - **Authoritative Simulation Pacing**: Game simulation (villager AI, clock/calendar, seasons, character movement speed, audio streaming) **remains strictly locked to real wall-clock time** (60 virtual vblanks/second). High-refresh-rate presentation never accelerates game time.
 
----
-
 The configuration examples below document intended options as well as
 implemented behavior. The host-only `render_scale` samples projected polygons
 at higher integer resolutions; it does not change the authoritative PS1 VRAM.
 See [TODO.md](../TODO.md) for outstanding work.
 
-## 2. Master Preset System & `vanillabtn.ini` Specification
+## Architecture and approach
+
+### Master preset system and `vanillabtn.ini`
 
 Configuration module: `native/src/config.h` & `native/src/config.c`.
 Current configuration lookup order (in `config_resolve_path`):
@@ -45,12 +55,12 @@ Current configuration lookup order (in `config_resolve_path`):
 This is distinct from the memory-card default folder, which uses
 `SDL_GetPrefPath()`. `--config` selects an explicit INI path.
 
-### Master Preset Behavior:
+#### Master preset behavior
 - **`mode = modern`** (default): `auto` values use the modern defaults assigned by each feature's resolver.
 - **`mode = authentic_ps1`**: `auto` feature toggles resolve to the authentic/default-off path where implemented.
 - **`mode = custom`**: Explicit switches take precedence; unresolved `auto` entries still use the feature resolver's default rather than universally turning off.
 
-### Default `vanillabtn.ini`:
+#### Default `vanillabtn.ini`
 ```ini
 ; ==============================================================================
 ; VANILLABTN MASTER CONFIGURATION
@@ -221,9 +231,9 @@ turbo_speed = 3.0
 
 ---
 
-## 3. Comprehensive Catalog of 35 PS1 Hardware Flaws Fixed (Phase 1)
+### Catalog of 35 PS1 hardware flaws addressed in Phase 1
 
-### Category A: Geometry, 3D Mesh, & GTE Unit
+#### Category A: Geometry, 3D mesh, and GTE unit
 
 | No | Original PS1 Flaw | Manifestation in Harvest Moon: BTN | VanillaBTN Solution |
 |---|---|---|---|
@@ -240,7 +250,7 @@ turbo_speed = 3.0
 
 ---
 
-### Category B: Rasterizer, Color, Texture, & GPU
+#### Category B: Rasterizer, color, texture, and GPU
 
 | No | Original PS1 Flaw | Manifestation in Harvest Moon: BTN | VanillaBTN Solution |
 |---|---|---|---|
@@ -261,7 +271,7 @@ turbo_speed = 3.0
 
 ---
 
-### Category C: Audio SPU, CD-ROM, & Sound Engine
+#### Category C: Audio SPU, CD-ROM, and sound engine
 
 | No | Original PS1 Flaw | Manifestation in Harvest Moon: BTN | VanillaBTN Solution |
 |---|---|---|---|
@@ -276,7 +286,7 @@ turbo_speed = 3.0
 
 ---
 
-### Category D: Input, Controllers, & Platform
+#### Category D: Input, controllers, and platform
 
 | No | Original PS1 Flaw | Manifestation in Harvest Moon: BTN | VanillaBTN Solution |
 |---|---|---|---|
@@ -286,7 +296,7 @@ turbo_speed = 3.0
 
 ---
 
-## 4. Modern Graphics & Platform Features (Phase 2)
+### Modern graphics and platform features in Phase 2
 
 Following the completion of the 35 PS1 flaw fixes, Phase 2 implements modern platform capabilities:
 
@@ -312,9 +322,9 @@ Following the completion of the 35 PS1 flaw fixes, Phase 2 implements modern pla
 
 ---
 
-## 5. Phased Implementation Roadmap
+## Work plan
 
-### PHASE 1: Configuration Foundation & 35 PS1 Flaws Fixes (HIGHEST PRIORITY) - COMPLETE
+### Phase 1: Configuration foundation and PS1 flaw fixes — complete
 - [x] **Milestone 1**: `vanillabtn.ini` configuration subsystem (`config.c/h`) with Master Preset System (`mode = modern / authentic_ps1 / custom`).
 - [x] **Milestone 2**: PGXP Precision Pipeline — GTE subpixel float vertex precision (anti-wobble) and perspective-correct texturing (anti-warp).
 - [x] **Milestone 3**: True Depth Buffer & Shadow Bias — Eliminates polygon Z-fighting and sunken character shadows.
@@ -328,12 +338,14 @@ Following the completion of the 35 PS1 flaw fixes, Phase 2 implements modern pla
 - [x] **Milestone 11**: Zero Fill-rate Bottleneck Architecture — Guarantees solid 60 FPS in heavy rain and festival scenes.
 - [x] **Milestone 12**: Input Subsystem Fixes — Circular analog normalization (diagonal running fix), HD rumble curve, sub-frame raw input polling, and disconnect auto-pause.
 
-### PHASE 2: Modern Graphics & Platform Enhancements - IMPLEMENTED (see limits)
+### Phase 2: Modern graphics and platform enhancements — implemented with limits
 - [x] **Milestone 13**: Multi-Monitor Discovery & 4 Window Modes (`host_display.c/h`).
 - [x] **Milestone 14**: Decoupled FPS Limiter & Pacing Lock (`host_pacing.c/h`, `sdk_sync.c/h`).
 - [x] **Milestone 15**: True Widescreen Hor+ 3D FOV Expansion (`ps1_gte.c/h`, `host_display.c/h`).
 - [x] **Milestone 16**: Multi-Backend Renderer Abstraction (`host_renderer.c/h`).
 - [x] **Milestone 17**: HD Font & QoL Features (`ps1_card.c/h`, `ps1_video.c/h`, `sdk_sync.c/h`).
+
+## Verification
 
 Milestone labels mean code and synthetic tests exist, not that every option
 has undergone hands-on gameplay acceptance. Remaining scene-specific gaps are
@@ -342,9 +354,7 @@ above, and the developer has confirmed the HD font and extended draw distance on
 Windows. Turbo works. Its audio is not heard accelerating, because the bounded SDL
 queue drops PCM beyond four ticks; the developer chose to leave this as is.
 
----
-
-## 6. Native Enhancement Implementation Notes
+## Implementation notes
 
 This section describes implementation details and compatibility boundaries of
 optional native enhancements. The original game remains authoritative for
@@ -573,7 +583,7 @@ changes separate from the matching PS1 reference build.
   silently format it or restore an older backup; damaged images without this
   proof are still rejected. Explicit `MemCardFormat` starts a fresh card.
 
-### Scope and boundaries
+### Compatibility limits
 
 - `src/` remains the original game source and should not be modified for
   cosmetic widescreen presentation. Native compatibility code belongs in

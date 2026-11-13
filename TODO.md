@@ -1,7 +1,8 @@
 # TODO
 
 This file tracks **outstanding engineering work**. Implementation details for
-completed features are maintained in [docs/enhancements.md](docs/enhancements.md).
+completed features are maintained in
+[docs/02-enhancements.md](docs/02-enhancements.md).
 The native Windows port must preserve the original game's behavior and the PS1
 reference build; see [AGENTS.md](AGENTS.md) and [docs/architecture.md](docs/architecture.md).
 
@@ -32,7 +33,7 @@ reference build; see [AGENTS.md](AGENTS.md) and [docs/architecture.md](docs/arch
       drops the excess. The developer decided to leave it unchanged.
 - [x] **Default preset policy** — `mode = modern` stays the default; the vision
       depends on the current major change (see `AGENTS.md` and
-      `docs/porting.md`).
+      `docs/01-porting.md`).
 - [x] **NPC dialogue crash (native gameplay)** — the Debug report captured a
       `0xC0000005` read at address `0x2` in `sprite_draw_frame`. Milestone 28
       corrected the x64 sprite-state corruption in event entry; the developer
@@ -134,8 +135,15 @@ reference build; see [AGENTS.md](AGENTS.md) and [docs/architecture.md](docs/arch
       timing; exact hardware-waveform equivalence still requires reference
       traces and developer listening acceptance.
 
+## Documentation
+
+- [x] **Numbered work documents** — the baseline port and enhancement phase use
+      the same work-document structure as `01-porting.md` and
+      `02-enhancements.md`; `work-template.md` defines the structure for the
+      next major work item.
+
 ## References
 
-- [Enhancements](docs/enhancements.md) — implemented features and limitations.
-- [Roadmap](docs/porting.md#native-windows-roadmap) — longer-term port architecture.
+- [Work 02](docs/02-enhancements.md) — implemented enhancements and limitations.
+- [Work 01](docs/01-porting.md#work-plan) — baseline port architecture and roadmap.
 - [Building](docs/building.md) — Windows build and verification commands.
