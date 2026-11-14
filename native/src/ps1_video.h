@@ -164,6 +164,9 @@ bool ps1_video_copy_scaled_panorama(const Ps1Video *video, int src_x, int src_y,
     int base_width, int height, uint32_t *target, size_t stride);
 int ps1_video_panorama_width(int base_width);
 void ps1_video_panorama_begin_frame(void);
+/* Starts a new host presentation budget without clearing either PS1
+ * framebuffer page or panoramic sidecar pixels. */
+void ps1_video_begin_host_filter_frame(void);
 /* A VRAM-wide clear also establishes the clear color of the host-only side
  * columns. The original VRAM still owns all center pixels and texture data. */
 void ps1_video_panorama_fill_rows(int first_row, int row_count, uint32_t rgb24);

@@ -10,7 +10,8 @@ recorded in [Work 02](docs/02-enhancements.md).
       `bilinear`/`bicubic` background modes across farm actors, UI, title/menu
       art, maps, rain and projected terrain. Confirm xBRZ does not stylize
       explicitly marked prerendered backgrounds and assess frame pacing with
-      `render_scale = native`; synthetic tests establish routing and VRAM
+      `render_scale = native`, including the deterministic host-filter budget;
+      synthetic tests establish routing and VRAM
       isolation, not perceived image quality.
 - [ ] **Hor+ scene coverage** — inspect scenes outside the farm for game-side
       visibility gates that still reject actors, objects, weather, or other

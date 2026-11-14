@@ -616,6 +616,13 @@ changes separate from the matching PS1 reference build.
   misses are cached so the renderer does not probe the filesystem each frame.
   Lookup also tries the same relative directory beside the executable.
   Replacements and scaled pixels share a bounded 64 MiB LRU cache.
+- To preserve frame pacing on sprite-heavy scenes, host filtering has a
+  deterministic per-frame work budget (one million output samples and 32,768
+  decoded source texels). It resets at `sdk_gpu_begin_frame`; primitives after
+  either budget is exhausted use the existing nearest host mirror for that
+  frame. Texture regions larger than 4,096 source pixels likewise retain the
+  native mirror unless they are an explicitly marked background. This is a
+  presentation fallback only and never changes VRAM or game simulation.
 - `pixel_aspect_ratio = crt_ntsc` applies the NTSC CRT 1.092 horizontal pixel
   aspect at SDL presentation, without changing VRAM resolution, HUD placement,
   game coordinates or polygon projection. Hor+ FOV is calculated from the

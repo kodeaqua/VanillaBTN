@@ -20,6 +20,14 @@ static Ps1TextureReplacementProvider s_replacement_provider;
 static void *s_replacement_userdata;
 static Ps1TextureCache s_texture_cache;
 static bool s_texture_cache_initialized;
+/* xBRZ is a presentation enhancement, not permission to spend unbounded CPU
+ * time in one game tick. The first deterministic primitives in a frame retain
+ * the effect; later ones use the existing nearest host mirror. */
+#define PS1_HOST_FILTER_SAMPLE_BUDGET 1000000u
+#define PS1_HOST_FILTER_MAX_SOURCE_PIXELS 4096u
+#define PS1_HOST_FILTER_SOURCE_BUDGET 32768u
+static size_t s_host_filter_samples_remaining = PS1_HOST_FILTER_SAMPLE_BUDGET;
+static size_t s_host_filter_source_remaining = PS1_HOST_FILTER_SOURCE_BUDGET;
 static Ps1AntiAliasingMode s_anti_aliasing = PS1_AA_SMAA;
 static bool s_smooth_fog = false;
 static float s_fog_near = 1000.0f;
@@ -218,6 +226,13 @@ void ps1_video_panorama_begin_frame(void) {
      * Do NOT call this on each game frame: one PS1 framebuffer is displayed
      * while the next is being drawn into the other half of VRAM. */
     ps1_video_panorama_clear_rows(0, PS1_VRAM_HEIGHT);
+    s_host_filter_samples_remaining = PS1_HOST_FILTER_SAMPLE_BUDGET;
+    s_host_filter_source_remaining = PS1_HOST_FILTER_SOURCE_BUDGET;
+}
+
+void ps1_video_begin_host_filter_frame(void) {
+    s_host_filter_samples_remaining = PS1_HOST_FILTER_SAMPLE_BUDGET;
+    s_host_filter_source_remaining = PS1_HOST_FILTER_SOURCE_BUDGET;
 }
 
 /* These pointers make the existing PS1 blending/depth rules work on extension
@@ -1012,6 +1027,25 @@ static uint32_t *decode_texture_region(const Ps1Video *video, unsigned tpage,
     return pixels;
 }
 
+static bool reserve_host_filter_samples(int width, int height, int scale) {
+    if (width <= 0 || height <= 0 || scale <= 1) return false;
+    if ((size_t)width > SIZE_MAX / (size_t)height / (size_t)scale / (size_t)scale)
+        return false;
+    size_t required = (size_t)width * (size_t)height * (size_t)scale * (size_t)scale;
+    if (required > s_host_filter_samples_remaining) return false;
+    s_host_filter_samples_remaining -= required;
+    return true;
+}
+
+static bool reserve_host_filter_source(int width, int height) {
+    if (width <= 0 || height <= 0 || (size_t)width > SIZE_MAX / (size_t)height)
+        return false;
+    size_t required = (size_t)width * (size_t)height;
+    if (required > s_host_filter_source_remaining) return false;
+    s_host_filter_source_remaining -= required;
+    return true;
+}
+
 static bool replacement_dimensions_valid(const Ps1ReplacementImage *image,
                                           int source_width, int source_height) {
     if (!image || !image->pixels || image->width < source_width
@@ -1346,7 +1380,10 @@ static void hires_draw_projected_triangle(Ps1Video *video, const Ps1DrawState *s
     int host_source_height = (int)ceilf(v_max) - host_v + 1;
     if (textured && (s_texture_filter == PS1_FILTER_XBRZ || s_replacement_provider)
         && host_source_width > 0 && host_source_width <= 256
-        && host_source_height > 0 && host_source_height <= 256) {
+        && host_source_height > 0 && host_source_height <= 256
+        && (size_t)host_source_width * (size_t)host_source_height
+            <= PS1_HOST_FILTER_MAX_SOURCE_PIXELS
+        && reserve_host_filter_source(host_source_width, host_source_height)) {
         host_source = decode_texture_region(video, tpage, clut,
             (unsigned)host_u, (unsigned)host_v,
             host_source_width, host_source_height);
@@ -1498,9 +1535,24 @@ static bool draw_sprite_copy(Ps1Video *video,
     float u_max = (float)(sprite->u + (unsigned)source_width - 1u);
     float v_min = (float)sprite->v;
     float v_max = (float)(sprite->v + (unsigned)source_height - 1u);
-    const bool host_filtered = s_hires.pixels &&
+    bool host_filtered = s_hires.pixels &&
         (s_texture_filter == PS1_FILTER_XBRZ || s_replacement_provider
             || (s_2d_widescreen_expansion && !is_projected));
+    const bool background = s_2d_widescreen_expansion && !is_projected;
+    if (host_filtered && !background
+        && (size_t)source_width * (size_t)source_height
+            > PS1_HOST_FILTER_MAX_SOURCE_PIXELS) {
+        host_filtered = false;
+    }
+    if (host_filtered && !background && (s_texture_filter == PS1_FILTER_XBRZ
+        || s_replacement_provider)
+        && !reserve_host_filter_source(source_width, source_height)) {
+        host_filtered = false;
+    }
+    if (host_filtered && !reserve_host_filter_samples(right - left, bottom - top,
+                                                       s_hires.scale)) {
+        host_filtered = false;
+    }
 
     for (int row = top; row < bottom; ++row) {
         for (int col = left; col < right; ++col) {

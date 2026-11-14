@@ -131,6 +131,7 @@ void sdk_gpu_begin_frame(void) {
      * evicted live vertex addresses.  Clear provenance before any new GTE
      * projections are written for this frame. */
     ps1_pgxp_clear();
+    ps1_video_begin_host_filter_frame();
     memset(expanded_packet_ids, 0, sizeof(expanded_packet_ids));
     build_2d_expansion = false;
     ps1_video_set_2d_widescreen_expansion(false);
