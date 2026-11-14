@@ -10,7 +10,7 @@
 } } while (0)
 
 static Ps1Video video;
-static uint32_t output[1280 * 3 * 240];
+static uint32_t output[1281 * 3 * 240];
 
 static uint32_t replacement_pixels[6 * 6];
 static int missing_provider_calls;
