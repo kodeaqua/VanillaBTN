@@ -32,8 +32,25 @@ target_compile_options(ps1_pgxp PRIVATE /W4)
 add_library(ps1_video STATIC src/ps1_video.c)
 set_target_properties(ps1_video PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
 target_include_directories(ps1_video PUBLIC src)
-target_link_libraries(ps1_video PUBLIC ps1_pgxp)
+target_link_libraries(ps1_video PUBLIC ps1_pgxp ps1_texture_cache)
 target_compile_options(ps1_video PRIVATE /W4)
+
+add_library(ps1_texture_cache STATIC src/ps1_texture_cache.c)
+set_target_properties(ps1_texture_cache PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_include_directories(ps1_texture_cache PUBLIC src)
+target_compile_options(ps1_texture_cache PRIVATE /W4)
+
+add_library(host_texture_pack STATIC src/host_texture_pack.c)
+set_target_properties(host_texture_pack PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_include_directories(host_texture_pack PUBLIC src)
+target_link_libraries(host_texture_pack PUBLIC ps1_video SDL3::SDL3)
+target_compile_options(host_texture_pack PRIVATE /W4)
+
+add_executable(ps1_texture_upscale_test tests/ps1_texture_upscale_test.c)
+set_target_properties(ps1_texture_upscale_test PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
+target_link_libraries(ps1_texture_upscale_test PRIVATE ps1_texture_cache)
+target_compile_options(ps1_texture_upscale_test PRIVATE /W4 /UNDEBUG)
+add_test(NAME ps1_host_texture_upscaling COMMAND ps1_texture_upscale_test)
 
 add_library(game_graphics STATIC src/game_graphics.c)
 set_target_properties(game_graphics PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES)
@@ -128,7 +145,7 @@ endif()
 set_target_properties(vanillabtn PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES
     OUTPUT_NAME "${VANILLABTN_EXECUTABLE_NAME}")
 target_include_directories(vanillabtn PRIVATE res)
-target_link_libraries(vanillabtn PRIVATE $<$<CONFIG:Debug>:host_stall_trace> SDL3::SDL3 ps1_video ps1_input ps1_clock ps1_audio ps1_card app_config ps1_pgxp)
+target_link_libraries(vanillabtn PRIVATE $<$<CONFIG:Debug>:host_stall_trace> SDL3::SDL3 ps1_video ps1_input ps1_clock ps1_audio ps1_card app_config ps1_pgxp host_texture_pack)
 target_compile_options(vanillabtn PRIVATE /W4 $<$<CONFIG:Release>:/O2 /Oi /Gy /GF>)
 target_link_options(vanillabtn PRIVATE $<$<CONFIG:Release>:/OPT:REF /OPT:ICF>)
 
@@ -756,7 +773,7 @@ target_compile_definitions(original_boot_test PRIVATE VANILLABTN_BOOT_TEST)
 target_link_libraries(original_boot_test PRIVATE Dbghelp)
 target_link_options(original_boot_test PRIVATE /MAP)
 target_compile_options(original_boot_test PRIVATE /W4)
-target_link_libraries(original_boot_test PRIVATE game_main host_display host_renderer host_pacing host_audio_policy SDL3::SDL3
+target_link_libraries(original_boot_test PRIVATE game_main host_display host_renderer host_pacing host_audio_policy host_texture_pack SDL3::SDL3
     ps1_input ps1_audio ps1_card app_config ps1_pgxp)
 
 add_executable(original_farm_memory_test tests/original_farm_memory_test.c)

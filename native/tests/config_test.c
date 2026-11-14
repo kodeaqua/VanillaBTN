@@ -66,6 +66,10 @@ static void test_save_and_load(void) {
     original.fixes.dithering = DITHER_DEBAND;
     original.graphics.render_scale = 4;
     original.graphics.texture_filter = FILTER_BILINEAR;
+    original.graphics.background_filter = BACKGROUND_FILTER_BICUBIC;
+    original.graphics.texture_replacements = true;
+    strncpy(original.graphics.texture_pack, "textures-test",
+            sizeof(original.graphics.texture_pack) - 1);
     original.input.analog_deadzone = 0.15f;
     strncpy(original.input.turbo_hotkey, "Space", sizeof(original.input.turbo_hotkey) - 1);
 
@@ -86,6 +90,9 @@ static void test_save_and_load(void) {
     assert(loaded.fixes.dithering == DITHER_DEBAND);
     assert(loaded.graphics.render_scale == 4);
     assert(loaded.graphics.texture_filter == FILTER_BILINEAR);
+    assert(loaded.graphics.background_filter == BACKGROUND_FILTER_BICUBIC);
+    assert(loaded.graphics.texture_replacements == true);
+    assert(strcmp(loaded.graphics.texture_pack, "textures-test") == 0);
     assert(loaded.input.analog_deadzone > 0.14f && loaded.input.analog_deadzone < 0.16f);
     assert(strcmp(loaded.input.turbo_hotkey, "Space") == 0);
 

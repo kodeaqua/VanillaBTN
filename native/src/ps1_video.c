@@ -1,5 +1,6 @@
 #include "ps1_video.h"
 #include "ps1_pgxp.h"
+#include "ps1_texture_cache.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -14,6 +15,11 @@ static bool s_texture_bleeding_fix = true;
 static bool s_alpha_halo_fix = true;
 static bool s_mipmapping = true;
 static Ps1TextureFilterMode s_texture_filter = PS1_FILTER_NEAREST;
+static Ps1BackgroundFilterMode s_background_filter = PS1_BACKGROUND_BILINEAR;
+static Ps1TextureReplacementProvider s_replacement_provider;
+static void *s_replacement_userdata;
+static Ps1TextureCache s_texture_cache;
+static bool s_texture_cache_initialized;
 static Ps1AntiAliasingMode s_anti_aliasing = PS1_AA_SMAA;
 static bool s_smooth_fog = false;
 static float s_fog_near = 1000.0f;
@@ -811,7 +817,9 @@ static bool sample_texel_advanced(const Ps1Video *video, unsigned tpage, unsigne
         if (vf > v_max) vf = v_max;
     }
 
-    if (s_texture_filter == PS1_FILTER_NEAREST && (!s_mipmapping || lod <= 2.0f)) {
+    /* xBRZ is presentation-only. The authoritative PS1 raster retains its
+     * nearest source texel; only the host sidecar reads the upscaled cache. */
+    if (s_texture_filter != PS1_FILTER_BILINEAR && (!s_mipmapping || lod <= 2.0f)) {
         int iu = s_texture_bleeding_fix ? (int)floorf(uf + 1e-4f) : (int)(uf + 0.5f);
         int iv = s_texture_bleeding_fix ? (int)floorf(vf + 1e-4f) : (int)(vf + 0.5f);
         if (s_texture_bleeding_fix) {
@@ -964,6 +972,297 @@ static uint16_t modulate_texel(uint16_t texel, uint32_t rgb24) {
     return (uint16_t)(red | (green << 5) | (blue << 10) | (texel & 0x8000u));
 }
 
+typedef struct Ps1HostTexture {
+    const uint32_t *pixels;
+    int width, height, scale;
+    size_t stride;
+} Ps1HostTexture;
+
+static void ensure_texture_cache(void) {
+    if (s_texture_cache_initialized) return;
+    ps1_texture_cache_init(&s_texture_cache, 64u * 1024u * 1024u);
+    s_texture_cache_initialized = true;
+}
+
+static uint32_t raw_texel_argb(uint16_t texel) {
+    if (texel == 0) return 0;
+    unsigned r = texel & 31u, g = (texel >> 5) & 31u, b = (texel >> 10) & 31u;
+    return 0xFF000000u | ((r << 3 | r >> 2) << 16)
+        | ((g << 3 | g >> 2) << 8) | (b << 3 | b >> 2);
+}
+
+static uint32_t *decode_texture_region(const Ps1Video *video, unsigned tpage,
+    unsigned clut, unsigned u, unsigned v, int width, int height) {
+    if (width <= 0 || height <= 0
+        || (size_t)width > SIZE_MAX / (size_t)height / sizeof(uint32_t)) return NULL;
+    uint32_t *pixels = (uint32_t *)malloc(
+        (size_t)width * (size_t)height * sizeof(*pixels));
+    if (!pixels) return NULL;
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            uint16_t texel = 0;
+            if (!ps1_video_sample_texel(video, tpage, clut,
+                    u + (unsigned)x, v + (unsigned)y, &texel)) {
+                free(pixels);
+                return NULL;
+            }
+            pixels[(size_t)y * width + x] = raw_texel_argb(texel);
+        }
+    }
+    return pixels;
+}
+
+static bool replacement_dimensions_valid(const Ps1ReplacementImage *image,
+                                          int source_width, int source_height) {
+    if (!image || !image->pixels || image->width < source_width
+        || image->height < source_height || image->stride < (size_t)image->width
+        || image->width % source_width != 0 || image->height % source_height != 0)
+        return false;
+    int scale_x = image->width / source_width;
+    int scale_y = image->height / source_height;
+    return scale_x == scale_y && scale_x >= 1 && scale_x <= 16;
+}
+
+static bool prepare_host_texture(const uint32_t *source, int width, int height,
+                                 int requested_scale, bool allow_xbrz,
+                                 Ps1HostTexture *out) {
+    if (!source || !out || width <= 0 || height <= 0) return false;
+    ensure_texture_cache();
+    uint64_t key = ps1_texture_content_key(source, width, height, (size_t)width);
+    if (!key) return false;
+
+    if (s_replacement_provider) {
+        bool known_miss = ps1_texture_cache_find(&s_texture_cache, key,
+            PS1_CACHE_REPLACEMENT_MISS, 0) != NULL;
+        const Ps1CachedTexture *cached = ps1_texture_cache_find(
+            &s_texture_cache, key, PS1_CACHE_REPLACEMENT, 0);
+        if (!cached && !known_miss) {
+            Ps1ReplacementImage image = {0};
+            if (s_replacement_provider(key, width, height, &image,
+                                       s_replacement_userdata)) {
+                if (replacement_dimensions_valid(&image, width, height)) {
+                    size_t count = (size_t)image.width * (size_t)image.height;
+                    uint32_t *packed = (uint32_t *)malloc(count * sizeof(*packed));
+                    if (packed) {
+                        for (int y = 0; y < image.height; ++y)
+                            memcpy(packed + (size_t)y * image.width,
+                                image.pixels + (size_t)y * image.stride,
+                                (size_t)image.width * sizeof(*packed));
+                        (void)ps1_texture_cache_store(&s_texture_cache, key,
+                            PS1_CACHE_REPLACEMENT, 0, packed,
+                            image.width, image.height);
+                        free(packed);
+                    }
+                }
+                if (image.release) image.release(image.pixels,
+                                                 image.release_userdata);
+            }
+            cached = ps1_texture_cache_find(&s_texture_cache, key,
+                PS1_CACHE_REPLACEMENT, 0);
+            if (!cached) {
+                const uint32_t marker = 0;
+                (void)ps1_texture_cache_store(&s_texture_cache, key,
+                    PS1_CACHE_REPLACEMENT_MISS, 0, &marker, 1, 1);
+            }
+        }
+        if (cached) {
+            *out = (Ps1HostTexture){cached->pixels, cached->width, cached->height,
+                cached->width / width, (size_t)cached->width};
+            return true;
+        }
+    }
+
+    if (!allow_xbrz) return false;
+    int scale = requested_scale > 6 ? 6 : requested_scale;
+    if (scale < 2) return false;
+    const Ps1CachedTexture *cached = ps1_texture_cache_find(
+        &s_texture_cache, key, PS1_CACHE_XBRZ, scale);
+    if (!cached) {
+        int scaled_width = width * scale, scaled_height = height * scale;
+        if (scaled_width <= 0 || scaled_height <= 0
+            || (size_t)scaled_width > SIZE_MAX / (size_t)scaled_height
+                / sizeof(uint32_t)) return false;
+        uint32_t *scaled = (uint32_t *)malloc(
+            (size_t)scaled_width * scaled_height * sizeof(*scaled));
+        if (!scaled) return false;
+        bool ok = ps1_texture_scale_xbrz(source, width, height, (size_t)width,
+            scale, scaled, (size_t)scaled_width)
+            && ps1_texture_cache_store(&s_texture_cache, key, PS1_CACHE_XBRZ,
+                scale, scaled, scaled_width, scaled_height);
+        free(scaled);
+        if (!ok) return false;
+        cached = ps1_texture_cache_find(&s_texture_cache, key,
+            PS1_CACHE_XBRZ, scale);
+    }
+    if (!cached) return false;
+    *out = (Ps1HostTexture){cached->pixels, cached->width, cached->height,
+        scale, (size_t)cached->width};
+    return true;
+}
+
+static uint32_t modulate_argb(uint32_t color, uint32_t rgb24, bool raw) {
+    if (raw || (color >> 24) == 0) return color;
+    unsigned r = (((color >> 16) & 255u) * ((rgb24 >> 16) & 255u)) >> 7;
+    unsigned g = (((color >> 8) & 255u) * ((rgb24 >> 8) & 255u)) >> 7;
+    unsigned b = ((color & 255u) * (rgb24 & 255u)) >> 7;
+    if (r > 255u) r = 255u;
+    if (g > 255u) g = 255u;
+    if (b > 255u) b = 255u;
+    return (color & 0xFF000000u) | (r << 16) | (g << 8) | b;
+}
+
+static uint32_t source_over(uint32_t back, uint32_t front) {
+    unsigned a = front >> 24;
+    if (a == 255u) return front;
+    if (a == 0) return back;
+    unsigned inv = 255u - a;
+    unsigned r = (((front >> 16) & 255u) * a + ((back >> 16) & 255u) * inv + 127u) / 255u;
+    unsigned g = (((front >> 8) & 255u) * a + ((back >> 8) & 255u) * inv + 127u) / 255u;
+    unsigned b = ((front & 255u) * a + (back & 255u) * inv + 127u) / 255u;
+    return 0xFF000000u | (r << 16) | (g << 8) | b;
+}
+
+static float cubic_weight(float x) {
+    x = fabsf(x);
+    if (x <= 1.0f) return (1.5f * x - 2.5f) * x * x + 1.0f;
+    if (x < 2.0f) return ((-0.5f * x + 2.5f) * x - 4.0f) * x + 2.0f;
+    return 0.0f;
+}
+
+static uint32_t filtered_source_pixel(const uint32_t *source, int width, int height,
+    float x, float y, Ps1BackgroundFilterMode mode) {
+    if (mode == PS1_BACKGROUND_NEAREST) {
+        int ix = (int)floorf(x + 0.5f), iy = (int)floorf(y + 0.5f);
+        if (ix < 0) ix = 0; if (ix >= width) ix = width - 1;
+        if (iy < 0) iy = 0; if (iy >= height) iy = height - 1;
+        return source[(size_t)iy * width + ix];
+    }
+    int radius = mode == PS1_BACKGROUND_BICUBIC ? 2 : 1;
+    int base_x = (int)floorf(x), base_y = (int)floorf(y);
+    double sum_a = 0.0, sum_r = 0.0, sum_g = 0.0, sum_b = 0.0, weights = 0.0;
+    for (int oy = 1 - radius; oy <= radius; ++oy) {
+        int sy = base_y + oy;
+        if (sy < 0) sy = 0; if (sy >= height) sy = height - 1;
+        float wy = mode == PS1_BACKGROUND_BICUBIC
+            ? cubic_weight(y - (float)(base_y + oy))
+            : (oy == 0 ? 1.0f - (y - floorf(y)) : y - floorf(y));
+        for (int ox = 1 - radius; ox <= radius; ++ox) {
+            int sx = base_x + ox;
+            if (sx < 0) sx = 0; if (sx >= width) sx = width - 1;
+            float wx = mode == PS1_BACKGROUND_BICUBIC
+                ? cubic_weight(x - (float)(base_x + ox))
+                : (ox == 0 ? 1.0f - (x - floorf(x)) : x - floorf(x));
+            double weight = (double)wx * wy;
+            uint32_t c = source[(size_t)sy * width + sx];
+            double a = (double)(c >> 24) / 255.0;
+            weights += weight;
+            sum_a += weight * a;
+            sum_r += weight * a * ((c >> 16) & 255u);
+            sum_g += weight * a * ((c >> 8) & 255u);
+            sum_b += weight * a * (c & 255u);
+        }
+    }
+    if (weights <= 1e-9 || sum_a <= 1e-9) return 0;
+    double alpha = sum_a / weights;
+    if (alpha < 0.0) alpha = 0.0; if (alpha > 1.0) alpha = 1.0;
+    unsigned a = (unsigned)(alpha * 255.0 + 0.5);
+    unsigned r = (unsigned)fmin(255.0, fmax(0.0, sum_r / sum_a + 0.5));
+    unsigned g = (unsigned)fmin(255.0, fmax(0.0, sum_g / sum_a + 0.5));
+    unsigned b = (unsigned)fmin(255.0, fmax(0.0, sum_b / sum_a + 0.5));
+    return (a << 24) | (r << 16) | (g << 8) | b;
+}
+
+static void hires_draw_filtered_sprite(Ps1Video *video, const Ps1DrawState *state,
+    const Ps1Sprite *sprite, bool is_projected, int shift_x, bool side_only,
+    int origin_y, float dest_left, float dest_width,
+    int left, int top, int right, int bottom) {
+    if (!s_hires.pixels || s_hires.scale <= 1) return;
+    int source_width = (int)(sprite->width & 0x3FF);
+    int source_height = (int)(sprite->height & 0x1FF);
+    uint32_t *source = decode_texture_region(video, sprite->tpage, sprite->clut,
+        sprite->u, sprite->v, source_width, source_height);
+    if (!source) return;
+
+    const bool background = s_2d_widescreen_expansion && !is_projected;
+    Ps1HostTexture texture = {source, source_width, source_height, 1,
+                              (size_t)source_width};
+    bool replacement = false;
+    if (s_replacement_provider) {
+        Ps1HostTexture candidate;
+        replacement = prepare_host_texture(source, source_width, source_height,
+            s_hires.scale, false, &candidate);
+        if (replacement) texture = candidate;
+    }
+    if (!background && !replacement && s_texture_filter == PS1_FILTER_XBRZ) {
+        Ps1HostTexture filtered;
+        if (prepare_host_texture(source, source_width, source_height,
+                                 s_hires.scale, true, &filtered)) texture = filtered;
+    }
+    int margin = s_panorama.pixels ? s_panorama.left_extra : 0;
+    int scale = s_hires.scale;
+    int scaled_left = left * scale, scaled_right = right * scale;
+    int scaled_top = top * scale, scaled_bottom = bottom * scale;
+    for (int sy = scaled_top; sy < scaled_bottom; ++sy) {
+        float logical_y = ((float)sy + 0.5f) / scale;
+        float source_y = logical_y - (float)origin_y;
+        if (source_y < 0.0f || source_y >= (float)source_height) continue;
+        for (int sx = scaled_left; sx < scaled_right; ++sx) {
+            int logical_col = sx / scale;
+            if (side_only && logical_col >= 0 && logical_col < 320) continue;
+            float logical_x = ((float)sx + 0.5f) / scale;
+            float source_x = (logical_x - dest_left)
+                * (float)source_width / dest_width;
+            if (source_x < 0.0f || source_x >= (float)source_width) continue;
+            uint32_t color;
+            if (background && !replacement) {
+                color = filtered_source_pixel(source, source_width, source_height,
+                    source_x - 0.5f, source_y - 0.5f, s_background_filter);
+            } else {
+                int tx = (int)(source_x * texture.scale);
+                int ty = (int)(source_y * texture.scale);
+                if (tx < 0) tx = 0;
+                if (ty < 0) ty = 0;
+                if (tx >= texture.width) tx = texture.width - 1;
+                if (ty >= texture.height) ty = texture.height - 1;
+                color = texture.pixels[(size_t)ty * texture.stride + tx];
+            }
+            if ((color >> 24) == 0) continue;
+            color = modulate_argb(color, sprite->rgb24, sprite->raw_texture);
+            size_t index = (size_t)sy * s_hires.width
+                + (size_t)(sx + margin * scale);
+            Ps1PanoramaPixel *dst = &s_hires.pixels[index];
+            if (!dst->touched) {
+                int base_x = logical_col;
+                Ps1RasterTarget base = raster_target(video, sy / scale, base_x,
+                    panorama_can_extend(state, is_projected));
+                dst->word = *base.word;
+                dst->color = *base.color;
+                dst->depth = *base.depth;
+                dst->transparent_depth = *base.transparent_depth;
+                dst->overdraw = *base.overdraw;
+                dst->touched = 1;
+            }
+            if (state->check_mask && (dst->word & 0x8000u)) continue;
+            uint32_t back = dst->color ? dst->color : raw_texel_argb(dst->word);
+            uint16_t nearest_texel = 0;
+            (void)ps1_video_sample_texel(video, sprite->tpage, sprite->clut,
+                sprite->u + (unsigned)source_x,
+                sprite->v + (unsigned)source_y, &nearest_texel);
+            if (sprite->semi_transparent && (nearest_texel & 0x8000u)) {
+                unsigned coverage = color >> 24;
+                uint32_t blended = blend_color32(back,
+                    0xFF000000u | (color & 0xFFFFFFu), state->blend_mode);
+                color = (coverage << 24) | (blended & 0xFFFFFFu);
+            }
+            dst->color = source_over(back, color);
+            dst->word = rgb15(dst->color & 0xFFFFFFu);
+            if (state->force_mask) dst->word |= 0x8000u;
+        }
+    }
+    free(source);
+    (void)shift_x;
+}
+
 /* A second, presentation-only raster pass evaluates covered 3D fragments
  * at sub-PS1-pixel centers. This pass precedes the original GP0 raster so
  * texture uploads and VRAM reads still see precisely the original target. */
@@ -1039,6 +1338,22 @@ static void hires_draw_projected_triangle(Ps1Video *video, const Ps1DrawState *s
     const double dv_dy = ((x[2]-x[1])*v[0] + (x[0]-x[2])*v[1]
         + (x[1]-x[0])*v[2]) * inv_area;
     float lod = (float)(fmax(hypot(du_dx, dv_dx), hypot(du_dy, dv_dy)) / scale);
+    uint32_t *host_source = NULL;
+    Ps1HostTexture host_texture = {0};
+    bool host_filtered = false;
+    int host_u = (int)floorf(u_min), host_v = (int)floorf(v_min);
+    int host_source_width = (int)ceilf(u_max) - host_u + 1;
+    int host_source_height = (int)ceilf(v_max) - host_v + 1;
+    if (textured && (s_texture_filter == PS1_FILTER_XBRZ || s_replacement_provider)
+        && host_source_width > 0 && host_source_width <= 256
+        && host_source_height > 0 && host_source_height <= 256) {
+        host_source = decode_texture_region(video, tpage, clut,
+            (unsigned)host_u, (unsigned)host_v,
+            host_source_width, host_source_height);
+        host_filtered = host_source && prepare_host_texture(host_source,
+            host_source_width, host_source_height, scale,
+            s_texture_filter == PS1_FILTER_XBRZ, &host_texture);
+    }
     int margin = s_panorama.pixels ? s_panorama.left_extra : 0;
     for (int sy = top; sy < bottom; ++sy) {
         const double py = ((double)sy + 0.5) / scale;
@@ -1095,10 +1410,25 @@ static void hires_draw_projected_triangle(Ps1Video *video, const Ps1DrawState *s
                     vf = (float)(l0*v[0] + l1*v[1] + l2*v[2]);
                 }
                 uint16_t texel;
-                if (!sample_texel_advanced(video, tpage, clut, uf, vf, lod,
-                        u_min, u_max, v_min, v_max, &texel, &front32,
-                        shade, raw_texture) || !texel) continue;
-                front = raw_texture ? texel : modulate_texel(texel, shade);
+                if (host_filtered) {
+                    int tx = (int)((uf - host_u) * host_texture.scale);
+                    int ty = (int)((vf - host_v) * host_texture.scale);
+                    if (tx < 0) tx = 0;
+                    if (ty < 0) ty = 0;
+                    if (tx >= host_texture.width) tx = host_texture.width - 1;
+                    if (ty >= host_texture.height) ty = host_texture.height - 1;
+                    front32 = host_texture.pixels[(size_t)ty * host_texture.stride + tx];
+                    if ((front32 >> 24) == 0) continue;
+                    front32 = modulate_argb(front32, shade, raw_texture);
+                    if (!ps1_video_sample_texel(video, tpage, clut,
+                            (unsigned)uf, (unsigned)vf, &texel)) continue;
+                    front = rgb15(front32 & 0xFFFFFFu) | (texel & 0x8000u);
+                } else {
+                    if (!sample_texel_advanced(video, tpage, clut, uf, vf, lod,
+                            u_min, u_max, v_min, v_max, &texel, &front32,
+                            shade, raw_texture) || !texel) continue;
+                    front = raw_texture ? texel : modulate_texel(texel, shade);
+                }
                 blend = semi_transparent && (texel & 0x8000u);
             } else {
                 front = quantize_rgb24(shade, sy / scale, sx / scale, state->dither);
@@ -1124,6 +1454,7 @@ static void hires_draw_projected_triangle(Ps1Video *video, const Ps1DrawState *s
             if (s_true_depth_buffer && !semi_transparent) dst->depth = (float)depth;
         }
     }
+    free(host_source);
 }
 
 static bool draw_sprite_copy(Ps1Video *video,
@@ -1167,6 +1498,9 @@ static bool draw_sprite_copy(Ps1Video *video,
     float u_max = (float)(sprite->u + (unsigned)source_width - 1u);
     float v_min = (float)sprite->v;
     float v_max = (float)(sprite->v + (unsigned)source_height - 1u);
+    const bool host_filtered = s_hires.pixels &&
+        (s_texture_filter == PS1_FILTER_XBRZ || s_replacement_provider
+            || (s_2d_widescreen_expansion && !is_projected));
 
     for (int row = top; row < bottom; ++row) {
         for (int col = left; col < right; ++col) {
@@ -1177,7 +1511,7 @@ static bool draw_sprite_copy(Ps1Video *video,
                 * (float)source_width / dest_width;
             if (source_x < 0.0f) source_x = 0.0f;
             if (source_x > (float)source_width) source_x = (float)source_width;
-            float u_offset = s_texture_filter == PS1_FILTER_NEAREST
+            float u_offset = s_texture_filter != PS1_FILTER_BILINEAR
                 ? floorf(source_x) : source_x - 0.5f;
             if (u_offset < 0.0f) u_offset = 0.0f;
             if (u_offset > (float)(source_width - 1)) u_offset = (float)(source_width - 1);
@@ -1212,9 +1546,16 @@ static bool draw_sprite_copy(Ps1Video *video,
             }
             *dst.color = front_c32;
             if (dst.touched) *dst.touched = 1;
-            if (blended) hires_blend_target(row, col, dst, incoming_color, state->blend_mode);
-            else hires_mirror_target(row, col, dst);
+            if (!host_filtered) {
+                if (blended) hires_blend_target(row, col, dst, incoming_color, state->blend_mode);
+                else hires_mirror_target(row, col, dst);
+            }
         }
+    }
+    if (host_filtered) {
+        hires_draw_filtered_sprite(video, state, sprite, is_projected,
+            shift_x, side_only, origin_y, dest_left, dest_width,
+            left, top, right, bottom);
     }
     return true;
 }
@@ -2430,11 +2771,27 @@ bool ps1_video_get_mipmapping(void) {
 }
 
 void ps1_video_set_texture_filter(Ps1TextureFilterMode mode) {
-    s_texture_filter = mode;
+    s_texture_filter = mode >= PS1_FILTER_NEAREST && mode <= PS1_FILTER_XBRZ
+        ? mode : PS1_FILTER_NEAREST;
 }
 
 Ps1TextureFilterMode ps1_video_get_texture_filter(void) {
     return s_texture_filter;
+}
+
+void ps1_video_set_background_filter(Ps1BackgroundFilterMode mode) {
+    s_background_filter = mode >= PS1_BACKGROUND_NEAREST
+        && mode <= PS1_BACKGROUND_BICUBIC ? mode : PS1_BACKGROUND_NEAREST;
+}
+
+Ps1BackgroundFilterMode ps1_video_get_background_filter(void) {
+    return s_background_filter;
+}
+
+void ps1_video_set_texture_replacement_provider(
+    Ps1TextureReplacementProvider provider, void *userdata) {
+    s_replacement_provider = provider;
+    s_replacement_userdata = userdata;
 }
 
 void ps1_video_set_anti_aliasing(Ps1AntiAliasingMode mode) {

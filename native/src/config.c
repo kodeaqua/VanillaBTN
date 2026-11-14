@@ -59,7 +59,11 @@ void config_set_defaults(AppConfig *config) {
     config->fixes.hd_rumble = TRISTATE_AUTO;
 
     config->graphics.texture_filter = FILTER_NEAREST;
+    config->graphics.background_filter = BACKGROUND_FILTER_BICUBIC;
     config->graphics.render_scale = 1;
+    config->graphics.texture_replacements = false;
+    strncpy(config->graphics.texture_pack, "textures",
+            sizeof(config->graphics.texture_pack) - 1);
     config->graphics.hd_font = TRISTATE_AUTO;
     config->graphics.extended_draw_distance = TRISTATE_AUTO;
 
@@ -322,6 +326,21 @@ static void parse_kv(AppConfig *config, const char *section, const char *key, co
             if (str_equals_case(val, "bilinear")) config->graphics.texture_filter = FILTER_BILINEAR;
             else if (str_equals_case(val, "xbrz")) config->graphics.texture_filter = FILTER_XBRZ;
             else config->graphics.texture_filter = FILTER_NEAREST;
+        } else if (str_equals_case(key, "background_filter")) {
+            if (str_equals_case(val, "nearest"))
+                config->graphics.background_filter = BACKGROUND_FILTER_NEAREST;
+            else if (str_equals_case(val, "bilinear"))
+                config->graphics.background_filter = BACKGROUND_FILTER_BILINEAR;
+            else config->graphics.background_filter = BACKGROUND_FILTER_BICUBIC;
+        } else if (str_equals_case(key, "texture_replacements")) {
+            config->graphics.texture_replacements = parse_bool(val, false);
+        } else if (str_equals_case(key, "texture_pack")) {
+            if (val[0] && !strstr(val, "..") && val[0] != '/' && val[0] != '\\'
+                && !(isalpha((unsigned char)val[0]) && val[1] == ':')) {
+                strncpy(config->graphics.texture_pack, val,
+                    sizeof(config->graphics.texture_pack) - 1);
+                config->graphics.texture_pack[sizeof(config->graphics.texture_pack) - 1] = '\0';
+            }
         } else if (str_equals_case(key, "render_scale")) {
             if (str_equals_case(val, "native")) config->graphics.render_scale = 0;
             else {
@@ -592,11 +611,18 @@ bool config_save(const AppConfig *config, const char *path) {
     fprintf(f,
         "[Graphics_Enhancements]\n"
         "texture_filter = %s\n"
+        "background_filter = %s\n"
+        "texture_replacements = %s\n"
+        "texture_pack = %s\n"
         "render_scale = %s\n"
         "hd_font = %s\n"
         "extended_draw_distance = %s\n\n",
         config->graphics.texture_filter == FILTER_BILINEAR ? "bilinear" :
         config->graphics.texture_filter == FILTER_XBRZ ? "xbrz" : "nearest",
+        config->graphics.background_filter == BACKGROUND_FILTER_NEAREST ? "nearest" :
+        config->graphics.background_filter == BACKGROUND_FILTER_BILINEAR ? "bilinear" : "bicubic",
+        config->graphics.texture_replacements ? "on" : "off",
+        config->graphics.texture_pack,
         config->graphics.render_scale == 0 ? "native" : render_scale_str,
         tristate_str(config->graphics.hd_font),
         tristate_str(config->graphics.extended_draw_distance));

@@ -16,8 +16,27 @@ typedef enum Ps1DitherMode {
 
 typedef enum Ps1TextureFilterMode {
     PS1_FILTER_NEAREST = 0,
-    PS1_FILTER_BILINEAR = 1
+    PS1_FILTER_BILINEAR = 1,
+    PS1_FILTER_XBRZ = 2
 } Ps1TextureFilterMode;
+
+typedef enum Ps1BackgroundFilterMode {
+    PS1_BACKGROUND_NEAREST = 0,
+    PS1_BACKGROUND_BILINEAR = 1,
+    PS1_BACKGROUND_BICUBIC = 2
+} Ps1BackgroundFilterMode;
+
+typedef struct Ps1ReplacementImage {
+    const uint32_t *pixels;
+    int width, height;
+    size_t stride;
+    void (*release)(const uint32_t *pixels, void *userdata);
+    void *release_userdata;
+} Ps1ReplacementImage;
+
+typedef bool (*Ps1TextureReplacementProvider)(uint64_t content_key,
+    int source_width, int source_height, Ps1ReplacementImage *out_image,
+    void *userdata);
 
 typedef enum Ps1AntiAliasingMode {
     PS1_AA_OFF = 0,
@@ -101,6 +120,10 @@ bool ps1_video_get_mipmapping(void);
 
 void ps1_video_set_texture_filter(Ps1TextureFilterMode mode);
 Ps1TextureFilterMode ps1_video_get_texture_filter(void);
+void ps1_video_set_background_filter(Ps1BackgroundFilterMode mode);
+Ps1BackgroundFilterMode ps1_video_get_background_filter(void);
+void ps1_video_set_texture_replacement_provider(
+    Ps1TextureReplacementProvider provider, void *userdata);
 
 void ps1_video_set_anti_aliasing(Ps1AntiAliasingMode mode);
 Ps1AntiAliasingMode ps1_video_get_anti_aliasing(void);

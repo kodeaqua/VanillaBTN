@@ -55,6 +55,12 @@ typedef enum TextureFilterMode {
     FILTER_XBRZ = 2
 } TextureFilterMode;
 
+typedef enum BackgroundFilterMode {
+    BACKGROUND_FILTER_NEAREST = 0,
+    BACKGROUND_FILTER_BILINEAR = 1,
+    BACKGROUND_FILTER_BICUBIC = 2
+} BackgroundFilterMode;
+
 typedef enum SpuInterpolationMode {
     SPU_INTERP_AUTO = 0,
     SPU_INTERP_GAUSSIAN = 1,
@@ -122,7 +128,10 @@ typedef struct Ps1FixesConfig {
 
 typedef struct GraphicsConfig {
     TextureFilterMode texture_filter;
+    BackgroundFilterMode background_filter;
     int render_scale;       /* Host 3D raster scale (0 = match output height, 1..16 explicit). */
+    bool texture_replacements;
+    char texture_pack[260]; /* Relative directory; generated hash names prevent traversal. */
     TriState hd_font;
     TriState extended_draw_distance;
 } GraphicsConfig;

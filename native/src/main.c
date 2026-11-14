@@ -33,6 +33,7 @@ extern int main_scene;
 #include "host_pacing.h"
 #include "host_audio_policy.h"
 #include "host_debug.h"
+#include "host_texture_pack.h"
 #include "sdk_pad.h"
 #include "sdk_card.h"
 #include "sdk_cd.h"
@@ -724,9 +725,17 @@ int main(int argc, char **argv) {
     bool tex_bleed = config_resolve_bool(host.config.fixes.texture_bleeding_fix, host.config.preset, true);
     bool alpha_halo = config_resolve_bool(host.config.fixes.alpha_halo_fix, host.config.preset, true);
     bool mipmap = config_resolve_bool(host.config.fixes.mipmapping, host.config.preset, true);
-    Ps1TextureFilterMode filter_mode = (host.config.graphics.texture_filter == FILTER_BILINEAR) ? PS1_FILTER_BILINEAR : PS1_FILTER_NEAREST;
+    Ps1TextureFilterMode filter_mode = host.config.graphics.texture_filter == FILTER_BILINEAR
+        ? PS1_FILTER_BILINEAR : host.config.graphics.texture_filter == FILTER_XBRZ
+        ? PS1_FILTER_XBRZ : PS1_FILTER_NEAREST;
+    Ps1BackgroundFilterMode background_mode =
+        host.config.graphics.background_filter == BACKGROUND_FILTER_NEAREST
+        ? PS1_BACKGROUND_NEAREST
+        : host.config.graphics.background_filter == BACKGROUND_FILTER_BILINEAR
+        ? PS1_BACKGROUND_BILINEAR : PS1_BACKGROUND_BICUBIC;
     if (host.config.preset == PRESET_AUTHENTIC_PS1) {
         filter_mode = PS1_FILTER_NEAREST;
+        background_mode = PS1_BACKGROUND_NEAREST;
     }
     AntiAliasingMode aa_cfg = config_resolve_anti_aliasing(host.config.fixes.anti_aliasing, host.config.preset);
     Ps1AntiAliasingMode aa_mode = (aa_cfg == AA_OFF) ? PS1_AA_OFF :
@@ -758,6 +767,15 @@ int main(int argc, char **argv) {
     host_display_set_integer_scaling(host.config.display.integer_scale);
     host_display_set_render_scale(host.config.graphics.render_scale);
     ps1_video_set_texture_filter(filter_mode);
+    ps1_video_set_background_filter(background_mode);
+    if (host.config.preset != PRESET_AUTHENTIC_PS1
+        && host.config.graphics.texture_replacements
+        && host_texture_pack_configure(host.config.graphics.texture_pack)) {
+        ps1_video_set_texture_replacement_provider(host_texture_pack_lookup, NULL);
+    } else {
+        host_texture_pack_disable();
+        ps1_video_set_texture_replacement_provider(NULL, NULL);
+    }
     ps1_video_set_anti_aliasing(aa_mode);
     ps1_video_set_smooth_fog(smooth_fog);
     ps1_video_set_oit_transparency(oit_trans);

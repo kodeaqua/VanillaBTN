@@ -192,8 +192,16 @@ fix_diagonal_running = auto
 hd_rumble = auto
 
 [Graphics_Enhancements]
-; Texture filter: nearest (sharp pixel art), bilinear (smooth), xbrz
+; Pixel-art texture filter: nearest (authentic), bilinear, xbrz
 texture_filter = nearest
+
+; Explicitly marked 2D background filter: nearest, bilinear, bicubic
+; Background provenance comes from the original draw context, not image size.
+background_filter = bicubic
+
+; Optional host-only HD replacement pack. No original assets are overwritten.
+texture_replacements = off
+texture_pack = textures
 
 ; 3D software raster multiplier: 1..16 or native (match display height;
 ; automatically reduced when the memory safety limit is reached)
@@ -357,6 +365,7 @@ behavior and limitations are retained in the implementation notes below.
 | **20** | Persist intentional virtual memory-card unformat operations and backup rotation. |
 | **21** | Rasterize projected 3D polygons into a scalable host-only surface. |
 | **22** | Present the selected `render_scale` without changing logical game or HUD coordinates. |
+| **29** | Upscale sprites, UI and projected pixel-art textures in the host sidecar with a bounded clean-room xBRZ-compatible cache; filter explicitly marked backgrounds separately and support optional content-hash HD replacements. |
 | **23** | Extend farm-world horizontal visibility gates for Hor+ presentation. |
 | **24** | Add optional full-rate stereo Hi-Fi reverb while retaining the authentic path. |
 | **25** | Bound native dynamic text-insert source lookups. |
@@ -577,7 +586,8 @@ changes separate from the matching PS1 reference build.
   nonfinite numbers, integer overflow, and truncated paths are rejected
   instead of silently changing another setting.
 - `render_scale = 1..16` controls the integer multiplier of a host-only
-  software raster target for projected 3D geometry. `render_scale = native`
+  software raster target for projected 3D geometry and filtered textured
+  primitives. `render_scale = native`
   picks the ceiling of SDL output height divided by 240 (up to 16).
   The allocator reduces the multiplier as needed to stay below 12 million
   samples across 512 PS1 framebuffer rows, and uses the 1x path on failure.
@@ -586,6 +596,26 @@ changes separate from the matching PS1 reference build.
   framebuffer texture coordinates and PS1 VRAM are not rescaled. This is
   integer software supersampling, not necessarily one sample per physical
   monitor pixel, and requires visual/performance validation in the game.
+- `texture_filter = xbrz` now selects an independently written scale-by-rules
+  implementation for sprites, UI and projected pixel-art texture regions in
+  the high-resolution host sidecar. Factors 2 through 6 are cached by decoded
+  content; higher host scales reuse the 6x result. The upstream GPLv3 xBRZ
+  source is neither copied nor linked into this MIT project. Nearest remains
+  available, and the `authentic_ps1` preset forces nearest presentation.
+- Explicit background provenance already carried by the ordering-table bridge
+  selects `background_filter` instead of xBRZ. `bilinear` and `bicubic` smooth
+  authored 2D backdrops; `nearest` is available for a pixel-authentic result.
+  Primitive dimensions are deliberately not used to guess whether artwork is
+  a background.
+- `texture_replacements = on` enables an optional host-only BMP pack under the
+  relative `texture_pack` directory. Files use
+  `<content-key>_<source-width>x<source-height>.bmp`, where `content-key` is the
+  lowercase 16-digit FNV-1a key produced from the little-endian width, height
+  and decoded ARGB8888 rows. Images must be an integral 1x..16x enlargement in
+  both dimensions. Invalid or missing files fall back to the selected filter;
+  misses are cached so the renderer does not probe the filesystem each frame.
+  Lookup also tries the same relative directory beside the executable.
+  Replacements and scaled pixels share a bounded 64 MiB LRU cache.
 - `pixel_aspect_ratio = crt_ntsc` applies the NTSC CRT 1.092 horizontal pixel
   aspect at SDL presentation, without changing VRAM resolution, HUD placement,
   game coordinates or polygon projection. Hor+ FOV is calculated from the
@@ -650,11 +680,11 @@ changes separate from the matching PS1 reference build.
   unavoidable, keep the PS1 reference path intact.
 - Asset loading still uses original PS1 game data supplied by the user; no
   proprietary disc files or SDK content belong in the repository.
-- Higher-resolution 3D polygon rasterization uses separate host-only integer
+- Higher-resolution polygon and filtered-texture rasterization uses separate host-only integer
   supersamples; an output-limited software rasterizer cannot guarantee
   exact physical-resolution samples at every display size or refresh rate.
-  Textures, UI sprites and non-projected PS1 primitives remain authored at
-  their original PS1 resolution rather than acquiring new source detail.
+  xBRZ reconstructs pixel-art edges and HD packs can supply replacement detail,
+  but neither method changes the original texture or framebuffer words in VRAM.
 - For outstanding developer acceptance, use [TODO.md](../TODO.md); for build
   instructions, use [building.md](building.md); for the SDK compatibility
   boundary, use [native-sdk.md](native-sdk.md).
