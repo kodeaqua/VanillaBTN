@@ -102,6 +102,21 @@ int main(void) {
     assert(sdk_gpu_ok());
     assert(video.vram[30][30] == 0x001F && video.vram[30][31] == 0x03E0
            && video.vram[30][32] == 0x7C00 && video.vram[30][33] == 0x03FF);
+    /* An empty or invalid .ANI part count is a no-op, not a pointer formed
+     * before the first part. The same guard protects all sprite builders. */
+    for (int count = -1; count <= 0; ++count) {
+        fixture.lists[0].count = (s16)count;
+        POLY_FT4 *start = (POLY_FT4 *)packets;
+        SPRT *sprite_start = (SPRT *)packets;
+        DR_MODE *mode_start = (DR_MODE *)(packets + 16);
+        assert(sprite_draw_frame(ot, start, &state, 0, 0, 0, 0,
+            4096, 4096, 0, 0, -1, -1, -1, -1) == start);
+        assert(text_sprite_draw(ot, start, &state, 0, 0, 0,
+            NULL, NULL, -1, -1, -1) == start);
+        anim_draw_sprt_parts(ot, &sprite_start, &mode_start, &state, 0, 0, 0, 0);
+        assert(sprite_start == (SPRT *)packets);
+        assert(mode_start == (DR_MODE *)(packets + 16));
+    }
     sdk_gpu_bind(NULL);
     assert(sdk_work_bind(NULL, 0));
     return 0;

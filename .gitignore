@@ -6,3 +6,7 @@ __pycache__/
 /sdk/gcc-2.95.2/
 /sdk/bin/
 /objdiff.json
+*.ini
+
+# Optional host frame-timing diagnostics (generated at runtime).
+VanillaBTN-stalls.txt

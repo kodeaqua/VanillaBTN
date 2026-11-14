@@ -1,6 +1,7 @@
 """Validate the release packaging script and assembled structure."""
 
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -9,6 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
 class ReleasePackageTest(unittest.TestCase):
+    @unittest.skipUnless(sys.platform == "win32", "Windows PowerShell packaging requires Windows")
     def test_package_release_assembly(self):
         script = REPO_ROOT / "tools" / "package-release.ps1"
         self.assertTrue(script.exists(), "package-release.ps1 must exist")

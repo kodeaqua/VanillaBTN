@@ -2429,7 +2429,13 @@ static s32 player_try_carry_throw(FarmPlayer *player, s32 request)
 
 static s32 player_try_nearby_action(FarmPlayer *player)
 {
+#ifdef VANILLABTN_NATIVE
+    /* The PS1 result is a 32-bit value reused as a pointer; widen it explicitly so
+     * the cast is well defined on x64. The function currently returns 0. */
+    FarmNearbyAction *p = (FarmNearbyAction *)(long long)player_start_nearby_actions(player);
+#else
     FarmNearbyAction *p = (FarmNearbyAction *)player_start_nearby_actions(player);
+#endif
     if (p == 0)
         return 0;
     return (p->value ^ 2) != 0;

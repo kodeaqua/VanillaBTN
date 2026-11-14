@@ -265,8 +265,9 @@ LOW/HIGH data offsets as the reference linker configuration, within that one
 allocation. Their pointer subtraction is valid on the host. PS1 builds retain
 their linker-defined symbols. These are data destinations; native scene
 functions still need separate linkage and dispatch. Imported MIPS code is
-never executed or cast to a host function pointer. This does not yet connect
-original global-state initialization, startup or the game loop.
+never executed or cast to a host function pointer. The native host now links
+the original game code and calls `game_main()`; see
+[Farm source compilation](#farm-source-compilation).
 
 ## Display environments
 
@@ -577,11 +578,12 @@ reference code hashes. Existing interrupted shop/helper/utility edits are kept.
 The farm target rejects implicit function declarations (`/we4013`). Remaining
 GS light descriptors and matrix-entry declarations match the installed SDK,
 but declarations alone do not implement that linkage. The archive compiles in
-Debug/Release and the existing 27 synthetic checks pass. It is not linked into
-the host executable and is not a playable farm: unresolved host/runtime entry
-points and serialized/host pointer boundaries still need work. In particular,
-the source build still reports pointer truncations in animal actions, event
-scripts/cue history and player code; those must be resolved before execution.
+Debug/Release. It is linked into the host executable through `game_main`, and
+the native `original_boot_test --cycle` probe reaches the farm and returns to
+the title with in-memory cards. This is a synthetic scene-execution check, not
+proof of playable fidelity. The two former x64 pointer-width warnings (`event_script.c` C4311 and
+`player.c` C4312) are resolved with `VANILLABTN_NATIVE`-guarded casts; the PS1
+branches are unchanged and still match the reference hashes.
 
 ### Bounded memory-card file transfers
 
@@ -735,7 +737,7 @@ The native Windows executable embeds native Win32 resources via `native/res/vani
 - **Application Icon**: `1 ICON "vanillabtn.ico"` compiled into the PE binary with multi-resolution mipmaps (16×16, 24×24, 32×32, 48×48, 64×64, 128×128, 256×256) generated using Lanczos downsampling with 32-bit RGBA transparency. Windows Explorer, the taskbar, and the window titlebar automatically display the icon.
 - **Application Manifest**: `vanillabtn.manifest` declares DPI awareness (`PerMonitorV2`), UTF-8 active code page, Common Controls v6 visual styling, and OS compatibility IDs.
 - **Version Resource**: `VS_VERSION_INFO` embeds file and product versioning, company metadata, and copyright matching project version increments.
-- **Automated Packaging**: `tools/package-release.ps1` orchestrates building `Release` with whole-program optimization, intrinsic acceleration, and COMDAT folding (`/O2 /Oi /Gy /GF /OPT:REF /OPT:ICF`), executes all 38 CTest suites and 9 Python tool checks, and packages `vanillabtn.exe`, documentation, and disc import utilities into a standalone zip distribution archive.
+- **Automated Packaging**: `tools/package-release.ps1` orchestrates building `Release` with whole-program optimization, intrinsic acceleration, and COMDAT folding (`/O2 /Oi /Gy /GF /OPT:REF /OPT:ICF`), executes all 72 CTest suites and 9 Python tool checks, and packages `vanillabtn.exe`, documentation, and disc import utilities into a standalone zip distribution archive.
 
 ### GPU mapping headroom and display presentation validation
 

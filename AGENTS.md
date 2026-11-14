@@ -1,10 +1,21 @@
 # Repository guidance
 
-VanillaBTN aims to bring *Harvest Moon: Back to Nature* to native Windows while
-preserving the original experience. The repository contains a matching PS1
-decompilation and an incomplete native Windows bringup. Native startup now
-calls the original game loop; this does not establish full gameplay fidelity. Its EXE and 13 overlays form the reference
-baseline and must continue to match their original SHA-1 hashes.
+VanillaBTN brings *Harvest Moon: Back to Nature* to native Windows. The
+repository contains a matching PS1 decompilation and an incomplete native
+Windows bringup. Native startup calls the original game loop; this does not
+establish full gameplay fidelity. The PS1 EXE and 13 overlays form the
+reference baseline and must continue to match their original SHA-1 hashes.
+
+## Project vision
+
+The vision depends on the major change currently being worked on, and the
+developer decides it. The baseline bringup (PR #2) was an as-is port. The
+current phase (PR #3) adds PS1 flaw fixes and modern enhancements, enabled by
+default through the `modern` preset, while the `authentic_ps1` preset keeps the
+original behavior. When the developer starts a new major change, ask for its
+vision before assuming either rule, and update this section and the applicable
+numbered work document under `docs/` to match. Start from
+[docs/work-template.md](docs/work-template.md) for a new major work item.
 
 ## Read first
 
@@ -12,8 +23,10 @@ baseline and must continue to match their original SHA-1 hashes.
 - [TODO.md](TODO.md) tracks active work and next steps. Check it before edits.
 - [docs/architecture.md](docs/architecture.md) maps the runtime and build layout.
 - [docs/building.md](docs/building.md) gives the build and verification commands.
-- [docs/porting.md](docs/porting.md) states the Windows port direction and fidelity rules.
-- [docs/roadmap.md](docs/roadmap.md) orders the native Windows bringup work.
+- [docs/01-porting.md](docs/01-porting.md) records the as-is Windows baseline,
+  fidelity rules, bringup roadmap, and audit.
+- [docs/02-enhancements.md](docs/02-enhancements.md) records the current PS1
+  fixes and modern-enhancement work.
 - [docs/versioning.md](docs/versioning.md) defines the project's version increments.
 
 ## Engineering approach
@@ -65,8 +78,9 @@ for this repository's agent workflow:
   object layout, and link order can affect the output bytes.
 - Keep native Windows port work separate from the PS1 matching build. Preserve
   the reference hashes as a guardrail; do not weaken them to make port code fit.
-  Default port behavior should retain the original game's mechanics, pacing,
-  content, and presentation. Put optional modifications outside that baseline.
+  Follow the project vision above for default behavior. Keep each enhancement
+  behind a configuration switch so the `authentic_ps1` preset can resolve it to
+  the original behavior, and keep gameplay fixes distinct from optional extras.
 - Document new or changed code so its purpose and non-obvious behavior are
   clear. Put concise comments near tricky logic and constraints; use separate
   documentation for broader workflows or architecture, and update it when the

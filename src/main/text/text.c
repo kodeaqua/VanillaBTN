@@ -164,6 +164,7 @@ static u16 text_glyphs[64];
 /* Digit buffer: text_format_number writes one glyph per digit into it. */
 static u16 text_digits[16];
 static u16 *text_sources[12];
+
 /* Name list the expanded text requests are built in. */
 static u16 text_list_buffer[224];
 
@@ -179,6 +180,16 @@ static u16 text_list_buffer[224];
 /* A text-insert halfword has TEXT_INSERT_FLAG set; its low 12 bits are the insert id. */
 #define TEXT_INSERT_FLAG 0x4000
 #define TEXT_INSERT_ID_MASK 0xFFF
+
+#ifdef VANILLABTN_NATIVE
+/* Archive text may contain an unresolved insert code. Only slots 0..11 are
+ * backed by text_sources; other codes must not address beyond this table on x64. */
+static u16 *text_dynamic_source(u16 code)
+{
+    u32 slot = code & TEXT_INSERT_ID_MASK;
+    return slot < sizeof(text_sources) / sizeof(text_sources[0]) ? text_sources[slot] : 0;
+}
+#endif
 
 /* The glyphs of the marks and digits text_char_code and text_format_number write. Letters
  * are not listed: glyph n is letter 'A' + n. */
@@ -899,6 +910,9 @@ static u8 *text_draw_string(u_long *ot, u8 *prim, u16 *text, s16 x, s16 y, s32 s
     u16 *child;
     s16 glyphX;
     s16 glyphY;
+#ifdef VANILLABTN_NATIVE
+    u16 *start = text;
+#endif
 
     if (nested == 0)
     {
@@ -1016,7 +1030,11 @@ static u8 *text_draw_string(u_long *ot, u8 *prim, u16 *text, s16 x, s16 y, s32 s
             child = text_insert_source(*text);
             if (child == 0)
             {
+#ifdef VANILLABTN_NATIVE
+                child = text_dynamic_source(*text);
+#else
                 child = text_sources[*text & TEXT_INSERT_ID_MASK];
+#endif
             }
             if (child != 0)
             {
@@ -1037,7 +1055,12 @@ static u8 *text_draw_string(u_long *ot, u8 *prim, u16 *text, s16 x, s16 y, s32 s
         }
         text++;
     }
+#ifdef VANILLABTN_NATIVE
+    /* Empty optional names are valid; there is no preceding glyph to read. */
+    text_last_code = text == start ? TEXT_END : text[-1];
+#else
     text_last_code = text[-1];
+#endif
     return prim;
 }
 
@@ -1048,7 +1071,11 @@ static s16 text_end_y(void)
     s16 y = text_pen_y;
     u16 index = text_index;
     u16 *p = text_current;
+#ifdef VANILLABTN_NATIVE
+    if (index != 0 && p[index - 1] == TEXT_LINE_BREAK)
+#else
     if (p[index - 1] == TEXT_LINE_BREAK)
+#endif
     {
         s32 next = y - TEXT_LINE_HEIGHT;
         next -= text_spacing_y;
@@ -1152,13 +1179,17 @@ static u16 text_count_matches(u16 *entries, u16 match, s16 limit, u16 *out_count
     s32 result;
     s32 count;
     u16 *child;
+#ifndef VANILLABTN_NATIVE
     u16 **table;
+#endif
     u16 recursive_count;
 
     result = 0;
     count = 0;
     match &= 0xFFFF;
+#ifndef VANILLABTN_NATIVE
     table = text_sources;
+#endif
     while (limit == 0 || count < limit)
     {
         if (*entries == TEXT_END)
@@ -1174,7 +1205,11 @@ static u16 text_count_matches(u16 *entries, u16 match, s16 limit, u16 *out_count
         {
             child = text_insert_source(*entries);
             if (child == 0)
+#ifdef VANILLABTN_NATIVE
+                child = text_dynamic_source(*entries);
+#else
                 child = table[*entries & TEXT_INSERT_ID_MASK];
+#endif
             if (child != 0)
             {
                 if (limit != 0)
@@ -1223,11 +1258,15 @@ static u16 text_count_entries(u16 *entries, u16 stop, s16 limit)
     s32 count;
     u16 *child;
     u16 *listed;
+#ifndef VANILLABTN_NATIVE
     u16 **table;
+#endif
 
     count = 0;
     stop &= 0xFFFF;
+#ifndef VANILLABTN_NATIVE
     table = text_sources;
+#endif
     for (; limit == 0 || count < limit; count++, entries++)
     {
         if (*entries == TEXT_END || *entries == stop)
@@ -1240,7 +1279,11 @@ static u16 text_count_entries(u16 *entries, u16 stop, s16 limit)
             child = text_insert_source(*entries);
             if (child == 0)
             {
+#ifdef VANILLABTN_NATIVE
+                listed = text_dynamic_source(*entries);
+#else
                 listed = table[*entries & TEXT_INSERT_ID_MASK];
+#endif
                 if (listed == 0)
                 {
                     continue;
@@ -1338,12 +1381,21 @@ static s32 text_measure(u16 *entries, s32 size, s16 spacing)
     u16 entry;
 
     width = 0;
+#ifdef VANILLABTN_NATIVE
+    /* Centered/right-aligned labels can legitimately be empty. */
+    if (*entries == TEXT_END || *entries == TEXT_LINE_BREAK)
+        return 0;
+#endif
     while (*entries != TEXT_LINE_BREAK && *entries != TEXT_END)
     {
         entry = *entries;
         if ((entry & 0xF000) == 0x4000)
         {
+#ifdef VANILLABTN_NATIVE
+            child = text_dynamic_source(entry);
+#else
             child = text_sources[entry & 0xFFF];
+#endif
             if (child != 0)
             {
                 width += text_measure(child, size, spacing);

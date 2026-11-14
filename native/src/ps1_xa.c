@@ -119,12 +119,28 @@ static int fetch_next_sector(Ps1XaPlayer *player) {
         num_sectors = player->file_sizes[player->file] / PS1_XA_SECTOR_SIZE;
     }
     uint8_t sector[PS1_XA_SECTOR_SIZE];
-    while (player->sector_index < num_sectors) {
+    int wrapped = 0;
+    while (1) {
+        if (player->sector_index >= num_sectors) {
+            if (player->seamless_loop && num_sectors > player->loop_start_sector && !wrapped) {
+                player->sector_index = player->loop_start_sector;
+                wrapped = 1;
+            } else {
+                return 0;
+            }
+        }
         uint32_t index = player->sector_index;
         const uint8_t *sec;
         if (player->reader) {
             int status = player->reader(player->reader_context, index, sector);
-            if (status <= 0) return status;
+            if (status <= 0) {
+                if (status == 0 && player->seamless_loop && num_sectors > player->loop_start_sector && !wrapped) {
+                    player->sector_index = player->loop_start_sector;
+                    wrapped = 1;
+                    continue;
+                }
+                return status;
+            }
             sec = sector;
         } else {
             sec = file_data + index * PS1_XA_SECTOR_SIZE;
@@ -158,8 +174,6 @@ static int fetch_next_sector(Ps1XaPlayer *player) {
             }
         }
     }
-
-    return 0;
 }
 
 /* Fetch whole frames so mono/stereo layout never changes halfway through a
@@ -202,6 +216,7 @@ void ps1_xa_play_source(Ps1XaPlayer *player, Ps1XaSectorReader reader, void *con
     ps1_xa_init(player);
     if (!reader || first >= count || file_number < 0 || file_number > 255
         || channel < 0 || channel > 31) return;
+    player->loop_start_sector = first;
     player->reader = reader;
     player->reader_context = context;
     player->reader_sectors = count;
@@ -227,6 +242,7 @@ void ps1_xa_play_track(Ps1XaPlayer *player, int track) {
     player->fade_volume = (int16_t)entry->volume;
     player->serial_volume = 45;
     player->sector_index = 0;
+    player->loop_start_sector = 0;
     player->sector_sample_count = 0;
     player->sector_sample_idx = 0;
     player->is_stereo = 0;
@@ -250,6 +266,15 @@ void ps1_xa_stop(Ps1XaPlayer *player) {
     player->state = PS1_XA_IDLE;
     player->sector_sample_count = 0;
     player->sector_sample_idx = 0;
+}
+
+void ps1_xa_set_seamless_loop(Ps1XaPlayer *player, int enabled) {
+    if (!player) return;
+    player->seamless_loop = enabled ? 1 : 0;
+}
+
+int ps1_xa_get_seamless_loop(const Ps1XaPlayer *player) {
+    return player ? player->seamless_loop : 0;
 }
 
 void ps1_xa_fade_tick(Ps1XaPlayer *player, int speed_mode) {

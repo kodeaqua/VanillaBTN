@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stddef.h>
 
 #define CHECK(condition) do { if (!(condition)) { \
     fprintf(stderr, "Check failed at line %d: %s\n", __LINE__, #condition); \
@@ -187,5 +188,17 @@ int main(void) {
     CHECK(main_scene == SCENE_FARM);
 
     sdk_gpu_bind(NULL);
+
+    /* 6. Animal pickup / action begin 64-bit FarmActor pointer integrity check */
+    farm_tables_register(0);
+    FarmPet test_dog;
+    memset(&test_dog, 0, sizeof(test_dog));
+    test_dog.actor.kind = ITEM_ADULT_DOG;
+    test_dog.actor.sprite.partLists = (AnimPartList *)0x1234567812345678ULL;
+    test_dog.actor.cue.id = 42;
+    farm_action_begin((struct FarmActionSlot *)&test_dog.actor);
+    CHECK((uintptr_t)test_dog.actor.sprite.partLists == 0x1234567812345678ULL);
+    CHECK(test_dog.actor.cue.id == -1);
+
     return 0;
 }

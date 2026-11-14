@@ -14,7 +14,9 @@ uint32_t ps1_clock_advance(Ps1Clock *clock, uint64_t delta_ns) {
     if (clock == NULL || clock->tick_duration_ns == 0) return 0;
 
     /* Clamp accumulator to avoid spiral of death, guarding against integer overflow */
-    uint64_t max_accum = (uint64_t)clock->max_ticks_per_step * clock->tick_duration_ns;
+    /* Untrusted/test clock parameters must not overflow the tick budget. */
+    uint64_t max_accum = clock->tick_duration_ns > UINT64_MAX / clock->max_ticks_per_step
+        ? UINT64_MAX : (uint64_t)clock->max_ticks_per_step * clock->tick_duration_ns;
     if (delta_ns > max_accum || clock->accumulator_ns > max_accum - delta_ns) {
         clock->accumulator_ns = max_accum;
     } else {

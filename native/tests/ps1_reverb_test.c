@@ -106,6 +106,49 @@ static void test_half_rate_fir_and_disable(void) {
     for (unsigned i = r.base; i < PS1_REVERB_WORDS; i++) CHECK(r.ram[i] == 8192);
 }
 
+static void test_full_rate_hifi_is_stereo_and_optional(void) {
+    Ps1Reverb authentic = {0}, hifi = {0};
+    uint16_t regs[32] = {0};
+    CHECK(ps1_reverb_set_registers(&authentic, regs, 256, 1));
+    CHECK(ps1_reverb_set_registers(&hifi, regs, 256, 1));
+    for (unsigned i = authentic.base; i < PS1_REVERB_WORDS; ++i) {
+        authentic.ram[i] = hifi.ram[i] = 8192;
+    }
+    ps1_reverb_set_hifi(&hifi, 1);
+    int16_t hw[2], hd[2];
+    ps1_reverb_clock(&authentic, 0, 0, 0, hw);
+    ps1_reverb_clock(&hifi, 0, 0, 0, hd);
+    CHECK(hd[0] == 8192 && hd[1] == 8192);
+    CHECK(hw[0] != hd[0] && hw[1] != hd[1]);
+    CHECK(hifi.cursor == hifi.base + 1);
+    CHECK(authentic.cursor == authentic.base);
+    CHECK(hifi.phase == 0 && hifi.history_position == 0);
+    for (unsigned i = authentic.base; i < PS1_REVERB_WORDS; ++i)
+        CHECK(hifi.ram[i] == 8192); /* write_enable=0 never modifies RAM */
+    ps1_reverb_set_hifi(&hifi, 0);
+    CHECK(!ps1_reverb_get_hifi(&hifi));
+    ps1_reverb_clock(&hifi, 0, 0, 0, hd);
+    CHECK(hifi.phase == 1 && hifi.history_position == 1);
+}
+
+static void test_hifi_reverb_does_not_mute_dry_audio(void) {
+    Ps1Spu authentic, hifi;
+    uint8_t loop[16] = {0x04, 7, 0x22};
+    int16_t normal_pcm[735 * 2], hifi_pcm[735 * 2];
+    ps1_spu_init(&authentic);
+    ps1_spu_key_on_raw(&authentic, 0, loop, sizeof(loop),
+                       0x10000, 0x4000, 0x4000);
+    hifi = authentic;
+    ps1_reverb_set_hifi(&hifi.reverb, 1);
+    ps1_spu_mix(&authentic, normal_pcm, 735, 0);
+    ps1_spu_mix(&hifi, hifi_pcm, 735, 0);
+    CHECK(memcmp(normal_pcm, hifi_pcm, sizeof(normal_pcm)) == 0);
+    int any = 0;
+    for (unsigned i = 0; i < sizeof(normal_pcm) / sizeof(normal_pcm[0]); ++i)
+        any |= normal_pcm[i] != 0;
+    CHECK(any); /* Dry SPU output must survive either wet-path selection. */
+}
+
 static void test_cd_send_and_depth(void) {
     Ps1Spu spu;
     ps1_spu_init(&spu);
@@ -173,6 +216,8 @@ int main(void) {
     test_register_arithmetic();
     test_wrap_and_presets();
     test_half_rate_fir_and_disable();
+    test_full_rate_hifi_is_stereo_and_optional();
+    test_hifi_reverb_does_not_mute_dry_audio();
     test_cd_send_and_depth();
     test_mix_block_boundaries();
     return 0;

@@ -14,6 +14,9 @@
 #include "ui_icons.h"
 #include "villager.h"
 #include "weather.h"
+#ifdef VANILLABTN_NATIVE
+#include "ps1_gte.h"
+#endif
 
 typedef struct {
     s16 season;
@@ -454,6 +457,16 @@ static void particle_respawn(FarmParticle *particle) {
         add2 = 20;
         add6 = 20;
     }
+#ifdef VANILLABTN_NATIVE
+    /* Weather particles are world sprites. Spread the existing particles over
+     * the Hor+ margins as well as the original view without consuming extra
+     * random numbers or changing the matching PS1 path. */
+    {
+        s32 margin = ps1_gte_widescreen_margin();
+        add0 += margin * 2;
+        add6 -= margin;
+    }
+#endif
     base &= 0xFFFF;
     particle->delay = rand_range(base) + add8;
     rand_range(base);

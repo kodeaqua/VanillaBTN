@@ -8,6 +8,9 @@
 #include "main.h"
 #include "prim.h"
 #include "ui_icons.h"
+#ifdef VANILLABTN_NATIVE
+#include "sdk_gpu.h"
+#endif
 
 typedef void (*TileDrawFn)(u_long *ot, AnimState *sprite, s16 frame, s32 x, s32 y);
 
@@ -38,6 +41,11 @@ static void bg_tile_screen(u_long *ot, void *drawArg) {
     s32 scroll;
     s32 frame;
 
+#ifdef VANILLABTN_NATIVE
+    /* This 24px grid is a full-screen background, not HUD. Keep its original
+     * tile spacing across the expanded 16:9 presentation surface. */
+    sdk_gpu_set_2d_widescreen_expansion(true);
+#endif
     anim_bind_file(&ui_icon_anim, (AnimFile *)farm_area.stageData);
     bg_scroll_frames++;
     scroll = bg_scroll_frames / 4 - bg_scroll_frames / 96 * 24;
@@ -50,6 +58,9 @@ static void bg_tile_screen(u_long *ot, void *drawArg) {
             draw(ot, &ui_icon_anim, bg_tile_frame_order[frame], x - scroll, y - scroll);
         }
     }
+#ifdef VANILLABTN_NATIVE
+    sdk_gpu_set_2d_widescreen_expansion(false);
+#endif
 }
 
 /* Draw one tile as a plain sprite of the staging animation. */

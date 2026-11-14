@@ -1,16 +1,66 @@
-# Native Windows roadmap
+# Work 01: Native Windows baseline port
 
-## Target
+## Status
+
+Baseline bringup from PR #2 is implemented. The native executable starts the
+original game loop and scene dispatcher, but source and synthetic checks do not
+establish full gameplay or audiovisual fidelity. Remaining active work belongs
+to [Work 02](02-enhancements.md) and [TODO.md](../TODO.md).
+
+## Vision
+
+Work 01 brings *Harvest Moon: Back to Nature* to a native x64 Windows
+executable as-is. It runs the original game code through native platform
+services while preserving gameplay, pacing, content, audiovisual presentation,
+and save data. The matching PS1 decompilation remains the behavioral and
+data-layout reference.
+
+## Scope and boundaries
+
+- Bring up the existing game code through native platform and SDK interfaces.
+  This is not a reconstruction of scenes, code, or gameplay. Do not implement
+  replacement scene flows, dialogs, menus, or game rules to imitate the game.
+  Limit original-code changes to compatibility needs and preserve behavior.
+- Enhancements are outside this work and are documented in
+  [Work 02](02-enhancements.md).
+- Keep the PS1 reference build independently reproducible and byte matching.
+  Native platform changes must not weaken its SHA-1 checks.
+- Do not distribute the original disc data or proprietary SDK. Use a player-
+  supplied copy of the game for any assets the port needs.
+
+## Architecture and approach
+
+### Native build profiles
+
+The Windows target has distinct `Debug` and `Release` builds.
+`Debug` should prioritize short compile times and useful diagnostic symbols.
+Logs, console prints, traces, assertions, and debug UI belong in that build.
+
+`Release` should use optimizations suited to runtime performance. Developer
+diagnostics must be excluded at compile time so they do not execute or add
+runtime overhead. Neither profile may depend on side effects inside diagnostic
+code. User-facing game messages and required error handling are gameplay or
+product behavior, not developer diagnostics.
+
+Agents verify that both profiles compile and pass code-level or synthetic
+checks, including checks that Release excludes developer diagnostics. The
+developer performs actual runtime and gameplay testing to judge behavior,
+timing, visuals, and audio. The PS1 reference build
+keeps its existing compiler settings and SHA-1 checks.
+
+## Work plan
+
+### Target
 
 Bringup means running the original game code through native platform services,
 not reconstructing its scenes, code, or gameplay. Each milestone must connect
 the original implementation rather than substitute a hand-written game flow.
 
-Bring up an **x64 native Windows executable** of the USA PS1 game before adding
-enhancements. Keep the original gameplay, timing, internal display modes,
+This section records the baseline bringup (PR #2). Bring up an **x64 native
+Windows executable** of the USA PS1 game before adding enhancements. Keep the original gameplay, timing, internal display modes,
 aspect ratio, texture behavior, audio, and save data. No high-resolution
 rendering, widescreen, PGXP-style geometry fixes, filters, replacement assets,
-or balance changes in this first port. Scaling the original pixels to a
+or balance changes in that first port. Scaling the original pixels to a
 window is presentation only; it must not change the internal render size.
 
 The current source is a matching PS1 build, not Windows-ready C: it calls
@@ -19,7 +69,7 @@ layout assumptions. The native port therefore needs a separate host target
 and explicit compatibility boundaries. Keep the PS1 build and its SHA-1 checks
 unchanged.
 
-## Initial stack
+### Initial stack
 
 | Concern | Choice for first bringup | Why |
 | --- | --- | --- |
@@ -36,13 +86,14 @@ host-side scene modules; do not execute MIPS overlays or assume their fixed
 addresses are valid Windows pointers. Represent PS1 addresses and serialized
 fields with explicit 32-bit types, and check structure sizes at compile time.
 
-## Milestones
+### Milestones
 
-Milestones 0 through 5 are fully implemented and verified, covering the native
-toolchain, disc/archive importer, software GPU/GTE rasterizer, input and simulation clock,
-SPU/VAB/SEQ audio and CD-XA streaming, and virtual memory card save/load.
-Milestone 6 provides complete scene coverage, optimized Release packaging, and runtime
-acceptance verified by the developer.
+Milestones 0 through 5 are implemented with code-level and synthetic checks,
+covering the native toolchain, disc/archive importer, software GPU/GTE rasterizer,
+input and simulation clock, SPU/VAB/SEQ audio and CD-XA streaming, and virtual
+memory card save/load. Milestone 6 has Release packaging and original scene
+execution; full scene coverage and actual runtime acceptance remain with the
+developer. The bringup is incomplete; see `TODO.md`.
 
 | Order | Work | Agent's code or synthetic exit check | Developer's actual check |
 | --- | --- | --- | --- |
@@ -59,14 +110,54 @@ smallest vertical slice of each early; do not equate a compiled `.exe` with a
 playable port. Agents provide code-level evidence, while the developer owns
 actual Windows and gameplay testing.
 
-## Post-Bringup Roadmap: Enhancement & Modernization
+### Handoff to Work 02
 
-Following the completion of the native baseline bringup (Milestones 0–6), VanillaBTN progresses into the **Enhancement & Modernization** phase. Detailed architecture, technical specifications, and configuration parameters are documented in [docs/enhancements.md](enhancements.md).
+The fixes-and-enhancements phase (PR #3) builds on the native baseline. Its
+design, configuration and implemented-feature notes live in
+[Work 02](02-enhancements.md), and open work is tracked in
+[TODO.md](../TODO.md).
 
-### Phased Priority
-1. **Phase 1: PS1 Hardware Inherent Flaws & Bottlenecks Fixes (Highest Priority)**:
-   Fixing 35 identified PS1 hardware flaws, including PGXP subpixel vertex precision (anti-wobble), PGXP perspective-correct texturing (anti-warp), true floating-point Z-buffer (anti-flicker), true color 32-bit (anti-banding), dithering removal, texture bleeding fix, 64-voice polyphony expansion, zero-gap CD-XA looping, micro-fade audio pop suppression, and circular analog stick normalization.
-2. **Phase 2: Modern Graphics & Platform Enhancements (Second Priority)**:
-   Introducing True Widescreen (Hor+ 3D FOV expansion without distortion, native culling expansion, and 2D HUD safe-area preservation), multi-backend graphics abstraction (Vulkan, Direct3D 11, OpenGL, Software), multi-monitor discovery with 4 window modes (windowed, borderless, fullscreen, maximized), decoupled pacing-locked FPS limiter (30, 60, monitor Hz, unlocked), and HD font rendering.
-3. **Master Preset Architecture**:
-   All options are managed via `vanillabtn.ini` with a master preset `mode = modern` (all fixes enabled automatically) or `mode = authentic_ps1` (100% original 1999 console behavior), allowing granular per-feature overrides.
+## Verification
+
+Native Debug compiles and passes all 75 CTest checks; Release compiles and
+passes all 74 checks (the Debug-only console adds one check). Assertions remain
+active in both profiles. The PS1 `check` target passes.
+This does not validate audiovisual or gameplay fidelity, and no original assets
+or SDK files were added.
+
+## Implementation notes
+
+### Native bringup audit
+
+Reviewed the native work from `fb5cfd8` through `3895816`, the current runtime,
+tests, and repository guidance. This is a source and synthetic audit; gameplay
+acceptance remains the developer's responsibility.
+
+#### Corrected defects
+
+- Release defined `NDEBUG`, disabling assertion-based checks in several native
+  tests. Test executables now explicitly undefine it while linking optimized
+  Release libraries.
+- Replacing a card file deleted its old blocks before checking capacity. A failed
+  replacement could lose the save. Mutations now use a staged card copy and
+  commit only on success. Regression checks cover a full card and an oversized
+  input, including preservation of all original bytes.
+- XA interpolation and volume products, and SPU master-volume multiplication
+  after summing voices, could overflow signed 32-bit arithmetic. These products
+  now use 64-bit intermediates. A full-scale XA regression checks the output.
+
+#### Findings at audit time
+
+These findings describe the code at the audited commits. They were rechecked
+against the current source by reading code and tests only; none was verified
+against hardware or runtime playback, and none establishes fidelity. Track
+current open work in `TODO.md`.
+
+| Finding at audit time | Current source state | Still open |
+|---|---|---|
+| `main.c` presented zeroed VRAM and ran no scene | Startup calls the original game loop and dispatcher | Runtime fidelity is the developer's to judge |
+| SDL opened video/audio only | `SDL_Init` includes `SDL_INIT_GAMEPAD`; two slots and rumble are wired | Hands-on controller check |
+| XA ignored coding info, mono history, fixed 18.9 kHz | `ps1_xa.c` reads the sector coding byte for stereo and rate; stereo decode keeps per-channel history; `ps1_xa_test.c` has a stereo fixture | Mono-versus-stereo fixtures cover one sector shape; listening check |
+| No SEQ scheduler, ADSR or reverb | `ps1_seq.c` and `ps1_reverb.c` exist with tests, and `ps1_spu.c` has an ADSR generator | Accuracy against hardware is unmeasured |
+| GTE was an approximation | Perspective divide uses the hardware UNR table and sets flag bits on saturation | Wider register and flag fixtures; shared-edge transparency checks |
+| Card tests only proved self-agreement | Tests corrupt magic, checksums, directory frames and recovery files | Independent fixtures for chain encoding, malformed chains and real save bytes |

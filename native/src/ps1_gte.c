@@ -2,6 +2,56 @@
 
 #include <string.h>
 #include <limits.h>
+#include <math.h>
+
+static bool s_float_gte_math = true;
+static float s_widescreen_scale = 1.0f;
+
+void ps1_gte_set_float_math(bool enabled) {
+    s_float_gte_math = enabled;
+}
+
+bool ps1_gte_get_float_math(void) {
+    return s_float_gte_math;
+}
+
+void ps1_gte_set_widescreen_scale(float scale) {
+    if (scale >= 0.5f && scale <= 4.0f) {
+        s_widescreen_scale = scale;
+    } else {
+        s_widescreen_scale = 1.0f;
+    }
+}
+
+float ps1_gte_get_widescreen_scale(void) {
+    return s_widescreen_scale;
+}
+
+int32_t ps1_gte_widescreen_margin(void) {
+    return (int32_t)floorf(160.0f * (s_widescreen_scale - 1.0f) + 0.5f);
+}
+
+bool ps1_gte_screen_band_contains(int32_t x, int32_t left, int32_t width) {
+    if (width <= 0) return false;
+    /* Projected X is unchanged by Hor+. The camera shows extra columns on
+     * either side, so expand only the visibility test, not the coordinates. */
+    int32_t extra = ps1_gte_widescreen_margin();
+    return (int64_t)x >= (int64_t)left - extra
+        && (int64_t)x < (int64_t)left + width + extra;
+}
+
+int32_t ps1_gte_scale_frustum_half_angle(int32_t base_half_angle) {
+    if (base_half_angle <= 0) return 0;
+    if (s_widescreen_scale <= 1.00001f) return base_half_angle;
+
+    const double units_per_radian = 4096.0 / (2.0 * 3.14159265358979323846);
+    const double base_radians = (double)base_half_angle / units_per_radian;
+    const double scaled_radians = atan(tan(base_radians) * (double)s_widescreen_scale);
+    long scaled_units = lround(scaled_radians * units_per_radian);
+    if (scaled_units < 0) scaled_units = 0;
+    if (scaled_units > 1023) scaled_units = 1023;
+    return (int32_t)scaled_units;
+}
 
 void ps1_gte_init(Ps1Gte *gte) {
     if (gte == NULL) return;
@@ -82,6 +132,7 @@ static int32_t projection_flag(uint32_t flags) {
 
 static void transform_vertex(const Ps1Gte *gte, const Ps1Vector3 *v,
                              int32_t *out_sx, int32_t *out_sy, int32_t *out_sz,
+                             Ps1SubpixelCoord *out_sub,
                              uint32_t *flags) {
     int64_t x = v->x;
     int64_t y = v->y;
@@ -103,7 +154,8 @@ static void transform_vertex(const Ps1Gte *gte, const Ps1Vector3 *v,
     int32_t ir_y = projection_ir(cy, 23, flags);
     projection_ir(cz, 22, flags);
     uint32_t quotient = perspective_quotient((uint16_t)gte->h, (uint16_t)*out_sz, flags);
-    int64_t screen_x = (int64_t)gte->ofx * 65536 + (int64_t)ir_x * quotient;
+    int64_t proj_ir_x = (int64_t)ir_x * quotient;
+    int64_t screen_x = (int64_t)gte->ofx * 65536 + proj_ir_x;
     int64_t screen_y = (int64_t)gte->ofy * 65536 + (int64_t)ir_y * quotient;
     if (screen_x > INT32_MAX || screen_y > INT32_MAX) *flags |= 1u << 16;
     if (screen_x < INT32_MIN || screen_y < INT32_MIN) *flags |= 1u << 15;
@@ -116,6 +168,63 @@ static void transform_vertex(const Ps1Gte *gte, const Ps1Vector3 *v,
     if (sy < -1024 || sy > 1023) *flags |= 1u << 13;
     *out_sx = sx < -1024 ? -1024 : sx > 1023 ? 1023 : (int32_t)sx;
     *out_sy = sy < -1024 ? -1024 : sy > 1023 ? 1023 : (int32_t)sy;
+
+    if (out_sub != NULL) {
+        float sub_z = (float)cz;
+        float sub_x, sub_y;
+
+        if (s_float_gte_math && cz > 0) {
+            float inv_4096 = 1.0f / 4096.0f;
+            float r00 = (float)gte->rot[0][0] * inv_4096;
+            float r01 = (float)gte->rot[0][1] * inv_4096;
+            float r02 = (float)gte->rot[0][2] * inv_4096;
+
+            float r10 = (float)gte->rot[1][0] * inv_4096;
+            float r11 = (float)gte->rot[1][1] * inv_4096;
+            float r12 = (float)gte->rot[1][2] * inv_4096;
+
+            float r20 = (float)gte->rot[2][0] * inv_4096;
+            float r21 = (float)gte->rot[2][1] * inv_4096;
+            float r22 = (float)gte->rot[2][2] * inv_4096;
+
+            float fx = (float)x;
+            float fy = (float)y;
+            float fz = (float)z;
+
+            float cx_fl = r00 * fx + r01 * fy + r02 * fz + (float)gte->trans[0];
+            float cy_fl = r10 * fx + r11 * fy + r12 * fz + (float)gte->trans[1];
+            float cz_fl = r20 * fx + r21 * fy + r22 * fz + (float)gte->trans[2];
+
+            if (cz_fl > 0.001f) {
+                float proj_x = (cx_fl * (float)gte->h) / cz_fl;
+                sub_x = (float)gte->ofx + proj_x;
+                sub_y = (float)gte->ofy + (cy_fl * (float)gte->h) / cz_fl;
+                sub_z = cz_fl;
+            } else {
+                float proj_x = (float)(screen_x - (int64_t)gte->ofx * 65536) / 65536.0f;
+                /* Screen coordinates remain the original PS1 camera projection. */
+                sub_x = (float)gte->ofx + proj_x;
+                sub_y = (float)screen_y / 65536.0f;
+            }
+        } else if (cz > 0) {
+            float proj_x = (float)(screen_x - (int64_t)gte->ofx * 65536) / 65536.0f;
+            /* Screen coordinates remain the original PS1 camera projection. */
+            sub_x = (float)gte->ofx + proj_x;
+            sub_y = (float)screen_y / 65536.0f;
+        } else {
+            float z_denom = (cz < -1) ? (float)cz : -1.0f;
+            float proj_x = (float)(cx * gte->h) / z_denom;
+            sub_x = (float)gte->ofx + proj_x;
+            sub_y = (float)gte->ofy + (float)(cy * gte->h) / z_denom;
+        }
+
+        float sub_w = (sub_z > 0.001f || sub_z < -0.001f) ? (1.0f / sub_z) : 0.0f;
+        out_sub->x = sub_x;
+        out_sub->y = sub_y;
+        out_sub->z = sub_z;
+        out_sub->w = sub_w;
+        out_sub->valid = true;
+    }
 }
 
 bool ps1_gte_rtps(Ps1Gte *gte, const Ps1Vector3 *v) {
@@ -129,12 +238,22 @@ bool ps1_gte_rtps(Ps1Gte *gte, const Ps1Vector3 *v) {
     gte->sxy[0] = gte->sxy[1];
     gte->sxy[1] = gte->sxy[2];
 
+    gte->sub_sz[0] = gte->sub_sz[1];
+    gte->sub_sz[1] = gte->sub_sz[2];
+    gte->sub_sz[2] = gte->sub_sz[3];
+
+    gte->sub_sxy[0] = gte->sub_sxy[1];
+    gte->sub_sxy[1] = gte->sub_sxy[2];
+
     int32_t sx = 0, sy = 0, sz = 0;
+    Ps1SubpixelCoord sub = {0};
     uint32_t flags = 0;
-    transform_vertex(gte, v, &sx, &sy, &sz, &flags);
+    transform_vertex(gte, v, &sx, &sy, &sz, &sub, &flags);
     gte->flag = projection_flag(flags);
     gte->sz[3] = sz;
     gte->sxy[2] = (Ps1ScreenCoord){(int16_t)sx, (int16_t)sy};
+    gte->sub_sz[3] = sub.z;
+    gte->sub_sxy[2] = sub;
     return gte->flag >= 0;
 }
 
@@ -142,14 +261,16 @@ bool ps1_gte_rtpt(Ps1Gte *gte, const Ps1Vector3 *v0, const Ps1Vector3 *v1, const
     if (gte == NULL || v0 == NULL || v1 == NULL || v2 == NULL) return false;
 
     gte->sz[0] = gte->sz[3];
+    gte->sub_sz[0] = gte->sub_sz[3];
 
     int32_t sx0 = 0, sy0 = 0, sz0 = 0;
     int32_t sx1 = 0, sy1 = 0, sz1 = 0;
     int32_t sx2 = 0, sy2 = 0, sz2 = 0;
+    Ps1SubpixelCoord sub0 = {0}, sub1 = {0}, sub2 = {0};
     uint32_t flags = 0;
-    transform_vertex(gte, v0, &sx0, &sy0, &sz0, &flags);
-    transform_vertex(gte, v1, &sx1, &sy1, &sz1, &flags);
-    transform_vertex(gte, v2, &sx2, &sy2, &sz2, &flags);
+    transform_vertex(gte, v0, &sx0, &sy0, &sz0, &sub0, &flags);
+    transform_vertex(gte, v1, &sx1, &sy1, &sz1, &sub1, &flags);
+    transform_vertex(gte, v2, &sx2, &sy2, &sz2, &sub2, &flags);
     gte->flag = projection_flag(flags);
     gte->sxy[0] = (Ps1ScreenCoord){(int16_t)sx0, (int16_t)sy0};
     gte->sxy[1] = (Ps1ScreenCoord){(int16_t)sx1, (int16_t)sy1};
@@ -157,7 +278,18 @@ bool ps1_gte_rtpt(Ps1Gte *gte, const Ps1Vector3 *v0, const Ps1Vector3 *v1, const
     gte->sz[1] = sz0;
     gte->sz[2] = sz1;
     gte->sz[3] = sz2;
+    gte->sub_sxy[0] = sub0;
+    gte->sub_sxy[1] = sub1;
+    gte->sub_sxy[2] = sub2;
+    gte->sub_sz[1] = sub0.z;
+    gte->sub_sz[2] = sub1.z;
+    gte->sub_sz[3] = sub2.z;
     return gte->flag >= 0;
+}
+
+void ps1_gte_get_sub_sxy(const Ps1Gte *gte, int index, Ps1SubpixelCoord *out) {
+    if (gte == NULL || out == NULL || index < 0 || index >= 3) return;
+    *out = gte->sub_sxy[index];
 }
 
 int32_t ps1_gte_nclip(Ps1Gte *gte) {

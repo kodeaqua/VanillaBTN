@@ -300,15 +300,25 @@ int MemCardFormat(int chan) {
 
 int MemCardUnformat(int chan) {
     Ps1Card *card = get_card_for_chan(chan);
-    if (card == NULL) {
+    s_last_cmd = 0x08;
+    if (!card || !card->present || ps1_card_validate(card) != PS1_CARD_OK) {
+        s_last_result = card && !card->present ? McErrCardNotExist : McErrCardInvalid;
         return -1;
     }
-    /* Persistence validates formatted cards; do not claim a disk unformat. */
-    if (s_bound_manager != NULL) return -1;
-    card->data[0] = 0;
-    card->data[1] = 0;
-    card->dirty = true;
-    s_last_cmd = 0x07;
+    Ps1Card *staged = stage_card(card);
+    if (!staged) {
+        s_last_result = McErrCardInvalid;
+        return -1;
+    }
+    if (!ps1_card_unformat(staged)) {
+        if (staged != card) free(staged);
+        s_last_result = McErrCardInvalid;
+        return -1;
+    }
+    if (!commit_card(card, staged)) {
+        s_last_result = McErrCardInvalid;
+        return -1;
+    }
     s_last_result = McErrNotFormat;
     return 1;
 }

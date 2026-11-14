@@ -1,10 +1,12 @@
 #include "sdk_gpu.h"
 #include "ps1_gpu.h"
+#include "ps1_pgxp.h"
 #include <libgpu.h>
 #include <libgte.h>
 #include <libgs.h>
 #include <string.h>
 #include <stdlib.h>
+#include <limits.h>
 
 _Static_assert(sizeof(u_long) == 4, "SDK words must be 32-bit");
 _Static_assert(sizeof(RECT) == 8, "SDK rectangles contain four halfwords");
@@ -15,6 +17,8 @@ static Ps1Video *vram;
 static Ps1DrawState draw;
 static DISPENV display;
 static bool display_enabled;
+/* The host panorama follows PS1 VRAM persistence: the game may draw an OT
+ * without clearing either framebuffer, so begin-frame cannot reset pixels. */
 
 SdkDisplay sdk_gpu_display(void) {
     return (SdkDisplay){display.disp.x, display.disp.y, display.disp.w, display.disp.h, display_enabled};
@@ -31,11 +35,113 @@ static PacketMap maps[SDK_MAP_COUNT];
 static unsigned map_count;
 static u_long next_id;
 static bool packet_error;
+/* The native game maps its entire 2MB RAM once, so inspecting PacketMap sizes
+ * cannot identify its 2048-entry depth OT. Record the actual ClearOTagR table
+ * declarations (normally one per alternating framebuffer) instead. */
+#define WORLD_OT_CAPACITY 8u
+static struct {
+    uintptr_t start;
+    size_t bytes;
+} world_ots[WORLD_OT_CAPACITY];
+static unsigned world_ot_count;
+/* The title authoring code marks animated backdrop sprites in bucket 36, then
+ * queues an additional full-screen color/backdrop layer in bucket 37 without
+ * an expansion marker. Record the 64-slot OT identity so that only those
+ * background packets can join the panorama; bucket 34 logo, HUD and other
+ * scenes are unaffected. OTs can be embedded in a single large RAM map. */
+#define BACKDROP_OT_CAPACITY 8u
+static struct {
+    uintptr_t start;
+    unsigned marked_bucket36_packets;
+} backdrop_ots[BACKDROP_OT_CAPACITY];
+static unsigned backdrop_ot_count;
+
+static int backdrop_slot(const void *ot_slot, unsigned *slot_index) {
+    const uintptr_t ptr = (uintptr_t)ot_slot;
+    for (unsigned i = 0; i < backdrop_ot_count; ++i) {
+        const uintptr_t base = backdrop_ots[i].start;
+        if (ptr >= base && ptr - base < 64u * sizeof(u_long)) {
+            *slot_index = (unsigned)((ptr - base) / sizeof(u_long));
+            return (int)i;
+        }
+    }
+    return -1;
+}
+/* Native presentation flags belong to the queued primitive, not to the
+ * moment its ordering table is replayed.  The game builds a title/background
+ * packet while expansion is enabled, then turns it off before DrawOTag().
+ * Hash only the opted-in packet IDs (0 is never a valid packet ID). */
+#define EXPANDED_PACKET_CAPACITY 16384u
+#define EXPANDED_PACKET_MASK (EXPANDED_PACKET_CAPACITY - 1u)
+static u_long expanded_packet_ids[EXPANDED_PACKET_CAPACITY];
+/* 1: repeat the 2D pattern (Load/Save); 2: title scrolling sprites are
+ * already tiled by the original game and must not be drawn twice. */
+static uint8_t expanded_packet_kind[EXPANDED_PACKET_CAPACITY];
+static bool build_2d_expansion;
+
+static uint8_t expanded_packet_lookup(u_long id) {
+    unsigned index = (unsigned)((id >> 2) * 2654435761u) & EXPANDED_PACKET_MASK;
+    for (unsigned probe = 0; probe < EXPANDED_PACKET_CAPACITY; ++probe) {
+        u_long saved = expanded_packet_ids[index];
+        if (saved == 0) return 0;
+        if (saved == id) return expanded_packet_kind[index];
+        index = (index + 1u) & EXPANDED_PACKET_MASK;
+    }
+    return 0;
+}
+
+static bool expanded_packet_mark(u_long id, uint8_t kind) {
+    unsigned index = (unsigned)((id >> 2) * 2654435761u) & EXPANDED_PACKET_MASK;
+    for (unsigned probe = 0; probe < EXPANDED_PACKET_CAPACITY; ++probe) {
+        if (expanded_packet_ids[index] == 0 || expanded_packet_ids[index] == id) {
+            expanded_packet_ids[index] = id;
+            expanded_packet_kind[index] = kind;
+            return true;
+        }
+        index = (index + 1u) & EXPANDED_PACKET_MASK;
+    }
+    return false;
+}
 
 void sdk_gpu_reset_packets(void) {
     map_count = 0;
+    world_ot_count = 0;
+    memset(world_ots, 0, sizeof(world_ots));
+    backdrop_ot_count = 0;
+    memset(backdrop_ots, 0, sizeof(backdrop_ots));
     next_id = 4;
     packet_error = false;
+    memset(expanded_packet_ids, 0, sizeof(expanded_packet_ids));
+    build_2d_expansion = false;
+    ps1_video_set_2d_widescreen_expansion(false);
+    ps1_video_set_2d_widescreen_repeat(true);
+    ps1_video_set_world_primitive_context(false);
+    ps1_video_panorama_begin_frame();
+    ps1_pgxp_clear();
+    ps1_video_clear_zbuffer(vram);
+    ps1_video_commit_clut(vram);
+}
+
+void sdk_gpu_begin_frame(void) {
+    /* A new frame invalidates packet metadata, never framebuffer pixels.
+     * In particular, semi-transparent 2D title sprites must blend with the
+     * same retained clear color in VRAM and panoramic sidecars. */
+    /* The original game rewinds and reuses its packet buffers every frame.
+     * Keeping PGXP entries indefinitely eventually filled the small cache and
+     * evicted live vertex addresses.  Clear provenance before any new GTE
+     * projections are written for this frame. */
+    ps1_pgxp_clear();
+    ps1_video_begin_host_filter_frame();
+    memset(expanded_packet_ids, 0, sizeof(expanded_packet_ids));
+    build_2d_expansion = false;
+    ps1_video_set_2d_widescreen_expansion(false);
+    ps1_video_set_2d_widescreen_repeat(true);
+    ps1_video_set_world_primitive_context(false);
+}
+
+void sdk_gpu_set_2d_widescreen_expansion(bool enabled) {
+    /* The flag is captured when the packet is linked, not when rendered. */
+    build_2d_expansion = enabled;
 }
 
 bool sdk_gpu_ok(void) { return !packet_error; }
@@ -81,6 +187,42 @@ void ClearOTagR(u_long *ot, long count) {
         packet_error = true;
         return;
     }
+    if (count == 64) {
+        const uintptr_t base = (uintptr_t)ot;
+        unsigned index = 0;
+        while (index < backdrop_ot_count && backdrop_ots[index].start != base) ++index;
+        if (index == backdrop_ot_count) {
+            if (backdrop_ot_count < BACKDROP_OT_CAPACITY) {
+                ++backdrop_ot_count;
+            } else {
+                memmove(&backdrop_ots[0], &backdrop_ots[1],
+                        (BACKDROP_OT_CAPACITY - 1) * sizeof(backdrop_ots[0]));
+                index = BACKDROP_OT_CAPACITY - 1;
+            }
+        }
+        backdrop_ots[index].start = base;
+        backdrop_ots[index].marked_bucket36_packets = 0;
+    }
+    /* Keep the real OT boundaries even when its storage belongs to a single
+     * SDK_RAM_SIZE mapping and no separate 8192-byte PacketMap exists. */
+    if (count == 2048) {
+        const uintptr_t base = (uintptr_t)ot;
+        unsigned index = 0;
+        while (index < world_ot_count && world_ots[index].start != base) ++index;
+        if (index == world_ot_count) {
+            if (world_ot_count < WORLD_OT_CAPACITY) {
+                ++world_ot_count;
+            } else {
+                /* Reuse the oldest entry if an unusual scene allocates a new
+                 * depth table; stale tables are no longer used after reset. */
+                memmove(&world_ots[0], &world_ots[1],
+                        (WORLD_OT_CAPACITY - 1) * sizeof(world_ots[0]));
+                index = WORLD_OT_CAPACITY - 1;
+            }
+        }
+        world_ots[index].start = base;
+        world_ots[index].bytes = (size_t)count * sizeof(u_long);
+    }
     ot[0] = SDK_END;
     for (long i = 1; i < count; ++i) ot[i] = address_id(ot + i - 1, 4);
 }
@@ -99,28 +241,71 @@ void sdk_add_prim(void *ot, void *packet) {
     u_long id = address_id(packet, bytes);
     if (!id && sdk_gpu_map(packet, bytes)) id = address_id(packet, bytes);
     if (!id) { packet_error = true; return; }
+    unsigned slot_index = 0;
+    const int title_ot = backdrop_slot(ot, &slot_index);
+    if (build_2d_expansion && title_ot >= 0 && slot_index == 36u &&
+        backdrop_ots[title_ot].marked_bucket36_packets < UINT_MAX) {
+        ++backdrop_ots[title_ot].marked_bucket36_packets;
+    }
+    /* The title backdrop (bucket 37) is a compound animation: its SPRTs and
+     * draw-mode packets must remain in the same background context. Limit the
+     * inferred expansion to this OT after the explicitly marked scrolling
+     * layer (bucket 36) has been queued; other OTs and logo bucket 34 retain
+     * their original 4:3 treatment. Do not assume a single GP0 opcode. */
+    const bool title_backdrop = !build_2d_expansion && title_ot >= 0 &&
+        slot_index == 37u && backdrop_ots[title_ot].marked_bucket36_packets >= 12u;
+    /* Bucket 36 is already a 3x3 authored scrolling tile field. Do not
+     * repeat its packets at +/-320 or semi-transparent tiles blend twice in
+     * the panorama, desaturating the title's green background. Keep repeat
+     * behavior for explicitly marked menu grids and bucket 37 backdrops. */
+    const uint8_t expand_kind = build_2d_expansion && title_ot >= 0 &&
+        slot_index == 36u ? 2u : 1u;
+    if ((build_2d_expansion || title_backdrop) &&
+        !expanded_packet_mark(id, expand_kind)) {
+        packet_error = true;
+        return;
+    }
     *tag = (*tag & 0xFF000000ul) | (*(u_long *)ot & SDK_END);
     *(u_long *)ot = (*(u_long *)ot & 0xFF000000ul) | id;
 }
 
 void DrawOTag(u_long *ot) {
+    /* Replaying an OT does not imply a VRAM clear; only GPU draw commands
+     * and explicit clears update the original page and its sidecar. */
     u_long id = address_id(ot, 4);
     size_t budget = next_id / 4;
     if (vram == NULL || !id || packet_error) { packet_error = true; return; }
+    /* The original game submits its 2048-slot depth OT separately from its
+     * 2D/UI OTs (which have 2/16/64 slots). Sprite actors use calculated 2D
+     * positions rather than writing GTE XY words straight into their packets.
+     * Preserve their native world-primitive classification in that OT without
+     * reclassifying title, fade, dialog or HUD sprites in other OTs. */
+    bool world_ot = false;
+    for (unsigned i = 0; i < world_ot_count; ++i) {
+        if ((uintptr_t)ot >= world_ots[i].start &&
+            (uintptr_t)ot - world_ots[i].start < world_ots[i].bytes) {
+            world_ot = true;
+            break;
+        }
+    }
+    ps1_video_set_world_primitive_context(world_ot);
     while (id != SDK_END && budget-- > 0) {
         u_long *packet = resolve_id(id, 4);
-        if (!packet || (id & 3)) { packet_error = true; return; }
+        if (!packet || (id & 3)) { ps1_video_set_world_primitive_context(false); packet_error = true; return; }
         unsigned words = *packet >> 24;
-        if (!resolve_id(id, (size_t)(words + 1) * 4)) { packet_error = true; return; }
+        if (!resolve_id(id, (size_t)(words + 1) * 4)) { ps1_video_set_world_primitive_context(false); packet_error = true; return; }
         if (words) {
-            /* long and uint32_t have the same representation on Windows, but
-             * copy into the dispatcher's type instead of aliasing them. */
-            uint32_t commands[255];
-            memcpy(commands, packet + 1, (size_t)words * 4);
-            if (!ps1_gpu_exec(vram, &draw, commands, words)) { packet_error = true; return; }
+            uint8_t expansion = expanded_packet_lookup(id);
+            ps1_video_set_2d_widescreen_expansion(expansion != 0);
+            ps1_video_set_2d_widescreen_repeat(expansion != 2);
+            bool success = ps1_gpu_exec(vram, &draw, (const uint32_t *)(packet + 1), words);
+            ps1_video_set_2d_widescreen_expansion(false);
+            ps1_video_set_2d_widescreen_repeat(true);
+            if (!success) { ps1_video_set_world_primitive_context(false); packet_error = true; return; }
         }
         id = *packet & SDK_END;
     }
+    ps1_video_set_world_primitive_context(false);
     if (id != SDK_END) packet_error = true; /* Cycles cannot hang the host. */
 }
 
@@ -133,6 +318,7 @@ static short gs_origin_x = 160, gs_origin_y = 120;
 void sdk_gpu_bind(Ps1Video *video) {
     vram = video;
     ps1_draw_state_reset(&draw);
+    ps1_video_clear_zbuffer(video);
     sdk_gpu_reset_packets();
     SetDefDispEnv(&display, 0, 240, 320, 240);
     display_enabled = (video != NULL);
@@ -180,6 +366,7 @@ DRAWENV *PutDrawEnv(DRAWENV *env) {
     draw.offset_y = env->ofs[1];
     draw.tpage = env->tpage & 0x1FF;
     draw.blend_mode = (env->tpage >> 5) & 3;
+    draw.dither = env->dtd != 0;
     if (env->isbg) ClearImage(&env->clip, env->r0, env->g0, env->b0);
     return env;
 }
@@ -216,8 +403,17 @@ int MoveImage(RECT *rect, int x, int y) {
     if (!copy) return -1;
     for (int row = 0; row < rect->h; ++row)
         memcpy(copy + (size_t)row * rect->w * 2, &vram->vram[rect->y + row][rect->x], (size_t)rect->w * 2);
-    for (int row = 0; row < rect->h; ++row)
+    for (int row = 0; row < rect->h; ++row) {
         memcpy(&vram->vram[y + row][x], copy + (size_t)row * rect->w * 2, (size_t)rect->w * 2);
+        memcpy(&vram->clut_vram[y + row][x], copy + (size_t)row * rect->w * 2, (size_t)rect->w * 2);
+        for (int col = 0; col < rect->w; ++col) {
+            uint16_t pix = vram->vram[y + row][x + col];
+            uint32_t r = (pix & 31u) << 3 | (pix & 31u) >> 2;
+            uint32_t g = ((pix >> 5) & 31u) << 3 | ((pix >> 5) & 31u) >> 2;
+            uint32_t b = ((pix >> 10) & 31u) << 3 | ((pix >> 10) & 31u) >> 2;
+            vram->color32[y + row][x + col] = 0xFF000000u | (r << 16) | (g << 8) | b;
+        }
+    }
     free(copy);
     return 0;
 }
@@ -237,6 +433,16 @@ int LoadImage(RECT *rect, u_long *pixels) {
         memcpy(&vram->vram[rect->y + row][rect->x],
                (const unsigned char *)pixels + (size_t)row * rect->w * 2,
                (size_t)rect->w * 2);
+        memcpy(&vram->clut_vram[rect->y + row][rect->x],
+               (const unsigned char *)pixels + (size_t)row * rect->w * 2,
+               (size_t)rect->w * 2);
+        for (int col = 0; col < rect->w; ++col) {
+            uint16_t pix = vram->vram[rect->y + row][rect->x + col];
+            uint32_t r = (pix & 31u) << 3 | (pix & 31u) >> 2;
+            uint32_t g = ((pix >> 5) & 31u) << 3 | ((pix >> 5) & 31u) >> 2;
+            uint32_t b = ((pix >> 10) & 31u) << 3 | ((pix >> 10) & 31u) >> 2;
+            vram->color32[rect->y + row][rect->x + col] = 0xFF000000u | (r << 16) | (g << 8) | b;
+        }
     }
     return 0;
 }

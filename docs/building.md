@@ -16,13 +16,53 @@ configures, builds, and runs CTest for each profile. It downloads the pinned
 on first configure and checks its SHA-256. The output is
 `build/native/<profile>/vanillabtn.exe`; the build tree is ignored by Git.
 No WSL, MSYS, Docker, or Python is needed for this native target.
+Debug uses `/O2 /Zo` with debug symbols because the GPU/GTE rasterizer and audio
+mixer run substantial work on the CPU; compiling those paths with MSVC's `/Od`
+makes gameplay substantially slower. `-Configuration DebugOptimized` remains
+as a compatibility alias with the same optimization policy. Release still
+removes developer diagnostics and uses its separate runtime settings.
+The CTest count changes as native regression tests are added; run
+`ctest --test-dir build/native/Release -N` to list the tests in a local build.
 
 The executable runs original startup and scene handlers using locally imported
 assets. The `native_startup` CTest checks executable linkage with `--check-build`;
 other tests check SDK and rendering behavior with synthetic fixtures. Actual
 visual, audio and gameplay acceptance remains with the developer.
-To inspect the Debug window, run `& .\build\native\Debug\vanillabtn.exe` and
-close it with the window's close button.
+To inspect the Debug build, run `& .\build\native\Debug\vanillabtn.exe`. It
+opens the game window and a separate `VanillaBTN Debug Log` console. The console
+shows timestamped lifecycle, configuration, data, renderer, graphics, audio,
+input, save, timing and game-error events. It intentionally avoids per-pixel,
+per-sample and ordinary per-frame logging. Close the game with its window close
+button. The console remains open after a normal exit or crash so its final
+messages can be reviewed; press Enter there to close it.
+
+### Diagnosing a gameplay crash (Debug only)
+
+Run the **Debug** game executable with your existing imported disc data and
+reproduce the crash (for example, by talking to the same NPC). The game writes
+`VanillaBTN-crash.txt` to the Windows temporary directory; in PowerShell:
+
+```powershell
+Get-Content (Join-Path $env:TEMP 'VanillaBTN-crash.txt')
+```
+
+If that file cannot be created, the handler tries the current working
+directory instead. The report includes the exception code, call stack and
+numeric scene/menu/dialog state; deliberate `SystemError` aborts also include
+their type and error code. Keep the Debug `.pdb` next to the executable to
+resolve more function names. This report is **not** a memory dump and does not
+include game-text, assets, card contents or absolute source paths. Share the
+report text with the NPC and location that trigger the crash; do not upload
+save images or copyrighted disc data. An OS termination that bypasses the
+unhandled-exception handler may produce no report.
+
+The separate Debug Log console also remains open when the game process crashes.
+An access violation may only appear as an unexpected pipe disconnect there, so
+use the text crash report for the call stack and numeric game state.
+
+These diagnostics do not run in Release. The NPC dialogue crash that motivated
+them was corrected in Milestone 28 and confirmed fixed by the developer on
+Windows; keep this workflow for any new crash.
 
 ## Release packaging
 
@@ -32,7 +72,10 @@ To assemble a standalone distribution archive for Windows with embedded applicat
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/package-release.ps1 -Configuration Release
 ```
 
-This compiles the optimized `Release` executable, embeds the application icon (`vanillabtn.ico`), version resource, and DPI awareness manifest, validates all 38 CTests and 9 Python tool tests, and packages a ready-to-distribute standalone folder and `.zip` archive into `dist/VanillaBTN-v<version>-win64.zip`.
+This compiles the optimized `Release` executable, embeds the application icon (`vanillabtn.ico`), version resource, and DPI awareness manifest, runs the registered CTest suite and Python tool tests, and packages a ready-to-distribute standalone folder and `.zip` archive into `dist/VanillaBTN-v<version>-win64.zip`.
+For a source ZIP without `.git`, packaging uses an explicitly unversioned
+`<major>.0.0+source` label rather than inventing a release history. Keep a
+normal Git checkout for authoritative commit-derived version numbers.
 
 ## Importing game data on Windows
 
@@ -95,6 +138,14 @@ Empty cards correctly report no loadable game until the original game saves a
 farm. Older experimental images with one-based allocation links are preserved
 as damaged; fixing those links alone does not validate their game payload.
 The option does not migrate, reset or overwrite the default preference cards.
+
+An explicit `--card-dir` must refer to an existing directory; a missing path or
+regular file is rejected instead of silently starting without cards. Card
+recovery checks `.tmp`, `.bak.hold`, `.bak`, and then older generations
+`.bak.1` through `.bak.5`. An invalid backup is left in place. If all
+candidates are invalid or inaccessible, VanillaBTN refuses to create a blank
+card over unresolved recovery files. Back up the entire card directory before
+manually deleting or restoring recovery images.
 
 
 Existing invalid cards are kept unchanged; loading them does not format or mark
@@ -191,3 +242,21 @@ The code-only target checks 14 files against `disc/binaries.sha1`. With
 `disc.bin` from `disc/disc.sha1`. A nonzero exit means at least one file failed
 to build or did not match the reference SHA-1. `disc.cue` is generated alongside
 `disc.bin` but is not in the SHA-1 lists.
+
+### Diagnosing missing native audio (Debug)
+
+If the game is silent, first check Windows' application volume mixer and the
+selected playback device. Make sure `master_volume = 100` and
+`mute_on_unfocus = false` in the configuration. A Debug executable writes
+`VanillaBTN-audio.txt` to the temporary directory (or the working directory
+if temporary storage is unavailable). In PowerShell:
+
+```powershell
+Get-Content (Join-Path $env:TEMP 'VanillaBTN-audio.txt')
+```
+
+`nonzero_ticks` counts VSync intervals whose post-volume PCM is nonzero;
+`submitted` counts successful SDL queue writes. When the first is zero,
+investigate game/SPU state; when it is nonzero but SDL cannot open/resume or
+submit, investigate the Windows playback endpoint. Nonzero PCM and successful
+submission do not prove that a speaker is audible.

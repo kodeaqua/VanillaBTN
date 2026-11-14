@@ -7,6 +7,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Save rotation keeps five historical backup generations. Recovery must
+ * consider every one of them before reporting an empty card. */
+#define PS1_CARD_BACKUP_GENERATIONS 5
+
 static const char *s_farm_filenames[PS1_CARD_SAVE_SLOTS] = {
     "BASLUS-01115-FARM0",
     "BASLUS-01115-FARM1",
@@ -138,6 +142,30 @@ Ps1CardStatus ps1_card_validate(const Ps1Card *card) {
     return owned == allocated ? PS1_CARD_OK : PS1_CARD_ERR_DAMAGED;
 }
 
+/* PS1 unformat invalidates the signature, not the file data. Verify the
+ * hypothetical original image before allowing these bytes to be persisted:
+ * arbitrary corrupt cards must still be rejected by backup/recovery. */
+bool ps1_card_is_unformatted(const Ps1Card *card) {
+    if (!card || card->data[0] != 0 || card->data[1] != 0) return false;
+    Ps1Card *restored = malloc(sizeof(*restored));
+    if (!restored) return false;
+    *restored = *card;
+    restored->data[0] = 'M';
+    restored->data[1] = 'C';
+    bool valid = ps1_card_validate(restored) == PS1_CARD_OK;
+    free(restored);
+    return valid;
+}
+
+bool ps1_card_unformat(Ps1Card *card) {
+    if (!card || !card->present || ps1_card_validate(card) != PS1_CARD_OK)
+        return false;
+    card->data[0] = 0;
+    card->data[1] = 0;
+    card->dirty = true;
+    return true;
+}
+
 int ps1_card_get_free_blocks(const Ps1Card *card) {
     if (!card || ps1_card_validate(card) != PS1_CARD_OK) return 0;
 
@@ -151,9 +179,11 @@ int ps1_card_get_free_blocks(const Ps1Card *card) {
     return free_blocks;
 }
 
-int ps1_card_find_file(const Ps1Card *card, const char *filename, uint32_t *out_size) {
-    if (!card || !filename || ps1_card_validate(card) != PS1_CARD_OK) return 0;
-
+/* The checked public lookup and file_blocks() both need this search.
+ * Once a whole card has been validated, avoid running the O(15-block)
+ * directory/chain validation a second time just to locate the same file. */
+static int find_file_in_valid_card(const Ps1Card *card, const char *filename,
+                                   uint32_t *out_size) {
     for (uint32_t b = 1; b <= PS1_CARD_DATA_BLOCKS; b++) {
         const uint8_t *dir = card->data + b * PS1_CARD_FRAME_SIZE;
         if (dir[0] == PS1_CARD_BLOCK_FIRST) {
@@ -173,13 +203,18 @@ int ps1_card_find_file(const Ps1Card *card, const char *filename, uint32_t *out_
     return 0;
 }
 
+int ps1_card_find_file(const Ps1Card *card, const char *filename, uint32_t *out_size) {
+    if (!card || !filename || ps1_card_validate(card) != PS1_CARD_OK) return 0;
+    return find_file_in_valid_card(card, filename, out_size);
+}
+
 Ps1CardStatus ps1_card_file_blocks(const Ps1Card *card, const char *filename,
     uint8_t blocks[PS1_CARD_DATA_BLOCKS], uint32_t *out_size) {
     if (!filename || !blocks) return PS1_CARD_ERR_IO;
     Ps1CardStatus status = ps1_card_validate(card);
     if (status != PS1_CARD_OK) return status;
     uint32_t size;
-    int start = ps1_card_find_file(card, filename, &size);
+    int start = find_file_in_valid_card(card, filename, &size);
     if (!start) return PS1_CARD_ERR_NO_FILE;
     uint8_t chain[PS1_CARD_DATA_BLOCKS];
     if (!walk_file_blocks(card, (unsigned)start, size, chain, NULL))
@@ -193,17 +228,21 @@ Ps1CardStatus ps1_card_file_blocks(const Ps1Card *card, const char *filename,
 Ps1CardStatus ps1_card_read_file(const Ps1Card *card, const char *filename,
     void *out_buf, size_t max_size, size_t *out_size) {
     if (!out_buf) return PS1_CARD_ERR_IO;
-    uint8_t chain[PS1_CARD_DATA_BLOCKS];
+    uint8_t chain[PS1_CARD_DATA_BLOCKS] = {0};
     uint32_t size;
     Ps1CardStatus status = ps1_card_file_blocks(card, filename, chain, &size);
     if (status != PS1_CARD_OK) return status;
     size_t length = size < max_size ? size : max_size;
     size_t done = 0;
     for (unsigned i = 0; done < length; ++i) {
+        /* The validated chain cannot exceed 15 blocks. Keep this explicit
+         * guard at the copy boundary in case the validator is ever changed. */
+        if (i >= PS1_CARD_DATA_BLOCKS || chain[i] < 1 ||
+            chain[i] > PS1_CARD_DATA_BLOCKS) return PS1_CARD_ERR_DAMAGED;
         size_t chunk = length - done;
         if (chunk > PS1_CARD_BLOCK_SIZE) chunk = PS1_CARD_BLOCK_SIZE;
         memcpy((uint8_t *)out_buf + done,
-            card->data + chain[i] * PS1_CARD_BLOCK_SIZE, chunk);
+            card->data + (size_t)chain[i] * PS1_CARD_BLOCK_SIZE, chunk);
         done += chunk;
     }
     if (out_size) *out_size = length;
@@ -303,7 +342,7 @@ Ps1CardStatus ps1_card_write_file(Ps1Card *card, const char *filename,
                                   const void *data, size_t size) {
     Ps1Card *staged;
     Ps1CardStatus status;
-    if (!card || !filename || !data || size == 0 || strlen(filename) > 20) {
+    if (!card || !filename || !*filename || !data || size == 0 || strlen(filename) > 20) {
         return PS1_CARD_ERR_IO;
     }
     /* Check before rounding so an oversized size cannot wrap or truncate. */
@@ -369,9 +408,10 @@ Ps1CardStatus ps1_card_read_slot_header(const Ps1Card *card, int slot_idx,
  * ---------------------------------------------------------------------- */
 /* A raw image must contain exactly one card, not just a plausible header. */
 static bool read_card_image(FILE *file, Ps1Card *card) {
-    size_t count = fread(card->data, 1, PS1_CARD_SIZE, file);
-    int extra = fgetc(file);
-    return count == PS1_CARD_SIZE && extra == EOF && !ferror(file);
+    /* Short reads already establish invalid input; do not issue another
+     * stream operation after EOF or a read error. */
+    if (fread(card->data, 1, PS1_CARD_SIZE, file) != PS1_CARD_SIZE) return false;
+    return fgetc(file) == EOF && !ferror(file);
 }
 
 static bool is_valid_mcr_file(const char *filepath) {
@@ -380,10 +420,31 @@ static bool is_valid_mcr_file(const char *filepath) {
     if (!file) return false;
     Ps1Card *card = malloc(sizeof(*card));
     bool valid = card && read_card_image(file, card) &&
-        ps1_card_validate(card) == PS1_CARD_OK;
+        (ps1_card_validate(card) == PS1_CARD_OK || ps1_card_is_unformatted(card));
     if (fclose(file) != 0) valid = false;
     free(card);
     return valid;
+}
+
+/* Finish a committed save interrupted before backup promotion. The
+ * active card remains authoritative; the displaced old primary is kept as
+ * its most recent backup instead of being overwritten on the next save. */
+static bool complete_backup_hold(const char *filepath, const char *hold_path,
+                                 const char *bak_path) {
+    SDL_PathInfo info;
+    if (!SDL_GetPathInfo(hold_path, &info)) return true;
+    if (!is_valid_mcr_file(hold_path)) return false;
+    if (!ps1_card_rotate_backups(filepath, PS1_CARD_BACKUP_GENERATIONS)) return false;
+    return SDL_RenamePath(hold_path, bak_path);
+}
+
+/* The oldest rotated backup has suffix .bak.5; use the same checked
+ * path construction when restoring it and when deciding whether it is safe
+ * to create a new blank memory card. */
+static bool backup_generation_path(char *path, size_t capacity,
+                                   const char *filepath, int generation) {
+    int length = snprintf(path, capacity, "%s.bak.%d", filepath, generation);
+    return length >= 0 && (size_t)length < capacity;
 }
 
 bool ps1_card_recover_file(const char *filepath) {
@@ -391,25 +452,46 @@ bool ps1_card_recover_file(const char *filepath) {
 
     char tmp_path[540];
     char bak_path[540];
+    char hold_path[540];
     int len_tmp = snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", filepath);
     int len_bak = snprintf(bak_path, sizeof(bak_path), "%s.bak", filepath);
+    int len_hold = snprintf(hold_path, sizeof(hold_path), "%s.bak.hold", filepath);
     if (len_tmp < 0 || (size_t)len_tmp >= sizeof(tmp_path) ||
-        len_bak < 0 || (size_t)len_bak >= sizeof(bak_path)) return false;
+        len_bak < 0 || (size_t)len_bak >= sizeof(bak_path) ||
+        len_hold < 0 || (size_t)len_hold >= sizeof(hold_path)) return false;
 
     /* If primary file is already valid, nothing to recover */
     if (is_valid_mcr_file(filepath)) {
         SDL_RemovePath(tmp_path);
-        return true;
+        return complete_backup_hold(filepath, hold_path, bak_path);
     }
 
     /* Replace directly: deleting the primary first loses it if rename fails. */
     if (is_valid_mcr_file(tmp_path)) {
-        if (SDL_RenamePath(tmp_path, filepath)) return true;
+        if (SDL_RenamePath(tmp_path, filepath))
+            return complete_backup_hold(filepath, hold_path, bak_path);
     }
 
-    /* Try recovering from .bak */
+    /* A crash can occur after moving the old primary to .bak.hold but
+     * before installing the new .tmp. The hold is newer than .bak, and must
+     * remain recoverable if the temporary image is incomplete. */
+    if (is_valid_mcr_file(hold_path)) {
+        if (SDL_RenamePath(hold_path, filepath)) return true;
+    }
+
+    /* Finally try the last fully rotated backup. */
     if (is_valid_mcr_file(bak_path)) {
         if (SDL_RenamePath(bak_path, filepath)) return true;
+    }
+
+    /* A damaged or missing .bak must not hide an older healthy generation.
+     * Check newest first, preserving invalid candidates in place. */
+    for (int generation = 1; generation <= PS1_CARD_BACKUP_GENERATIONS; ++generation) {
+        char older[560];
+        if (!backup_generation_path(older, sizeof(older), filepath, generation))
+            return false;
+        if (is_valid_mcr_file(older) && SDL_RenamePath(older, filepath))
+            return true;
     }
 
     return false;
@@ -434,6 +516,17 @@ bool ps1_card_load_from_file(Ps1Card *card, const char *filepath) {
         if (SDL_GetPathInfo(candidate, &info)) return false;
         snprintf(candidate, sizeof(candidate), "%s.bak", filepath);
         if (SDL_GetPathInfo(candidate, &info)) return false;
+        /* An interrupted save can leave only .bak.hold. Do not invent a
+         * blank card while any unresolved recovery image still exists. */
+        int hold_len = snprintf(candidate, sizeof(candidate), "%s.bak.hold", filepath);
+        if (hold_len < 0 || (size_t)hold_len >= sizeof(candidate) ||
+            SDL_GetPathInfo(candidate, &info)) return false;
+        /* Even an invalid historical backup may be recoverable manually.
+         * Never mask it by silently formatting a new primary card. */
+        for (int generation = 1; generation <= PS1_CARD_BACKUP_GENERATIONS; ++generation) {
+            if (!backup_generation_path(candidate, sizeof(candidate), filepath, generation)
+                || SDL_GetPathInfo(candidate, &info)) return false;
+        }
         ps1_card_format(card);
         bool saved = ps1_card_save_to_file(card, filepath);
         card->present = saved;
@@ -449,19 +542,50 @@ bool ps1_card_load_from_file(Ps1Card *card, const char *filepath) {
      * Only an explicit format request may replace it; shutdown must not. */
     card->present = true;
     card->dirty = false;
-    return ps1_card_validate(card) == PS1_CARD_OK;
+    return ps1_card_validate(card) == PS1_CARD_OK ||
+        ps1_card_is_unformatted(card);
+}
+
+bool ps1_card_rotate_backups(const char *filepath, int max_backups) {
+    if (!filepath || max_backups <= 0) return false;
+    char src[560], dst[560];
+    for (int i = max_backups; i >= 1; --i) {
+        int src_len, dst_len;
+        if (i == 1) {
+            src_len = snprintf(src, sizeof(src), "%s.bak", filepath);
+            dst_len = snprintf(dst, sizeof(dst), "%s.bak.1", filepath);
+        } else {
+            src_len = snprintf(src, sizeof(src), "%s.bak.%d", filepath, i - 1);
+            dst_len = snprintf(dst, sizeof(dst), "%s.bak.%d", filepath, i);
+        }
+        if (src_len < 0 || dst_len < 0 ||
+            (size_t)src_len >= sizeof(src) || (size_t)dst_len >= sizeof(dst))
+            return false;
+        SDL_PathInfo info;
+        if (SDL_GetPathInfo(src, &info) && !SDL_RenamePath(src, dst))
+            return false;
+    }
+    return true;
 }
 
 bool ps1_card_save_to_file(const Ps1Card *card, const char *filepath) {
     if (!card || !filepath || !card->present ||
-        ps1_card_validate(card) != PS1_CARD_OK) return false;
+        (ps1_card_validate(card) != PS1_CARD_OK &&
+         !ps1_card_is_unformatted(card))) return false;
 
     char tmp_path[540];
     char bak_path[540];
+    char bak_hold[540];
     int len_tmp = snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", filepath);
     int len_bak = snprintf(bak_path, sizeof(bak_path), "%s.bak", filepath);
+    int len_hold = snprintf(bak_hold, sizeof(bak_hold), "%s.bak.hold", filepath);
     if (len_tmp < 0 || (size_t)len_tmp >= sizeof(tmp_path) ||
-        len_bak < 0 || (size_t)len_bak >= sizeof(bak_path)) return false;
+        len_bak < 0 || (size_t)len_bak >= sizeof(bak_path) ||
+        len_hold < 0 || (size_t)len_hold >= sizeof(bak_hold)) return false;
+
+    /* A previous save may have committed the new primary while leaving the
+     * old one in .bak.hold. Resolve it before creating another hold file. */
+    if (!complete_backup_hold(filepath, bak_hold, bak_path)) return false;
 
     /* Never overwrite an unresolved recovery candidate from an earlier run. */
     FILE *f = fopen(tmp_path, "wbx");
@@ -477,21 +601,35 @@ bool ps1_card_save_to_file(const Ps1Card *card, const char *filepath) {
         return false;
     }
 
-    /* Replace the old backup only if the primary can be moved into place. */
+    /* Move existing primary to hold location without touching .bak yet */
     SDL_PathInfo info;
-    if (SDL_GetPathInfo(filepath, &info) && !SDL_RenamePath(filepath, bak_path)) {
+    bool had_primary = false;
+    if (SDL_GetPathInfo(filepath, &info)) {
+        if (!SDL_RenamePath(filepath, bak_hold)) {
+            SDL_RemovePath(tmp_path);
+            return false;
+        }
+        had_primary = true;
+    }
+
+    /* Atomically replace target with temp file */
+    if (!SDL_RenamePath(tmp_path, filepath)) {
+        if (had_primary) {
+            SDL_RenamePath(bak_hold, filepath);
+        }
         SDL_RemovePath(tmp_path);
         return false;
     }
 
-    /* 3. Atomically replace target with temp file */
-    if (!SDL_RenamePath(tmp_path, filepath)) {
-        /* Restore backup if rename failed */
-        SDL_RenamePath(bak_path, filepath);
-        return false;
+    /* Once primary is successfully replaced, rotate historical backups and promote hold to .bak */
+    if (had_primary) {
+        if (ps1_card_rotate_backups(filepath, PS1_CARD_BACKUP_GENERATIONS)) {
+            /* SDL_RenamePath replaces the destination atomically. If it
+             * fails, preserve .bak.hold for the next recovery attempt. */
+            SDL_RenamePath(bak_hold, bak_path);
+        }
     }
 
-    /* Keep .bak as a safety net */
     return true;
 }
 
@@ -503,15 +641,25 @@ bool ps1_card_manager_init(Ps1CardManager *mgr, const char *custom_dir) {
     memset(mgr, 0, sizeof(*mgr));
 
     if (custom_dir && custom_dir[0] != '\0') {
-        snprintf(mgr->base_dir, sizeof(mgr->base_dir), "%s", custom_dir);
+        int written = snprintf(mgr->base_dir, sizeof(mgr->base_dir), "%s", custom_dir);
+        if (written < 0 || (size_t)written >= sizeof(mgr->base_dir)) return false;
     } else {
         char *pref = SDL_GetPrefPath("VanillaBTN", "VanillaBTN");
         if (pref) {
-            snprintf(mgr->base_dir, sizeof(mgr->base_dir), "%s", pref);
+            int written = snprintf(mgr->base_dir, sizeof(mgr->base_dir), "%s", pref);
             SDL_free(pref);
+            if (written < 0 || (size_t)written >= sizeof(mgr->base_dir)) return false;
         } else {
             snprintf(mgr->base_dir, sizeof(mgr->base_dir), ".");
         }
+    }
+
+    /* An explicitly chosen card directory must exist. Otherwise both card
+     * loads can fail while the manager still claims initialization succeeded. */
+    if (custom_dir && *custom_dir) {
+        SDL_PathInfo info;
+        if (!SDL_GetPathInfo(mgr->base_dir, &info) ||
+            info.type != SDL_PATHTYPE_DIRECTORY) return false;
     }
 
     size_t blen = strlen(mgr->base_dir);

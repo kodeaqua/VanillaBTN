@@ -73,6 +73,12 @@ void ps1_input_clear(Ps1InputRecord *record);
 /* Fold an SDL signed left stick into pad.c's four cardinal sectors/dead zone. */
 uint32_t ps1_input_stick_buttons(int16_t x, int16_t y);
 
+/* Normalize raw 16-bit signed analog stick into 8-bit PS1 [0..255] stick range with
+ * circular gate normalization (fixing the diagonal running walk-drop bug) and deadzone. */
+void ps1_input_normalize_stick(int16_t host_x, int16_t host_y, float deadzone,
+                              bool fix_diagonal_running,
+                              uint8_t *out_x, uint8_t *out_y);
+
 /* Convert SDL trigger axes into the original digital L2/R2 buttons. */
 uint32_t ps1_input_trigger_buttons(int16_t left, int16_t right);
 

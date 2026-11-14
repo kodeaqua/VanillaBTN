@@ -44,6 +44,31 @@ typedef struct ChickenSpawnSource {
     u32 unusedC;
 } ChickenSpawnSource;
 
+#ifdef VANILLABTN_NATIVE
+typedef struct FarmActionSlot {
+    ItemId kind;
+    u16 targetIndex;
+    u16 name[NAME_LENGTH];
+    s16 affection;
+    s16 waitTimer;
+    FarmDate date;
+    u16 facing;
+    u16 action;
+    s16 taskNo;
+    s16 taskId;
+    s16 taskTime;
+    s16 interruptTime;
+    LimitPair place;
+    u16 unused32;
+    u32 flags;
+    VECTOR position;
+    VECTOR payload48;   /* FarmActor.speed */
+    VECTOR destination;
+    VECTOR target;
+    AnimState sprite;
+    ItemCue cue;
+} FarmActionSlot;
+#else
 typedef struct FarmActionSlot {
     s16 kind;
     u8 pad02[0x26 - 0x2];
@@ -58,6 +83,7 @@ typedef struct FarmActionSlot {
     u8 pad58[0xA8 - 0x58];
     ItemCue cue;
 } FarmActionSlot;
+#endif
 
 /* One entry of the cue table farm_mode_cues. farm_cue_matches_mode scans for `id` and
  * answers whether the current mode bit (farm_season_mode_bit) is in `mask`. `x`, `y` and

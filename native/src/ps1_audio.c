@@ -1,6 +1,7 @@
 /* ps1_audio.c — host-side audio system integrating PS1 SPU and CD-XA with SDL3. */
 
 #include "ps1_audio.h"
+#include "host_debug.h"
 #include <SDL3/SDL.h>
 #include <string.h>
 
@@ -8,7 +9,10 @@
 #define MAX_QUEUED_BYTES (2 * FRAMES_PER_GAME_TICK * 2 * (int)sizeof(int16_t)) /* ~66 ms */
 
 bool ps1_audio_init(Ps1Audio *audio) {
-    if (!audio) return false;
+    if (!audio) {
+        HOST_DEBUG_ERROR("AUDIO", "Audio initialization received no state");
+        return false;
+    }
     memset(audio, 0, sizeof(*audio));
 
     ps1_spu_init(&audio->spu);
@@ -20,11 +24,21 @@ bool ps1_audio_init(Ps1Audio *audio) {
     spec.freq = PS1_SPU_SAMPLE_RATE;
 
     audio->stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, NULL, NULL);
-    if (audio->stream) {
-        SDL_ResumeAudioStreamDevice(audio->stream);
+    if (audio->stream && SDL_ResumeAudioStreamDevice(audio->stream)) {
         audio->has_output = true;
+        HOST_DEBUG_INFO("AUDIO", "SDL audio stream opened at %d Hz stereo S16",
+            PS1_SPU_SAMPLE_RATE);
     } else {
+        /* A created stream does not guarantee that its device resumed.
+         * Retain headless mixing, but report the actual playback failure. */
+        SDL_strlcpy(audio->output_error, SDL_GetError(), sizeof(audio->output_error));
+        if (audio->stream) {
+            SDL_DestroyAudioStream(audio->stream);
+            audio->stream = NULL;
+        }
         audio->has_output = false;
+        HOST_DEBUG_WARN("AUDIO", "SDL playback unavailable; headless mixing remains active: %s",
+            audio->output_error[0] ? audio->output_error : "unknown error");
     }
 
     return true;
@@ -38,6 +52,7 @@ void ps1_audio_shutdown(Ps1Audio *audio) {
         audio->stream = NULL;
     }
     audio->has_output = false;
+    HOST_DEBUG_INFO("AUDIO", "Audio stream shut down");
 }
 
 void ps1_audio_mix(Ps1Audio *audio, int16_t *out, int frames) {

@@ -409,6 +409,11 @@ void anim_draw_sprt_parts(u_long *ot, SPRT **sprites, DR_MODE **modes, AnimState
     dx = frame->dx;
     dy = frame->dy;
     list = &state->partLists[frame->parts];
+#ifdef VANILLABTN_NATIVE
+    /* An empty part list draws nothing. Avoid creating an invalid pointer
+     * one entry before the host allocation before the loop even starts. */
+    if (list->count <= 0) return;
+#endif
     part = ANIM_PARTS(state, list);
     part += list->count - 1;
     for (n = list->count - 1; n >= 0; n--) {
@@ -523,6 +528,9 @@ POLY_FT4 *sprite_draw_frame(u_long *ot, POLY_FT4 *prim, AnimState *sprite, u8 an
         return prim;
     }
     count = sprite->partLists[frame->parts].count;
+#ifdef VANILLABTN_NATIVE
+    if (count <= 0) return prim;
+#endif
     part = ANIM_PARTS(sprite, &sprite->partLists[frame->parts]);
     part += count - 1;
     for (n = count - 1; n >= 0; n--) {
@@ -698,6 +706,9 @@ POLY_FT4 *text_sprite_draw(u_long *ot, POLY_FT4 *prim, AnimState *sprite, s16 x,
         seen[k] = -1;
     }
     count = sprite->partLists[frame->parts].count;
+#ifdef VANILLABTN_NATIVE
+    if (count <= 0) return prim;
+#endif
     part = ANIM_PARTS(sprite, &sprite->partLists[frame->parts]);
     part += count - 1;
     for (n = count - 1; n >= 0; n--, prim++, part--) {

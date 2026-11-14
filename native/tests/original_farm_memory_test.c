@@ -4,6 +4,8 @@
 #include "sdk_gpu.h"
 #include "sdk_memory.h"
 #include "scene.h"
+#include "chicken.h"
+#include "animal_actions.h"
 #include "farm_probe.h"
 #include "model.h"
 #include <stdio.h>
@@ -103,5 +105,64 @@ int main(void) {
     chunk_checksums[0] = 55;
     CHECK(event_chunk_read_back((u8 *)buffer, 0, 0, 0) == (u8 *)tail);
     sdk_gpu_bind(NULL);
+
+    /* Event entry copies the active villagers' ordinary sprites into event
+     * sprites. The PS1 code assumes 48-byte AnimState and 0x1D4-byte records;
+     * x64 must keep all native pointers and use each record's real stride. */
+    FarmRequestSlot event_request = {0};
+    AnimFile files[CHARACTER_COUNT] = {0};
+    AnimRange ranges[CHARACTER_COUNT] = {0};
+    AnimPartList lists[CHARACTER_COUNT] = {0};
+    AnimFrame frames[CHARACTER_COUNT] = {0};
+    game_state.request = &event_request;
+    memset(game_state.villagers, 0, sizeof(game_state.villagers));
+    for (int i = 0; i < CHARACTER_COUNT; ++i) {
+        FarmVillager *villager = &game_state.villagers[i];
+        memset(&villager->sprite80, (unsigned char)(0x20 + i), sizeof(AnimState));
+        memset(&villager->sprite, 0xAA, sizeof(AnimState));
+        villager->sprite80.source = &files[i];
+        villager->sprite80.ranges = &ranges[i];
+        villager->sprite80.partLists = &lists[i];
+        villager->sprite80.frames = (u8 *)&frames[i];
+        villager->sprite80.animation = (u8)(i % 4);
+        villager->sprite80.frame = (u8)(i % 3);
+        villager->sprite80.scale = 4096 + i;
+        villager->id = (CharacterId)i;
+        villager->friendship = (s16)(50 + i);
+        memset(&villager->cue, 0x5A, sizeof(villager->cue));
+    }
+    villager_sprites_copy();
+    for (int i = 0; i < CHARACTER_COUNT; ++i) {
+        FarmVillager *villager = &game_state.villagers[i];
+        CHECK(memcmp(&villager->sprite, &villager->sprite80, sizeof(AnimState)) == 0);
+        CHECK(villager->sprite.ranges == &ranges[i]);
+        CHECK(villager->sprite.partLists == &lists[i]);
+        CHECK(villager->sprite.frames == (u8 *)&frames[i]);
+        CHECK(villager->sprite.source == &files[i]);
+        CHECK(villager->id == (CharacterId)i && villager->friendship == 50 + i);
+        for (size_t j = 0; j < sizeof(villager->cue); ++j)
+            CHECK(((const u8 *)&villager->cue)[j] == 0x5A);
+    }
+    game_state.request = NULL;
+
+    /* Removing a chicken must clear the entire host-sized actor, not only
+     * the original 0xB4-byte PS1 layout (which predates 64-bit ANI pointers). */
+    struct { FarmChicken record; u32 after; } chicken_guard = {0};
+    memset(&chicken_guard.record, 0x7B, sizeof(chicken_guard.record));
+    chicken_guard.after = 0xDAC0FFEEu;
+    chicken_clear(&chicken_guard.record);
+    for (size_t i = 0; i < sizeof(chicken_guard.record); i++)
+        CHECK(((const u8 *)&chicken_guard.record)[i] == 0);
+    CHECK(chicken_guard.after == 0xDAC0FFEEu);
+
+    /* An action slot has the same x64 sprite-pointer expansion as a chicken.
+     * A neighbor sentinel catches writes beyond the intended native slot. */
+    struct { FarmAction record; u32 after; } action_guard = {0};
+    memset(&action_guard.record, 0x6C, sizeof(action_guard.record));
+    action_guard.after = 0xAA5500FFu;
+    farm_action_clear(&action_guard.record);
+    for (size_t i = 0; i < sizeof(action_guard.record); i++)
+        CHECK(((const u8 *)&action_guard.record)[i] == 0);
+    CHECK(action_guard.after == 0xAA5500FFu);
     return 0;
 }

@@ -118,7 +118,7 @@ static void test_metadata_persistence(void) {
     long last_cmd = 0, last_rslt = 0;
     MemCardSync(0, &last_cmd, &last_rslt);
     CHECK(last_cmd == 0x09 && last_rslt == McErrCardInvalid);
-    CHECK(MemCardUnformat(0) == -1);
+    CHECK(MemCardUnformat(5) == -1);
     check_disk_matches(card, path);
     FILE *blocked = fopen(temp, "wb");
     CHECK(blocked && fputc(0x42, blocked) == 0x42 && fclose(blocked) == 0);
@@ -133,6 +133,68 @@ static void test_metadata_persistence(void) {
     CHECK(ps1_card_find_file(card, "KEEP", NULL) > 0);
     sdk_card_bind_manager(NULL);
     remove(path); remove(temp); remove(backup);
+    free(manager);
+}
+
+/* Unformat is an explicit disk transaction. Reopening must not auto-restore
+ * the formatted backup and failed persistence must leave the live card intact. */
+static void test_unformat_persistence(void) {
+    const char *path = "test_sdk_card_unformat.mcr";
+    const char *tmp = "test_sdk_card_unformat.mcr.tmp";
+    const char *bak = "test_sdk_card_unformat.mcr.bak";
+    Ps1CardManager *manager = calloc(1, sizeof(*manager));
+    Ps1Card *reopened = malloc(sizeof(*reopened));
+    uint8_t *formatted = malloc(PS1_CARD_SIZE);
+    CHECK(manager && reopened && formatted);
+    remove(path); remove(tmp); remove(bak);
+    remove("test_sdk_card_unformat.mcr.bak.1");
+    Ps1Card *card = &manager->cards[0];
+    ps1_card_format(card);
+    CHECK(ps1_card_write_file(card, "DIARY", data, PS1_CARD_BLOCK_SIZE) == PS1_CARD_OK);
+    CHECK(snprintf(card->filepath, sizeof(card->filepath), "%s", path) > 0);
+    CHECK(ps1_card_save_to_file(card, path));
+    card->dirty = false;
+    sdk_card_bind_manager(manager);
+    MemCardInit(0);
+
+    /* A leftover .tmp must block the write without mutating active data. */
+    memcpy(formatted, card->data, PS1_CARD_SIZE);
+    memcpy(snapshot, card->data, sizeof(snapshot));
+    FILE *file = fopen(tmp, "wb");
+    CHECK(file && fputc(1, file) == 1 && fclose(file) == 0);
+    CHECK(MemCardUnformat(0) == -1);
+    CHECK(ps1_card_validate(card) == PS1_CARD_OK && !card->dirty);
+    CHECK(memcmp(snapshot, card->data, sizeof(snapshot)) == 0);
+    check_disk_matches(card, path);
+    remove(tmp);
+
+    CHECK(MemCardUnformat(0) == 1);
+    CHECK(ps1_card_validate(card) == PS1_CARD_ERR_UNFORMATTED);
+    CHECK(ps1_card_is_unformatted(card) && !card->dirty);
+    check_disk_matches(card, path);
+    CHECK(ps1_card_recover_file(path));
+    CHECK(ps1_card_load_from_file(reopened, path));
+    CHECK(reopened->present && !reopened->dirty);
+    CHECK(ps1_card_is_unformatted(reopened));
+    CHECK(memcmp(reopened->data, card->data, PS1_CARD_SIZE) == 0);
+    CHECK(MemCardCreateFile(0, "NEW", 1) == McErrNotFormat);
+    CHECK(MemCardUnformat(0) == -1);
+
+    /* Previous files remain in the backup, with byte-identical contents. */
+    CHECK(ps1_card_load_from_file(reopened, bak));
+    CHECK(ps1_card_validate(reopened) == PS1_CARD_OK);
+    CHECK(ps1_card_find_file(reopened, "DIARY", NULL) > 0);
+    CHECK(memcmp(reopened->data, formatted, PS1_CARD_SIZE) == 0);
+
+    CHECK(MemCardFormat(0) == McErrNone);
+    CHECK(ps1_card_validate(card) == PS1_CARD_OK && !card->dirty);
+    CHECK(ps1_card_load_from_file(reopened, path));
+    CHECK(ps1_card_validate(reopened) == PS1_CARD_OK);
+    sdk_card_bind_manager(NULL);
+    remove(path); remove(tmp); remove(bak);
+    remove("test_sdk_card_unformat.mcr.bak.1");
+    free(formatted);
+    free(reopened);
     free(manager);
 }
 
@@ -255,5 +317,6 @@ int main(void) {
     CHECK(MemCardGetDirentry(0, NULL, entries, &files, 0, 1) == 0);
     test_write_persists_before_completion();
     test_metadata_persistence();
+    test_unformat_persistence();
     return 0;
 }

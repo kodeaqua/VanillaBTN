@@ -1,13 +1,21 @@
 #include <libgpu.h>
 #ifndef NDEBUG
+#include "host_debug.h"
 #include <stdarg.h>
 #include <stdio.h>
+
+static int debug_print(const char *format, va_list args) {
+    char message[512];
+    int written = vsnprintf(message, sizeof(message), format, args);
+    if (written >= 0) HOST_DEBUG_WARN("GAME", "%s", message);
+    return written;
+}
 
 void FntPrint(const char *format, ...) {
     if (!format) return;
     va_list args;
     va_start(args, format);
-    vfprintf(stderr, format, args);
+    debug_print(format, args);
     va_end(args);
 }
 
@@ -57,7 +65,7 @@ int KanjiFntPrint(const char *format, ...) {
     int written;
     va_list args;
     va_start(args, format);
-    written = vfprintf(stderr, format, args);
+    written = debug_print(format, args);
     va_end(args);
     return written;
 }

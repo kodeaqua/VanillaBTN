@@ -15,6 +15,8 @@
 #include <stdint.h>
 #include "ps1_reverb.h"
 
+#define PS1_SPU_HW_VOICES 24
+#define PS1_SPU_MAX_VOICES 64
 #define PS1_SPU_VOICES 24
 #define PS1_SPU_SAMPLE_RATE 44100
 #define PS1_SPU_VAB_SLOTS 8
@@ -74,6 +76,14 @@ typedef struct {
     int             adsr_sustain_rate; /* 0..127 */
     int             adsr_release_mode; /* 0 = Linear, 1 = Exponential */
     int             adsr_release_rate; /* 0..31 */
+
+    /* Modern enhancements */
+    int             fade_samples_remaining;
+    int             fade_samples_total;
+    int             vag_loop_crossfade;
+    int             crossfade_remaining;
+    int             crossfade_total;
+    int16_t         crossfade_tail;
 } Ps1Voice;
 
 /* Parsed VAB slot */
@@ -94,8 +104,12 @@ typedef struct {
 
 /* SPU state */
 typedef struct {
-    Ps1Voice        voices[PS1_SPU_VOICES];
+    Ps1Voice        voices[PS1_SPU_MAX_VOICES];
     Ps1VabSlot      vabs[PS1_SPU_VAB_SLOTS];
+    int             num_voices;        /* 24 (authentic) or 64 (expanded) */
+    int             pop_suppression;   /* 0 = authentic, 1 = 64-sample micro-fade */
+    int             vag_loop_crossfade;/* 0 = authentic, 1 = boundary crossfade */
+    int             float_mixing;      /* 0 = authentic 16-bit clamp, 1 = 32-bit float soft limit */
     int16_t         master_vol_left;  /* 0..0x7FFF */
     int16_t         master_vol_right;
     int16_t         cd_vol_left;      /* 0..0x7FFF */
@@ -105,7 +119,7 @@ typedef struct {
     const int16_t  *cd_input;
     unsigned        cd_input_frames, cd_input_position;
     int             cd_mix, cd_reverb, mono_voices;
-    uint32_t        reverb_voice_mask;
+    uint64_t        reverb_voice_mask;
     Ps1Reverb       reverb;
     int16_t         reverb_gain_left, reverb_gain_right;
 
@@ -176,6 +190,22 @@ void ps1_spu_set_reverb_params(Ps1Spu *spu, int type, int depth_l, int depth_r,
 
 /* Update EON independently of key-on/off; return the complete enabled mask. */
 uint32_t ps1_spu_set_reverb_voice(Ps1Spu *spu, uint32_t mask, int enabled);
+
+/* Polyphony expansion (24 -> 64 voices) */
+void ps1_spu_set_polyphony_expansion(Ps1Spu *spu, int enabled);
+int  ps1_spu_get_polyphony_expansion(const Ps1Spu *spu);
+
+/* Micro-fade pop suppression on sudden key-off */
+void ps1_spu_set_pop_suppression(Ps1Spu *spu, int enabled);
+int  ps1_spu_get_pop_suppression(const Ps1Spu *spu);
+
+/* VAG loop boundary crossfade smoothing */
+void ps1_spu_set_vag_crossfade(Ps1Spu *spu, int enabled);
+int  ps1_spu_get_vag_crossfade(const Ps1Spu *spu);
+
+/* 32-bit float audio mixing with transparent soft-knee limiting */
+void ps1_spu_set_float_mixing(Ps1Spu *spu, int enabled);
+int  ps1_spu_get_float_mixing(const Ps1Spu *spu);
 
 /* Mix frames stereo 16-bit PCM samples into out (interleaved L/R).
  * If accumulate is non-zero, samples are added to existing contents of out.

@@ -20,6 +20,7 @@ static u_long next_sector, seek_sector, seek_target;
 static bool seek_pending;
 static u_char last_command, drive_mode, filter_file, filter_channel;
 static bool filter_set, xa_streaming, xa_paused, stream_ended;
+static bool xa_seamless_loop = false;
 static Ps1XaPlayer xa_player;
 static DiscFile *stream_file;
 static u_long stream_first;
@@ -37,9 +38,18 @@ static int read_xa_sector(void *context, uint32_t index, uint8_t *sector) {
     /* One sector arrives per 294 output samples at double speed. The reader
      * cannot skip ahead through interleaved sectors that have not arrived. */
     uint64_t arrived = stream_clock / 44100;
-    if (index >= stream_first - file->first + arrived) return -1;
+    if (!xa_seamless_loop && index >= stream_first - file->first + arrived) return -1;
     return fseek(file->handle, (long)(index * PS1_XA_SECTOR_SIZE), SEEK_SET) == 0
         && fread(sector, 1, PS1_XA_SECTOR_SIZE, file->handle) == PS1_XA_SECTOR_SIZE;
+}
+
+void sdk_cd_set_seamless_loop(bool enabled) {
+    xa_seamless_loop = enabled;
+    ps1_xa_set_seamless_loop(&xa_player, enabled ? 1 : 0);
+}
+
+bool sdk_cd_get_seamless_loop(void) {
+    return xa_seamless_loop;
 }
 
 void sdk_cd_mix(int16_t *out, int frames) {
@@ -239,6 +249,7 @@ int CdControl(u_char command, u_char *parameter, u_char *result) {
             stream_clock = 0;
             ps1_xa_play_source(&xa_player, read_xa_sector, file,
                 seek_sector - file->first, file->sectors, filter_file, filter_channel);
+            if (xa_seamless_loop) ps1_xa_set_seamless_loop(&xa_player, 1);
         }
         seek_pending = false;
         xa_paused = false;

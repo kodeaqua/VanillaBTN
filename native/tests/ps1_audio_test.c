@@ -12,7 +12,9 @@ static void test_audio_init_shutdown(void) {
     (void)ok;
     assert(ok);
 
-    /* In test environment, has_output may be true or false depending on audio hardware */
+    /* A stream that failed to resume must not masquerade as working output.
+     * Headless test environments may legitimately have no playback device. */
+    assert(audio.has_output == (audio.stream != NULL));
     ps1_audio_shutdown(&audio);
     assert(audio.stream == NULL);
     assert(!audio.has_output);

@@ -78,6 +78,11 @@ static int16_t fetch_voice_raw_sample(Ps1Voice *voice) {
 
         if (flags & PS1_ADPCM_FLAG_LOOP_END) {
             if (flags & PS1_ADPCM_FLAG_LOOP_REPEAT) {
+                if (voice->vag_loop_crossfade) {
+                    voice->crossfade_remaining = 16;
+                    voice->crossfade_total = 16;
+                    voice->crossfade_tail = voice->block[ADPCM_SAMPLES_PER_BLOCK - 1];
+                }
                 voice->byte_offset = voice->loop_offset;
             } else {
                 voice->stop_after_block = 1;
@@ -85,7 +90,13 @@ static int16_t fetch_voice_raw_sample(Ps1Voice *voice) {
         }
     }
 
-    return voice->block[voice->block_sample_idx++];
+    int16_t sample = voice->block[voice->block_sample_idx++];
+    if (voice->crossfade_remaining > 0) {
+        float alpha = (float)voice->crossfade_remaining / (float)voice->crossfade_total;
+        sample = (int16_t)((1.0f - alpha) * (float)sample + alpha * (float)voice->crossfade_tail);
+        voice->crossfade_remaining--;
+    }
+    return sample;
 }
 
 /* -------------------------------------------------------------------------
@@ -186,6 +197,10 @@ static void voice_step_adsr(Ps1Voice *v) {
 void ps1_spu_init(Ps1Spu *spu) {
     if (spu == NULL) return;
     memset(spu, 0, sizeof(*spu));
+    spu->num_voices = PS1_SPU_HW_VOICES;
+    spu->pop_suppression = 0;
+    spu->vag_loop_crossfade = 0;
+    spu->float_mixing = 0;
     spu->master_vol_left = 0x3FFF;
     spu->master_vol_right = 0x3FFF;
     spu->cd_vol_left = 0x1FFF;
@@ -274,10 +289,11 @@ Ps1VabId ps1_spu_load_vab(Ps1Spu *spu, const uint8_t *header, uint32_t header_si
 
 void ps1_spu_free_vab(Ps1Spu *spu, Ps1VabId id) {
     if (!spu || id < 0 || id >= PS1_SPU_VAB_SLOTS) return;
-    for (int v = 0; v < PS1_SPU_VOICES; v++) {
+    int limit = spu->num_voices > 0 ? spu->num_voices : PS1_SPU_HW_VOICES;
+    for (int v = 0; v < limit; v++) {
         if (spu->voices[v].vab_id == id) {
             memset(&spu->voices[v], 0, sizeof(spu->voices[v]));
-            spu->reverb_voice_mask &= ~(1u << v);
+            spu->reverb_voice_mask &= ~(1ULL << v);
         }
     }
     memset(&spu->vabs[id], 0, sizeof(spu->vabs[id]));
@@ -289,12 +305,14 @@ void ps1_spu_free_vab(Ps1Spu *spu, Ps1VabId id) {
 void ps1_spu_key_on_raw(Ps1Spu *spu, int voice_idx, const uint8_t *data,
                         uint32_t data_len, uint32_t pitch_16_16,
                         int16_t vol_left, int16_t vol_right) {
-    if (!spu || voice_idx < 0 || voice_idx >= PS1_SPU_VOICES || !data || data_len < ADPCM_BLOCK_SIZE) return;
+    int max_v = spu && spu->num_voices > 0 ? spu->num_voices : PS1_SPU_HW_VOICES;
+    if (!spu || voice_idx < 0 || voice_idx >= max_v || !data || data_len < ADPCM_BLOCK_SIZE) return;
 
-    spu->reverb_voice_mask &= ~(1u << voice_idx);
+    spu->reverb_voice_mask &= ~(1ULL << voice_idx);
     Ps1Voice *v = &spu->voices[voice_idx];
     memset(v, 0, sizeof(*v));
     v->active = 1;
+    v->vag_loop_crossfade = spu->vag_loop_crossfade;
     v->vab_id = PS1_VAB_NONE;
     v->sample_data = data;
     v->sample_len = data_len;
@@ -316,7 +334,8 @@ void ps1_spu_key_on_raw(Ps1Spu *spu, int voice_idx, const uint8_t *data,
 void ps1_spu_key_on_vab(Ps1Spu *spu, int voice_idx, Ps1VabId vab_id,
                         int prog, int tone, int note, int fine,
                         int voll, int volr) {
-    if (!spu || voice_idx < 0 || voice_idx >= PS1_SPU_VOICES) return;
+    int max_v = spu && spu->num_voices > 0 ? spu->num_voices : PS1_SPU_HW_VOICES;
+    if (!spu || voice_idx < 0 || voice_idx >= max_v) return;
     if (vab_id < 0 || vab_id >= PS1_SPU_VAB_SLOTS || !spu->vabs[vab_id].loaded) return;
 
     Ps1VabSlot *slot = &spu->vabs[vab_id];
@@ -355,6 +374,7 @@ void ps1_spu_key_on_vab(Ps1Spu *spu, int voice_idx, Ps1VabId vab_id,
     Ps1Voice *v = &spu->voices[voice_idx];
     memset(v, 0, sizeof(*v));
     v->active = 1;
+    v->vag_loop_crossfade = spu->vag_loop_crossfade;
     v->vab_id = vab_id;
     v->sample_data = slot->body + body_off;
     v->sample_len = slot->vag_lengths[vag_idx];
@@ -368,19 +388,26 @@ void ps1_spu_key_on_vab(Ps1Spu *spu, int voice_idx, Ps1VabId vab_id,
     memcpy(&adsr1, atr + 16, 2);
     memcpy(&adsr2, atr + 18, 2);
     voice_init_adsr(v, adsr1, adsr2);
-    ps1_spu_set_reverb_voice(spu, 1u << voice_idx, (atr[1] & 4) != 0);
+    if (voice_idx < 32) {
+        ps1_spu_set_reverb_voice(spu, 1u << voice_idx, (atr[1] & 4) != 0);
+    } else {
+        if ((atr[1] & 4) != 0) spu->reverb_voice_mask |= (1ULL << voice_idx);
+        else spu->reverb_voice_mask &= ~(1ULL << voice_idx);
+    }
 
     v->curr_sample = fetch_voice_raw_sample(v);
     v->next_sample = fetch_voice_raw_sample(v);
 }
 
 void ps1_spu_voice_set_adsr(Ps1Spu *spu, int voice_idx, uint16_t adsr1, uint16_t adsr2) {
-    if (!spu || voice_idx < 0 || voice_idx >= PS1_SPU_VOICES) return;
+    int max_v = spu && spu->num_voices > 0 ? spu->num_voices : PS1_SPU_HW_VOICES;
+    if (!spu || voice_idx < 0 || voice_idx >= max_v) return;
     voice_init_adsr(&spu->voices[voice_idx], adsr1, adsr2);
 }
 
 void ps1_spu_key_off(Ps1Spu *spu, int voice_idx) {
-    if (!spu || voice_idx < 0 || voice_idx >= PS1_SPU_VOICES) return;
+    int max_v = spu && spu->num_voices > 0 ? spu->num_voices : PS1_SPU_HW_VOICES;
+    if (!spu || voice_idx < 0 || voice_idx >= max_v) return;
     Ps1Voice *v = &spu->voices[voice_idx];
     if (!v->active) return;
     if (v->env_phase != PS1_ADSR_RELEASE) {
@@ -391,15 +418,23 @@ void ps1_spu_key_off(Ps1Spu *spu, int voice_idx) {
 
 void ps1_spu_key_off_all(Ps1Spu *spu) {
     if (!spu) return;
-    for (int v = 0; v < PS1_SPU_VOICES; v++) {
-        spu->voices[v].active = 0;
-        spu->voices[v].env_phase = PS1_ADSR_OFF;
-        spu->voices[v].env_level = 0;
+    int limit = spu->num_voices > 0 ? spu->num_voices : PS1_SPU_HW_VOICES;
+    for (int v = 0; v < limit; v++) {
+        if (!spu->voices[v].active) continue;
+        if (spu->pop_suppression) {
+            spu->voices[v].fade_samples_remaining = 64;
+            spu->voices[v].fade_samples_total = 64;
+        } else {
+            spu->voices[v].active = 0;
+            spu->voices[v].env_phase = PS1_ADSR_OFF;
+            spu->voices[v].env_level = 0;
+        }
     }
 }
 
 int ps1_spu_voice_is_active(const Ps1Spu *spu, int voice_idx) {
-    if (!spu || voice_idx < 0 || voice_idx >= PS1_SPU_VOICES) return 0;
+    int max_v = spu && spu->num_voices > 0 ? spu->num_voices : PS1_SPU_HW_VOICES;
+    if (!spu || voice_idx < 0 || voice_idx >= max_v) return 0;
     return spu->voices[voice_idx].active;
 }
 
@@ -446,10 +481,10 @@ void ps1_spu_set_reverb_params(Ps1Spu *spu, int type, int depth_l, int depth_r,
 
 uint32_t ps1_spu_set_reverb_voice(Ps1Spu *spu, uint32_t mask, int enabled) {
     if (!spu) return 0;
-    mask &= 0x00ffffff;
-    if (enabled) spu->reverb_voice_mask |= mask;
-    else spu->reverb_voice_mask &= ~mask;
-    return spu->reverb_voice_mask;
+    uint64_t m = (uint64_t)(mask & 0x00ffffffu);
+    if (enabled) spu->reverb_voice_mask |= m;
+    else spu->reverb_voice_mask &= ~m;
+    return (uint32_t)(spu->reverb_voice_mask & 0x00ffffffu);
 }
 
 /* -------------------------------------------------------------------------
@@ -460,13 +495,14 @@ void ps1_spu_mix(Ps1Spu *spu, int16_t *out, int frames, int accumulate) {
 
     int32_t mvol_l = spu->master_vol_left;
     int32_t mvol_r = spu->master_vol_right;
+    int limit = spu->num_voices > 0 ? spu->num_voices : PS1_SPU_HW_VOICES;
 
     for (int f = 0; f < frames; f++) {
         int32_t mix_l = 0;
         int32_t mix_r = 0;
         int32_t send_l = 0, send_r = 0;
 
-        for (int v = 0; v < PS1_SPU_VOICES; v++) {
+        for (int v = 0; v < limit; v++) {
             Ps1Voice *voice = &spu->voices[v];
             if (!voice->active) continue;
 
@@ -478,11 +514,22 @@ void ps1_spu_mix(Ps1Spu *spu, int16_t *out, int frames, int accumulate) {
             /* ADSR envelope scaling */
             samp = (int32_t)(((int64_t)samp * voice->env_level) >> 15);
 
+            /* Micro-fade pop suppression */
+            if (voice->fade_samples_remaining > 0) {
+                samp = (int32_t)(((int64_t)samp * voice->fade_samples_remaining) / voice->fade_samples_total);
+                voice->fade_samples_remaining--;
+                if (voice->fade_samples_remaining == 0) {
+                    voice->active = 0;
+                    voice->env_phase = PS1_ADSR_OFF;
+                    voice->env_level = 0;
+                }
+            }
+
             int32_t left = (samp * (int32_t)voice->vol_left) >> 15;
             int32_t right = (samp * (int32_t)voice->vol_right) >> 15;
             mix_l += left;
             mix_r += right;
-            if (spu->reverb_voice_mask & (1u << v)) {
+            if (spu->reverb_voice_mask & (1ULL << v)) {
                 send_l += left;
                 send_r += right;
             }
@@ -518,21 +565,95 @@ void ps1_spu_mix(Ps1Spu *spu, int16_t *out, int frames, int accumulate) {
         mix_l += (wet[0] * (int32_t)spu->reverb_gain_left) >> 15;
         mix_r += (wet[1] * (int32_t)spu->reverb_gain_right) >> 15;
 
-        /* The sum of 24 voices can exceed 16-bit range before master scaling. */
-        int32_t out_l = (int32_t)(((int64_t)mix_l * mvol_l) >> 15);
-        int32_t out_r = (int32_t)(((int64_t)mix_r * mvol_r) >> 15);
+        if (spu->float_mixing) {
+            float f_l = (float)mix_l * ((float)mvol_l / 32768.0f);
+            float f_r = (float)mix_r * ((float)mvol_r / 32768.0f);
 
-        if (accumulate) {
-            out_l += out[f * 2 + 0];
-            out_r += out[f * 2 + 1];
+            if (accumulate) {
+                f_l += (float)out[f * 2 + 0];
+                f_r += (float)out[f * 2 + 1];
+            }
+
+            /* Soft-knee limiter: linear below 28000, smooth tanh saturation up to 32767 */
+            static const float KNEE = 28000.0f;
+            static const float CEIL = 32767.0f;
+            static const float RANGE = 4767.0f;
+
+            if (fabsf(f_l) > KNEE) {
+                float excess = (fabsf(f_l) - KNEE) / RANGE;
+                float sign = f_l < 0.0f ? -1.0f : 1.0f;
+                f_l = sign * (KNEE + RANGE * tanhf(excess));
+            }
+            if (fabsf(f_r) > KNEE) {
+                float excess = (fabsf(f_r) - KNEE) / RANGE;
+                float sign = f_r < 0.0f ? -1.0f : 1.0f;
+                f_r = sign * (KNEE + RANGE * tanhf(excess));
+            }
+
+            if (f_l >  32767.0f) f_l =  32767.0f;
+            if (f_l < -32768.0f) f_l = -32768.0f;
+            if (f_r >  32767.0f) f_r =  32767.0f;
+            if (f_r < -32768.0f) f_r = -32768.0f;
+
+            out[f * 2 + 0] = (int16_t)f_l;
+            out[f * 2 + 1] = (int16_t)f_r;
+        } else {
+            /* The sum of 24 voices can exceed 16-bit range before master scaling. */
+            int32_t out_l = (int32_t)(((int64_t)mix_l * mvol_l) >> 15);
+            int32_t out_r = (int32_t)(((int64_t)mix_r * mvol_r) >> 15);
+
+            if (accumulate) {
+                out_l += out[f * 2 + 0];
+                out_r += out[f * 2 + 1];
+            }
+
+            if (out_l >  32767) out_l =  32767;
+            if (out_l < -32768) out_l = -32768;
+            if (out_r >  32767) out_r =  32767;
+            if (out_r < -32768) out_r = -32768;
+
+            out[f * 2 + 0] = (int16_t)out_l;
+            out[f * 2 + 1] = (int16_t)out_r;
         }
-
-        if (out_l >  32767) out_l =  32767;
-        if (out_l < -32768) out_l = -32768;
-        if (out_r >  32767) out_r =  32767;
-        if (out_r < -32768) out_r = -32768;
-
-        out[f * 2 + 0] = (int16_t)out_l;
-        out[f * 2 + 1] = (int16_t)out_r;
     }
+}
+
+void ps1_spu_set_polyphony_expansion(Ps1Spu *spu, int enabled) {
+    if (!spu) return;
+    spu->num_voices = enabled ? PS1_SPU_MAX_VOICES : PS1_SPU_HW_VOICES;
+}
+
+int ps1_spu_get_polyphony_expansion(const Ps1Spu *spu) {
+    return spu ? (spu->num_voices > PS1_SPU_HW_VOICES) : 0;
+}
+
+void ps1_spu_set_pop_suppression(Ps1Spu *spu, int enabled) {
+    if (!spu) return;
+    spu->pop_suppression = enabled ? 1 : 0;
+}
+
+int ps1_spu_get_pop_suppression(const Ps1Spu *spu) {
+    return spu ? spu->pop_suppression : 0;
+}
+
+void ps1_spu_set_vag_crossfade(Ps1Spu *spu, int enabled) {
+    if (!spu) return;
+    spu->vag_loop_crossfade = enabled ? 1 : 0;
+    int limit = spu->num_voices > 0 ? spu->num_voices : PS1_SPU_HW_VOICES;
+    for (int v = 0; v < limit; v++) {
+        spu->voices[v].vag_loop_crossfade = spu->vag_loop_crossfade;
+    }
+}
+
+int ps1_spu_get_vag_crossfade(const Ps1Spu *spu) {
+    return spu ? spu->vag_loop_crossfade : 0;
+}
+
+void ps1_spu_set_float_mixing(Ps1Spu *spu, int enabled) {
+    if (!spu) return;
+    spu->float_mixing = enabled ? 1 : 0;
+}
+
+int ps1_spu_get_float_mixing(const Ps1Spu *spu) {
+    return spu ? spu->float_mixing : 0;
 }

@@ -1,6 +1,7 @@
 #include "ps1_seq.h"
 
 #include <string.h>
+#include <math.h>
 
 static unsigned big16(const uint8_t *p) {
     return (unsigned)p[0] * 256u + p[1];
@@ -38,6 +39,7 @@ static bool delta(Ps1Seq *seq) {
 bool ps1_seq_open(Ps1Seq *seq, const uint8_t *data, size_t size, Ps1VabId bank, bool repeat) {
     if (seq == NULL) return false;
     memset(seq, 0, sizeof(*seq));
+    seq->equal_power_panning = false;
     if (data == NULL || size < 15 || memcmp(data, "pQES", 4) != 0
         || data[4] != 0 || data[5] != 0 || data[6] != 0 || data[7] != 1) return false;
     seq->ppqn = big16(data + 8);
@@ -97,8 +99,17 @@ static void voice_volume(Ps1Seq *seq, Ps1Spu *spu, unsigned voice) {
     if (pan < 0) pan = 0;
     if (pan > 127) pan = 127;
     volume = volume * program[1] * bank->header[24] / (127u * 127u);
-    unsigned left = volume * (unsigned)(127 - pan) * 2u / 127u;
-    unsigned right = volume * (unsigned)pan * 2u / 127u;
+    unsigned left, right;
+    if (seq->equal_power_panning) {
+        float theta = ((float)pan / 127.0f) * 1.57079632679f;
+        float gain_l = cosf(theta);
+        float gain_r = sinf(theta);
+        left = (unsigned)((float)volume * gain_l);
+        right = (unsigned)((float)volume * gain_r);
+    } else {
+        left = volume * (unsigned)(127 - pan) * 2u / 127u;
+        right = volume * (unsigned)pan * 2u / 127u;
+    }
     if (left > 127) left = 127;
     if (right > 127) right = 127;
     left = left * seq->seq_vol_left / 127u;
@@ -249,4 +260,13 @@ void ps1_seq_mix(Ps1Seq *seq, Ps1Spu *spu, int16_t *out, int frames) {
         ps1_spu_mix(spu, out + i * 2, 1, 0);
         ++seq->sample_clock;
     }
+}
+
+void ps1_seq_set_equal_power_panning(Ps1Seq *seq, bool enabled) {
+    if (!seq) return;
+    seq->equal_power_panning = enabled;
+}
+
+bool ps1_seq_get_equal_power_panning(const Ps1Seq *seq) {
+    return seq ? seq->equal_power_panning : false;
 }

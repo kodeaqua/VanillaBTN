@@ -11,16 +11,18 @@ should be optional and separate from that default experience.
 This repository contains a matching decompilation of the PlayStation USA
 release (`SLUS_011.15`) and a native x64 Windows bringup executable. The
 native executable runs the original startup and scene dispatcher against
-locally imported disc data, featuring complete software GPU/GTE rasterization,
-SPU/VAB/SEQ audio, CD-XA music streaming, dual controller input with rumble, and
-virtual memory card save/load. The PS1 source builds the EXE and its 13 overlays
+locally imported disc data, using a software GPU/GTE rasterizer, SPU/VAB/SEQ
+audio, CD-XA music streaming, dual controller input with rumble, and virtual
+memory card save/load. The bringup is incomplete and gameplay fidelity is not
+established; see [TODO.md](TODO.md). The PS1 source builds the EXE and its 13 overlays
 byte for byte and, given your own copy of the disc, the whole disc image. That build
 remains the reference baseline. Building it with Docker on Windows still produces
 PS1 binaries.
 
-The [Windows roadmap](docs/roadmap.md) orders the bringup work, and the
-[enhancement blueprint](docs/enhancements.md) defines the post-bringup modernization roadmap.
-The [porting rules](docs/porting.md) define its fidelity boundaries. The
+The [baseline port work](docs/01-porting.md) records the as-is Windows bringup,
+and the [enhancement work](docs/02-enhancements.md) defines the subsequent PS1
+fixes and modernization roadmap. The baseline document also defines the port's
+fidelity boundaries. The
 [architecture guide](docs/architecture.md) maps the current code.
 [AGENTS.md](AGENTS.md) records repository rules for coding agents.
 The [versioning policy](docs/versioning.md) explains the project's development
@@ -42,7 +44,11 @@ For release packaging with application icons and manifests into a standalone `.z
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/package-release.ps1 -Configuration Release
 ```
 
-See [building instructions](docs/building.md) for Debug profile options and testing. The native build does not use Docker, WSL, or MSYS.
+See [enhancement implementation notes](docs/02-enhancements.md#implementation-notes)
+for panoramic rendering, title composition, scene transitions, configuration,
+and memory-card behavior. See [building instructions](docs/building.md) for
+Debug profile options and testing. The native build does not use Docker, WSL,
+or MSYS.
 
 ### PS1 Reference Build
 

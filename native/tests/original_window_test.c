@@ -160,6 +160,24 @@ int main(void) {
     fake_pad.pressed = PAD_CROSS;
     CHECK(text_window_draw(&ot[2], msg, 30, 168, 0, 48) == TEXT_WINDOW_CLOSED);
     fake_pad.pressed = 0;
+
+    /* Dialogue, menus and event text share insert expansion. An absent optional
+     * animal or unknown archive insert must not index past the source table. */
+    game_state.animals.slots[0].animal = -1;
+    u16 missing_insert[] = {0x4FFF, 0x4016, 0x0001, TEXT_END};
+    text_reset();
+    ClearOTagR(ot, 32);
+    text_draw_plain(&ot[2], missing_insert, 30, 168);
+    CHECK(text_window_draw(&ot[2], missing_insert, 30, 168, 0, 48) == TEXT_WINDOW_PRINTING);
+    CHECK(text_window_draw(&ot[2], missing_insert, 30, 168, 0, 48) == TEXT_WINDOW_PRINTING);
+
+    /* Empty optional labels must not read a code from before their first word. */
+    extern u16 text_last_code;
+    u16 empty_label[] = {TEXT_END};
+    text_last_code = 0x1234;
+    text_draw_plain(&ot[2], empty_label, 30, 168);
+    CHECK(text_last_code == TEXT_END);
+
     DrawOTag(ot + 31);
     CHECK(sdk_gpu_ok());
     input_pad1 = input_records;

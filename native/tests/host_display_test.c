@@ -1,5 +1,6 @@
 #include "host_display.h"
 #include "sdk_gpu.h"
+#include "config.h"
 #include <libgpu.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,8 +18,89 @@ static void color(SDL_Surface *surface, unsigned char r, unsigned char g, unsign
     CHECK(actual_r == r && actual_g == g && actual_b == b && actual_a == 255);
 }
 
+static void test_monitor_discovery_and_window_modes(void) {
+    /* Set dummy video driver for synthetic headless environment */
+    SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "dummy");
+    CHECK(SDL_Init(SDL_INIT_VIDEO));
+
+    /* 1. Multi-monitor discovery queries */
+    int count = host_display_get_monitor_count();
+    CHECK(count >= 0);
+
+    SDL_DisplayID id0 = host_display_get_monitor_id(0);
+    /* In dummy driver or real headless, ID is either 0 or a valid ID */
+    (void)id0;
+    SDL_DisplayID id_invalid = host_display_get_monitor_id(999);
+    (void)id_invalid;
+
+    SDL_Rect bounds;
+    bool has_bounds = host_display_get_monitor_bounds(0, &bounds);
+    (void)has_bounds;
+    CHECK(!host_display_get_monitor_bounds(0, NULL)); /* NULL-safety */
+
+    /* 2. Window creation with DisplayConfig */
+    DisplayConfig cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.window_mode = WINDOW_MODE_WINDOWED;
+    cfg.window_width = 800;
+    cfg.window_height = 600;
+    cfg.monitor = 0;
+
+    SDL_Window *window = host_display_create_window(&cfg);
+    CHECK(window != NULL);
+
+    /* 3. Real windowed transitions must work in the dummy backend. Other
+     * modes depend on an active display and window manager. In particular,
+     * SDL's dummy backend cannot be assumed to support maximize/exclusive
+     * fullscreen. Test their host result without treating unsupported driver
+     * capabilities as failures in headless CI. */
+    cfg.window_mode = WINDOW_MODE_WINDOWED;
+    CHECK(host_display_apply_mode(window, &cfg));
+    WindowMode optional_modes[] = {
+        WINDOW_MODE_MAXIMIZED, WINDOW_MODE_BORDERLESS, WINDOW_MODE_FULLSCREEN
+    };
+    unsigned unsupported = 0;
+    for (size_t i = 0; i < sizeof(optional_modes) / sizeof(optional_modes[0]); ++i) {
+        cfg.window_mode = optional_modes[i];
+        cfg.fullscreen_width = 800;
+        cfg.fullscreen_height = 600;
+        cfg.fullscreen_hz = 60;
+        if (!host_display_apply_mode(window, &cfg)) {
+            ++unsupported;
+            SDL_ClearError();
+        }
+        cfg.window_mode = WINDOW_MODE_WINDOWED;
+        CHECK(host_display_apply_mode(window, &cfg));
+    }
+
+    /* 4. Toggling fullscreen is transactional: unsupported modes must not
+     * mutate the config. Test both directions only when this backend can
+     * actually create a fullscreen window. */
+    CHECK(cfg.window_mode == WINDOW_MODE_WINDOWED);
+    if (host_display_toggle_fullscreen(window, &cfg)) {
+        CHECK(cfg.window_mode == WINDOW_MODE_BORDERLESS ||
+              cfg.window_mode == WINDOW_MODE_FULLSCREEN);
+        CHECK(host_display_toggle_fullscreen(window, &cfg));
+        CHECK(cfg.window_mode == WINDOW_MODE_WINDOWED);
+    } else {
+        ++unsupported;
+        CHECK(cfg.window_mode == WINDOW_MODE_WINDOWED);
+        SDL_ClearError();
+        CHECK(host_display_apply_mode(window, &cfg));
+    }
+    if (unsupported != 0) {
+        fprintf(stderr, "host_display_test: %u optional dummy video transitions unavailable (not a failure)\n",
+                unsupported);
+    }
+
+    SDL_DestroyWindow(window);
+    SDL_Quit();
+}
+
 int main(void) {
-    CHECK(SDL_Init(0));
+    test_monitor_discovery_and_window_modes();
+
+    CHECK(SDL_Init(SDL_INIT_VIDEO));
     /* Render into a memory surface: no physical window, device or gameplay. */
     SDL_Surface *surface = SDL_CreateSurface(640, 480, SDL_PIXELFORMAT_ARGB8888);
     CHECK(surface != NULL);

@@ -20,6 +20,10 @@ typedef struct SdkCdXaStatus {
 
 SdkCdXaStatus sdk_cd_xa_status(void);
 
+/* Configure seamless 0ms CD-XA looping */
+void sdk_cd_set_seamless_loop(bool enabled);
+bool sdk_cd_get_seamless_loop(void);
+
 /* Decode the mounted drive stream to unscaled stereo PCM. This advances the
  * drive even while the SPU CD input is muted; no user files are written. */
 void sdk_cd_mix(int16_t *out, int frames);

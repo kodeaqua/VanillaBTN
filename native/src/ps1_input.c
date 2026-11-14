@@ -35,6 +35,67 @@ uint32_t ps1_input_stick_buttons(int16_t host_x, int16_t host_y) {
     return PS1_PAD_LEFT;
 }
 
+void ps1_input_normalize_stick(int16_t host_x, int16_t host_y, float deadzone,
+                              bool fix_diagonal_running,
+                              uint8_t *out_x, uint8_t *out_y) {
+    if (out_x == NULL || out_y == NULL) return;
+
+    if (!fix_diagonal_running) {
+        /* Authentic PS1 linear truncation without circular rescaling */
+        *out_x = (uint8_t)(((int)host_x + 32768) / 256);
+        *out_y = (uint8_t)(((int)host_y + 32768) / 256);
+        return;
+    }
+
+    /* Convert to normalized floating-point range [-1.0, 1.0] */
+    float nx = (float)host_x / 32767.0f;
+    float ny = (float)host_y / 32767.0f;
+    if (nx < -1.0f) nx = -1.0f; if (nx > 1.0f) nx = 1.0f;
+    if (ny < -1.0f) ny = -1.0f; if (ny > 1.0f) ny = 1.0f;
+
+    float r = sqrtf(nx * nx + ny * ny);
+
+    /* Public callers may supply a nonfinite deadzone even though the INI
+     * parser rejects one. Normalize it before arithmetic and int casts. */
+    if (!isfinite(deadzone) || deadzone < 0.0f) deadzone = 0.0f;
+    if (deadzone > 0.9f) deadzone = 0.9f;
+
+    if (r <= deadzone) {
+        *out_x = 128;
+        *out_y = 128;
+        return;
+    }
+
+    /* Unit direction vector */
+    float dir_x = nx / r;
+    float dir_y = ny / r;
+
+    /* Rescale radial magnitude from [deadzone, 1.0] to [0.0, 1.0] */
+    float r_norm = (r - deadzone) / (1.0f - deadzone);
+    if (r_norm > 1.0f) r_norm = 1.0f;
+
+    /* Circular-to-octagonal gate scaling:
+     * In an octagonal/square gate, diagonal corners reach distance sqrt(2) ~ 1.414.
+     * Scale by 1.0 / max(|dir_x|, |dir_y|) so diagonal pushes reach full 1.0 magnitude. */
+    float max_axis = fmaxf(fabsf(dir_x), fabsf(dir_y));
+    float scale = (max_axis > 1e-4f) ? (1.0f / max_axis) : 1.0f;
+
+    float out_nx = dir_x * r_norm * scale;
+    float out_ny = dir_y * r_norm * scale;
+
+    if (out_nx < -1.0f) out_nx = -1.0f; if (out_nx > 1.0f) out_nx = 1.0f;
+    if (out_ny < -1.0f) out_ny = -1.0f; if (out_ny > 1.0f) out_ny = 1.0f;
+
+    int final_x = (int)roundf(128.0f + out_nx * 127.0f);
+    int final_y = (int)roundf(128.0f + out_ny * 127.0f);
+
+    if (final_x < 0) final_x = 0; if (final_x > 255) final_x = 255;
+    if (final_y < 0) final_y = 0; if (final_y > 255) final_y = 255;
+
+    *out_x = (uint8_t)final_x;
+    *out_y = (uint8_t)final_y;
+}
+
 #include <string.h>
 
 void ps1_input_init(Ps1InputRecord *record) {

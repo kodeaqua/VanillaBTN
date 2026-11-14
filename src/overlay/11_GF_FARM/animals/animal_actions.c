@@ -180,7 +180,13 @@ void farm_action_set_countdown(s32 step, s32 start_value) {
 
 /* Zero an actor record, which frees its slot. */
 void farm_action_clear(void *arg) {
+#ifdef VANILLABTN_NATIVE
+    /* PS1's 0xB0-byte record grows with native animation pointers; a
+     * partial clear leaves stale sprite state when a slot is reused. */
+    memset(arg, 0, sizeof(FarmAction));
+#else
     memset(arg, 0, 0xB0);
+#endif
     *(s16 *)arg = 0;
 }
 

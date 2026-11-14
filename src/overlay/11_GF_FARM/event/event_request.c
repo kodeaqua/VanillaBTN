@@ -133,13 +133,23 @@ static void event_request_claim_unchecked(s32 event)
 /* Claim a request slot for `event` unless it is already queued (see scene_claim_entry). */
 struct FarmRequestSlot *event_request_claim(s32 event)
 {
+#ifdef VANILLABTN_NATIVE
+    /* Native C must return the slot explicitly. The reference MIPS build
+     * preserves the original call/return sequence below for binary parity. */
+    return scene_claim_entry(event, 1, 0);
+#else
     scene_claim_entry(event, 1, 0);
+#endif
 }
 
 /* As event_request_claim, but the claim may use any of the five slots. */
 struct FarmRequestSlot *event_request_claim_any(s32 event)
 {
+#ifdef VANILLABTN_NATIVE
+    return scene_claim_entry(event, 0, 1);
+#else
     scene_claim_entry(event, 0, 1);
+#endif
 }
 
 /* Advance one timer: 0xFF means stopped, and a running timer stops at 120. */
