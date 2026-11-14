@@ -6,9 +6,11 @@ recorded in [Work 02](docs/02-enhancements.md).
 
 ## Gameplay and visual acceptance
 
-- [ ] **Left panorama seam** — negative filtered subpixels now use floor
-      division, including mask lookups and repeated backgrounds. Recheck the
-      title-screen line; synthetic coverage does not prove its visual cause.
+- [ ] **Left panorama seam** — panorama backgrounds now use the known-good
+      mirror from `76727ca`, bypassing per-tile host filtering. A regression
+      test proves uniform samples across the center/side boundary; recheck
+      the title-screen line visually. Composed-background filtering remains
+      pending as part of the GPU renderer migration.
 - [ ] **GPU renderer migration** — move rasterization and texture filtering
       onto the host GPU, preserve PS1 transfer/readback semantics, and compare
       against the software reference. This migration is not implemented yet.

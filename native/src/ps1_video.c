@@ -1541,6 +1541,11 @@ static bool draw_sprite_copy(Ps1Video *video,
         (s_texture_filter == PS1_FILTER_XBRZ || s_replacement_provider
             || (s_2d_widescreen_expansion && !is_projected));
     const bool background = s_2d_widescreen_expansion && !is_projected;
+    /* Per-tile filtering clamps samples at authored tile borders and can
+     * switch to nearest halfway through a panorama when the budget runs out.
+     * Keep the baseline mirror until background filtering runs on a composed
+     * surface with shared samples across the center and side columns. */
+    if (background) host_filtered = false;
     if (host_filtered && !background
         && (size_t)source_width * (size_t)source_height
             > PS1_HOST_FILTER_MAX_SOURCE_PIXELS) {

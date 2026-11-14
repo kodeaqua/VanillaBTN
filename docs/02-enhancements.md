@@ -623,6 +623,12 @@ changes separate from the matching PS1 reference build.
   frame. Texture regions larger than 4,096 source pixels likewise retain the
   native mirror unless they are an explicitly marked background. This is a
   presentation fallback only and never changes VRAM or game simulation.
+- Panorama backgrounds currently bypass per-tile host filtering and use the
+  mirror path from `76727ca`. Filtering individual tiles introduced boundary
+  differences and could change mode partway through a background when its
+  frame budget was exhausted. `background_filter` remains parsed, but these
+  backgrounds retain nearest until filtering can run on their composed
+  surface. Sprite/UI xBRZ remains available.
 - `pixel_aspect_ratio = crt_ntsc` applies the NTSC CRT 1.092 horizontal pixel
   aspect at SDL presentation, without changing VRAM resolution, HUD placement,
   game coordinates or polygon projection. Hor+ FOV is calculated from the

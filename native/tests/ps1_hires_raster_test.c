@@ -218,6 +218,29 @@ static void test_filtered_repeat_covers_left_seam(void) {
 }
 
 int main(void) {
+    /* Panorama backgrounds retain the known-good mirror until filtering can
+     * be applied across the composed image rather than individual tiles. */
+    memset(&video, 0, sizeof(video));
+    ps1_video_set_render_scale(3);
+    CHECK(ps1_video_configure_panorama(320, 240, 4.0f / 3.0f));
+    ps1_video_panorama_begin_frame();
+    ps1_video_set_true_color(true);
+    ps1_video_set_texture_filter(PS1_FILTER_XBRZ);
+    ps1_video_set_background_filter(PS1_BACKGROUND_BICUBIC);
+    ps1_video_set_2d_widescreen_expansion(true);
+    Ps1DrawState backdrop_state = state_for_page(0);
+    video.vram[0][640] = 0x001Fu;
+    video.vram[0][641] = 0x7C00u;
+    Ps1Sprite backdrop = {-1, 0, 2, 1, 0, 0,
+        10u | (2u << 7), 0, 0x808080u, true, false};
+    CHECK(ps1_video_draw_sprite(&video, &backdrop_state, &backdrop));
+    CHECK(ps1_video_copy_scaled_panorama(&video, 0, 0, 320, 240, output, 1281));
+    for (int x = 52 * 3; x < 53 * 3; ++x)
+        CHECK(output[x] == 0xFFFF0000u);
+    for (int x = 53 * 3; x < 54 * 3; ++x)
+        CHECK(output[x] == 0xFF0000FFu);
+    ps1_video_set_2d_widescreen_expansion(false);
+    ps1_video_set_texture_filter(PS1_FILTER_NEAREST);
     test_filtered_repeat_covers_left_seam();
     test_actual_subpixel_shading_and_hud_compositing();
     test_panorama_margins_and_second_page();
