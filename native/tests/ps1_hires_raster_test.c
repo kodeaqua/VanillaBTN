@@ -189,7 +189,36 @@ static void test_host_texture_filters_do_not_rewrite_source(void) {
     ps1_video_set_texture_replacement_provider(NULL, NULL);
 }
 
+/* Characterization: verifies coverage, but also passes before floor division.
+ * The active window's visible seam still needs developer acceptance. */
+static void test_filtered_repeat_covers_left_seam(void) {
+    memset(&video, 0, sizeof(video));
+    ps1_video_set_render_scale(3);
+    CHECK(ps1_video_configure_panorama(320, 240, 4.0f / 3.0f));
+    ps1_video_panorama_begin_frame();
+    ps1_video_set_texture_filter(PS1_FILTER_NEAREST);
+    ps1_video_set_background_filter(PS1_BACKGROUND_NEAREST);
+    ps1_video_set_2d_widescreen_expansion(true);
+    ps1_video_set_2d_widescreen_repeat(true);
+    Ps1DrawState state = state_for_page(0);
+    /* A masked center pixel must not suppress negative host subpixels. */
+    state.check_mask = true;
+    video.vram[0][0] = 0x8000u;
+    for (int y = 0; y < 24; ++y)
+        for (int x = 640; x < 664; ++x) video.vram[y][x] = 0x7FFFu;
+    Ps1Sprite sprite = {72, 0, 24, 24, 0, 0,
+        10u | (2u << 7), 0, 0x808080u, true, false};
+    CHECK(ps1_video_draw_sprite(&video, &state, &sprite));
+    CHECK(ps1_video_copy_scaled_panorama(&video, 0, 0, 320, 240, output, 1281));
+    for (int x = 53 * 3 - 3; x < 53 * 3; ++x)
+        CHECK(output[x] == 0xFFFFFFFFu);
+    ps1_video_set_2d_widescreen_expansion(false);
+    ps1_video_set_2d_widescreen_repeat(false);
+    ps1_video_set_widescreen_scale(1.0f, 160.0f);
+}
+
 int main(void) {
+    test_filtered_repeat_covers_left_seam();
     test_actual_subpixel_shading_and_hud_compositing();
     test_panorama_margins_and_second_page();
     test_white_margin_after_clearing();

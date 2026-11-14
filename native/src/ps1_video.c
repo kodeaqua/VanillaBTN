@@ -1241,7 +1241,9 @@ static void hires_draw_filtered_sprite(Ps1Video *video, const Ps1DrawState *stat
         float source_y = logical_y - (float)origin_y;
         if (source_y < 0.0f || source_y >= (float)source_height) continue;
         for (int sx = scaled_left; sx < scaled_right; ++sx) {
-            int logical_col = sx / scale;
+            /* Negative panorama coordinates need floor division: truncating
+             * -1/scale to zero drops the last side-only samples at the seam. */
+            int logical_col = sx < 0 ? (sx - scale + 1) / scale : sx / scale;
             if (side_only && logical_col >= 0 && logical_col < 320) continue;
             float logical_x = ((float)sx + 0.5f) / scale;
             float source_x = (logical_x - dest_left)
