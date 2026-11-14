@@ -10,12 +10,9 @@ reference baseline and must continue to match their original SHA-1 hashes.
 
 The vision depends on the major change currently being worked on, and the
 developer decides it. The baseline bringup (PR #2) was an as-is port. The
-enhancement phase (PR #3) adds PS1 flaw fixes and modern enhancements, enabled by
+current phase (PR #3) adds PS1 flaw fixes and modern enhancements, enabled by
 default through the `modern` preset, while the `authentic_ps1` preset keeps the
-original behavior. The developer has now authorized Work 03 in
-[docs/03-native-gpu.md](docs/03-native-gpu.md): migrate rasterization and filtering
-to the host GPU while preserving game-visible transfers and game logic. This
-work is active; a GPU raster backend is not implemented yet. When the developer starts a new major change, ask for its
+original behavior. When the developer starts a new major change, ask for its
 vision before assuming either rule, and update this section and the applicable
 numbered work document under `docs/` to match. Start from
 [docs/work-template.md](docs/work-template.md) for a new major work item.

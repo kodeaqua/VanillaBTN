@@ -11,10 +11,9 @@ recorded in [Work 02](docs/02-enhancements.md).
       test proves uniform samples across the center/side boundary; recheck
       the title-screen line visually. Composed-background filtering remains
       pending as part of the GPU renderer migration.
-- [ ] **GPU renderer migration** — follow [Work 03](docs/03-native-gpu.md).
-      Next: device/resource/shader prototype and a synthetic GPU transfer test,
-      then ordered transfers and primitive rasterization. GPU implementation
-      remains pending; the software reference is still the active renderer.
+- [ ] **GPU renderer migration** — move rasterization and texture filtering
+      onto the host GPU, preserve PS1 transfer/readback semantics, and compare
+      against the software reference. This migration is not implemented yet.
 
 - [ ] **Host texture filtering** — compare `nearest`, `xbrz`, and the separate
       `bilinear`/`bicubic` background modes across farm actors, UI, title/menu
