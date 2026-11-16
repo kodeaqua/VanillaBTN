@@ -1,0 +1,13 @@
+# New VanillaBTN text content only: avoid bulk renormalization of PS1 reference files.
+/AGENTS.md text eol=lf
+/TODO.md text eol=lf
+/VANILLABTN.md text eol=lf
+/docs/*.md text eol=lf
+*.rs text eol=lf
+*.toml text eol=lf
+
+# Keep binary files opaque in Git; do not treat game resources as text.
+*.bin -text
+*.iso -text
+*.img -text
+*.exe -text
