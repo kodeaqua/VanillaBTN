@@ -77,6 +77,24 @@ else()
     install(FILES "${PROJECT_SOURCE_DIR}/LICENSE" "${PROJECT_SOURCE_DIR}/NOTICE" DESTINATION .)
 endif()
 
+add_executable(vanillabtn_seq_test test_seq_player.c seq_player.c)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    if(vanillabtn_llvm)
+        target_compile_options(vanillabtn_seq_test PRIVATE -O0 -g -Wall -Wextra)
+        foreach(sanitizer IN LISTS sanitizers)
+            set(flag "-fsanitize=${sanitizer}")
+            string(TOUPPER "${sanitizer}" sanitizer_name)
+            if(VANILLABTN_HAS_${sanitizer_name}_SANITIZER)
+                target_compile_options(vanillabtn_seq_test PRIVATE "${flag}")
+                target_link_options(vanillabtn_seq_test PRIVATE "${flag}")
+            endif()
+        endforeach()
+    else()
+        target_compile_options(vanillabtn_seq_test PRIVATE /W4)
+    endif()
+endif()
+add_test(NAME vanillabtn_seq_player COMMAND vanillabtn_seq_test)
+
 add_test(NAME vanillabtn_native_smoke
     COMMAND ${CMAKE_COMMAND} "-DEXECUTABLE=$<TARGET_FILE:vanillabtn>" "-DBUILD_CONFIG=$<CONFIG>"
     "-DHAS_GAME=$<BOOL:${VANILLABTN_PSYZ_SOURCE_DIR}>"
