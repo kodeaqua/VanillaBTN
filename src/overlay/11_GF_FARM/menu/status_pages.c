@@ -131,6 +131,15 @@ static s16 status_recipe_count;
 static AnimState status_page_sprites[3];
 AnimState status_cursor_sprite;
 AnimState status_mark_sprite;
+#ifdef __psyz
+static AnimState *const status_sprite_slots[] = {
+    &status_page_sprites[0], &status_page_sprites[1], &status_page_sprites[2],
+    &status_cursor_sprite, &status_mark_sprite,
+};
+#define STATUS_SPRITE(index) (status_sprite_slots[(index)])
+#else
+#define STATUS_SPRITE(index) (&status_page_sprites[(index)])
+#endif
 
 /* A one-shot latch: set once, drawn while set, cleared to reset. */
 static s32 status_latch = 0;
@@ -312,7 +321,11 @@ static void status_summary_build(void) {
     status_list_top = 0;
     status_cycle_frames = 0;
     for (i = 0; i < 14; i++) {
+#ifdef __psyz
+        u16 c = i < NAME_LENGTH ? game_state.progress.estate.farmName[i] : TEXT_END;
+#else
         u16 c = (game_state.progress.estate.farmName)[i];
+#endif
 
         if (c != TEXT_END) {
             status_text_line[i] = c;
@@ -422,21 +435,13 @@ static void status_load_sprites(void) {
     texture_pack_load(STAGING_BUFFER + sizeof(FarmPack));
     status_pack = *(FarmPack *)STAGING_BUFFER;
 #ifdef __psyz
-    AnimState *const sprites[] = {
-        &status_page_sprites[0], &status_page_sprites[1], &status_page_sprites[2],
-        &status_cursor_sprite, &status_mark_sprite,
-    };
-    _Static_assert(sizeof(sprites) / sizeof(sprites[0]) ==
+    _Static_assert(sizeof(status_sprite_slots) / sizeof(status_sprite_slots[0]) ==
                        sizeof(status_sprite_offsets) / sizeof(status_sprite_offsets[0]),
                    "each status sprite needs a pack offset");
-    for (i = 0; i < sizeof(sprites) / sizeof(sprites[0]); i++) {
-        anim_bind_file(sprites[i], (AnimFile *)(status_pack.bytes + status_sprite_offsets[i]));
-    }
-#else
-    for (i = 0; i < 5; i++) {
-        anim_bind_file(&status_page_sprites[i], (AnimFile *)(status_pack.bytes + status_sprite_offsets[i]));
-    }
 #endif
+    for (i = 0; i < 5; i++) {
+        anim_bind_file(STATUS_SPRITE(i), (AnimFile *)(status_pack.bytes + status_sprite_offsets[i]));
+    }
 }
 
 /* Advance the page sequence (steps 1 to 6) as the screen fades out and back in.
@@ -564,8 +569,7 @@ static void status_draw_summary(void) {
 }
 
 static void status_draw_sprite_label(s32 sprite, s32 anim, u16 *text, s16 x, s16 y) {
-    anim_draw_sprt_cursor(&current_frame->otTags[0][26], &status_page_sprites[sprite], anim & 0xFF, 0,
-                  x, y);
+    anim_draw_sprt_cursor(&current_frame->otTags[0][26], STATUS_SPRITE(sprite), anim & 0xFF, 0, x, y);
     text_draw_plain(&current_frame->otTags[0][21], text, x + 24, y + 4);
 }
 
@@ -644,8 +648,8 @@ typedef struct FarmStatusMark {
 } FarmStatusMark;
 
 static void status_draw_entry(s32 value, s32 sprite, s32 animation, s32 frame, u16 *text, s16 x, s16 y) {
-    anim_draw_sprt_cursor(&current_frame->otTags[0][26], &status_page_sprites[sprite], animation & 0xFF,
-                  frame & 0xFF, x, y);
+    anim_draw_sprt_cursor(&current_frame->otTags[0][26], STATUS_SPRITE(sprite), animation & 0xFF,
+                          frame & 0xFF, x, y);
     text_draw_plain(&current_frame->otTags[0][21], text, x + 24, y + 2);
     status_draw_glyph_run_4(value, x + 96, y + 16);
 }
