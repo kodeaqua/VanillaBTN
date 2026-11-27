@@ -715,12 +715,34 @@ static SaveSlotRecord save_slot_records[3];
 static u8 saveload_unused_801377A0[128];
 static s16 save_slot_status[4];
 static u8 *save_icon_base;
+#ifdef __psyz
+/* PS1 BSS lays out the header, three icon frames, slot record, and image data
+ * contiguously across SAVE_FILE_BYTES (0x9690); keep one object for native safety. */
+static union {
+    u8 raw[SAVE_FILE_BYTES];
+    struct {
+        u8 header[0x80];
+        IconFrame icon_frame_0;
+        IconFrame icon_frame_1;
+        IconFrame icon_frame_2;
+        u8 slot_record[0x80];
+        u8 image_data[SAVE_FILE_BYTES - 0x280];
+    } fields;
+} save_file_buf;
+#define save_file_header (save_file_buf.raw)
+#define save_icon_frame_0 (save_file_buf.fields.icon_frame_0)
+#define save_icon_frame_1 (save_file_buf.fields.icon_frame_1)
+#define save_icon_frame_2 (save_file_buf.fields.icon_frame_2)
+#define save_slot_record (save_file_buf.fields.slot_record)
+#define save_image_data (save_file_buf.fields.image_data)
+#else
 static u8 save_file_header[0x80];
 static IconFrame save_icon_frame_0;
 static IconFrame save_icon_frame_1;
 static IconFrame save_icon_frame_2;
 static u8 save_slot_record[0x80];
 static u8 save_image_data[0x9690 - 0x280];
+#endif
 static char save_file_name_buf[32];
 static u16 save_name_line[24];
 static SaveHeader save_header;
