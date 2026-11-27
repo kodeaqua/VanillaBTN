@@ -17,6 +17,13 @@ if(vanillabtn_llvm)
     set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
 endif()
 add_executable(vanillabtn main.c)
+set(VANILLABTN_PSYZ_SOURCE_DIR "" CACHE PATH "Local PsyZ source checkout for the game build")
+if(VANILLABTN_PSYZ_SOURCE_DIR)
+    if(NOT vanillabtn_llvm)
+        message(FATAL_ERROR "Configure the native game with -DCMAKE_C_COMPILER=clang.")
+    endif()
+    include(game_sources.cmake)
+endif()
 configure_file("${PROJECT_SOURCE_DIR}/tools/psx_disc.py" tools/psx_disc.py COPYONLY)
 configure_file("${PROJECT_SOURCE_DIR}/disc/disc.sha1" disc/disc.sha1 COPYONLY)
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -72,5 +79,6 @@ endif()
 
 add_test(NAME vanillabtn_native_smoke
     COMMAND ${CMAKE_COMMAND} "-DEXECUTABLE=$<TARGET_FILE:vanillabtn>" "-DBUILD_CONFIG=$<CONFIG>"
+    "-DHAS_GAME=$<BOOL:${VANILLABTN_PSYZ_SOURCE_DIR}>"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/smoke.cmake"
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}")

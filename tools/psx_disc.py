@@ -10,6 +10,9 @@ file system with the CD-XA extensions.
     psx_disc.py import DISC.bin|DISC.cue --out DIR
         Check the USA reference checksum, then extract to DIR.
 
+    psx_disc.py prepare-cue DISC.bin|DISC.cue --out OUT.cue
+        Check the USA reference checksum, then write a single-track descriptor.
+
     psx_disc.py build LAYOUT.xml --files DIR [--replace NAME=PATH]... -o OUT.bin [--cue OUT.cue]
         The image LAYOUT.xml describes (an mkpsxiso <iso_project>), its files read
         from DIR, or from PATH for each --replace'd disc path.
@@ -36,6 +39,7 @@ SYNC = b"\x00" + b"\xff" * 10 + b"\x00"
 PREGAP = 150                # the 2 s before LBA 0 (MSF 00:02:00)
 LICENSE_SECTORS = 12        # sectors 0-11: the licence data; 12-15 are empty Form 2
 PVD_LBA = 16
+PSYZ_CUE_PATH_BYTES = 512
 
 # Sub-header sub-modes (CD-XA).
 SM_EOR, SM_DATA, SM_FORM2, SM_EOF = 0x01, 0x08, 0x20, 0x80
@@ -427,6 +431,40 @@ def cue_binary(cue: Path) -> Path:
     return binary
 
 
+def check_reference_sha1(digest: str) -> None:
+    manifest = Path(__file__).resolve().parents[1] / "disc" / "disc.sha1"
+    match = re.search(r"(?m)^([0-9a-f]{40})[ \t]+disc\.bin$", manifest.read_text(encoding="ascii"))
+    if not match:
+        raise SystemExit("The disc manifest has no reference SHA-1.")
+    if digest != match[1]:
+        raise SystemExit("The disc does not match the USA reference SHA-1.")
+
+
+def prepare_cue(disc: Path, out: Path) -> None:
+    """Verify the reference and write a single-track CUE for the native loader."""
+    binary = (cue_binary(disc) if disc.suffix.lower() == ".cue" else disc).resolve(strict=True)
+    if binary == out.resolve() or disc.resolve() == out.resolve():
+        raise SystemExit("The runtime CUE must be a separate file.")
+    path = binary.as_posix()
+    if any(character in path for character in '"\r\n'):
+        raise SystemExit("The disc path is not supported by the native loader.")
+    try:
+        encoded_path = path.encode("mbcs" if sys.platform == "win32" else "utf-8")
+    except UnicodeError:
+        raise SystemExit("The disc path is not supported by the native loader.") from None
+    if len(encoded_path) >= PSYZ_CUE_PATH_BYTES:
+        raise SystemExit("The disc path is too long for the native loader.")
+
+    sha1 = hashlib.sha1(usedforsecurity=False)
+    with binary.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            sha1.update(chunk)
+    check_reference_sha1(sha1.hexdigest())
+    out.write_bytes(
+        b'FILE "' + encoded_path + b'" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n'
+    )
+
+
 def extract(disc: Path, out: Path, verify_reference: bool = False) -> None:
     image = disc.read_bytes()
     label = "Disc" if verify_reference else str(disc)
@@ -439,12 +477,7 @@ def extract(disc: Path, out: Path, verify_reference: bool = False) -> None:
         _extract_image(image, pvd, out)
         return
 
-    manifest = Path(__file__).resolve().parents[1] / "disc" / "disc.sha1"
-    match = re.search(r"(?m)^([0-9a-f]{40})[ \t]+disc\.bin$", manifest.read_text(encoding="ascii"))
-    if not match:
-        raise SystemExit("The disc manifest has no reference SHA-1.")
-    if hashlib.sha1(image, usedforsecurity=False).hexdigest() != match[1]:
-        raise SystemExit("The disc does not match the USA reference SHA-1.")
+    check_reference_sha1(hashlib.sha1(image, usedforsecurity=False).hexdigest())
 
     staging_parent = out if out.is_dir() else out.parent
     staging_parent.mkdir(parents=True, exist_ok=True)
@@ -609,6 +642,9 @@ def main(argv: list[str] | None = None) -> int:
     p = commands.add_parser("import", help="verify and extract the USA reference BIN or CUE")
     p.add_argument("disc", type=Path)
     p.add_argument("--out", type=Path, required=True)
+    p = commands.add_parser("prepare-cue", help="verify the USA disc and write a runtime CUE")
+    p.add_argument("disc", type=Path)
+    p.add_argument("--out", type=Path, required=True)
     p = commands.add_parser("build", help="an image from a layout and its files")
     p.add_argument("layout", type=Path)
     p.add_argument("--files", type=Path, required=True)
@@ -618,6 +654,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "extract":
         extract(args.disc, args.out)
+    elif args.command == "prepare-cue":
+        try:
+            prepare_cue(args.disc, args.out)
+        except OSError as error:
+            raise SystemExit(f"Could not prepare disc ({error.strerror}).") from None
     elif args.command == "import":
         try:
             disc = cue_binary(args.disc) if args.disc.suffix.lower() == ".cue" else args.disc

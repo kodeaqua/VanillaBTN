@@ -95,6 +95,12 @@ for graphics types and build integration.
   duplicate global symbols, 0 pointer-truncation warnings, and 0 buffer-bounds
   warnings. Together with `native/sdk_compat.c`, all 113 units link cleanly
   against `psyz.lib` and `SDL3-static.lib` with 0 unresolved symbols.
+- **Local game build.** Set `VANILLABTN_PSYZ_SOURCE_DIR` with Windows Clang to link the same
+  source manifests into `vanillabtn`. Use `--disc` to verify and mount a reference image.
+  [Build and launch instructions](README.md#build-and-run-the-game-locally)
+- **Windows launch smoke.** Debug with the reference BIN and an installed Release with
+  the reference CUE initialized Direct3D 12 and ran for 15 seconds. CTest also verifies
+  that a mismatched image is rejected before starting the game.
 - **Runtime probes.** Verified A_FILE disc reads, PsyZ pad polling, 64-bit
   text-bank pointers, GTE `RotMatrixZXY` and transforms, `MoveImage2` VRAM copy,
   `libgs` lighting/offset, `kernel.h` `struct DIRENTRY`, and `libmcrd`/`libmcx`
@@ -125,8 +131,8 @@ compatibility layer covers the remaining PsyZ `00fb42e` gaps so all 113 units li
 | PocketStation (`libmcx`) | `McxStartCom`, `McxStopCom`, `McxCardType`, `McxSync`, plus 15 sample-only calls in `10_PdaSamp` | Reports PocketStation absent (`McxErrInvalid` on valid card ports) so regular memory-card probing succeeds. |
 
 All 113 units have 0 pointer-to-integer, buffer-bounds, and `-Wreturn-type`
-warnings. Next: verify PS1/native save cross-compatibility, audio and day/season
-parity, and wire the CMake full-game target once PsyZ licensing is confirmed.
+warnings. Verify PS1/native save cross-compatibility and audio, day, and season
+parity through the local game build.
 
 ## Verification
 

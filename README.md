@@ -60,8 +60,22 @@ ctest --test-dir build/native/llvm-debug --output-on-failure
 For LLVM Release, use the Release preset and `build/native/llvm-release`.
 LLVM Debug enables AddressSanitizer and UndefinedBehaviorSanitizer when available.
 
-This target supports startup and reference-disc import. See the roadmap for game and
-overlay integration milestones.
+### Build and run the game locally
+
+Point CMake at a local PsyZ checkout at revision `00fb42e` with its SDL submodule
+initialized. Configure from a Windows x64 developer shell with Clang.
+
+```powershell
+cmake --preset windows-x64-release -B build/native/game-release -DCMAKE_C_COMPILER=clang "-DVANILLABTN_PSYZ_SOURCE_DIR=path/to/psyz"
+cmake --build build/native/game-release
+ctest --test-dir build/native/game-release --output-on-failure
+& .\build\native\game-release\native\vanillabtn.exe --disc 'path\to\disc.cue'
+```
+
+Use `windows-x64-debug` and a separate build directory for Debug. The build links
+the game and overlays into `vanillabtn.exe`. `--disc` accepts the USA BIN or CUE
+and verifies it using Python 3.10 or newer on `PATH`. PsyZ stores virtual cards
+under `%LOCALAPPDATA%\VanillaBTN`.
 
 ### Import a reference disc locally
 

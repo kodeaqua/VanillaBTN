@@ -24,3 +24,14 @@ execute_process(COMMAND "${EXECUTABLE}" --import-disc RESULT_VARIABLE result
 if(NOT result STREQUAL "2" OR NOT diagnostic MATCHES "Usage: vanillabtn")
     message(FATAL_ERROR "The import option must report a missing disc argument.")
 endif()
+
+if(HAS_GAME)
+    set(invalid_disc "${CMAKE_CURRENT_BINARY_DIR}/smoke_invalid_disc")
+    file(WRITE "${invalid_disc}" "Invalid reference image")
+    execute_process(COMMAND "${EXECUTABLE}" --disc "${invalid_disc}" RESULT_VARIABLE result
+        ERROR_VARIABLE diagnostic TIMEOUT 15)
+    file(REMOVE "${invalid_disc}")
+    if(NOT result STREQUAL "1" OR NOT diagnostic MATCHES "does not match the USA reference SHA-1")
+        message(FATAL_ERROR "A mismatched disc must be rejected before boot.")
+    endif()
+endif()

@@ -3,6 +3,12 @@
 #include <wchar.h>
 #include <windows.h>
 
+#ifdef VANILLABTN_HAS_GAME
+#include <psyz/cd.h>
+
+int vanillabtn_game_main(void);
+#endif
+
 #if !defined(_M_X64)
 #error VanillaBTN requires the Windows x64 compiler target.
 #endif
@@ -18,19 +24,21 @@ static int adjacent_file(wchar_t path[MAX_PATH], const wchar_t *filename) {
     return name != NULL && wcscpy_s(name + 1, MAX_PATH - (name + 1 - path), filename) == 0;
 }
 
-static int import_disc(const wchar_t *disc) {
+static int data_directory(wchar_t path[MAX_PATH]) {
+    DWORD length = GetEnvironmentVariableW(L"LOCALAPPDATA", path, MAX_PATH);
+    if (length == 0 || length >= MAX_PATH || wcschr(path, L'"') ||
+        wcscat_s(path, MAX_PATH, L"\\VanillaBTN") != 0) {
+        fputs("Could not locate the local data directory.\n", stderr);
+        return 0;
+    }
+    return 1;
+}
+
+static int run_disc_tool(const wchar_t *operation, const wchar_t *disc, const wchar_t *output) {
     DWORD attributes = GetFileAttributesW(disc);
     if (attributes == INVALID_FILE_ATTRIBUTES || (attributes & FILE_ATTRIBUTE_DIRECTORY) ||
         wcslen(disc) >= MAX_PATH || wcschr(disc, L'"')) {
         fputs("Could not open the supplied disc image.\n", stderr);
-        return 0;
-    }
-
-    wchar_t output[MAX_PATH];
-    DWORD length = GetEnvironmentVariableW(L"LOCALAPPDATA", output, MAX_PATH);
-    if (length == 0 || length >= MAX_PATH || wcschr(output, L'"') ||
-        wcscat_s(output, MAX_PATH, L"\\VanillaBTN\\disc") != 0) {
-        fputs("Could not locate the local data directory.\n", stderr);
         return 0;
     }
 
@@ -55,8 +63,8 @@ static int import_disc(const wchar_t *disc) {
 
     wchar_t command[5 * MAX_PATH];
     if (swprintf_s(command, _countof(command),
-                   L"\"%ls\" -I \"%ls\" import --out \"%ls\" -- \"%ls\"", python, script, output,
-                   disc) < 0) {
+                   L"\"%ls\" -I \"%ls\" %ls --out \"%ls\" -- \"%ls\"", python, script,
+                   operation, output, disc) < 0) {
         return 0;
     }
 
@@ -64,7 +72,7 @@ static int import_disc(const wchar_t *disc) {
     startup.cb = sizeof(startup);
     PROCESS_INFORMATION process;
     if (!CreateProcessW(python, command, NULL, NULL, FALSE, 0, NULL, NULL, &startup, &process)) {
-        fputs("Could not start Python for disc import.\n", stderr);
+        fputs("Could not start Python for disc verification.\n", stderr);
         return 0;
     }
     CloseHandle(process.hThread);
@@ -72,11 +80,53 @@ static int import_disc(const wchar_t *disc) {
     int succeeded = WaitForSingleObject(process.hProcess, INFINITE) == WAIT_OBJECT_0 &&
                     GetExitCodeProcess(process.hProcess, &status) && status == 0;
     CloseHandle(process.hProcess);
-    if (!succeeded) {
-        fputs("Reference disc import failed.\n", stderr);
-    }
     return succeeded;
 }
+
+static int import_disc(const wchar_t *disc) {
+    wchar_t output[MAX_PATH];
+    return data_directory(output) && wcscat_s(output, MAX_PATH, L"\\disc") == 0 &&
+           run_disc_tool(L"import", disc, output);
+}
+
+#ifdef VANILLABTN_HAS_GAME
+static int launch_game(const wchar_t *disc) {
+    wchar_t directory[MAX_PATH];
+    if (!data_directory(directory)) {
+        return 1;
+    }
+
+    wchar_t temp_directory[MAX_PATH];
+    wchar_t cue[MAX_PATH];
+    DWORD length = GetTempPathW(MAX_PATH, temp_directory);
+    if (length == 0 || length >= MAX_PATH || wcschr(temp_directory, L'"') ||
+        GetTempFileNameW(temp_directory, L"vbt", 0, cue) == 0) {
+        fputs("Could not create a temporary disc descriptor.\n", stderr);
+        return 1;
+    }
+
+    char mount_path[MAX_PATH];
+    BOOL substituted = FALSE;
+    UINT code_page = GetACP();
+    DWORD flags = code_page == CP_UTF8 ? WC_ERR_INVALID_CHARS : WC_NO_BEST_FIT_CHARS;
+    BOOL *used_default = code_page == CP_UTF8 ? NULL : &substituted;
+    int mounted = WideCharToMultiByte(code_page, flags, cue, -1, mount_path, sizeof(mount_path),
+                                      NULL, used_default) &&
+                  !substituted && run_disc_tool(L"prepare-cue", disc, cue) &&
+                  Psyz_CdSetDiskPath(mount_path) == 0;
+    DeleteFileW(cue);
+    if (!mounted) {
+        fputs("Could not mount the USA reference disc.\n", stderr);
+        return 1;
+    }
+    if ((!CreateDirectoryW(directory, NULL) && GetLastError() != ERROR_ALREADY_EXISTS) ||
+        !SetCurrentDirectoryW(directory)) {
+        fputs("Could not use the local data directory.\n", stderr);
+        return 1;
+    }
+    return vanillabtn_game_main();
+}
+#endif
 
 #ifdef VANILLABTN_DEBUG
 static int write_startup_log(void) {
@@ -109,11 +159,21 @@ int wmain(int argc, wchar_t *argv[]) {
     }
 #endif
     if (argc != 1) {
+#ifdef VANILLABTN_HAS_GAME
+        if (argc == 3 && wcscmp(argv[1], L"--disc") == 0) {
+            return launch_game(argv[2]);
+        }
+#endif
         if (argc != 3 || wcscmp(argv[1], L"--import-disc") != 0) {
+#ifdef VANILLABTN_HAS_GAME
+            fputs("Usage: vanillabtn [--disc PATH | --import-disc PATH]\n", stderr);
+#else
             fputs("Usage: vanillabtn [--import-disc PATH]\n", stderr);
+#endif
             return 2;
         }
         if (!import_disc(argv[2])) {
+            fputs("Reference disc import failed.\n", stderr);
             return 1;
         }
         puts("Reference disc imported.");
