@@ -4,7 +4,11 @@
  */
 #include "abs.h"
 #include <string.h>
+#ifdef __psyz
+#include <math.h>
+#else
 #include <libmath.h>
+#endif
 #include <sys/types.h>
 #include <libgte.h>
 #include <libgpu.h>
