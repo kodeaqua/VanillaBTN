@@ -3636,6 +3636,13 @@ static void title_fill_field_layout(s32 layout) {
     s32 row;
     s32 col;
     u8 kind;
+#ifdef __psyz
+    u16 demo_field[FIELD_ROWS * FIELD_COLS];
+    enum { DEMO_HEAD_BYTES = sizeof(title_layout3_cells) + sizeof(D_800BC998) };
+    _Static_assert(DEMO_HEAD_BYTES < sizeof(demo_field) &&
+                       sizeof(demo_field) - DEMO_HEAD_BYTES <= sizeof(D_800BCAEC),
+                   "the three demo tables must cover the field");
+#endif
 
     switch (layout) {
     case TITLE_LAYOUT_NEW_1:
@@ -3645,7 +3652,15 @@ static void title_fill_field_layout(s32 layout) {
         source = title_layout2_cells;
         break;
     case TITLE_LAYOUT_DEMO:
+#ifdef __psyz
+        /* The matching PS1 layout continues through the next two static tables. */
+        memcpy(demo_field, title_layout3_cells, sizeof(title_layout3_cells));
+        memcpy((u8 *)demo_field + sizeof(title_layout3_cells), D_800BC998, sizeof(D_800BC998));
+        memcpy((u8 *)demo_field + DEMO_HEAD_BYTES, D_800BCAEC, sizeof(demo_field) - DEMO_HEAD_BYTES);
+        source = demo_field;
+#else
         source = title_layout3_cells;
+#endif
         break;
     case TITLE_LAYOUT_NEW_0:
     default:
