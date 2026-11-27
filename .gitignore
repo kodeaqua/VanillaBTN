@@ -6,3 +6,7 @@ __pycache__/
 /sdk/bin/
 /objdiff.json
 /out/
+.env*
+*.log
+*.bin
+*.cue

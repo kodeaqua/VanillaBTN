@@ -4,6 +4,8 @@ A matching decompilation of *Harvest Moon: Back to Nature* (PlayStation, USA,
 `SLUS_011.15`). The C source builds the EXE and its 13 overlays byte for byte and, given
 your own copy of the disc, the whole disc image.
 
+See the [VanillaBTN roadmap](ROADMAP.md) for the native port milestones.
+
 ## Building
 
 ```sh
