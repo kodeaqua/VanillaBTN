@@ -32,8 +32,8 @@ can decide separately whether to rename the GitHub repository.
   [SDL 3.4.20](https://github.com/libsdl-org/SDL/releases/tag/release-3.4.20)
 - **Disc import and runtime reads.** `tools/psx_disc.py import` accepts BIN or CUE and
   verifies the USA reference before extraction. `tools/afile.py unpack` unpacks A_FILE.
-  `Psyz_CdSetDiskPath` reads the CUE and referenced tracks at runtime. The native app
-  still needs to invoke or replace the import command on first run.
+  The Windows startup executable invokes the importer with `--import-disc`.
+  Interactive disc selection and in-game reads through PsyZ remain separate milestones.
 - **PsyZ licensing needs clarification before public integration.** VanillaBTN
   uses MIT, and `NOTICE` identifies the upstream base as CC0. PsyZ marks
   `psyz/include` and `psyz/src/psyq` as *Unlicensed*. A submodule pins a revision

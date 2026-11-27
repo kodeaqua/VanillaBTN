@@ -60,14 +60,20 @@ ctest --test-dir build/native/llvm-debug --output-on-failure
 For LLVM Release, use the Release preset and `build/native/llvm-release`.
 LLVM Debug enables AddressSanitizer and UndefinedBehaviorSanitizer when available.
 
-This target currently runs the startup smoke test. See the roadmap for game and overlay
-integration milestones.
+This target supports startup and reference-disc import. See the roadmap for game and
+overlay integration milestones.
 
 ### Import a reference disc locally
 
-Run `python tools/psx_disc.py import path/to/disc.cue --out path/to/local-data`
-from the repository root. The importer also accepts the BIN directly. It checks
-the USA reference SHA-1 before writing files.
+With Python 3.10 or newer on `PATH`, run the native executable with your BIN or CUE:
+
+```powershell
+& .\build\native\windows-x64-release\native\vanillabtn.exe --import-disc 'path\to\disc.cue'
+```
+
+The bundled importer checks the USA reference SHA-1 before writing to
+`%LOCALAPPDATA%\VanillaBTN\disc`. To select another output directory, use
+`python tools/psx_disc.py import path/to/disc.cue --out path/to/local-data`.
 
 A CUE must describe one `MODE2/2352` track starting at `00:00:00`. Keep the BIN
 with the CUE, and choose an output directory outside the checkout and save directory.

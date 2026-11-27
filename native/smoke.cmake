@@ -18,3 +18,9 @@ foreach(run RANGE 1 2)
         message(FATAL_ERROR "Release created a log file.")
     endif()
 endforeach()
+
+execute_process(COMMAND "${EXECUTABLE}" --import-disc RESULT_VARIABLE result
+    ERROR_VARIABLE diagnostic)
+if(NOT result STREQUAL "2" OR NOT diagnostic MATCHES "Usage: vanillabtn")
+    message(FATAL_ERROR "The import option must report a missing disc argument.")
+endif()
