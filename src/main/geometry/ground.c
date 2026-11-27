@@ -8,7 +8,11 @@
 #include "model.h"
 
 static s32 ground_xz_in_clip(s32 x0, s32 y0, s32 x1, s32 y1);
+#ifdef __psyz
+static s32 ground_xyz_in_clip(const VECTOR *first, const VECTOR *second);
+#else
 static s32 ground_xyz_in_clip(long *first, long *second);
+#endif
 static s32 ground_primitive_under(TmdObject *table, TmdObject *object);
 
 SVECTOR *ground_vertices;
@@ -134,7 +138,11 @@ s32 ground_find_object(Model *model, VECTOR *pos) {
             center.vx = centers->coords[coord];
             center.vy = centers->coords[coord + 1];
             center.vz = centers->coords[coord + 2];
+#ifdef __psyz
+            if (ground_xyz_in_clip(&here, &center) != 0) {
+#else
             if (ground_xyz_in_clip(&here.vx, &center.vx) != 0) {
+#endif
                 ground_objects[hits] = i;
                 hits++;
                 if (hits >= 8) {
@@ -191,6 +199,16 @@ static s32 ground_xz_in_clip(s32 x0, s32 y0, s32 x1, s32 y1) {
     return 1;
 }
 
+#ifdef __psyz
+static s32 ground_xyz_in_clip(const VECTOR *first, const VECTOR *second) {
+    s32 limit = (ground_clip >> 1) + 600;
+    s32 x = first->vx - second->vx;
+    s32 y = first->vy - second->vy;
+    s32 z = first->vz - second->vz;
+
+    return -limit <= x && x <= limit && -limit <= y && y <= limit && -limit <= z && z <= limit;
+}
+#else
 static s32 ground_xyz_in_clip(long *first, long *second) {
     s32 limit;
     s32 negative_limit;
@@ -208,56 +226,71 @@ static s32 ground_xyz_in_clip(long *first, long *second) {
     if ((delta < negative_limit) || (limit < delta)) return 0;
     return 1;
 }
+#endif
 
 /* A TMD primitive starts with its header word (olen, ilen, flag, mode); the
  * vertex indices are u16s at a per-type byte offset. */
 #define PRIM_HEADER(p) (*(u32 *)(p))
 #define PRIM_INDEX(p, offset) (*(u16 *)((p) + (offset)))
 
-/* Return 0 when a primitive of `object` is under *ground_pos (the hit is in
- * ground_hit_prim_ptr), 1 when none is. */
+/* GCC's nested scope preserves the matching PS1 function layout. */
+#ifndef __psyz
 static s32 ground_primitive_under(TmdObject *table, TmdObject *object) {
     s32 count;
     SVECTOR *vertices;
     u8 *primitives;
+#else
+static
+#endif
+s32 ground_triangle_under(SVECTOR *a, SVECTOR *b, SVECTOR *c) {
+    VECTOR *pos;
 
-    s32 ground_triangle_under(SVECTOR *a, SVECTOR *b, SVECTOR *c) {
-        VECTOR *pos;
+    pos = ground_pos;
+    ground_dy = (a->vy + b->vy + c->vy) / 3;
+    ground_dy = pos->vy - ground_dy;
+    if (ground_dy > ground_tolerance || ground_dy < -ground_tolerance) {
+        return 1;
+    }
+    ground_pos_x = pos->vx;
+    ground_pos_z = pos->vz;
+    ground_edge0 = (b->vx - a->vx) * (ground_pos_z - a->vz) - (b->vz - a->vz) * (ground_pos_x - a->vx);
+    ground_edge1 = (c->vx - b->vx) * (ground_pos_z - b->vz) - (c->vz - b->vz) * (ground_pos_x - b->vx);
+    ground_edge2 = (a->vx - c->vx) * (ground_pos_z - c->vz) - (a->vz - c->vz) * (ground_pos_x - c->vx);
+    if ((ground_edge0 > 0 || ground_edge1 > 0 || ground_edge2 > 0) &&
+        (ground_edge0 < 0 || ground_edge1 < 0 || ground_edge2 < 0)) {
+        return 1;
+    }
+    ground_found = 1;
+    ground_triangle[0] = a;
+    ground_triangle[1] = b;
+    ground_triangle[2] = c;
+    return 0;
+}
 
-        pos = ground_pos;
-        ground_dy = (a->vy + b->vy + c->vy) / 3;
-        ground_dy = pos->vy - ground_dy;
-        if (ground_dy > ground_tolerance || ground_dy < -ground_tolerance) {
-            return 1;
-        }
-        ground_pos_x = pos->vx;
-        ground_pos_z = pos->vz;
-        ground_edge0 = (b->vx - a->vx) * (ground_pos_z - a->vz) - (b->vz - a->vz) * (ground_pos_x - a->vx);
-        ground_edge1 = (c->vx - b->vx) * (ground_pos_z - b->vz) - (c->vz - b->vz) * (ground_pos_x - b->vx);
-        ground_edge2 = (a->vx - c->vx) * (ground_pos_z - c->vz) - (a->vz - c->vz) * (ground_pos_x - c->vx);
-        if ((ground_edge0 > 0 || ground_edge1 > 0 || ground_edge2 > 0) &&
-            (ground_edge0 < 0 || ground_edge1 < 0 || ground_edge2 < 0)) {
-            return 1;
-        }
-        ground_found = 1;
-        ground_triangle[0] = a;
-        ground_triangle[1] = b;
-        ground_triangle[2] = c;
+#ifdef __psyz
+static
+#endif
+s32 ground_quad_under(s32 a, s32 b, s32 c, s32 d) {
+    if (a == b || a == c) {
+        return ground_triangle_under(&ground_vertices[c], &ground_vertices[b], &ground_vertices[d]);
+    }
+    if (d == b || d == c) {
+        return ground_triangle_under(&ground_vertices[a], &ground_vertices[b], &ground_vertices[c]);
+    }
+    if (ground_triangle_under(&ground_vertices[a], &ground_vertices[b], &ground_vertices[c]) == 0) {
         return 0;
     }
+    return ground_triangle_under(&ground_vertices[d], &ground_vertices[c], &ground_vertices[b]);
+}
 
-    s32 ground_quad_under(s32 a, s32 b, s32 c, s32 d) {
-        if (a == b || a == c) {
-            return ground_triangle_under(&ground_vertices[c], &ground_vertices[b], &ground_vertices[d]);
-        }
-        if (d == b || d == c) {
-            return ground_triangle_under(&ground_vertices[a], &ground_vertices[b], &ground_vertices[c]);
-        }
-        if (ground_triangle_under(&ground_vertices[a], &ground_vertices[b], &ground_vertices[c]) == 0) {
-            return 0;
-        }
-        return ground_triangle_under(&ground_vertices[d], &ground_vertices[c], &ground_vertices[b]);
-    }
+/* Return 0 when a primitive of `object` is under *ground_pos (the hit is in
+ * ground_hit_prim_ptr), 1 when none is. */
+#ifdef __psyz
+static s32 ground_primitive_under(TmdObject *table, TmdObject *object) {
+    s32 count;
+    SVECTOR *vertices;
+    u8 *primitives;
+#endif
 
     count = object->n_primitive;
     /* TMD tables hold offsets from the model base. */
