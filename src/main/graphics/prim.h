@@ -9,11 +9,6 @@
 #include <libgs.h>
 #include "types.h"
 
-struct LineF2;
-struct PolyF4;
-struct PolyG4;
-struct Tile1;
-
 /* PSY-Q's POLY_FT4, with each x/y pair and u/v/clut group as one word. */
 typedef struct PolyFT4 {
     u8 addr[3];         /* ordering-table link */
@@ -48,17 +43,21 @@ typedef union PrimCursor {
     (*(u32 *)(p) = ((u32)(sizeof(type) / 4 - 1) << 24) | (*(ot) & 0xFFFFFF),   \
      *(ot) = (u32)(p) & 0xFFFFFF)
 
-void prim_add_pixel(u_long *ot, s16 x, s16 y, s32 color, s16 semi_trans);
-void prim_add_line(u_long *ot, s16 x0, s16 y0, s16 x1, s16 y1, s32 color, s16 semi_trans);
-void prim_add_gouraud_rect(u_long *ot, s16 x, s16 y, s16 w, s16 h, s32 c0, s32 c1, s32 c2, s32 c3, s16 semi_trans);
-void prim_add_rect(u_long *ot, s16 x, s16 y, s16 w, s16 h, s32 color, s16 semi_trans);
-void prim_add_tile(u_long *ot, s16 x, s16 y, s16 w, s16 h, s32 packed, s16 flag);
-void prim_add_rect_mode(u_long *ot, s16 x, s16 y, s16 w, s16 h, s32 color, s16 semi_trans, u8 flags);
-struct Tile1 *prim_make_pixel(struct Tile1 *tile, u_long *ot, s16 x, s16 y, s32 color, s16 semi_trans);
-struct LineF2 *prim_make_line(struct LineF2 *line, u_long *ot, s16 x0, s16 y0, s16 x1, s16 y1, s32 color, s16 semi_trans);
-struct PolyG4 *prim_make_gouraud_rect(struct PolyG4 *poly, u_long *ot, s16 x, s16 y, s16 w, s16 h, s32 c0, s32 c1, s32 c2, s32 c3, s16 semi_trans);
-void *prim_make_rect(struct PolyF4 *poly, u_long *ot, s16 x, s16 y, s16 w, s16 h, s32 color, s16 semi_trans);
-TILE *prim_make_tile(TILE *dst, u_long *src, s16 x, s16 y, s16 w, s16 h, s32 packed, s16 flag);
-void *prim_make_rect_mode(void *first, u_long *source, s16 x, s16 y, s16 w, s16 h, s32 color, s16 semi_trans, u8 flags);
+void prim_add_pixel(void *ot, s16 x, s16 y, s32 color, s16 semi_trans);
+void prim_add_line(void *ot, s16 x0, s16 y0, s16 x1, s16 y1, s32 color, s16 semi_trans);
+void prim_add_gouraud_rect(void *ot, s16 x, s16 y, s16 w, s16 h, s32 c0, s32 c1, s32 c2, s32 c3,
+                          s16 semi_trans);
+void prim_add_rect(void *ot, s16 x, s16 y, s16 w, s16 h, s32 color, s16 semi_trans);
+void prim_add_tile(void *ot, s16 x, s16 y, s16 w, s16 h, s32 packed, s16 flag);
+void prim_add_rect_mode(void *ot, s16 x, s16 y, s16 w, s16 h, s32 color, s16 semi_trans, u8 flags);
+TILE_1 *prim_make_pixel(TILE_1 *tile, void *ot, s16 x, s16 y, s32 color, s16 semi_trans);
+LINE_F2 *prim_make_line(LINE_F2 *line, void *ot, s16 x0, s16 y0, s16 x1, s16 y1, s32 color,
+                       s16 semi_trans);
+POLY_G4 *prim_make_gouraud_rect(POLY_G4 *poly, void *ot, s16 x, s16 y, s16 w, s16 h, s32 c0, s32 c1,
+                                s32 c2, s32 c3, s16 semi_trans);
+void *prim_make_rect(POLY_F4 *poly, void *ot, s16 x, s16 y, s16 w, s16 h, s32 color, s16 semi_trans);
+TILE *prim_make_tile(TILE *dst, void *src, s16 x, s16 y, s16 w, s16 h, s32 packed, s16 flag);
+void *prim_make_rect_mode(void *first, void *source, s16 x, s16 y, s16 w, s16 h, s32 color,
+                          s16 semi_trans, u8 flags);
 
 #endif /* PRIM_H */
