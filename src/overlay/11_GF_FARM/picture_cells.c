@@ -837,7 +837,7 @@ s32 picture_load_to_vram(s32 sprite)
  * when found, build the cell's primitive at (u, v). Flags 1, 4 or 8 first draw the empty
  * marker there; flag 8 centres it using the cell's recorded size; flag 4 shifts it by 16
  * and adds flag 2. */
-void picture_cell_build_prim(s16 key, s16 part, u_long *object, s16 u, s16 v, s32 flags) {
+void picture_cell_build_prim(s16 key, s16 part, void *object, s16 u, s16 v, s32 flags) {
     s32 row;
     u32 column;
     s16 *row0;
@@ -863,7 +863,8 @@ void picture_cell_build_prim(s16 key, s16 part, u_long *object, s16 u, s16 v, s3
     if (row == -1) return;
 
     if (flags & (PICTURE_CELL_BIT0 | PICTURE_CELL_HALF_SHIFT | PICTURE_CELL_CENTER)) {
-        item_empty_marker_draw(&object[1], u, v);
+        OT_TYPE *slot = object;
+        item_empty_marker_draw(&slot[1], u, v);
     }
     if (flags & PICTURE_CELL_CENTER) {
         u += (PICTURE_CELL_SIZE - farm_area.mode.pictureEntries[row][column].w) / 2;

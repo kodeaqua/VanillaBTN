@@ -1333,7 +1333,7 @@ static void mg5_draw_backdrop(void) {
 /* Projects the object's position and draws it. Before the race the racers' bodies get the
  * marker icon; the extras get it throughout, and the fixed animations always do. */
 static void mg5_anim_draw_at(AnimState *object, SVECTOR *position) {
-    u_long *drawing_area;
+    OT_TYPE *drawing_area;
     SVECTOR *converted;
 
     converted = &mg5_converted_vec;

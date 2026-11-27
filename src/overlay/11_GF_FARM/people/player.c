@@ -3948,7 +3948,7 @@ static s32 player_exchange_tool(s32 mode)
 }
 
 /* Draw the farm cursor at (pos_x, pos_y). */
-void farm_draw_cursor(u_long *ot, s32 pos_x, s32 pos_y, s32 frame)
+void farm_draw_cursor(void *ot, s32 pos_x, s32 pos_y, s32 frame)
 {
     s32 x;
     s32 y;
@@ -4016,7 +4016,7 @@ static void player_draw_body(FarmPlayer *player, s32 offset, FarmScreenXY *pos)
     s16 tintB;
     s16 tintC;
     AnimState *sprite;
-    u_long *otEntry;
+    OT_TYPE *otEntry;
 
     otEntry = &current_frame->ot[offset >> 2];
 
@@ -5157,7 +5157,7 @@ static void thrown_item_update(FarmThrownItem *effect)
     FarmStoredItem pair;
     s32 landing;
     s32 depth;
-    u_long *ot;
+    OT_TYPE *ot;
 
     landing = 0;
     thrown_item_vertex.vx = effect->position.vx + 150;

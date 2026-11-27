@@ -1131,7 +1131,7 @@ static void villager_draw(FarmVillager *villager)
 {
     SVECTOR input;
     FarmScreenPoint result;
-    u_long *ot_slot;
+    OT_TYPE *ot_slot;
 
     input.vx = villager->position.vx + 150;
     input.vy = villager->position.vy - 100;

@@ -4,7 +4,7 @@
 #include "farm_state.h"
 #include "ui_icons.h"
 
-static void ui_draw_icon(u_long *ot, s32 icon, s32 frame, s16 x, s16 y);
+static void ui_draw_icon(void *ot, s32 icon, s32 frame, s16 x, s16 y);
 
 u8 ui_icon_cycle;
 /* Frame counter kept as a seconds field: 0..59. */
@@ -65,7 +65,7 @@ void ui_draw_icon_0b_1(u_long *ot, signed short x, signed short y) {
     ui_draw_icon(ot, 0xB, 1, x, y);
 }
 
-void ui_draw_icon_18_sub(u_long *ot, s16 x, s16 y, s16 sub) {
+void ui_draw_icon_18_sub(void *ot, s16 x, s16 y, s16 sub) {
     ui_draw_icon(ot, 0x18, sub, x, y);
 }
 
@@ -94,7 +94,7 @@ void ui_draw_icon_2b_sub(u_long *ot, s16 x, s16 y, s16 sub) {
 AnimState ui_icon_anim;
 
 /* Draw one UI icon from the shared icon animation, binding its file on first use. */
-static void ui_draw_icon(u_long *ot, s32 icon, s32 frame, s16 x, s16 y) {
+static void ui_draw_icon(void *ot, s32 icon, s32 frame, s16 x, s16 y) {
     if (ui_icon_anim.source != (AnimFile *)farm_area.stageData) {
         anim_bind_file(&ui_icon_anim, (AnimFile *)farm_area.stageData);
     }

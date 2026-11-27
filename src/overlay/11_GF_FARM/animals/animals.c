@@ -96,7 +96,7 @@ static s32 farm_cue_matches_mode(s32 id);
 static void farm_spawn_mode_object(void);
 static void farm_spawn_table_objects(void);
 static void farm_roll_stray_dogs(void);
-static void farm_draw_unless_hidden(u32 flags, u_long *ot, u32 x, u32 y);
+static void farm_draw_unless_hidden(u32 flags, void *ot, u32 x, u32 y);
 static u16 farm_walker_pick_heading(FarmActor *walker, s32 blocked, s32 flags);
 static u16 farm_walker_pick_turn(u16 heading, u16 turn, u16 bias);
 static u16 farm_heading_classify(FarmActor *state);
@@ -1084,7 +1084,7 @@ void farm_spawn_chicken_sources(void) {
  * during a transition. */
 void farm_draw_actor(FarmActor *object) {
     FarmScreenPoint result;
-    u_long *primitive;
+    OT_TYPE *primitive;
 
     if ((game_state.globalFlags & GLOBAL_FLAG_TRANSITION) == 0) {
         farm_draw_point.vx = object->position.vx + 150;
@@ -1119,7 +1119,7 @@ void farm_draw_actor(FarmActor *object) {
 void farm_draw_object(FarmHelper *helper) {
     SVECTOR input;
     FarmScreenPoint result;
-    u_long *primitive;
+    OT_TYPE *primitive;
 
     if ((game_state.globalFlags & GLOBAL_FLAG_TRANSITION) != 0) {
         return;
@@ -1148,7 +1148,7 @@ void farm_draw_object(FarmHelper *helper) {
 void farm_request_project(FarmActor *request, VramPlace *places, s32 base)
 {
     FarmScreenPoint result;
-    u_long *object;
+    OT_TYPE *object;
 
     if ((game_state.globalFlags & GLOBAL_FLAG_TRANSITION) == 0) {
         farm_request_draw_point.vx = request->position.vx + 150;
@@ -1177,7 +1177,7 @@ void farm_request_project(FarmActor *request, VramPlace *places, s32 base)
     }
 }
 
-static void farm_draw_unless_hidden(u32 flags, u_long *ot, u32 x, u32 y) {
+static void farm_draw_unless_hidden(u32 flags, void *ot, u32 x, u32 y) {
     if (!(flags & 0x1000)) {
         farm_draw_cursor(ot, x, y, flags >> 31);
     }

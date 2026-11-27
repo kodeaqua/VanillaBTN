@@ -642,7 +642,9 @@ static void main_init_frame_records(void) {
         frame_records[i].otLengths[3] = 0;
         frame_records[i].otDepth = FRAME_OT_DEPTH;
         frame_records[i].otDepthBits = 11;
-        frame_records[i].ot = (u_long *)(base + REGION_OT + i * 0x2000);
+#ifndef __psyz
+        frame_records[i].ot = (OT_TYPE *)(base + REGION_OT + i * 0x2000);
+#endif
         frame_records[i].drawEnv.dtd = 1;
         frame_records[i].drawEnv.dfe = 1;
         frame_records[i].drawEnv.isbg = 1;
@@ -681,10 +683,12 @@ static void main_init_frame_records(void) {
  * primitive buffer is zeroed and its cursor rewound. */
 static void main_init_frame_records_wide(void) {
     s32 i;
+#ifndef __psyz
     s32 k;
     s32 j;
     FrameState *fb;
     u8 *region;
+#endif
     u8 *base;
 
     base = WORK_REGION;
@@ -706,7 +710,9 @@ static void main_init_frame_records_wide(void) {
         frame_records[i].otLengths[3] = 0;
         frame_records[i].otDepth = FRAME_OT_DEPTH;
         frame_records[i].otDepthBits = 11;
-        frame_records[i].ot = (u_long *)(base + REGION_OT + i * 0x2000);
+#ifndef __psyz
+        frame_records[i].ot = (OT_TYPE *)(base + REGION_OT + i * 0x2000);
+#endif
         frame_records[i].drawEnv.dtd = 1;
         frame_records[i].drawEnv.dfe = 1;
         frame_records[i].drawEnv.isbg = 1;
@@ -737,12 +743,15 @@ static void main_init_frame_records_wide(void) {
         frame_records[i].workBase = base + REGION_WORK + i * 0x5EDC;
         frame_records[i].primBuffer = base + REGION_PRIM + i * FRAME_PRIM_SIZE;
     }
+#ifdef __psyz
+    frame_buffers_layout();
+#else
     region = region_base;
     for (k = 0; k < 2; k++) {
         fb = &frame_records[k];
         fb->otDepth = FRAME_OT_DEPTH;
         fb->otDepthBits = 11;
-        fb->ot = (u_long *)&region[k * 0x2000 + REGION_OT];
+        fb->ot = (OT_TYPE *)&region[k * 0x2000 + REGION_OT];
         fb->primSize = FRAME_PRIM_SIZE;
         fb->primStart = &region[k * FRAME_PRIM_SIZE + REGION_PRIM];
         ClearOTagR(fb->ot, FRAME_OT_DEPTH);
@@ -751,6 +760,7 @@ static void main_init_frame_records_wide(void) {
         }
         fb->primCursor.bytes = fb->primStart;
     }
+#endif
 }
 
 /* Save the high overlay region into a frame's primitive buffer (enabled == 0), or restore it from

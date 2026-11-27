@@ -77,10 +77,10 @@ typedef s32 (*TextFill)(s32 arg);
 
 static TextWindowResult text_window_frame(u_long *ot, u16 *text, s16 x, s16 y, s16 unused, s16 height);
 static void text_window_clear(void);
-static u8 *text_draw_string(u_long *ot, u8 *prim, u16 *text, s16 x, s16 y, s32 scale, s32 mode, s32 semiTrans,
+static u8 *text_draw_string(void *ot, u8 *prim, u16 *text, s16 x, s16 y, s32 scale, s32 mode, s32 semiTrans,
                             s32 nested, s32 toOrigin);
 static s16 text_end_y(void);
-static u8 *text_glyph_sprite(u_long *ot, struct Sprt *sprt, u16 glyph, s16 x, s16 y, u8 r, u8 g, u8 b, u32 palette,
+static u8 *text_glyph_sprite(void *ot, struct Sprt *sprt, u16 glyph, s16 x, s16 y, u8 r, u8 g, u8 b, u32 palette,
                                          s32 semiTrans);
 static u16 *text_find_nth(u16 *entry, u16 code, s32 nth, s32 limit);
 static u16 text_count_matches(u16 *entries, u16 match, s16 limit, u16 *out_count);
@@ -494,7 +494,7 @@ static void text_printf(u8 *fmt, ...)
     s32 i;
     s16 saved_a;
     s16 saved_b;
-    u_long *ot;
+    OT_TYPE *ot;
 
     if (game_state.globalFlags & GLOBAL_FLAG_TRANSITION)
     {
@@ -892,7 +892,7 @@ static void text_window_clear(void)
  * text state, 0xFFD is a space, and a code with bit 14 set expands to a
  * nested string (drawn recursively). With `mode` 1 the text types out: one
  * more glyph per tick of the text_glyph_interval timer, counted in text_index. */
-static u8 *text_draw_string(u_long *ot, u8 *prim, u16 *text, s16 x, s16 y, s32 scale, s32 mode, s32 semiTrans,
+static u8 *text_draw_string(void *ot, u8 *prim, u16 *text, s16 x, s16 y, s32 scale, s32 mode, s32 semiTrans,
                             s32 nested, s32 toOrigin)
 {
     s32 fast;
@@ -1062,7 +1062,7 @@ static s16 text_end_y(void)
  * with text CLUT `palette` (0 if out of range) and optionally semi-transparent,
  * followed by the draw-mode packet that selects the sheet's texture page.
  * Returns the next free packet address. */
-static u8 *text_glyph_sprite(u_long *ot, struct Sprt *sprt, u16 glyph, s16 x, s16 y, u8 r, u8 g, u8 b, u32 palette,
+static u8 *text_glyph_sprite(void *ot, struct Sprt *sprt, u16 glyph, s16 x, s16 y, u8 r, u8 g, u8 b, u32 palette,
                                          s32 semiTrans)
 {
     DrTPage *tpage;

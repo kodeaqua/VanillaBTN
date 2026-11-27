@@ -1391,7 +1391,7 @@ static void event_villager_tick(FarmVillager *villager)
     FarmScreenPoint screen;
     SVECTOR input;
     s32 paused;
-    u_long *position;
+    OT_TYPE *position;
     s16 scene;
 
     paused = game_state.globalFlags & GLOBAL_FLAG_PAUSED;

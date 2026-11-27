@@ -7,15 +7,24 @@
 #include "frame_buffers.h"
 #include "main.h"
 
+#ifdef __psyz
+/* The native entries would overlap the primitive buffers at the PS1 offsets. */
+static OT_TYPE frame_main_ots[2][FRAME_OT_DEPTH];
+#else
 /* An OT entry is a tag in its top byte and the next entry's address in the other 24 bits. */
 #define OT_TAG_MASK 0xFF000000
 #define OT_ADDRESS_MASK 0x00FFFFFF
+#endif
 
 /* Link a primitive into the ordering table at `index` and advance the primitive cursor. */
 void *ot_insert_prim(s32 index, s32 advance) {
     FrameState *state;
+#ifdef __psyz
+    void *current;
+#else
     u_long *current;
-    u_long *entry;
+#endif
+    OT_TYPE *entry;
     s32 limit;
 
     state = current_frame;
@@ -25,9 +34,14 @@ void *ot_insert_prim(s32 index, s32 advance) {
         index = limit - 1;
     }
     entry = &state->ot[index];
+#ifdef __psyz
+    current = state->primCursor.bytes;
+    addPrim(entry, current);
+#else
     current = state->primCursor.tag;
     *current = (*current & OT_TAG_MASK) | (*entry & OT_ADDRESS_MASK);
     *entry = (u_long)current & OT_ADDRESS_MASK;
+#endif
     state->primCursor.bytes += advance;
     return current;
 }
@@ -36,8 +50,7 @@ void debug_hook_run(s32 unused0) {
     /* Empty hook. */
 }
 
-/* Carve both frame buffers' ordering tables and primitive buffers out of the
- * region at region_base, clear them, and rewind each primitive cursor. */
+/* Lay out and clear both frame buffers' main ordering tables and primitive buffers. */
 void frame_buffers_layout(void) {
     s32 i;
     s32 j;
@@ -50,7 +63,11 @@ void frame_buffers_layout(void) {
         fb->otDepth = FRAME_OT_DEPTH;
         fb->otDepthBits = 11;
         fb->primSize = FRAME_PRIM_SIZE;
-        fb->ot = (u_long *)&region[i * 0x2000 + REGION_OT];
+#ifdef __psyz
+        fb->ot = frame_main_ots[i];
+#else
+        fb->ot = (OT_TYPE *)&region[i * 0x2000 + REGION_OT];
+#endif
         fb->primStart = &region[i * FRAME_PRIM_SIZE + REGION_PRIM];
         ClearOTagR(fb->ot, FRAME_OT_DEPTH);
         for (j = 0; j < FRAME_PRIM_SIZE; j++) {

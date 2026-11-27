@@ -47,7 +47,7 @@ typedef struct FrameState {
     PrimCursor primCursor;  /* the next free byte of the primitive buffer; rewound to
                              * primStart each frame */
     s32 primSize;       /* bytes in the primitive buffer */
-    u_long *ot;         /* the main OT, otDepth entries indexed by depth */
+    OT_TYPE *ot;        /* the main OT, otDepth entries indexed by depth */
     u8 *primStart;      /* this frame's primitive buffer */
     u32 workSize;       /* bytes of the GS work area */
     u8 *workBase;       /* the GS work area (gs_work_alloc allocates from it) */

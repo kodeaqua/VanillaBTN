@@ -157,8 +157,8 @@ static void mg2_resume_sprites(void);
 static void mg2_sprites_apply(s32 mode);
 static void mg2_draw_pause_icon(void);
 static s32 mg2_message_offset(s32 index);
-static void mg2_sprite_submit(u_long *ot, AnimState *sprite, Mg2Vector *vector, s16 bias);
-static void mg2_draw_scenery_piece(u_long *ot, AnimState *sprite, Mg2Vector *vector, s16 mode);
+static void mg2_sprite_submit(void *ot, AnimState *sprite, Mg2Vector *vector, s16 bias);
+static void mg2_draw_scenery_piece(OT_TYPE *ot, AnimState *sprite, Mg2Vector *vector, s16 mode);
 static void mg2_draw_results_board(void);
 static void mg2_snap_to_ground(Mg2Vector *p);
 static void mg2_load_payload(void);
@@ -1615,10 +1615,11 @@ static s32 mg2_message_offset(s32 index) {
 }
 
 /* Snap the vector to the ground, project it, and draw the sprite there, shifted by bias. */
-static void mg2_sprite_submit(u_long *ot, AnimState *sprite, Mg2Vector *vector, s16 bias) {
+static void mg2_sprite_submit(void *ot, AnimState *sprite, Mg2Vector *vector, s16 bias) {
     s32 slot;
-    u_long *target;
-    u_long *mainSlot;
+    OT_TYPE *table = ot;
+    OT_TYPE *target;
+    OT_TYPE *mainSlot;
 
     mg2_snap_to_ground(vector);
     mg2_project_vec.vx = vector->x;
@@ -1626,7 +1627,7 @@ static void mg2_sprite_submit(u_long *ot, AnimState *sprite, Mg2Vector *vector, 
     mg2_project_vec.vz = vector->z;
     slot = gte_project_vertex(&mg2_project_xy, &mg2_project_vec);
     mg2_project_xy.y += bias;
-    target = &ot[slot >> 3];
+    target = &table[slot >> 3];
     mainSlot = &current_frame->ot[slot >> 3];
     if (sprite == &mg2_state.objects[0].sprite || sprite == &mg2_state.objects[1].sprite ||
         sprite == &mg2_state.objects[2].sprite) {
@@ -1636,7 +1637,7 @@ static void mg2_sprite_submit(u_long *ot, AnimState *sprite, Mg2Vector *vector, 
         anim_draw_ft4_advance(ot, sprite, mg2_project_xy.x, mg2_project_xy.y);
     } else {
         if (vector->y != MG2_GROUND_Y && vector->z - vector->x >= 0) {
-            target = &ot[slot >> 2];
+            target = &table[slot >> 2];
             mainSlot = &current_frame->ot[slot >> 2];
         }
         anim_draw_ft4_advance(target, sprite, mg2_project_xy.x, mg2_project_xy.y);
@@ -1645,7 +1646,7 @@ static void mg2_sprite_submit(u_long *ot, AnimState *sprite, Mg2Vector *vector, 
 }
 
 /* Snap and project a scenery piece, set its frame from mode, and draw it. */
-static void mg2_draw_scenery_piece(u_long *ot, AnimState *sprite, Mg2Vector *vector, s16 mode) {
+static void mg2_draw_scenery_piece(OT_TYPE *ot, AnimState *sprite, Mg2Vector *vector, s16 mode) {
     s32 slot;
 
     mg2_snap_to_ground(vector);

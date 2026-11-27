@@ -1560,7 +1560,7 @@ static void mg3_draw_frame(void) {
 /* Project a point (its coordinates moved by a fixed view offset) to the screen and draw the sprite
  * there; records 0, 1, 2 and 5 also get the small icon over it. */
 static void mg3_draw_sprite_at(AnimState *object, s16 *coordinates) {
-    u_long *drawing_area;
+    OT_TYPE *drawing_area;
 
     mg3_offset_vec.vx = coordinates[0] + 150;
     mg3_offset_vec.vy = coordinates[1] - 100;

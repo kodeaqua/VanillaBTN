@@ -240,7 +240,7 @@ void player_start_rucksack(FarmPlayer *player);
 void player_load_item_pictures(void);
 void player_new_day_reset(void);
 void player_stop_motion(void);
-void farm_draw_cursor(u_long *ot, s32 pos_x, s32 pos_y, s32 frame);
+void farm_draw_cursor(void *ot, s32 pos_x, s32 pos_y, s32 frame);
 void player_count_idle(FarmPlayer *player);
 s32 player_reset_pose(void);
 s32 player_show_item(FarmStoredItem *item);

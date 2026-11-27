@@ -122,7 +122,7 @@ void clut_scroll_step(ClutFade *fade, s32 amount, s32 mode) {
     vals.y = fade->load.y;
     vals.w = fade->load.w;
     vals.h = fade->load.h;
-    result = ot_insert_prim(0, 0x44);
+    result = ot_insert_prim(0, sizeof(*result));
     SetDrawLoad(result, &vals);
     clut_blend_palettes(result->p, fade->clut, fade->clut + 8, fade->position, fade->span);
 }
@@ -137,7 +137,7 @@ void clut_fade_step(ClutFade *arg, s32 value) {
     vals.y = arg->load.y;
     vals.w = arg->load.w;
     vals.h = arg->load.h;
-    result = ot_insert_prim(0, 0x44);
+    result = ot_insert_prim(0, sizeof(*result));
     SetDrawLoad(result, &vals);
     clut_blend_palettes(result->p, arg->clut, arg->clut + 8, value, arg->span);
 }

@@ -92,7 +92,7 @@ s32 picture_row_clut_free(s16 arg);
 s32 picture_free_slot(s16 arg);
 void *item_art_address(s16 packed_id);
 s32 picture_load_to_vram(s32 sprite);
-void picture_cell_build_prim(s16 key, s16 part, u_long *object, s16 u, s16 v, s32 flags);
+void picture_cell_build_prim(s16 key, s16 part, void *object, s16 u, s16 v, s32 flags);
 s32 counter_step(FarmStoredItem *item, s16 amount);
 void stored_item_clear(FarmStoredItem *item);
 void stored_item_set(FarmStoredItem *item, s16 id, s16 modifier, s16 count);

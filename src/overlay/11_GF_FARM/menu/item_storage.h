@@ -24,7 +24,7 @@ void item_picture_slots_clear(void);
 void item_picture_slots_unmark(void);
 void item_entry_refresh(u_long *object, u16 id, s16 x, s16 y);
 void item_effect_submit(u_long *ot, s16 posX, s16 posY);
-void item_empty_marker_draw(u_long *ot, s16 x, s16 y);
+void item_empty_marker_draw(void *ot, s16 x, s16 y);
 void item_anim_draw(u_long *ot, s16 posX, s16 posY, s32 value);
 s16 item_pictures_load_poll(s16 arg);
 

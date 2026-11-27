@@ -405,7 +405,7 @@ void item_effect_submit(u_long *ot, s16 posX, s16 posY) {
     anim_draw_ft4_cursor(ot, &ui_icon_anim, ui_icon_anim.animation, ui_icon_anim.frame, x, y, 0x1000, 0, 0);
 }
 
-void item_empty_marker_draw(u_long *ot, s16 x, s16 y) {
+void item_empty_marker_draw(void *ot, s16 x, s16 y) {
     anim_select_range(&ui_icon_anim, 11);
     anim_set_frame(&ui_icon_anim, 2);
     anim_draw_sprt_cursor(ot, &ui_icon_anim, ui_icon_anim.animation, ui_icon_anim.frame, x, y);

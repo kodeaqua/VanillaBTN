@@ -11,8 +11,12 @@
 
 /* PSY-Q's POLY_FT4, with each x/y pair and u/v/clut group as one word. */
 typedef struct PolyFT4 {
+#ifdef __psyz
+    O_TAG;
+#else
     u8 addr[3];         /* ordering-table link */
     u8 len;
+#endif
     u8 r0, g0, b0;
     u8 code;
     s32 xy0;
