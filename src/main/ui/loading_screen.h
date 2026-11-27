@@ -22,7 +22,7 @@ typedef struct LoadingPicture {
 
 /* The loading screen's own packets. */
 typedef struct LoadingPackets {
-    u_long ots[2][LOADING_OT_LENGTH];
+    OT_TYPE ots[2][LOADING_OT_LENGTH];
     SPRT sprites[2][32];
     DR_MODE modes[2][32];
     u8 pad900[0x1300 - 0x900];

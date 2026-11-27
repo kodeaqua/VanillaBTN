@@ -108,7 +108,7 @@ extern InputRecord *input_pad2;
 /* Base of the big scratch/OT region. */
 extern u8 *region_base;
 /* The active one of the two OTs the frame is drawn through. */
-extern u_long *active_ot;
+extern OT_TYPE *active_ot;
 /* The OT base for the current frame. */
 extern u8 *frame_ot_base;
 /* Struct definitions for the game's global data objects. Parts without a name are

@@ -18,10 +18,14 @@
 /* The debug display pan moves by this many pixels a frame. */
 #define DEBUG_PAN_STEP 8
 
+#ifdef __psyz
+typedef DR_MODE DrTPage;
+#else
 typedef struct {
     u32 tag;
     u32 code[2];
 } DrTPage;
+#endif
 
 static void fade_set_enabled(signed int enabled);
 static void display_reset_envs(void);
@@ -131,7 +135,7 @@ s32 vsync_elapsed(s32 interval, s32 *last, s32 restart) {
 void screen_fade_frame(void) {
     s32 step;
     u8 level;
-    u_long *ot;
+    void *ot;
     POLY_F4 *poly;
     DR_MODE *mode;
     s32 shade;
@@ -384,7 +388,7 @@ void screen_fade_step(void) {
     u8 level;
     POLY_F4 *quad;
     DrTPage *tpage;
-    u_long *ot;
+    OT_TYPE *ot;
 
     if (fade_steps_left > 0) {
         buffer = current_frame != frame_records;

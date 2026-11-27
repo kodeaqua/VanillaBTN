@@ -82,14 +82,14 @@ s32 frame_index;
 InputRecord *input_pad1;
 InputRecord *input_pad2;
 u8 *region_base;
-u_long *active_ot;
+OT_TYPE *active_ot;
 u8 *frame_ot_base_init;
 u8 *frame_ot_base;
 FrameState *current_frame;
 
 /* Two ordering tables of two entries each (the active one is active_ot), then the
  * two frame records and the controller input records. */
-static u_long frame_ots[4];
+static OT_TYPE frame_ots[4];
 FrameState frame_records[2];
 VabStream vab_stream_copy;
 InputRecord input_records[2];
@@ -121,7 +121,7 @@ s32 scene_overlay_loaded = 0;
  * overlay for the requested scene (main_scene), installs its per-frame handler
  * (scene_frame_handler), and runs one frame (main_run_frame). */
 int main(void) {
-    u_long *env;
+    OT_TYPE *env;
     FrameState *fb;
 
     input_pad1 = input_records;
@@ -380,7 +380,7 @@ int main(void) {
  * drawn at the next VSync (main_draw_ots). */
 static void main_run_frame(void) {
     FrameState *fb;
-    u_long *env;
+    OT_TYPE *env;
 
     vsync_after_draw = 0;
     vsync_before_draw = 0;

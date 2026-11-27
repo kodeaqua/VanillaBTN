@@ -58,7 +58,7 @@ void loading_screen_draw(void) {
     FrameState *state;
     s32 index;
     LoadingPackets *packets;
-    u_long *ot;
+    OT_TYPE *ot;
     SPRT *sprites;
     DR_MODE *modes;
     packets = &loading_packets;

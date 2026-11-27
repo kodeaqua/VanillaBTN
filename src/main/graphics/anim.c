@@ -301,7 +301,7 @@ static POLY_FT4 *anim_draw_ft4_prim_advance(u_long *ot, POLY_FT4 *prim, AnimStat
     return result;
 }
 
-void anim_draw_sprt_slots_advance(u_long *ot, SPRT **sprites, DR_MODE **modes, AnimState *p, s16 x,
+void anim_draw_sprt_slots_advance(OT_TYPE *ot, SPRT **sprites, DR_MODE **modes, AnimState *p, s16 x,
                                   s16 y)
 {
     anim_draw_sprt(ot, sprites, modes, p, p->animation, p->frame, x, y);
@@ -324,7 +324,7 @@ s32 text_queue_sprite(u_long *ot, struct AnimState *sprite, s32 x, s32 y, s32 un
     return 0;
 }
 
-void anim_draw_sprt(u_long *ot, SPRT **sprites, DR_MODE **modes, struct AnimState *sprite,
+void anim_draw_sprt(void *ot, SPRT **sprites, DR_MODE **modes, struct AnimState *sprite,
                     unsigned char anim, unsigned char frame, signed short x, signed short y) {
     anim_draw_sprt_parts(ot, sprites, modes, sprite, anim, frame, x, y);
 }
@@ -386,7 +386,7 @@ typedef union {
 
 /* Queue frame `frameIndex` of animation `anim` as SPRTs, each with its texture page's
  * DR_MODE, last part first. */
-void anim_draw_sprt_parts(u_long *ot, SPRT **sprites, DR_MODE **modes, AnimState *state, u8 anim,
+void anim_draw_sprt_parts(void *ot, SPRT **sprites, DR_MODE **modes, AnimState *state, u8 anim,
                    u8 frameIndex, s16 x, s16 y) {
     AnimRange *range;
     AnimFrame *frame;
@@ -426,7 +426,11 @@ void anim_draw_sprt_parts(u_long *ot, SPRT **sprites, DR_MODE **modes, AnimState
         }
 
         setSprt(*sprites);
+#ifdef __psyz
+        setRGB0(*sprites, (u8)SPRT_NEUTRAL_RGBC, (u8)SPRT_NEUTRAL_RGBC, (u8)SPRT_NEUTRAL_RGBC);
+#else
         *(u_long *)&(*sprites)->r0 = SPRT_NEUTRAL_RGBC;
+#endif
         setSemiTrans(*sprites, (state->flags & ANIM_FLAG_SEMI_TRANSPARENT) || ((part->attr >> 4) & 1));
         setShadeTex(*sprites, 0);
         setXY0(*sprites, x + dx + part->dx, y + dy + part->dy);

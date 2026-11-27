@@ -132,11 +132,12 @@ typedef struct AnimPackToc {
 #define ANIM_PACK_START(toc, k) ((&(toc)->count)[(k) + 1])
 
 void anim_bind_file(AnimState *state, AnimFile *file);
-void anim_draw_sprt(u_long *ot, SPRT **sprites, DR_MODE **modes, AnimState *sprite, u8 anim, u8 frame, s16 x, s16 y);
+void anim_draw_sprt(void *ot, SPRT **sprites, DR_MODE **modes, AnimState *sprite, u8 anim, u8 frame,
+                    s16 x, s16 y);
 POLY_FT4 *anim_draw_ft4(u_long *ot, POLY_FT4 *prim, AnimState *sprite, s32 anim, u8 frame, s16 x, s16 y, s32 scale, s32 keepPosition, u16 flags, s16 pageX, s16 pageY);
 void anim_draw_sprt_cursor(u_long *ot, AnimState *sprite, u8 anim, u8 frame, s16 x, s16 y);
 void anim_draw_ft4_cursor(u_long *ot, AnimState *sprite, u8 anim, u8 frame, s16 x, s16 y, s32 scale, s32 keepPosition, u16 flags);
-void anim_draw_sprt_parts(u_long *ot, SPRT **sprites, DR_MODE **modes, AnimState *state, u8 anim,
+void anim_draw_sprt_parts(void *ot, SPRT **sprites, DR_MODE **modes, AnimState *state, u8 anim,
                           u8 frame, s16 x, s16 y);
 void anim_select_range(AnimState *state, u8 anim);
 void anim_set_frame(AnimState *state, u8 frame);
@@ -151,7 +152,8 @@ s32 anim_part_palette(AnimState *state, s32 first, s32 second);
 u16 anim_find_bank_image(AnimState *source, ImageBank *bank, s32 key);
 void anim_draw_ft4_advance(u_long *ot, AnimState *p, s16 x, s16 y);
 void anim_draw_sprt_advance(u_long *ot, AnimState *p, s16 x, s16 y);
-void anim_draw_sprt_slots_advance(u_long *ot, SPRT **sprites, DR_MODE **modes, AnimState *p, s16 x, s16 y);
+void anim_draw_sprt_slots_advance(OT_TYPE *ot, SPRT **sprites, DR_MODE **modes, AnimState *p, s16 x,
+                                  s16 y);
 
 void bits16_set(u16 *flags, s32 bits);
 void bits16_clear(u16 *flags, s32 bits);
