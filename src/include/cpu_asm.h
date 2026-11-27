@@ -4,6 +4,12 @@
 /* The CPU operations C cannot express: the scratchpad stack, the return-address store
  * and the host-debugger break. */
 
+#ifdef __psyz
+/* Native calls use the host stack and cannot store a host address in a PS1 word. */
+#define SCRATCHPAD_STACK_ENTER() ((void)0)
+#define SCRATCHPAD_STACK_LEAVE() ((void)0)
+#define SAVE_RETURN_ADDRESS(where) (*(where) = 0)
+#else
 /* The scratchpad: the PSX's 1 KB of on-chip RAM, much faster than main memory. */
 #define SCRATCHPAD          0x1F800000
 #define SCRATCHPAD_SIZE     0x400
@@ -34,5 +40,6 @@
 
 /* The SN Systems host-debugger poll; a no-op trap under no debugger. */
 #define pollhost() __asm__ volatile("break 1024")
+#endif
 
 #endif
