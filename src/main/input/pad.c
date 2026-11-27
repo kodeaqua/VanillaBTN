@@ -4,13 +4,22 @@
 #include <sys/types.h>
 #include <libapi.h>
 #include <libgte.h>
+#ifdef __psyz
+#include <libetc.h>
+#define csqrt SquareRoot12
+#else
 #include <libpad.h>
+#endif
 #include <abs.h>
 #include <string.h>
 #include "types.h"
 #include "farm_state.h"
 #include "main.h"
 #include "pad.h"
+
+#ifdef __psyz
+_Static_assert(sizeof(PadBuffer) == PSYZ_PAD_BUF_LEN, "PadBuffer matches PsyZ SIO frame");
+#endif
 
 /* What pad_read_buttons returns when the port cannot be read. */
 #define PAD_READ_ERROR (-0xFF0001)
@@ -19,7 +28,9 @@ static void pad_read_record(InputRecord *record, u8 slot);
 static void pad_clear_record(InputRecord *record);
 static s32 pad_read_buttons(s32 index);
 static void pad_start_ports(void);
+#ifndef __psyz
 static s32 pad_align_actuators(s32 slot);
+#endif
 static u8 pad_dpad_with_stick(s32 port);
 static s32 pad_read_analog(s32 index);
 static s32 pad_stick_tilt(u8 x, u8 y);
@@ -86,6 +97,28 @@ signed int pad_is_started(void) {
  * With input replay on, a port with no pad reads the recording. A ready pad (stable) is
  * set up once; when its actuators align, its record is cleared and it is polled again. */
 void pad_poll_ports(void) {
+#ifdef __psyz
+    s32 slot;
+
+    for (slot = 0; slot < 2; slot++) {
+        Psyz_PadsGet(slot, (char *)&pad_buffers[slot], sizeof(pad_buffers[slot]));
+        if (pad_buffers[slot].status != 0 || pad_buffers[slot].type == PSYZ_CTRL_DISCONNECTED) {
+            if (game_state.globalFlags & GLOBAL_FLAG_INPUT_REPLAY) {
+                pad_read_record(&input_records[slot], slot);
+            } else {
+                pad_port_mode[slot] = 0;
+                pad_needs_mode[slot] = 1;
+                pad_clear_record(&input_records[slot]);
+            }
+            continue;
+        }
+        if (pad_needs_mode[slot] == 1) {
+            pad_port_mode[slot] = pad_buffers[slot].type >> 4;
+            pad_needs_mode[slot] = 0;
+        }
+        pad_read_record(&input_records[slot], slot);
+    }
+#else
     PadPorts ports;
     s32 slot;
     s32 again;
@@ -129,6 +162,7 @@ void pad_poll_ports(void) {
             }
         } while (again == 1);
     }
+#endif
 }
 
 /* Refresh an input record from its pad: the vibration request, held and pressed buttons,
@@ -250,13 +284,21 @@ static s32 pad_read_buttons(s32 index) {
 
 /* Hand the port buffers and actuator tables to the pad library, and start polling. */
 static void pad_start_ports(void) {
+#ifdef __psyz
+    InitPAD((char *)&pad_buffers[0], sizeof(pad_buffers[0]),
+            (char *)&pad_buffers[1], sizeof(pad_buffers[1]));
+    Psyz_PadsSetKind(0, 0, PSYZ_CTRL_ANALOG_PAD);
+    Psyz_PadsSetKind(1, 0, PSYZ_CTRL_ANALOG_PAD);
+#else
     PadInitDirect((u8 *)&pad_buffers[0], (u8 *)&pad_buffers[1]);
     PadSetAct(PAD_PORT_1, pad_actuators[0], 8);
     PadSetAct(PAD_PORT_2, pad_actuators[1], 8);
     PadStartCom();
+#endif
     pad_started = 1;
 }
 
+#ifndef __psyz
 /* Actuator alignment for PadSetActAlign. */
 static u8 pad_actuator_align[] = {
     0xFF, 0x00, 0x01, 0xFF, 0xFF, 0xFF, 0x00, 0x00,
@@ -273,6 +315,7 @@ static s32 pad_align_actuators(s32 slot) {
     }
     return result;
 }
+#endif
 
 /* The d-pad's four bits in the buttons byte: all set while no direction is pressed. */
 #define PAD_DPAD_BITS 0xF0
@@ -403,6 +446,7 @@ static s16 pad_stick_heading(u8 x, u8 y) {
  * fixed header, with the motor on when there is force; the tables are cleared while no pad
  * is started. */
 static void pad_set_vibration(u8 motor, u8 force, s32 port) {
+    /* shortcut: native controller vibration is not forwarded to SDL3 yet, wire rumble during parity */
     if (pad_port_mode[port] == 0) {
         pad_actuators[port][0] = 0x40;
         pad_actuators[port][1] = motor != 0;
