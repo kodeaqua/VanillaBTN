@@ -3,6 +3,7 @@
 #include <sys/types.h>
 #include <libgte.h>
 #ifdef __psyz
+#include <string.h>
 /* PsyZ implements rsin/rcos (same 4096-unit Q4.12 trig) without csin/ccos aliases. */
 #define csin rsin
 #define ccos rcos
@@ -2600,9 +2601,24 @@ static s16 title_column_c_count = 0;
 static s16 title_logo_slide = -160;
 static s16 title_drop_count = 48;
 static s16 title_logo_wipe = 320;
+#ifdef __psyz
+static const struct {
+    const u8 *data;
+    size_t size;
+} title_images[] = {
+    {title_image_0, sizeof(title_image_0)},
+    {title_image_1, sizeof(title_image_1)},
+    {title_image_2, sizeof(title_image_2)},
+};
+_Static_assert(sizeof(title_image_0) <= sizeof(loading_data) &&
+                   sizeof(title_image_1) <= sizeof(loading_data) &&
+                   sizeof(title_image_2) <= sizeof(loading_data),
+               "title pictures must fit in the loading buffer");
+#else
 static TitleImage *title_image_ptrs[3] = {
     (TitleImage *)title_image_0, (TitleImage *)title_image_1, (TitleImage *)title_image_2,
 };
+#endif
 static s16 title_scroll_a = 0;
 static s16 title_scroll_b = 0;
 static s32 title_caption_offsets[4] = {
@@ -2693,15 +2709,23 @@ static void title_enter_state(void) {
 /* Shows a random title picture once the sprite file is in. Continuing a saved game
  * skips straight to the next state; otherwise the picture fades in. */
 static void title_state_show_image(void) {
+#ifndef __psyz
     TitleImage *image;
     TitleImage *const *images;
+#endif
     FrameState *framebuffer;
     FrameState *other;
 
     if (title_load_sprite_file() != 0) {
+#ifdef __psyz
+        s32 index = rand_range(sizeof(title_images) / sizeof(title_images[0]));
+        memset(&loading_data, 0, sizeof(loading_data));
+        memcpy(&loading_data, title_images[index].data, title_images[index].size);
+#else
         image = (TitleImage *)&loading_data;
         images = title_image_ptrs;
         *image = *images[rand_range(3)];
+#endif
         if (title_saved_flags & GLOBAL_FLAG_CONTINUE) {
             title_load_state = TITLE_LOAD_MUSIC;
             game_state.progress.entryStep++;
