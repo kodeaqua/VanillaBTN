@@ -81,6 +81,18 @@ with the CUE, and choose an output directory outside the checkout and save direc
 A fresh import publishes the output directory after extraction succeeds. A repeat
 import stages files first and preserves unrelated files in the destination.
 
+### Stage a Windows startup package
+
+After building Release, install into an empty directory under `build/`:
+
+```powershell
+cmake --install build/native/windows-x64-release --prefix build/package/VanillaBTN
+```
+
+Distribute the installed directory as a unit. It contains the startup executable,
+importer, checksum manifest, and notices. The executable requires the Visual C++
+x64 runtime. Disc import also requires Python 3.10 or newer on `PATH`.
+
 ## Exceptions
 
 Two things in the build are not compiled from source:

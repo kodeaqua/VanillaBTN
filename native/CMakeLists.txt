@@ -63,6 +63,11 @@ else()
         target_compile_options(vanillabtn PRIVATE -O2)
     endif()
     set_property(TARGET vanillabtn PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+
+    install(TARGETS vanillabtn RUNTIME DESTINATION .)
+    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/tools/psx_disc.py" DESTINATION tools)
+    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/disc/disc.sha1" DESTINATION disc)
+    install(FILES "${PROJECT_SOURCE_DIR}/LICENSE" "${PROJECT_SOURCE_DIR}/NOTICE" DESTINATION .)
 endif()
 
 add_test(NAME vanillabtn_native_smoke

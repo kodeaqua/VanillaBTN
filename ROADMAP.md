@@ -77,6 +77,9 @@ for graphics types and build integration.
 - **LLVM on Windows.** Clang builds the startup target with ASan and UBSan in
   Debug and LTO in Release. The LLVM frontend also accepts shared headers with
   GNU C extensions that MSVC rejects.
+- **Windows packaging.** The Release install rules stage the startup executable,
+  importer, checksum manifest, and notices. The installed startup package can
+  import a user-provided disc. The playable release in milestone 5 remains pending.
 - **PsyZ modules.** PsyZ `00fb42e` and its SDL 3.4.20 revision built on Windows x64.
   The upstream overlay sample passed host symbol imports, nested loading, and state
   reset on reload. Start with PsyZ modules for the native game integration and verify
