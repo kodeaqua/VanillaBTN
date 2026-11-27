@@ -1,5 +1,8 @@
 /* The player: input, movement, tools, carried and thrown items. */
 
+#ifdef __psyz
+#include <stdint.h>
+#endif
 #include <sys/types.h>
 #include <abs.h>
 #include <string.h>
@@ -2406,7 +2409,11 @@ static s32 player_try_carry_throw(FarmPlayer *player, s32 request)
 
 static s32 player_try_nearby_action(FarmPlayer *player)
 {
+#ifdef __psyz
+    FarmNearbyAction *p = (FarmNearbyAction *)(intptr_t)player_start_nearby_actions(player);
+#else
     FarmNearbyAction *p = (FarmNearbyAction *)player_start_nearby_actions(player);
+#endif
     if (p == 0)
         return 0;
     return (p->value ^ 2) != 0;
@@ -6285,7 +6292,11 @@ s32 player_init_toys(FarmPlayer *player)
     file_offset = ANIM_PACK_START(entry, 0);
     do
     {
+#ifdef __psyz
+        anim_bind_file(&player->toys[i].sprite, (void *)(file_base + file_offset));
+#else
         anim_bind_file(&player->toys[i].sprite, (void *)(file_offset + (s32)file_base));
+#endif
         i++;
     } while (i < PLAYER_TOYS);
 

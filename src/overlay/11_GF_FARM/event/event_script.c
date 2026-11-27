@@ -789,7 +789,11 @@ static s32 event_chunk_checksum(u32 *src, u32 size)
 {
     u32 i;
     s32 sum;
+#ifdef __psyz
+    if ((uintptr_t)src & 3)
+#else
     if ((u32)src & 3)
+#endif
     {
         SystemError(0x43, 0x190);
     }
@@ -1546,7 +1550,11 @@ static s32 event_block_first_size(FarmEventBlock *block)
 /* Offset of entry index in the block. */
 static s32 event_block_entry(FarmEventBlock *block, s32 index)
 {
+#ifdef __psyz
+    return block->entryOffsets[index];
+#else
     return *(s32 *)((index << 2) + (s32)block->entryOffsets);
+#endif
 }
 
 /* Data of entry index in the block. */
