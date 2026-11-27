@@ -9,6 +9,11 @@
 #include <libapi.h>
 #include "sdk_mcrd.h"
 #include <libmcx.h>
+#ifdef __psyz
+/* PS1 libapi rename() translates bu00: paths and returns 1 on success (CRT returns 0). */
+long psyz_card_rename(const char *old_name, const char *new_name);
+#define rename psyz_card_rename
+#endif
 #include "types.h"
 #include "main.h"
 #include "mcard.h"

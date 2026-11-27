@@ -133,7 +133,9 @@ int main(void) {
     vsync_pending_callback = 0;
     ResetCallback();
     CdInit();
+#ifndef __psyz
     SetMem(2);
+#endif
     VSync(3);
     VSync(3);
     VSync(3);
@@ -499,15 +501,27 @@ void main_set_clear_screen(s32 value) {
     main_clear_screen_enabled = value;
 }
 
+#ifdef __psyz
+/* PsyZ keeps GsOUT_PACKET_P private and omits GsGetWorkBase; mirror it locally. */
+static u8 *native_gs_work_base;
+#endif
+
 /* Allocate `size` bytes of packets from the GS work area. */
 void *gs_work_alloc(s32 size) {
     u8 *limit = current_frame->workBase + current_frame->workSize;
+#ifdef __psyz
+    u8 *packet = native_gs_work_base;
+#else
     u8 *packet = GsGetWorkBase();
+#endif
     if (limit < packet + size) {
         do {
         } while (host_poll() != 0);
         SystemError(0x50, 0);
     }
+#ifdef __psyz
+    native_gs_work_base = packet + size;
+#endif
     GsSetWorkBase(packet + size);
     return packet;
 }
@@ -518,6 +532,9 @@ void gs_work_release(void *end) {
         do {
         } while (host_poll() != 0);
     }
+#ifdef __psyz
+    native_gs_work_base = (u8 *)end;
+#endif
     GsSetWorkBase(end);
 }
 
@@ -569,6 +586,9 @@ u8 *main_get_region_base(void) {
 static void main_frame_begin(void) {
     s32 ot_base;
 
+#ifdef __psyz
+    native_gs_work_base = current_frame->workBase;
+#endif
     GsSetWorkBase(current_frame->workBase);
     ot_base = ((frame_index * 3) << 12) + REGION_FRAME_OT_BASE;
     frame_ot_base = region_base + ot_base;
