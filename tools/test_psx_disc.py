@@ -1,6 +1,9 @@
+import errno
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from tools import psx_disc
 
@@ -47,3 +50,46 @@ class DiscImportTest(unittest.TestCase):
             with self.assertRaisesRegex(SystemExit, "does not match the USA reference SHA-1"):
                 psx_disc.main(["import", str(disc), "--out", str(out)])
             self.assertFalse(out.exists())
+
+    def test_failed_extraction_can_be_retried_without_damaging_destination(self):
+        with tempfile.TemporaryDirectory() as temp:
+            folder = Path(temp)
+            image = psx_disc.Image()
+            for _ in range(psx_disc.PVD_LBA):
+                image.empty_form2_sector(psx_disc.SM_FORM2)
+            image.form1_sector(b"\x01CD001", psx_disc.DATA_LAST)
+            disc = folder / "data.bin"
+            disc.write_bytes(image.data)
+            digest = hashlib.sha1(image.data, usedforsecurity=False).hexdigest()
+            (folder / "disc").mkdir()
+            (folder / "disc" / "disc.sha1").write_text(f"{digest}  disc.bin\n", encoding="ascii")
+
+            write_bytes = Path.write_bytes
+
+            def fail_during_write(path, data):
+                write_bytes(path, data[:1])
+                raise OSError(errno.ENOSPC, "simulated full disk")
+
+            with patch.object(psx_disc, "__file__", str(folder / "tools" / "psx_disc.py")):
+                for existing in (False, True):
+                    with self.subTest(existing=existing):
+                        out = folder / ("existing" if existing else "new")
+                        extracted = out / "license_data.dat"
+                        if existing:
+                            out.mkdir()
+                            extracted.write_bytes(b"previous data")
+                            (out / "keep.txt").write_text("unrelated", encoding="utf-8")
+                        args = ["import", str(disc), "--out", str(out)]
+                        with patch.object(Path, "write_bytes", fail_during_write):
+                            with self.assertRaisesRegex(SystemExit, "simulated full disk"):
+                                psx_disc.main(args)
+                        if existing:
+                            self.assertEqual(extracted.read_bytes(), b"previous data")
+                        else:
+                            self.assertFalse(out.exists())
+                        self.assertEqual(psx_disc.main(args), 0)
+                        expected_size = psx_disc.LICENSE_SECTORS * psx_disc.RAW
+                        self.assertEqual(extracted.stat().st_size, expected_size)
+                        if existing:
+                            kept = (out / "keep.txt").read_text(encoding="utf-8")
+                            self.assertEqual(kept, "unrelated")

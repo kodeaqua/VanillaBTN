@@ -27,6 +27,7 @@ import sys
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path, PureWindowsPath
+from tempfile import TemporaryDirectory
 
 SECTOR = 2352               # a raw sector
 USER = 2048                 # a Form 1 sector's user data
@@ -434,14 +435,38 @@ def extract(disc: Path, out: Path, verify_reference: bool = False) -> None:
     pvd = _user_data(image, PVD_LBA)
     if pvd[:6] != b"\x01CD001":
         raise SystemExit(f"{label}: no ISO 9660 volume descriptor at sector {PVD_LBA}")
-    if verify_reference:
-        manifest = Path(__file__).resolve().parents[1] / "disc" / "disc.sha1"
-        match = re.search(r"(?m)^([0-9a-f]{40})[ \t]+disc\.bin$", manifest.read_text(encoding="ascii"))
-        if not match:
-            raise SystemExit("The disc manifest has no reference SHA-1.")
-        if hashlib.sha1(image, usedforsecurity=False).hexdigest() != match[1]:
-            raise SystemExit("The disc does not match the USA reference SHA-1.")
+    if not verify_reference:
+        _extract_image(image, pvd, out)
+        return
 
+    manifest = Path(__file__).resolve().parents[1] / "disc" / "disc.sha1"
+    match = re.search(r"(?m)^([0-9a-f]{40})[ \t]+disc\.bin$", manifest.read_text(encoding="ascii"))
+    if not match:
+        raise SystemExit("The disc manifest has no reference SHA-1.")
+    if hashlib.sha1(image, usedforsecurity=False).hexdigest() != match[1]:
+        raise SystemExit("The disc does not match the USA reference SHA-1.")
+
+    staging_parent = out if out.is_dir() else out.parent
+    staging_parent.mkdir(parents=True, exist_ok=True)
+    with TemporaryDirectory(prefix=".vanillabtn-import-", dir=staging_parent) as temp:
+        staged = Path(temp) / "disc"
+        _extract_image(image, pvd, staged)
+        if staging_parent != out:
+            try:
+                staged.rename(out)
+                return
+            except OSError:
+                if not out.is_dir():
+                    raise
+        # Replace entries individually so a repeat import keeps unrelated files.
+        for source in staged.rglob("*"):
+            if source.is_file():
+                target = out / source.relative_to(staged)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                source.replace(target)
+
+
+def _extract_image(image: bytes, pvd: bytes, out: Path) -> None:
     out.mkdir(parents=True, exist_ok=True)
     (out / "license_data.dat").write_bytes(
         b"".join(image[n * SECTOR + 16:(n + 1) * SECTOR] for n in range(LICENSE_SECTORS)))

@@ -72,6 +72,9 @@ the USA reference SHA-1 before writing files.
 A CUE must describe one `MODE2/2352` track starting at `00:00:00`. Keep the BIN
 with the CUE, and choose an output directory outside the checkout and save directory.
 
+A fresh import publishes the output directory after extraction succeeds. A repeat
+import stages files first and preserves unrelated files in the destination.
+
 ## Exceptions
 
 Two things in the build are not compiled from source:
