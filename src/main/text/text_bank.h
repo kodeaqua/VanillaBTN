@@ -398,12 +398,18 @@ typedef struct TextBankStarts {
 extern TextBankStarts text_bank_starts;
 
 /* A message, at its offset from the start of the messages. */
+#ifdef __psyz
+#define LOCALIZED(message) ((u16 *)((u8 *)(message) + text_bank_starts.messages))
+#define LOCALIZED_NAME(name) \
+    ((u16 *)((u8 *)(name) + (text_bank_starts.names - (s32)offsetof(TextBank, names))))
+#else
 #define LOCALIZED(message) ((u16 *)(text_bank_starts.messages + (u32)(message)))
 
 /* A name's offset within the names. */
 #define NAME_OFFSET(name) ((s32)(name) - (s32)offsetof(TextBank, names))
 
 #define LOCALIZED_NAME(name) ((u16 *)(text_bank_starts.names + NAME_OFFSET(name)))
+#endif
 
 /* The text `offset` bytes from the bank's start, for the tables that hold the offset
  * itself (the recipes' dish names, the helpers' and chickens' names, the ledger's grades). */

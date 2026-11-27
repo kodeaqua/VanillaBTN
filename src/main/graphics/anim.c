@@ -1,6 +1,9 @@
 /* Animations: binding an .ANI file, the frame clock and the frame lookups, drawing the
  * frames as SPRTs and POLY_FT4s, queueing them at the primitive cursor, and text drawn
  * through sprite parts. */
+#ifdef __psyz
+#include <stdint.h>
+#endif
 #include <string.h>
 #include <sys/types.h>
 #include <libgte.h>
@@ -37,7 +40,11 @@ void anim_bind_file(AnimState *state, AnimFile *file) {
     u32 caller;
 
     SAVE_RETURN_ADDRESS(&caller);
+#ifdef __psyz
+    if (((uintptr_t)file & 3) != 0) {
+#else
     if ((u32)file != ((u32)file >> 2) << 2) {
+#endif
         ANI_FAIL();
     }
     if (file->magic != ANI_MAGIC) {
