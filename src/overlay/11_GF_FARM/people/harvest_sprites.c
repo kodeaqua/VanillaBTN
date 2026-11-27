@@ -375,7 +375,11 @@ static s32 harvest_helper_timer_tick(FarmHelper *helper) {
     actions = harvest_helper_tick_handlers;
     action = actions[action_id];
     if (action != 0) {
+#ifdef __psyz
+        action(helper);
+#else
         action();
+#endif
     }
     if (!(helper->actor.flags & ACTOR_FLAG_CUE_RUNNING) && helper->actor.interruptTime >= HELPER_TASK_INTERVAL) {
         harvest_helper_seasonal_task(helper);

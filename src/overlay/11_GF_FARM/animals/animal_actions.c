@@ -180,13 +180,21 @@ void farm_action_set_countdown(s32 step, s32 start_value) {
 
 /* Zero an actor record, which frees its slot. */
 void farm_action_clear(void *arg) {
+#ifdef __psyz
+    memset(arg, 0, sizeof(FarmAction));
+#else
     memset(arg, 0, 0xB0);
+#endif
     *(s16 *)arg = 0;
 }
 
 /* Pick a random slot and discard it. */
 s32 farm_action_pick_slot(u16 arg) {
+#ifdef __psyz
+    return farm_pick_random_slot(arg);
+#else
     farm_pick_random_slot(arg);
+#endif
 }
 
 /* Event 0x15B: when clock_is_pending reports 1, estateFlags has ESTATE_FLAG_DOG_WALK and

@@ -3136,7 +3136,11 @@ static s32 shop_basket_step(void) {
         menu_request_open(2, 0xD6);
         return 1;
     }
+#ifdef __psyz
+    return shop_item_grant(ITEM_BASKET, 2, 0xD5, SHOP_GRANT_ITEM);
+#else
     shop_item_grant(ITEM_BASKET, 2, 0xD5, SHOP_GRANT_ITEM);
+#endif
 }
 
 /* The spring result: without a greenhouse it runs only in spring (done at once otherwise); a

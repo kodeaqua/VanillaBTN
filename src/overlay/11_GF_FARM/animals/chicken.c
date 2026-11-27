@@ -337,7 +337,11 @@ s32 farm_actor_dispatch_state(FarmActor *object, s32 state) {
 }
 
 void chicken_clear(FarmChicken *p) {
+#ifdef __psyz
+    memset(p, 0, sizeof(FarmChicken));
+#else
     memset(p, 0, 0xB4);
+#endif
     p->actor.kind = 0;
 }
 

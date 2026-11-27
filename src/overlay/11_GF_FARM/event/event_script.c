@@ -1075,7 +1075,11 @@ void event_map_upload(u8 *dst)
 s32 event_current_script_id(void)
 {
     s32 result;
+#ifdef __psyz
+    if (event_flag_get(EVENT_FLAG_REQUEST_BUSY) != 0 && game_state.request != 0)
+#else
     if (event_flag_get(EVENT_FLAG_REQUEST_BUSY) != 0)
+#endif
         result = game_state.request->args[0];
     else
         result = 0;
