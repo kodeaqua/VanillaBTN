@@ -10,6 +10,14 @@
 #include "cd_audio.h"
 #include "farm_state.h"
 
+#ifdef __psyz
+/* PsyZ reads synchronously in CdRead(), so breaking a read only pauses the drive. */
+static void afile_cd_read_break(void) {
+    CdControlF(CdlPause, 0);
+}
+#define CdReadBreak afile_cd_read_break
+#endif
+
 /* Read the whole CD file `name` into `destination`, waiting until the read has drained. */
 static s32 cd_read_file(char *name, u_long *destination) {
     CdlFILE file;
