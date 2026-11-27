@@ -90,6 +90,24 @@ for graphics types and build integration.
 - **Overlay archive reads.** A Windows x64 diagnostic ran the shared A_FILE reader
   against the reference disc. It checked all 33 offsets and verified a low, high, low
   load sequence against the disc bytes, with region buffers standing in for PS1 RAM.
+- **Main native compile and link check.** `src/main/main.c` and 35 other `src/main/`
+  units compile with Windows x64 Clang against PsyZ `00fb42e`. PsyZ implements
+  low-level `libcard`/`libapi` memory-card APIs, not `libmcrd` or `libmcx`.
+
+### Native `src/main` link check (PsyZ `00fb42e`)
+
+Linking the 36 compiling `src/main/` objects (all except `input/pad.c` and `cd/afile.c`)
+against `psyz.lib` and `SDL3-static.lib` leaves 36 unresolved symbols:
+
+| Subsystem | Unresolved symbols | Notes |
+|---|---|---|
+| Kernel (`libapi`) | `SetMem` | Declared in `libapi.h`; not built in `psyz.lib`. |
+| Graphics (`libgs`) | `GsSetOffset`, `GsInit3D`, `GsGetWorkBase` | Declared in `libgs.h`; `INCLUDE_ASM` stubs in PsyZ `00fb42e`. |
+| Memory card (`libmcrd`) | `MemCardInit`, `MemCardStart` | Header-only in PsyZ `00fb42e`; PsyZ implements `libcard`/`libapi` (`InitCARD`, `StartCARD`, `StopCARD`, `_bu_init`, `_card_*`, `firstfile`/`nextfile`). |
+| PocketStation (`libmcx`) | `McxStartCom` | Header-only in PsyZ `00fb42e`; no implementation. |
+| CD / A_FILE (`cd/afile.c`) | `afile_init`, `afile_read_range`, `afile_poll_range`, `afile_read_bytes`, `afile_read_async` | `afile.c` fails to compile: `CdReadBreak` is undeclared in PsyZ `libcd.h`. |
+| Input (`input/pad.c`) | `pad_init`, `pad_reset_records`, `pad_set_repeat`, `pad_set_repeat2`, `pad_poll_ports`, `pad_is_started` | `pad.c` fails to compile: no `libpad.h` in PsyZ `00fb42e` (advanced pad prototypes live in `libetc.h`). |
+| Overlays (`src/overlay/*`) | 15 scene handlers (`debug_tick`, `pda_sample_run`, `farm_enter_dispatch`, `save_screen_tick`, `load_screen_tick`, `save_transfer_screen_tick`, `mg1_run_state`, `mg2_phase_run`, `mg3_step_dispatch`, `mg4_run_step`, `mg5_step_run`, `title_step_dispatch`, `staff_tick`, `swind_window_tick`, `mcard_screen_tick`) and 3 farm callbacks (`farm_clamp_status`, `item_use_coin`, `farm_adjust_stamina_fatigue`) | Resolved once overlays load via PsyZ modules or host dispatch. |
 
 ## Verification
 
