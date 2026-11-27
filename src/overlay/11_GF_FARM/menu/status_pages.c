@@ -421,9 +421,22 @@ static void status_load_sprites(void) {
     }
     texture_pack_load(STAGING_BUFFER + sizeof(FarmPack));
     status_pack = *(FarmPack *)STAGING_BUFFER;
+#ifdef __psyz
+    AnimState *const sprites[] = {
+        &status_page_sprites[0], &status_page_sprites[1], &status_page_sprites[2],
+        &status_cursor_sprite, &status_mark_sprite,
+    };
+    _Static_assert(sizeof(sprites) / sizeof(sprites[0]) ==
+                       sizeof(status_sprite_offsets) / sizeof(status_sprite_offsets[0]),
+                   "each status sprite needs a pack offset");
+    for (i = 0; i < sizeof(sprites) / sizeof(sprites[0]); i++) {
+        anim_bind_file(sprites[i], (AnimFile *)(status_pack.bytes + status_sprite_offsets[i]));
+    }
+#else
     for (i = 0; i < 5; i++) {
         anim_bind_file(&status_page_sprites[i], (AnimFile *)(status_pack.bytes + status_sprite_offsets[i]));
     }
+#endif
 }
 
 /* Advance the page sequence (steps 1 to 6) as the screen fades out and back in.
