@@ -24,6 +24,7 @@
 #include "field_item_requests.h"
 #include "fishing.h"
 #include "harvest_sprites.h"
+#include "main.h"
 #include "menu_window.h"
 #include "menus.h"
 #include "messages.h"
@@ -49,6 +50,10 @@ void farm_mode_tick(void) {
     u32 eventMode;
     u32 flags;
 
+#ifdef __psyz
+    /* Scene switches clear the GTE offset before the farm resumes. */
+    SetGeomOffset(MAIN_DISPLAY_WIDTH / 2, MAIN_DISPLAY_HEIGHT / 2);
+#endif
     if (game_state.globalFlags & (GLOBAL_FLAG_DEMO_START | GLOBAL_FLAG_INPUT_REPLAY)) {
         rand_seed = 1;
     }
