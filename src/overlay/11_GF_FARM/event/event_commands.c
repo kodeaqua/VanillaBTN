@@ -3,7 +3,7 @@
  * limits.
  */
 #include "abs.h"
-#include <memory.h>
+#include <string.h>
 #include <libmath.h>
 #include <sys/types.h>
 #include <libgte.h>

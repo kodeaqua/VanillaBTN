@@ -1,6 +1,6 @@
 /* Farm start-up and re-entry, the zone entry table, and the event availability checks. */
 
-#include <memory.h>
+#include <string.h>
 #include "types.h"
 #include "actor.h"
 #include "afile.h"

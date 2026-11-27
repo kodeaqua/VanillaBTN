@@ -5,7 +5,7 @@
 #include <libcd.h>
 #include <libsnd.h>
 #include <libspu.h>
-#include <memory.h>
+#include <string.h>
 #include <libetc.h>
 #include "types.h"
 #include "afile.h"

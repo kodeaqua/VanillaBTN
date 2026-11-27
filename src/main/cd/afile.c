@@ -4,7 +4,7 @@
 #include <libgte.h>
 #include <libgpu.h>
 #include <libcd.h>
-#include <memory.h>
+#include <string.h>
 #include "types.h"
 #include "afile.h"
 #include "cd_audio.h"

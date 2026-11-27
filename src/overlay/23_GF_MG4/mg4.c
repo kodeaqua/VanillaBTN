@@ -1,7 +1,7 @@
 /* Minigame 4: its state machine, the players and records, and the drawing. */
 
 #include <sys/types.h>
-#include <memory.h>
+#include <string.h>
 #include <abs.h>
 #include <libgte.h>
 #include <libgpu.h>

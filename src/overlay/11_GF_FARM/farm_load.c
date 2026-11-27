@@ -1,7 +1,7 @@
 /* Loading the farm's resources from the CD: the sections, the season and item art, the
  * sprite and texture blocks. */
 
-#include <memory.h>
+#include <string.h>
 #include <sys/types.h>
 #include <libgte.h>
 #include <libgpu.h>

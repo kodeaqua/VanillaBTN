@@ -1,5 +1,5 @@
 /* The family: the wife and child, the daily update of the family, its pregnancy and the child's growth. */
-#include <memory.h>
+#include <string.h>
 #include "types.h"
 #include "event_flags.h"
 #include "family.h"

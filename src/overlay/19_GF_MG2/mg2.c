@@ -1,7 +1,7 @@
 /* Overlay 19_GF_MG2: minigame 2. */
 
 #include <sys/types.h>
-#include <memory.h>
+#include <string.h>
 #include <libgte.h>
 #include <libgpu.h>
 #include <libgs.h>

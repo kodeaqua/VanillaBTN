@@ -2,7 +2,7 @@
  * targets. Each record has its own state, sprite and target group. */
 
 #include <sys/types.h>
-#include <memory.h>
+#include <string.h>
 #include <libgte.h>
 #include <libgpu.h>
 #include <libgs.h>

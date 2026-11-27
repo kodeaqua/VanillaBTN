@@ -5,7 +5,7 @@
 #include <gtemac.h>
 #include <libgpu.h>
 #include <libgs.h>
-#include <memory.h>
+#include <string.h>
 #include "types.h"
 #include "camera.h"
 #include "cpu_asm.h"

@@ -2,7 +2,7 @@
 
 #include <sys/types.h>
 #include <abs.h>
-#include <memory.h>
+#include <string.h>
 #include <libgte.h>
 #include "types.h"
 #include "actor.h"

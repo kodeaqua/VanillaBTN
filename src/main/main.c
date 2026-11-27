@@ -1,7 +1,7 @@
 /* Entry point, the frame loop, and the frame records: the ordering tables and
  * primitive buffers that each frame is drawn into. */
 
-#include <memory.h>
+#include <string.h>
 #include <sys/types.h>
 #include <libetc.h>
 #include <libgte.h>

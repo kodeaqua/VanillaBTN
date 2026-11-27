@@ -1,6 +1,6 @@
 /* Harvest sprites: the farm helpers' daily work, their scripts and their talk, and what each harvest is worth. */
 #include <sys/types.h>
-#include <memory.h>
+#include <string.h>
 #include <libgte.h>
 #include "types.h"
 #include "actor.h"

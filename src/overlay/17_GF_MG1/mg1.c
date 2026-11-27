@@ -1,7 +1,7 @@
 /* Minigame 1: the race, its results table and its payload. */
 
 #include <sys/types.h>
-#include <memory.h>
+#include <string.h>
 #include <libgte.h>
 #include <libgpu.h>
 #include <libgs.h>

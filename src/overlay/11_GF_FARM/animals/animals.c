@@ -3,7 +3,7 @@
 #include <abs.h>
 #include <sys/types.h>
 #include <libgte.h>
-#include <memory.h>
+#include <string.h>
 #include "types.h"
 #include "actor.h"
 #include "anim.h"

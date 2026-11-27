@@ -1,6 +1,6 @@
 /* Farm event scripts: the step interpreter, the chunks of script data kept in VRAM, the
  * actors the events draw, entering and leaving an event, and the event images. */
-#include <memory.h>
+#include <string.h>
 #include <sys/types.h>
 #include <libgte.h>
 #include <libgpu.h>

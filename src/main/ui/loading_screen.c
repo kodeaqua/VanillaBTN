@@ -1,4 +1,4 @@
-#include <memory.h>
+#include <string.h>
 #include <sys/types.h>
 #include <libgte.h>
 #include <libgpu.h>

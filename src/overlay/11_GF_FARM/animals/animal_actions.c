@@ -1,5 +1,5 @@
 /* The farm's action slots: claiming one for an animal or pet, and their per-frame update and cues. */
-#include <memory.h>
+#include <string.h>
 #include <libapi.h>
 #include <sys/types.h>
 #include <libgte.h>

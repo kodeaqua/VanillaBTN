@@ -1,7 +1,7 @@
 /* The farm clock: the calendar and time of day, the minute tick, the queue of
  * timed events, and the date flags that follow the calendar. */
 
-#include <memory.h>
+#include <string.h>
 #include "types.h"
 #include "animals.h"
 #include "clock.h"

@@ -1,7 +1,7 @@
 /* Animations: binding an .ANI file, the frame clock and the frame lookups, drawing the
  * frames as SPRTs and POLY_FT4s, queueing them at the primitive cursor, and text drawn
  * through sprite parts. */
-#include <memory.h>
+#include <string.h>
 #include <sys/types.h>
 #include <libgte.h>
 #include <libgpu.h>

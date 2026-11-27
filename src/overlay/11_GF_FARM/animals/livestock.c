@@ -1,5 +1,5 @@
 /* Livestock on the farm: the overnight update of each cow and sheep, their cue scripts and their walking. */
-#include <memory.h>
+#include <string.h>
 #include <sys/types.h>
 #include "types.h"
 #include "actor.h"

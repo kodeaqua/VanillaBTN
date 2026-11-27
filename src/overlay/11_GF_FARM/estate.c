@@ -1,7 +1,7 @@
 /* Farm estate bookkeeping: gold, the message queues, the daily notices and the
  * farm's search records. */
 
-#include <memory.h>
+#include <string.h>
 #include "types.h"
 #include "anim.h"
 #include "animals.h"

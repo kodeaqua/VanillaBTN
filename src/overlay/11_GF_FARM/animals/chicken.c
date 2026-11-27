@@ -1,7 +1,7 @@
 /* Chickens on the farm: their spawn, daily tick, state and timers, their sprites and the
  * animals' sprite table, their next state, following the player, their cue scripts and
  * their walking. */
-#include <memory.h>
+#include <string.h>
 #include "types.h"
 #include "actor.h"
 #include "anim.h"

@@ -1,7 +1,7 @@
 /* The save/load screens: choosing a slot, saving and loading the farm to the memory card. */
 
 #include <sys/types.h>
-#include <memory.h>
+#include <string.h>
 #include <libgte.h>
 #include <libgpu.h>
 #include <libsnd.h>

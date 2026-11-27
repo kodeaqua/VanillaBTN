@@ -1,7 +1,7 @@
 /* The farm dog: its sprite, its spawn, requests, daily affection and training tick, its
  * phase machine, and its actions: the idle phase, item and action searches, its cues and
  * scripted walks. */
-#include <memory.h>
+#include <string.h>
 #include <sys/types.h>
 #include <libgte.h>
 #include <libgpu.h>

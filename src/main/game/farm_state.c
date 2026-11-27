@@ -1,4 +1,4 @@
-#include <memory.h>
+#include <string.h>
 #include "types.h"
 #include "afile.h"
 #include "farm_state.h"

@@ -1,5 +1,5 @@
 /* The farm horse and pony: its sprite, its bond with the player, its cues and its actions. */
-#include <memory.h>
+#include <string.h>
 #include "types.h"
 #include "actor.h"
 #include "anim.h"

@@ -5,7 +5,7 @@
 #include <libgte.h>
 #include <libgpu.h>
 #include <libgs.h>
-#include <memory.h>
+#include <string.h>
 #include "types.h"
 #include "clock.h"
 #include "event_commands.h"
