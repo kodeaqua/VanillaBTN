@@ -9,7 +9,20 @@
 #include <libgs.h>
 #include <libcd.h>
 #include <libapi.h>
+#ifdef __psyz
+/* PsyZ's kernel.h defines struct DIRENTRY without a guard macro, so libmcrd.h collides. */
+#define DIRENTRY DIRENTRY
+#pragma push_macro("O_RDONLY")
+#pragma push_macro("O_WRONLY")
+#undef O_RDONLY
+#undef O_WRONLY
+#endif
 #include <libmcrd.h>
+#ifdef __psyz
+#undef DIRENTRY
+#pragma pop_macro("O_RDONLY")
+#pragma pop_macro("O_WRONLY")
+#endif
 #include <libmcx.h>
 #include "types.h"
 #include "afile.h"
