@@ -1659,20 +1659,33 @@ static void mg2_draw_scenery_piece(OT_TYPE *ot, AnimState *sprite, Mg2Vector *ve
     ui_draw_icon_18_sub(&current_frame->ot[slot >> 3], mg2_project_xy2.x, mg2_project_xy2.y, 0);
 }
 
+/* Keep the helper nested for the matching compiler's code layout. */
+#ifndef __psyz
 /* The results board: a 2x4 grid of labels (the farm's text in the first cell, then the messages of picks 1..7), then the markers for the rounds reached. */
 static void mg2_draw_results_board(void) {
     s32 saved;
     s32 row;
     s32 col;
     u16 *text;
+#else
+static
+#endif
+/* Draw frame `frame` of sprite bank `bank`. */
+void mg2_draw_board_marker(s32 bank, s32 frame) {
+    anim_select_range(&mg2_state.iconSprite, bank & 0xFF);
+    anim_set_frame(&mg2_state.iconSprite, frame);
+    anim_draw_sprt_cursor(&current_frame->otTags[0][5], &mg2_state.iconSprite,
+                  mg2_state.iconSprite.animation, mg2_state.iconSprite.frame, 0, 0);
+}
 
-    /* Draw frame `frame` of sprite bank `bank`. */
-    void mg2_draw_board_marker(s32 bank, s32 frame) {
-        anim_select_range(&mg2_state.iconSprite, bank & 0xFF);
-        anim_set_frame(&mg2_state.iconSprite, frame);
-        anim_draw_sprt_cursor(&current_frame->otTags[0][5], &mg2_state.iconSprite,
-                      mg2_state.iconSprite.animation, mg2_state.iconSprite.frame, 0, 0);
-    }
+#ifdef __psyz
+/* The results board: a 2x4 grid of labels (the farm's text in the first cell, then the messages of picks 1..7), then the markers for the rounds reached. */
+static void mg2_draw_results_board(void) {
+    s32 saved;
+    s32 row;
+    s32 col;
+    u16 *text;
+#endif
 
     anim_select_range(&mg2_state.iconSprite, 0);
     anim_draw_sprt_cursor(&current_frame->otTags[0][6], &mg2_state.iconSprite,

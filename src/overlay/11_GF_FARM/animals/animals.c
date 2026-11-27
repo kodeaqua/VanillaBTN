@@ -971,28 +971,41 @@ static void farm_roll_stray_dogs(void) {
     game_state.progress.estate.estateFlags |= ESTATE_FLAG_STRAY_DOGS;
 }
 
+/* Keep the helper nested for the matching compiler's code layout. */
+#ifndef __psyz
 /* Is a dead farm item of a kind `kind` selects? `kind` bit 1 matches items that died of age, bit 2
  * the others. `mode` picks the tables: bit 4 the chickens, and bits 1 and 2 the livestock (bit 2
  * for records with ACTOR_FLAG_BIT16, bit 1 for the rest). */
 s32 farm_kind_selected(s32 mode, u32 kind)
 {
-    s32 farm_kind_matches_flags(FarmActor *object, u32 kind)
-    {
-        u32 flags;
-        u32 diedOfAge;
+#else
+static
+#endif
+s32 farm_kind_matches_flags(FarmActor *object, u32 kind)
+{
+    u32 flags;
+    u32 diedOfAge;
 
-        flags = object->flags;
-        diedOfAge = flags & ACTOR_FLAG_DIED_OF_AGE;
-        if (flags & ACTOR_FLAG_DIED) {
-            if ((kind & 1) && diedOfAge == 1) {
-                return 1;
-            }
-            if ((kind & 2) && diedOfAge == 0) {
-                return 1;
-            }
+    flags = object->flags;
+    diedOfAge = flags & ACTOR_FLAG_DIED_OF_AGE;
+    if (flags & ACTOR_FLAG_DIED) {
+        if ((kind & 1) && diedOfAge == 1) {
+            return 1;
         }
-        return 0;
+        if ((kind & 2) && diedOfAge == 0) {
+            return 1;
+        }
     }
+    return 0;
+}
+
+#ifdef __psyz
+/* Is a dead farm item of a kind `kind` selects? `kind` bit 1 matches items that died of age, bit 2
+ * the others. `mode` picks the tables: bit 4 the chickens, and bits 1 and 2 the livestock (bit 2
+ * for records with ACTOR_FLAG_BIT16, bit 1 for the rest). */
+s32 farm_kind_selected(s32 mode, u32 kind)
+{
+#endif
 
     s32 i;
 
@@ -1306,19 +1319,30 @@ static u16 farm_move_compare_table[10] = {
     FARM_MOVE_X_GT_Z_EQ, FARM_MOVE_X_GT_Z_LT, FARM_MOVE_X_GT_Z_GT, FARM_MOVE_SAME,
 };
 
+/* Keep the helper nested for the matching compiler's code layout. */
+#ifndef __psyz
 /* Compare both coordinate pairs three ways and look the pair up in the table. */
 static u16 farm_move_table_lookup(FarmActor *state)
 {
-    s32 farm_move_compare(s32 a, s32 b)
-    {
-        if (a == b) {
-            return 0;
-        }
-        if (a < b) {
-            return 1;
-        }
-        return 2;
+#else
+static
+#endif
+s32 farm_move_compare(s32 a, s32 b)
+{
+    if (a == b) {
+        return 0;
     }
+    if (a < b) {
+        return 1;
+    }
+    return 2;
+}
+
+#ifdef __psyz
+/* Compare both coordinate pairs three ways and look the pair up in the table. */
+static u16 farm_move_table_lookup(FarmActor *state)
+{
+#endif
 
     s32 first;
     s32 second;
@@ -1964,20 +1988,32 @@ static u16 farm_heading_table[10] = {
     0x0000, 0x0005, 0x0007, 0x0006, 0x0001, 0x0002, 0x0008, 0x0004, 0x0003, 0x0000,
 };
 
+/* Keep the helper nested for the matching compiler's code layout. */
+#ifndef __psyz
 /* Classify the object's heading from its two coordinate pairs; when it is close to its target on
  * both axes, clear ACTOR_FLAG_APPROACHING_PLAYER (0x2000) and report 0 instead. */
 static u16 farm_heading_classify(FarmActor *state)
 {
-    s32 farm_heading_compare(s32 a, s32 b)
-    {
-        if (a == b) {
-            return 0;
-        }
-        if (a < b) {
-            return 1;
-        }
-        return 2;
+#else
+static
+#endif
+s32 farm_heading_compare(s32 a, s32 b)
+{
+    if (a == b) {
+        return 0;
     }
+    if (a < b) {
+        return 1;
+    }
+    return 2;
+}
+
+#ifdef __psyz
+/* Classify the object's heading from its two coordinate pairs; when it is close to its target on
+ * both axes, clear ACTOR_FLAG_APPROACHING_PLAYER (0x2000) and report 0 instead. */
+static u16 farm_heading_classify(FarmActor *state)
+{
+#endif
 
     s32 x1;
     s32 y1;
