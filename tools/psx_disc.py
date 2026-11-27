@@ -1,11 +1,14 @@
 """Read and write the game's CD image.
 
 The disc is one MODE2/2352 data track: raw 2352-byte sectors holding an ISO 9660
-file system with the CD-XA extensions. Two commands:
+file system with the CD-XA extensions.
 
     psx_disc.py extract DISC.bin --out DIR
         Every file of the disc's file system into DIR, at its path on the disc, and
         the licence sectors as DIR/license_data.dat.
+
+    psx_disc.py import DISC.bin|DISC.cue --out DIR
+        Check the USA reference checksum, then extract to DIR.
 
     psx_disc.py build LAYOUT.xml --files DIR [--replace NAME=PATH]... -o OUT.bin [--cue OUT.cue]
         The image LAYOUT.xml describes (an mkpsxiso <iso_project>), its files read
@@ -17,11 +20,13 @@ Standard library only.
 from __future__ import annotations
 
 import argparse
+import hashlib
+import re
 import struct
 import sys
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 SECTOR = 2352               # a raw sector
 USER = 2048                 # a Form 1 sector's user data
@@ -398,13 +403,45 @@ def _records(image: bytes, lba: int, size: int):
             offset += length
 
 
-def extract(disc: Path, out: Path) -> None:
+def cue_binary(cue: Path) -> Path:
+    """Find the binary for a single MODE2/2352 track starting at sector zero."""
+    try:
+        records = [line.strip() for line in cue.read_text(encoding="utf-8-sig").splitlines()]
+    except UnicodeError:
+        raise SystemExit("The CUE sheet must be UTF-8.") from None
+    records = [line for line in records if line and line.split(maxsplit=1)[0].upper() != "REM"]
+    track = [line.upper().split() for line in records[1:]]
+    if track != [["TRACK", "01", "MODE2/2352"], ["INDEX", "01", "00:00:00"]]:
+        raise SystemExit("Expected one MODE2/2352 CUE track starting at sector zero.")
+
+    match = re.fullmatch(r'FILE\s+(?:"([^"\x00]+)"|([^"\s\x00]+))\s+BINARY', records[0], re.I)
+    if not match:
+        raise SystemExit("Expected one BINARY file in the CUE sheet.")
+    name = PureWindowsPath(match[1] or match[2])
+    if name.drive or name.root or ".." in name.parts or name.suffix.lower() != ".bin":
+        raise SystemExit("The CUE sheet must use a relative BIN path within its directory.")
+    binary = cue.parent.joinpath(*name.parts).resolve()
+    if not binary.is_relative_to(cue.parent.resolve()):
+        raise SystemExit("The CUE sheet's BIN path leaves its directory.")
+    return binary
+
+
+def extract(disc: Path, out: Path, verify_reference: bool = False) -> None:
     image = disc.read_bytes()
+    label = "Disc" if verify_reference else str(disc)
     if len(image) % SECTOR:
-        raise SystemExit(f"{disc}: not a MODE2/2352 image ({len(image)} bytes)")
+        raise SystemExit(f"{label}: not a MODE2/2352 image ({len(image)} bytes)")
     pvd = _user_data(image, PVD_LBA)
     if pvd[:6] != b"\x01CD001":
-        raise SystemExit(f"{disc}: no ISO 9660 volume descriptor at sector {PVD_LBA}")
+        raise SystemExit(f"{label}: no ISO 9660 volume descriptor at sector {PVD_LBA}")
+    if verify_reference:
+        manifest = Path(__file__).resolve().parents[1] / "disc" / "disc.sha1"
+        match = re.search(r"(?m)^([0-9a-f]{40})[ \t]+disc\.bin$", manifest.read_text(encoding="ascii"))
+        if not match:
+            raise SystemExit("The disc manifest has no reference SHA-1.")
+        if hashlib.sha1(image, usedforsecurity=False).hexdigest() != match[1]:
+            raise SystemExit("The disc does not match the USA reference SHA-1.")
+
     out.mkdir(parents=True, exist_ok=True)
     (out / "license_data.dat").write_bytes(
         b"".join(image[n * SECTOR + 16:(n + 1) * SECTOR] for n in range(LICENSE_SECTORS)))
@@ -544,6 +581,9 @@ def main(argv: list[str] | None = None) -> int:
     p = commands.add_parser("extract", help="the disc's files and licence into a directory")
     p.add_argument("disc", type=Path)
     p.add_argument("--out", type=Path, required=True)
+    p = commands.add_parser("import", help="verify and extract the USA reference BIN or CUE")
+    p.add_argument("disc", type=Path)
+    p.add_argument("--out", type=Path, required=True)
     p = commands.add_parser("build", help="an image from a layout and its files")
     p.add_argument("layout", type=Path)
     p.add_argument("--files", type=Path, required=True)
@@ -553,6 +593,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "extract":
         extract(args.disc, args.out)
+    elif args.command == "import":
+        try:
+            disc = cue_binary(args.disc) if args.disc.suffix.lower() == ".cue" else args.disc
+            extract(disc, args.out, verify_reference=True)
+        except OSError as error:
+            raise SystemExit(f"Could not import disc ({error.strerror}).") from None
     else:
         replace = {}
         for item in args.replace:

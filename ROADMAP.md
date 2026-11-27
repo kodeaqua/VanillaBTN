@@ -30,10 +30,10 @@ can decide separately whether to rename the GitHub repository.
   [Module support](https://github.com/Xeeynamo/psyz/blob/00fb42e6f49c146ad760a1f605b15d2a4ec598f0/psyz/cmake/module.cmake) ·
   [CD and XA implementation](https://github.com/Xeeynamo/psyz/blob/00fb42e6f49c146ad760a1f605b15d2a4ec598f0/psyz/src/psyz/libcd.c) ·
   [SDL 3.4.20](https://github.com/libsdl-org/SDL/releases/tag/release-3.4.20)
-- **Disc extraction and runtime reads use different inputs.** `tools/psx_disc.py extract`
-  reads the BIN and `tools/afile.py unpack` unpacks A_FILE. `Psyz_CdSetDiskPath` reads
-  the CUE and the referenced tracks. Test A_FILE and XA reads first to establish what
-  first run needs to extract and store locally.
+- **Disc import and runtime reads.** `tools/psx_disc.py import` accepts BIN or CUE and
+  verifies the USA reference before extraction. `tools/afile.py unpack` unpacks A_FILE.
+  `Psyz_CdSetDiskPath` reads the CUE and referenced tracks at runtime. The native app
+  still needs to invoke or replace the import command on first run.
 - **PsyZ licensing needs clarification before public integration.** VanillaBTN
   uses MIT, and `NOTICE` identifies the upstream base as CC0. PsyZ marks
   `psyz/include` and `psyz/src/psyq` as *Unlicensed*. A submodule pins a revision

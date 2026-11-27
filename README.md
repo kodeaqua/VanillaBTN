@@ -63,6 +63,15 @@ LLVM Debug enables AddressSanitizer and UndefinedBehaviorSanitizer when availabl
 This target currently runs the startup smoke test. See the roadmap for game and overlay
 integration milestones.
 
+### Import a reference disc locally
+
+Run `python tools/psx_disc.py import path/to/disc.cue --out path/to/local-data`
+from the repository root. The importer also accepts the BIN directly. It checks
+the USA reference SHA-1 before writing files.
+
+A CUE must describe one `MODE2/2352` track starting at `00:00:00`. Keep the BIN
+with the CUE, and choose an output directory outside the checkout and save directory.
+
 ## Exceptions
 
 Two things in the build are not compiled from source:
