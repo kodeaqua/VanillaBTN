@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <wchar.h>
 #include <windows.h>
+#include <strsafe.h>
 
 #ifdef VANILLABTN_HAS_GAME
 #include <psyz/cd.h>
@@ -21,13 +22,14 @@ static int adjacent_file(wchar_t path[MAX_PATH], const wchar_t *filename) {
     }
 
     wchar_t *name = wcsrchr(path, L'\\');
-    return name != NULL && wcscpy_s(name + 1, MAX_PATH - (name + 1 - path), filename) == 0;
+    return name != NULL && SUCCEEDED(StringCchCopyW(name + 1, MAX_PATH - (name + 1 - path),
+                                                    filename));
 }
 
 static int data_directory(wchar_t path[MAX_PATH]) {
     DWORD length = GetEnvironmentVariableW(L"LOCALAPPDATA", path, MAX_PATH);
     if (length == 0 || length >= MAX_PATH || wcschr(path, L'"') ||
-        wcscat_s(path, MAX_PATH, L"\\VanillaBTN") != 0) {
+        FAILED(StringCchCatW(path, MAX_PATH, L"\\VanillaBTN"))) {
         fputs("Could not locate the local data directory.\n", stderr);
         return 0;
     }
@@ -85,7 +87,7 @@ static int run_disc_tool(const wchar_t *operation, const wchar_t *disc, const wc
 
 static int import_disc(const wchar_t *disc) {
     wchar_t output[MAX_PATH];
-    return data_directory(output) && wcscat_s(output, MAX_PATH, L"\\disc") == 0 &&
+    return data_directory(output) && SUCCEEDED(StringCchCatW(output, MAX_PATH, L"\\disc")) &&
            run_disc_tool(L"import", disc, output);
 }
 

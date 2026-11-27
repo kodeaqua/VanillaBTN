@@ -35,3 +35,12 @@ if(HAS_GAME)
         message(FATAL_ERROR "A mismatched disc must be rejected before boot.")
     endif()
 endif()
+
+# A valid environment value can leave too little room for the application directory.
+string(REPEAT "x" 255 long_directory)
+set(ENV{LOCALAPPDATA} "${long_directory}")
+execute_process(COMMAND "${EXECUTABLE}" --import-disc unused RESULT_VARIABLE result
+    ERROR_VARIABLE diagnostic)
+if(NOT result STREQUAL "1" OR NOT diagnostic MATCHES "Could not locate the local data directory")
+    message(FATAL_ERROR "An oversized local data path must return an import error.")
+endif()
