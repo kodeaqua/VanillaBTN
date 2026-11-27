@@ -5145,11 +5145,30 @@ static void shop_menu_clear(FarmMenu *menu) {
     }
 }
 
+/* Keep the helper nested for the matching compiler's code layout. */
+#ifndef __psyz
+static void shop_menu_draw(FarmMenu *menu, s16 x, s16 y) {
+#else
+static
+#endif
+s32 has_medal_price(u8 *flags) {
+    s32 j;
+
+    for (j = 0; j < 10; j++, flags++) {
+        if (*flags == 2) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 /* Draw `menu` at (x, y): up to ten rows of label, value and cursor, then the
  * frame around them. A value is drawn by its row's flag: 0 a price in gold, 2 a
  * price in medals, 3 a row of dashes as wide as the value column, anything else
  * nothing. */
+#ifdef __psyz
 static void shop_menu_draw(FarmMenu *menu, s16 x, s16 y) {
+#endif
     u_long *display;
     s16 valueX;
     s32 span;
@@ -5161,18 +5180,6 @@ static void shop_menu_draw(FarmMenu *menu, s16 x, s16 y) {
     s16 *values;
     u8 *flags;
     s32 i;
-
-    /* Whether any row's value is a medal price (flag 2). */
-    s32 has_medal_price(u8 *flags) {
-        s32 j;
-
-        for (j = 0; j < 10; j++, flags++) {
-            if (*flags == 2) {
-                return 1;
-            }
-        }
-        return 0;
-    }
 
     display = &current_frame->otTags[0][15];
     valueX = menu->columns[0] * 8 + 28;

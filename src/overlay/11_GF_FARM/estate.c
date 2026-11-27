@@ -1518,17 +1518,29 @@ static KindValues estate_kind_values[4] = {
     {0, 0, 0},
 };
 
-/* Set the item of each record from its state flags, using the kind's three values. */
+/* Keep the helper nested for the matching compiler's code layout. */
+#ifndef __psyz
 static void estate_record_ids_update(s16 kind, s16 count, FarmEstateRecord *records) {
-    /* Pick the item value for the record's state flags, or 0 when none is set. */
-    s32 estate_kind_value_for_flags(u16 flags, s16 valueWhenBit13, s16 valueWhenBit11, s16 valueWhenBit12)
-    {
-        if (flags & 0x2000) return valueWhenBit13;
-        if (flags & 0x800) return valueWhenBit11;
-        if (flags & 0x1000) return valueWhenBit12;
-        return 0;
+#else
+static
+#endif
+s32 estate_kind_value_for_flags(u16 flags, s16 valueWhenBit13, s16 valueWhenBit11,
+                                s16 valueWhenBit12) {
+    if (flags & 0x2000) {
+        return valueWhenBit13;
     }
+    if (flags & 0x800) {
+        return valueWhenBit11;
+    }
+    if (flags & 0x1000) {
+        return valueWhenBit12;
+    }
+    return 0;
+}
 
+#ifdef __psyz
+static void estate_record_ids_update(s16 kind, s16 count, FarmEstateRecord *records) {
+#endif
     s32 i;
     s32 itemId;
 

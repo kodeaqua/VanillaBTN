@@ -569,22 +569,28 @@ static s32 event_time_check(s32 command) {
     return hour_outside_range(first, second);
 }
 
+/* Keep the helper nested for the matching compiler's code layout. */
+#ifndef __psyz
+static s32 event_condition_test(s32 id)
+{
+#else
+static
+#endif
+s32 winter_23_single_check(s32 which) {
+    if (game_state.progress.clock.date.season == SEASON_WINTER &&
+        game_state.progress.clock.date.day == 23 && event_flag_get(EVENT_FLAG_SINGLE) == 1 &&
+        event_flag_get(EVENT_FLAG_KAREN_RICK_MARRIED + which) == 0) {
+        return 1;
+    }
+    return 0;
+}
+
+#ifdef __psyz
 /* Is condition `id` (0..21) of the farm's event script met? Records the id in
  * event_pending_pair when it is. */
 static s32 event_condition_test(s32 id)
 {
-    /* Winter 23rd, while the player is single and the marriage flag `which` is not set. */
-    s32 winter_23_single_check(s32 which)
-    {
-        if (game_state.progress.clock.date.season == SEASON_WINTER &&
-            game_state.progress.clock.date.day == 23 &&
-            event_flag_get(EVENT_FLAG_SINGLE) == 1 &&
-            event_flag_get(EVENT_FLAG_KAREN_RICK_MARRIED + which) == 0) {
-            return 1;
-        }
-        return 0;
-    }
-
+#endif
     s32 result;
     s32 limit;
     s16 value;
