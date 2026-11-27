@@ -106,7 +106,14 @@ typedef s32 (*CellFromWorldToolClear)(s32 *, u16 *, u16 *);
 typedef s32 (*WorldToCellHandler)(VECTOR *, s16 *, s16 *);
 
 /* Hop steps indexed [row][facing]: row 0 while the jump crouches, row 1 otherwise. */
-#define HOPS ((FarmHopStep(*)[12])move_steps_large)
+#ifdef __psyz
+/* The PS1 row 1 reads past move_steps_large into hop_steps, which a native link does not lay out
+ * contiguously, so name both tables. */
+#define HOP_STEP(row, facing)                                                                      \
+    ((row) == 0 ? &((FarmHopStep *)move_steps_large)[facing] : &hop_steps[facing])
+#else
+#define HOP_STEP(row, facing) (&((FarmHopStep(*)[12])move_steps_large)[row][facing])
+#endif
 
 /* Tool experience: the base gain, and the gain of a committed move. */
 #define TOOL_EXP_BASE 40
@@ -4421,14 +4428,14 @@ void player_update_position(void)
     {
         if (!(player->stateFlags & PLAYER_FLAG_STILL))
         {
-            hop = &HOPS[1][player->facing38];
+            hop = HOP_STEP(1, player->facing38);
             if (player->mode == PLAYER_MODE_JUMP_CROUCH)
             {
-                hop = &HOPS[0][player->facing38];
+                hop = HOP_STEP(0, player->facing38);
             }
             if (player->mode == PLAYER_MODE_JUMP_LAUNCH)
             {
-                hop = &HOPS[1][player->facing38];
+                hop = HOP_STEP(1, player->facing38);
             }
             player->velocity[0] += hop->dx;
             player->velocity[2] += hop->dz;
