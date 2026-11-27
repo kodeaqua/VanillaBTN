@@ -7,6 +7,9 @@
 #include <libspu.h>
 #include <string.h>
 #include <libetc.h>
+#ifdef __psyz
+#include <psyz/audio.h>
+#endif
 #include "types.h"
 #include "afile.h"
 #include "cd_audio.h"
@@ -143,6 +146,10 @@ void sound_init(void) {
     SsSetSerialVol(0, 0, 0);
     CdControl(9, 0, 0);
     sound_reset_slots();
+#ifdef __psyz
+    /* Host playback must start before any CD audio is requested. */
+    (void)Psyz_AudioInit();
+#endif
 }
 
 /* Sound offsets, read in adjacent pairs: an entry and the next one bound a sound's data. */
