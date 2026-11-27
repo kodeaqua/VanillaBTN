@@ -114,9 +114,9 @@ symbols from `11_GF_FARM`. Remaining unresolved symbols across the full game:
 | PocketStation (`libmcx`) | `McxStartCom` (`main`), `McxCardType`, `McxSync` (`15_saveload`, `31_gf_mcard`, `10_PdaSamp`), plus 15 sample-only calls in `10_PdaSamp` | Header-only in PsyZ `00fb42e`; no implementation. |
 | Overlay dispatch | 15 scene handlers and 3 `11_GF_FARM` callbacks (`farm_clamp_status`, `item_use_coin`, `farm_adjust_stamina_fatigue`) referenced by `main`; 15 `11_GF_FARM` symbols referenced by `30_GF_swind` | Resolved once overlays load via PsyZ modules or host dispatch. |
 
-Remaining compile-time portability findings to fix before linking: 14
-pointer-to-integer casts across 6 `11_GF_FARM` files and adjacent-global BSS
-`memset`/`memcpy` spanning `save_file_header` in `15_saveload/saveload.c`.
+All 113 units compile with 0 pointer-to-integer truncation warnings and 0
+buffer-bounds warnings (`family_tables` uses native name arrays and `saveload`
+packs its `0x9690`-byte save buffer into one union).
 
 ## Verification
 
