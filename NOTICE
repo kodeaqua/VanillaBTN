@@ -1,0 +1,10 @@
+VanillaBTN
+Copyright (c) 2026 VanillaBTN contributors, MIT (see LICENSE).
+
+Based on hmbtn-decomp by coalslav, released under CC0 1.0:
+https://github.com/coalslav/hmbtn-decomp
+
+Third-party:
+- tools/maspsx: own license, see tools/maspsx/LICENSE.
+
+The game and the PSY-Q SDK belong to their owners and are not included.
