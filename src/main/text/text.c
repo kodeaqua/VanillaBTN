@@ -34,7 +34,11 @@
 /* Textured sprite primitive. */
 typedef struct Sprt
 {
+#ifdef __psyz
+    O_TAG;
+#else
     u32 tag;
+#endif
     u8 r0, g0, b0, code;
     s16 x0, y0;
     u8 u0, v0;
@@ -44,7 +48,11 @@ typedef struct Sprt
 
 typedef struct DrTPage
 {
+#ifdef __psyz
+    O_TAG;
+#else
     u32 tag;
+#endif
     u32 code[1];
 } DrTPage;
 
@@ -57,7 +65,11 @@ typedef struct
 /* A sprite and a draw-mode primitive; used by text_draw_face. */
 typedef struct
 {
+#ifdef __psyz
+    O_TAG;
+#else
     u32 tag;
+#endif
     u8 r0, g0, b0, code;
     s16 x0, y0;
     u8 u0, v0;
@@ -67,7 +79,11 @@ typedef struct
 
 typedef struct
 {
+#ifdef __psyz
+    O_TAG;
+#else
     u32 tag;
+#endif
     u32 code[1];
 } PrimDrTPage;
 
@@ -862,8 +878,13 @@ static TextWindowResult text_window_frame(void *ot, u16 *text, s16 x, s16 y, s16
         text_begin_typing();
     }
     ret = result;
+#ifdef __psyz
+    restore = gs_work_alloc(sizeof(DR_AREA));
+    clip = gs_work_alloc(sizeof(DR_AREA));
+#else
     restore = gs_work_alloc(12);
     clip = gs_work_alloc(12);
+#endif
     area.x = x;
     area.y = y + current_frame->drawEnv.clip.y;
     area.w = 320 - x;
@@ -900,6 +921,12 @@ static u8 *text_draw_string(void *ot, u8 *prim, u16 *text, s16 x, s16 y, s32 sca
     s16 glyphX;
     s16 glyphY;
 
+#ifdef __psyz
+    if (text == 0)
+    {
+        return prim;
+    }
+#endif
     if (nested == 0)
     {
         text_margin_x = x;

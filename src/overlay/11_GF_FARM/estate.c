@@ -200,6 +200,13 @@ s32 estate_pending_op_start(void) {
 
 /* Clear the message queues and forget the notices seen. */
 void estate_queues_clear(void) {
+#ifdef __psyz
+    s32 i;
+    for (i = 0; i < MESSAGE_QUEUE_LEN; i++) {
+        game_state.progress.estate.queues[0][i].kind = -1;
+        game_state.progress.estate.queues[1][i].kind = -1;
+    }
+#else
     s32 empty = -1;
     u8 *p = (u8 *)&game_state;
     s32 i;
@@ -208,6 +215,7 @@ void estate_queues_clear(void) {
         p[0x4A36] = empty;
         p += 4;
     }
+#endif
     game_state.progress.estate.noticesSeen = 0;
 }
 

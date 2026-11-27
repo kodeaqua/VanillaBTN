@@ -1356,9 +1356,16 @@ static s16 shop_plot_find_marked(void) {
 /* 1 when the marked plot (shop_plot_find_marked) has its 0x40 status bit, else 0. */
 static s32 shop_plot_check_marked(void) {
     s32 i = shop_plot_find_marked();
+#ifdef __psyz
+    if (i >= 0 && i < MAX_CHICKENS &&
+        (game_state.animals.chickens[i].actor.flags & ACTOR_FLAG_PRIZE_WINNER)) {
+        return 1;
+    }
+#else
     u8 *base = (u8 *)&game_state;
     FarmPlotStatus *records = (FarmPlotStatus *)(base + 0x7AE8);
     if (records[i].value & 0x40) return 1;
+#endif
     return 0;
 }
 

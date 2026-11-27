@@ -1895,8 +1895,12 @@ void rle_expand(u8 *dst, u8 *src, s32 count) {
 
 /* A textured sprite primitive, and a draw-mode primitive for its texture page. */
 typedef struct {
+#ifdef __psyz
+    O_TAG;
+#else
     u8 addr[3];
     u8 len;
+#endif
     u8 r0, g0, b0, code;
     s16 x0, y0;
     u8 u0, v0;
@@ -1905,8 +1909,12 @@ typedef struct {
 } SpritePrim;
 
 typedef struct {
+#ifdef __psyz
+    O_TAG;
+#else
     u8 addr[3];
     u8 len;
+#endif
     u32 code[2];
 } DrawModePrim;
 
