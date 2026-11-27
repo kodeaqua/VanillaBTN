@@ -11,6 +11,9 @@
 #define gte_nclip_b() gte_nclip()
 #define gte_avsz3_b() gte_avsz3()
 #define gte_avsz4_b() gte_avsz4()
+/* The matching command below includes the GTE translation registers. */
+#undef gte_rtv0
+#define gte_rtv0() gte_rtv0tr()
 #else
 #include <inline_c.h>
 
