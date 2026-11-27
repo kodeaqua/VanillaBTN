@@ -99,6 +99,15 @@ for graphics types and build integration.
   text-bank pointers, GTE `RotMatrixZXY` and transforms, `MoveImage2` VRAM copy,
   `libgs` lighting/offset, `kernel.h` `struct DIRENTRY`, and `libmcrd`/`libmcx`
   32 KB save/load round-trips layered over PsyZ's `libcard`/`libapi`.
+- **Live multi-scene render.** All 15 scenes (`TITLE`, `FARM`, `SAVE`, `LOAD`,
+  `MG1`..`MG5`, `STAFF`, `DEBUG`, `LIVESTOCK_TRADE`, `MG_DEBUG`, `MEMCARD`,
+  `PDA_SAMPLE`) booted against the USA disc on Direct3D 12.
+- **Milestone 3 save/load flow.** Verified `TITLE` -> Farmhouse -> Diary save
+  (32,768-byte PS1 `SC` save via 32-bit `Ps1SaveImage`) -> state wipe -> `TITLE`
+  reboot -> `LOAD` -> `FARM_LOADED` -> Outdoor Farm Yard with restored state.
+- **Overlay re-entry.** Verified 12 repeated transitions across `TITLE`, `FARM`,
+  `MG1`, `MG5`, `STAFF`, `FARM_MINIGAME_EXIT`, and `FARM_STAFF_EXIT` after fixing
+  static re-entry resets, missing returns, and unprototyped calls under `__psyz`.
 
 ### Native SDK compatibility (`native/sdk_compat.c` against PsyZ `00fb42e`)
 
@@ -115,10 +124,9 @@ compatibility layer covers the remaining PsyZ `00fb42e` gaps so all 113 units li
 | Memory card (`libmcrd`) | `MemCardInit`, `MemCardStart`, `MemCardStop`, `MemCardEnd`, `MemCardCallback`, `MemCardAccept`, `MemCardExist`, `MemCardSync`, `MemCardGetDirentry`, `MemCardCreateFile`, `MemCardDeleteFile`, `MemCardOpen`, `MemCardClose`, `MemCardReadData`, `MemCardWriteData`, `MemCardReadFile`, `MemCardWriteFile`, `MemCardFormat`, `MemCardUnformat` | Layered over PsyZ `libcard`/`libapi` (`InitCARD`, `StartCARD`, `firstfile`/`nextfile`, `psyz_open/read/write/lseek/close`, `erase`) with path and alignment validation. |
 | PocketStation (`libmcx`) | `McxStartCom`, `McxStopCom`, `McxCardType`, `McxSync`, plus 15 sample-only calls in `10_PdaSamp` | Reports PocketStation absent (`McxErrInvalid` on valid card ports) so regular memory-card probing succeeds. |
 
-All 113 units have 0 pointer-to-integer warnings and 0 buffer-bounds warnings
-(`family_tables` uses native name arrays and `saveload` packs its `0x9690`-byte
-save buffer into one union). Next step: wire native game execution and overlay
-loading/reset on top of PsyZ once PsyZ licensing is confirmed.
+All 113 units have 0 pointer-to-integer, buffer-bounds, and `-Wreturn-type`
+warnings. Next: verify PS1/native save cross-compatibility, audio and day/season
+parity, and wire the CMake full-game target once PsyZ licensing is confirmed.
 
 ## Verification
 
