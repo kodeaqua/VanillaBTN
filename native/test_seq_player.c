@@ -250,11 +250,28 @@ static void test_sfx_coexistence_and_eot_loop(void) {
     vanillabtn_seq_close(h);
 }
 
+static void test_truncated_note_off_releases_voice(void) {
+    static const uint8_t song[] = {
+        'p', 'Q', 'E', 'S', 0, 0, 0, 1, 0, 60, 0x0f, 0x42, 0x40, 4, 2,
+        0, 0x90, 64, 127, 1, 0x80, 64,
+    };
+    mock_reset();
+    vanillabtn_seq_reset();
+    short h = vanillabtn_seq_open_sized(song, sizeof(song), 2);
+    assert(h >= 0);
+    vanillabtn_seq_play(h, 1, 1);
+    vanillabtn_seq_tick();
+    assert(mock_total_key_ons == 1);
+    assert(mock_voices[21].key_off_count == 1);
+    vanillabtn_seq_close(h);
+}
+
 int main(void) {
     vanillabtn_seq_set_backend(&mock_backend);
     test_invalid_headers();
     test_playback_multitone_nrpn_loop_and_pitch_bend();
     test_sfx_coexistence_and_eot_loop();
+    test_truncated_note_off_releases_voice();
     puts("seq_player unit tests passed.");
     return 0;
 }

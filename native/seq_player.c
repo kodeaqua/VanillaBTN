@@ -657,9 +657,7 @@ static void seq_step_slot(short handle, char status[SEQ_TOTAL_VOICES]) {
         slot->delta_remaining = 0;
 
         if (slot->cursor >= slot->size) {
-            slot->playing = 0;
-            seq_key_off_slot_voices(handle);
-            return;
+            goto end_track;
         }
 
         status_byte = slot->data[slot->cursor];
@@ -670,9 +668,7 @@ static void seq_step_slot(short handle, char status[SEQ_TOTAL_VOICES]) {
             }
         } else {
             if (slot->running_status == 0) {
-                slot->playing = 0;
-                seq_key_off_slot_voices(handle);
-                return;
+                goto end_track;
             }
             status_byte = slot->running_status;
         }
@@ -683,31 +679,27 @@ static void seq_step_slot(short handle, char status[SEQ_TOTAL_VOICES]) {
 
         if (hi == 0x80u) {
             if (slot->cursor + 2 > slot->size) {
-                slot->playing = 0;
-                return;
+                goto end_track;
             }
             seq_handle_note_off(handle, channel, (uint8_t)(slot->data[slot->cursor] & 0x7Fu));
             slot->cursor += 2;
         } else if (hi == 0x90u) {
             if (slot->cursor + 2 > slot->size) {
-                slot->playing = 0;
-                return;
+                goto end_track;
             }
             seq_handle_note_on(handle, channel, (uint8_t)(slot->data[slot->cursor] & 0x7Fu),
                                (uint8_t)(slot->data[slot->cursor + 1] & 0x7Fu), status);
             slot->cursor += 2;
         } else if (hi == 0xA0u) {
             if (slot->cursor + 2 > slot->size) {
-                slot->playing = 0;
-                return;
+                goto end_track;
             }
             slot->cursor += 2;
         } else if (hi == 0xB0u) {
             uint8_t cc;
             uint8_t val;
             if (slot->cursor + 2 > slot->size) {
-                slot->playing = 0;
-                return;
+                goto end_track;
             }
             cc = (uint8_t)(slot->data[slot->cursor] & 0x7Fu);
             val = (uint8_t)(slot->data[slot->cursor + 1] & 0x7Fu);
@@ -715,22 +707,19 @@ static void seq_step_slot(short handle, char status[SEQ_TOTAL_VOICES]) {
             seq_handle_control_change(handle, channel, cc, val);
         } else if (hi == 0xC0u) {
             if (slot->cursor + 1 > slot->size) {
-                slot->playing = 0;
-                return;
+                goto end_track;
             }
             slot->ch[channel].program = (uint8_t)(slot->data[slot->cursor++] & 0x7Fu);
         } else if (hi == 0xD0u) {
             if (slot->cursor + 1 > slot->size) {
-                slot->playing = 0;
-                return;
+                goto end_track;
             }
             slot->cursor += 1;
         } else if (hi == 0xE0u) {
             uint8_t lsb;
             uint8_t msb;
             if (slot->cursor + 2 > slot->size) {
-                slot->playing = 0;
-                return;
+                goto end_track;
             }
             lsb = slot->data[slot->cursor];
             msb = slot->data[slot->cursor + 1];
@@ -739,8 +728,7 @@ static void seq_step_slot(short handle, char status[SEQ_TOTAL_VOICES]) {
         } else if (status_byte == 0xFFu) {
             uint8_t meta;
             if (slot->cursor >= slot->size) {
-                slot->playing = 0;
-                return;
+                goto end_track;
             }
             meta = slot->data[slot->cursor++];
             if (meta == SEQ_META_END_OF_TRACK) {
@@ -751,14 +739,11 @@ static void seq_step_slot(short handle, char status[SEQ_TOTAL_VOICES]) {
                     seq_restart_from_start(slot);
                     continue;
                 }
-                slot->playing = 0;
-                seq_key_off_slot_voices(handle);
-                return;
+                goto end_track;
             } else if (meta == SEQ_META_SET_TEMPO) {
                 uint32_t new_tempo;
                 if (slot->cursor + 3 > slot->size) {
-                    slot->playing = 0;
-                    return;
+                    goto end_track;
                 }
                 new_tempo = ((uint32_t)slot->data[slot->cursor] << 16) |
                             ((uint32_t)slot->data[slot->cursor + 1] << 8) |
@@ -772,23 +757,23 @@ static void seq_step_slot(short handle, char status[SEQ_TOTAL_VOICES]) {
                 uint32_t skip_len = 0;
                 if (!seq_read_vlq(slot->data, slot->size, &slot->cursor, &skip_len) ||
                     skip_len > slot->size - slot->cursor) {
-                    slot->playing = 0;
-                    return;
+                    goto end_track;
                 }
                 slot->cursor += skip_len;
             }
         } else {
-            slot->playing = 0;
-            seq_key_off_slot_voices(handle);
-            return;
+            goto end_track;
         }
 
         if (!seq_read_vlq(slot->data, slot->size, &slot->cursor, &slot->delta_remaining)) {
-            slot->playing = 0;
-            seq_key_off_slot_voices(handle);
-            return;
+            goto end_track;
         }
     }
+    return;
+
+end_track:
+    slot->playing = 0;
+    seq_key_off_slot_voices(handle);
 }
 
 void vanillabtn_seq_set_backend(const VanillabtnSeqBackend *backend) {
