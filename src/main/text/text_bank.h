@@ -5,10 +5,13 @@
  * string is a named member, so the code says which text it draws; the strings of one
  * table are grouped (dishes, seeds). The bank is two parts, TextMessages and TextNames. */
 
+#include <stddef.h>
 #include "types.h"
 
 /* The PsyQ stddef.h has no offsetof. */
+#ifndef offsetof
 #define offsetof(type, member) ((u32) & ((type *)0)->member)
+#endif
 
 typedef struct TextMessages {
     u16 prompt_yes_no[9];
