@@ -16,6 +16,23 @@ docker run --rm --user "$(id -u):$(id -g)" -v "$PWD":/src:ro -v /tmp/hmbtn-build
 `check` compares every output with the original's SHA-1. Without `-DORIGINAL_DISC` it
 builds and checks only the 14 code binaries, which needs no game data.
 
+### Windows and macOS (Docker Desktop)
+
+Building straight from a bind mount fails there (GCC 2.95.2's 32-bit `cpp` cannot `stat`
+files on the mount), and a checkout with CRLF line ends breaks it too. Use
+`tools/docker_build.sh`, which builds from a private LF copy of the source inside the
+container (`.gitattributes` keeps the checkout LF). PowerShell:
+
+```powershell
+docker run --rm -v "${PWD}:/src:ro" -v hmbtn-build-vol:/build `
+    -v "C:\path\to\disc-dir:/disc:ro" -e "ORIGINAL_DISC=/disc/disc.bin" `
+    -v "${PWD}\out:/out" hmbtn-build sh /src/tools/docker_build.sh
+```
+
+`ORIGINAL_DISC` is optional, and a mounted `/out` receives the built `disc.bin` and
+`disc.cue`. Delete the `hmbtn-build-vol` volume (`docker volume rm`) to start from a clean
+build.
+
 ## Exceptions
 
 Two things in the build are not compiled from source:
