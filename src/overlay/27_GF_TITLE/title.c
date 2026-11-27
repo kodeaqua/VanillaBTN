@@ -2,6 +2,11 @@
 
 #include <sys/types.h>
 #include <libgte.h>
+#ifdef __psyz
+/* PsyZ implements rsin/rcos (same 4096-unit Q4.12 trig) without csin/ccos aliases. */
+#define csin rsin
+#define ccos rcos
+#endif
 #include <libgpu.h>
 #include <libgs.h>
 #include "types.h"

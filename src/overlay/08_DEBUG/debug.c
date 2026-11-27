@@ -5,6 +5,11 @@
 #include <sys/types.h>
 #include <libgte.h>
 #include <libgpu.h>
+#ifdef __psyz
+/* PsyZ declares KanjiFntClose/Print with a stream id; PS1 uses the default stream. */
+#define KanjiFntClose() (KanjiFntClose)(-1)
+#define KanjiFntPrint(...) (KanjiFntPrint)(-1, __VA_ARGS__)
+#endif
 #include "types.h"
 #include "debug.h"
 #include "farm_state.h"

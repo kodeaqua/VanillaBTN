@@ -5,6 +5,10 @@
 #include <libgte.h>
 #include <libgpu.h>
 #include <libgs.h>
+#ifdef __psyz
+/* PsyZ's libgs.h omits GsSetLightMode. */
+void GsSetLightMode(int mode);
+#endif
 #include <string.h>
 #include "types.h"
 #include "event_flags.h"
@@ -310,23 +314,41 @@ void scene_set_lights(void)
     s32 direction;
 
     direction = 100;
+#ifdef __psyz
+    scene_lights[0].direction.vx = direction;
+    scene_lights[0].direction.vy = direction;
+    scene_lights[0].direction.vz = direction;
+#else
     scene_lights[0].vx = direction;
     scene_lights[0].vy = direction;
     scene_lights[0].vz = direction;
+#endif
     scene_lights[0].r = 0xD0;
     scene_lights[0].g = 0xD0;
     scene_lights[0].b = 0xD0;
     GsSetFlatLight(0, &scene_lights[0]);
+#ifdef __psyz
+    scene_lights[1].direction.vx = direction;
+    scene_lights[1].direction.vy = direction;
+    scene_lights[1].direction.vz = direction;
+#else
     scene_lights[1].vx = direction;
     scene_lights[1].vy = direction;
     scene_lights[1].vz = direction;
+#endif
     scene_lights[1].r = 0;
     scene_lights[1].g = 0;
     scene_lights[1].b = 0;
     GsSetFlatLight(1, &scene_lights[1]);
+#ifdef __psyz
+    scene_lights[2].direction.vx = direction;
+    scene_lights[2].direction.vy = direction;
+    scene_lights[2].direction.vz = direction;
+#else
     scene_lights[2].vx = direction;
     scene_lights[2].vy = direction;
     scene_lights[2].vz = direction;
+#endif
     scene_lights[2].r = 0;
     scene_lights[2].g = 0;
     scene_lights[2].b = 0;
