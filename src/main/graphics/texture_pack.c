@@ -9,7 +9,13 @@
 static void texture_pack_upload(void *pack, s16 x, s16 y, s16 altX, s16 altY, s32 mode);
 
 static char texture_upload_buffer[1024];
+#ifdef __psyz
+/* Batch each block into one LoadImage so PsyZ does not exhaust GPU transfer buffers per row. */
+#define NATIVE_VRAM_HALFWORDS (1024u * 512u)
+static u16 native_texture_block_buf[NATIVE_VRAM_HALFWORDS];
+#else
 static u16 texture_row_buffer[256];
+#endif
 
 void texture_pack_load(u8 *pack) {
     texture_pack_upload(pack, 0, 0, 0, 0, 0);
@@ -103,6 +109,84 @@ static void texture_pack_upload(void *pack, s16 x, s16 y, s16 altX, s16 altY, s3
         repeat = 0;
         rows = rect.h;
         rowBytes = rect.w * 2;
+#ifdef __psyz
+        if (width == 0 || height == 0 || (u32)width * (u32)height > NATIVE_VRAM_HALFWORDS) {
+            pack = BANK_NEXT(block, size);
+            i++;
+            continue;
+        }
+        if ((flags & 0xC) == 0) {
+            for (row = 0; row < rows; row++) {
+                u16 *row_dst = native_texture_block_buf + (u32)row * width;
+                dst = (u8 *)row_dst;
+                for (col = 0; col < rowBytes; col++, run--) {
+                    if (run <= 0) {
+                        run = *src++;
+                        if (run < 0) {
+                            repeat = 0;
+                            run = -run;
+                        } else {
+                            repeat = 1;
+                            fill = *src++;
+                        }
+                    }
+                    if (repeat == 0) {
+                        *dst = *src++;
+                    } else {
+                        *dst = fill;
+                    }
+                    dst++;
+                }
+                if ((flags & 2) && mode == 1) {
+                    for (j = 1; j < width; j++) {
+                        row_dst[j] |= 0x8000;
+                    }
+                }
+            }
+            LoadImage(&rect, (u_long *)native_texture_block_buf);
+        } else if (flags & 0x8) {
+            for (col = 0; col < rowBytes; col += 2) {
+                u32 x_idx = (u32)(col >> 1);
+                for (half = 0; half < 2; half++) {
+                    /* The low byte of each texel word first, then the high byte. */
+                    for (row = 0; row < rows; row++, run--) {
+                        if (run <= 0) {
+                            run = *src++;
+                            if (run < 0) {
+                                repeat = 0;
+                                run = -run;
+                            } else {
+                                repeat = 1;
+                                fill = *src++;
+                            }
+                        }
+                        dst = (u8 *)&native_texture_block_buf[(u32)row * width + x_idx] +
+                              (half != 0);
+                        if (repeat == 0) {
+                            *dst = *src++;
+                        } else {
+                            *dst = fill;
+                        }
+                    }
+                }
+            }
+            LoadImage(&rect, (u_long *)native_texture_block_buf);
+        } else {
+            for (row = 0; row < rows; row++) {
+                u16 *row_dst = native_texture_block_buf + (u32)row * width;
+                dst = (u8 *)row_dst;
+                for (col = 0; col < rowBytes; col++) {
+                    *dst++ = *src++;
+                }
+                if ((flags & 2) && mode == 1) {
+                    for (j = 1; j < width; j++) {
+                        row_dst[j] |= 0x8000;
+                    }
+                }
+            }
+            LoadImage(&rect, (u_long *)native_texture_block_buf);
+        }
+#else
         if ((flags & 0xC) == 0) {
             rect.h = 1;
             for (row = 0; row < rows; row++) {
@@ -182,6 +266,7 @@ static void texture_pack_upload(void *pack, s16 x, s16 y, s16 altX, s16 altY, s3
                 rect.y++;
             }
         }
+#endif
         while (DrawSync(1) != 0) {
         }
         pack = BANK_NEXT(block, size);

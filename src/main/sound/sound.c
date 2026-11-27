@@ -810,8 +810,13 @@ static s32 sound_vab_stream_step(void) {
                 SsVabTransBodyPartly(stream->dest, stream->chunkSize, stream->vabId);
                 vab_stream_copy = *stream;
                 stream->state = VAB_STREAM_READ_START;
+#ifdef __psyz
+                /* PsyZ 00fb42e transfers synchronously and returns 0 for wait flag 1. */
+                SsVabTransCompleted(0);
+#else
                 while (SsVabTransCompleted(1) == 0) {
                 }
+#endif
                 vab_stream.offset += vab_stream.chunkSize;
                 vab_stream.chunkIndex++;
             }

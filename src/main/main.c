@@ -132,6 +132,10 @@ int main(void) {
     input_pad2 = &input_records[1];
     vsync_pending_callback = 0;
     ResetCallback();
+#ifdef __psyz
+    /* PS1 BIOS initializes libgpu before main(); PsyZ requires ResetGraph before ClearImage. */
+    ResetGraph(0);
+#endif
     CdInit();
 #ifndef __psyz
     SetMem(2);
