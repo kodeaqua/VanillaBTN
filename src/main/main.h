@@ -12,6 +12,14 @@
 #include "prim.h"
 #include "sound.h"
 
+enum { MAIN_DISPLAY_WIDTH = 320, MAIN_DISPLAY_HEIGHT = 240 };
+
+#ifdef __psyz
+/* PsyZ keeps the GsInitGraph dimensions private. */
+#define HWD0 ((long)MAIN_DISPLAY_WIDTH)
+#define VWD0 ((long)MAIN_DISPLAY_HEIGHT)
+#endif
+
 /* Entries in each frame's main ordering table. */
 #define FRAME_OT_DEPTH 2048
 #define FRAME_PRIM_SIZE 0x17700

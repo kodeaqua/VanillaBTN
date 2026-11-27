@@ -169,7 +169,7 @@ int main(void) {
     InitGeom();
     SetGeomOffset(0, 0);
     SetGeomScreen(1000);
-    GsInitGraph(320, 240, 0, 0, 0);
+    GsInitGraph(MAIN_DISPLAY_WIDTH, MAIN_DISPLAY_HEIGHT, 0, 0, 0);
     GsDefDispBuff(0, 0, 0, 0);
     GsSetOffset(0, 0);
     GsSetDrawBuffOffset();
