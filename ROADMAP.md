@@ -90,33 +90,35 @@ for graphics types and build integration.
 - **Overlay archive reads.** A Windows x64 diagnostic ran the shared A_FILE reader
   against the reference disc. It checked all 33 offsets and verified a low, high, low
   load sequence against the disc bytes, with region buffers standing in for PS1 RAM.
-- **Full-tree native compile and symbol audit.** All 113 C units (38 `src/main/`
-  and 75 `src/overlay/`) compile with Windows x64 Clang against PsyZ `00fb42e`,
-  with 0 duplicate global symbols across the executable and all 13 overlays.
+- **Full-tree native compile and link.** All 113 C units (38 `src/main/` and 75
+  `src/overlay/`) compile with Windows x64 Clang against PsyZ `00fb42e`, with 0
+  duplicate global symbols, 0 pointer-truncation warnings, and 0 buffer-bounds
+  warnings. Together with `native/sdk_compat.c`, all 113 units link cleanly
+  against `psyz.lib` and `SDL3-static.lib` with 0 unresolved symbols.
 - **Runtime probes.** Verified A_FILE disc reads, PsyZ pad polling, 64-bit
-  text-bank pointers, GTE trig/transforms, and `kernel.h` `struct DIRENTRY`.
-  PsyZ implements `libcard`/`libapi` memory-card APIs, not `libmcrd` or `libmcx`.
+  text-bank pointers, GTE `RotMatrixZXY` and transforms, `MoveImage2` VRAM copy,
+  `libgs` lighting/offset, `kernel.h` `struct DIRENTRY`, and `libmcrd`/`libmcx`
+  32 KB save/load round-trips layered over PsyZ's `libcard`/`libapi`.
 
-### Native symbol audit (PsyZ `00fb42e`)
+### Native SDK compatibility (`native/sdk_compat.c` against PsyZ `00fb42e`)
 
-All 113 units link against `psyz.lib` and `SDL3-static.lib` with 0 duplicate
-global symbols. Seven overlays (`17_GF_MG1`..`25_GF_MG5`, `27_GF_TITLE`,
-`28_GF_STAFF`) have 0 missing SDK symbols; only `30_GF_swind` imports 15
-symbols from `11_GF_FARM`. Remaining unresolved symbols across the full game:
+Seven overlays (`17_GF_MG1`..`25_GF_MG5`, `27_GF_TITLE`, `28_GF_STAFF`) need no
+extra SDK shims. Only `30_GF_swind` imports 15 symbols from `11_GF_FARM`. The
+compatibility layer covers the remaining PsyZ `00fb42e` gaps so all 113 units link:
 
-| Subsystem | Unresolved symbols | Notes |
+| Subsystem | Symbols covered | Notes |
 |---|---|---|
-| Kernel (`libapi`) | `SetMem` (`main`), `rename` (`31_gf_mcard`) | `SetMem` not built in `psyz.lib`; `rename` clashes with host CRT for `bu00:` card paths. |
-| GTE (`libgte`) | `RotMatrixZXY` (`11_GF_FARM`) | Not implemented in `psyz.lib`. |
-| GPU (`libgpu`) | `MoveImage2` (`11_GF_FARM`); `KanjiFntOpen`, `KanjiFntClose`, `KanjiFntPrint`, `KanjiFntFlush` (`08_DEBUG`, `30_GF_swind`) | `MoveImage2` missing; `KanjiFnt*` are debug-only and unimplemented. |
-| Graphics (`libgs`) | `GsSetOffset`, `GsInit3D`, `GsGetWorkBase` (`main`); `GsSetAmbient`, `GsSetFlatLight`, `GsSetLightMode`, `GsSetProjection` (`11_GF_FARM`) | `INCLUDE_ASM` stubs or omitted in PsyZ `00fb42e`. |
-| Memory card (`libmcrd`) | `MemCardInit`, `MemCardStart` (`main`); `MemCardAccept`, `MemCardSync`, `MemCardCreateFile`, `MemCardExist`, `MemCardFormat`, `MemCardGetDirentry`, `MemCardReadFile`, `MemCardWriteFile`, `MemCardUnformat` (`10_PdaSamp`, `15_saveload`, `31_gf_mcard`) | Header-only in PsyZ `00fb42e`; layer over PsyZ's implemented `libcard`/`libapi` (`InitCARD`, `StartCARD`, `StopCARD`, `_bu_init`, `_card_*`, `firstfile`/`nextfile`). |
-| PocketStation (`libmcx`) | `McxStartCom` (`main`), `McxCardType`, `McxSync` (`15_saveload`, `31_gf_mcard`, `10_PdaSamp`), plus 15 sample-only calls in `10_PdaSamp` | Header-only in PsyZ `00fb42e`; no implementation. |
-| Overlay dispatch | 15 scene handlers and 3 `11_GF_FARM` callbacks (`farm_clamp_status`, `item_use_coin`, `farm_adjust_stamina_fatigue`) referenced by `main`; 15 `11_GF_FARM` symbols referenced by `30_GF_swind` | Resolved once overlays load via PsyZ modules or host dispatch. |
+| Kernel (`libapi`) | `SetMem` (guarded in `main.c`), `psyz_card_rename` (`31_gf_mcard`) | Translates `bu00:` paths and returns PS1 `1`/`0` status. |
+| GTE (`libgte`) | `RotMatrixZXY` (`11_GF_FARM`) | Q4.12 Z-X-Y Euler matrix using PsyZ `rsin`/`rcos`. |
+| GPU (`libgpu`) | `MoveImage2` (`11_GF_FARM`); `KanjiFnt*` (`08_DEBUG`, `30_GF_swind`) | `MoveImage2` forwards to `MoveImage`; `KanjiFnt*` are debug-only stubs. |
+| Graphics (`libgs`) | `GsGetWorkBase` (mirrored in `main.c`); `GsSetOffset`, `GsInit3D`, `GsSetProjection`, `GsSetFlatLight`, `GsSetAmbient`, `GsSetLightMode` | Updates PsyZ `POSITION`, `GsSetDrawBuffOffset`, and GTE screen/light/color matrices. |
+| Memory card (`libmcrd`) | `MemCardInit`, `MemCardStart`, `MemCardStop`, `MemCardEnd`, `MemCardCallback`, `MemCardAccept`, `MemCardExist`, `MemCardSync`, `MemCardGetDirentry`, `MemCardCreateFile`, `MemCardDeleteFile`, `MemCardOpen`, `MemCardClose`, `MemCardReadData`, `MemCardWriteData`, `MemCardReadFile`, `MemCardWriteFile`, `MemCardFormat`, `MemCardUnformat` | Layered over PsyZ `libcard`/`libapi` (`InitCARD`, `StartCARD`, `firstfile`/`nextfile`, `psyz_open/read/write/lseek/close`, `erase`) with path and alignment validation. |
+| PocketStation (`libmcx`) | `McxStartCom`, `McxStopCom`, `McxCardType`, `McxSync`, plus 15 sample-only calls in `10_PdaSamp` | Reports PocketStation absent (`McxErrInvalid` on valid card ports) so regular memory-card probing succeeds. |
 
-All 113 units compile with 0 pointer-to-integer truncation warnings and 0
-buffer-bounds warnings (`family_tables` uses native name arrays and `saveload`
-packs its `0x9690`-byte save buffer into one union).
+All 113 units have 0 pointer-to-integer warnings and 0 buffer-bounds warnings
+(`family_tables` uses native name arrays and `saveload` packs its `0x9690`-byte
+save buffer into one union). Next step: wire native game execution and overlay
+loading/reset on top of PsyZ once PsyZ licensing is confirmed.
 
 ## Verification
 
