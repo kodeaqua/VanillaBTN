@@ -74,6 +74,9 @@ for graphics types and build integration.
   build matched all 17 outputs against the reference SHA-1 values.
 - **Native startup.** Both Windows x64 presets build and smoke-test the `vanillabtn`
   target. Milestone 2 also requires the game sources and overlays to build natively.
+- **LLVM on Windows.** Clang builds the startup target with ASan and UBSan in
+  Debug and LTO in Release. The LLVM frontend also accepts shared headers with
+  GNU C extensions that MSVC rejects.
 - **PsyZ modules.** PsyZ `00fb42e` and its SDL 3.4.20 revision built on Windows x64.
   The upstream overlay sample passed host symbol imports, nested loading, and state
   reset on reload. Start with PsyZ modules for the native game integration and verify

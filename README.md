@@ -49,6 +49,17 @@ Use `windows-x64-release` in the same commands for Release. The executable is un
 `build/native/<preset>/native/`. Debug writes `VanillaBTN.log` beside it and uses
 AddressSanitizer when available. Release builds with link-time optimization.
 
+To use the Visual Studio LLVM tools, configure `clang` in a separate build directory:
+
+```powershell
+cmake --preset windows-x64-debug -B build/native/llvm-debug -DCMAKE_C_COMPILER=clang
+cmake --build build/native/llvm-debug
+ctest --test-dir build/native/llvm-debug --output-on-failure
+```
+
+For LLVM Release, use the Release preset and `build/native/llvm-release`.
+LLVM Debug enables AddressSanitizer and UndefinedBehaviorSanitizer when available.
+
 This target currently runs the startup smoke test. See the roadmap for game and overlay
 integration milestones.
 
