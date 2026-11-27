@@ -29,5 +29,8 @@ void ui_draw_icon_2b_sub(void *ot, s16 x, s16 y, s16 sub);
 
 /* The shared sprite every "draw one item" path stages into. */
 extern AnimState ui_icon_anim;
+#ifdef __psyz
+void ui_icons_bind_stage(void);
+#endif
 
 #endif /* UI_ICONS_H */

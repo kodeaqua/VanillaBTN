@@ -93,10 +93,22 @@ void ui_draw_icon_2b_sub(void *ot, s16 x, s16 y, s16 sub) {
 
 AnimState ui_icon_anim;
 
-/* Draw one UI icon from the shared icon animation, binding its file on first use. */
-static void ui_draw_icon(void *ot, s32 icon, s32 frame, s16 x, s16 y) {
+#ifdef __psyz
+void ui_icons_bind_stage(void) {
     if (ui_icon_anim.source != (AnimFile *)farm_area.stageData) {
         anim_bind_file(&ui_icon_anim, (AnimFile *)farm_area.stageData);
     }
+}
+#endif
+
+/* Draw one UI icon from the shared icon animation, binding its file on first use. */
+static void ui_draw_icon(void *ot, s32 icon, s32 frame, s16 x, s16 y) {
+#ifdef __psyz
+    ui_icons_bind_stage();
+#else
+    if (ui_icon_anim.source != (AnimFile *)farm_area.stageData) {
+        anim_bind_file(&ui_icon_anim, (AnimFile *)farm_area.stageData);
+    }
+#endif
     anim_draw_sprt_cursor(ot, &ui_icon_anim, icon & 0xFF, frame & 0xFF, x, y);
 }

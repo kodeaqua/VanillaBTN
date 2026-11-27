@@ -726,7 +726,9 @@ static void player_update_controller_flags(void)
 static void player_build_result(FarmPlayer *player)
 {
     VECTOR values;
+#ifndef __psyz
     s32 index;
+#endif
     s16 *table;
     s32 result_value;
     u32 *status_word;
@@ -734,10 +736,16 @@ static void player_build_result(FarmPlayer *player)
     player_probe_target(player, &player->position, 0x18);
     values.vy = player->position.vy;
     values.pad = player->position.pad;
+#ifndef __psyz
     index = player->facing38 << 2;
+#endif
     values.vx = player->position.vx;
     values.vz = player->position.vz;
+#ifdef __psyz
+    table = facing_reach[player->facing38];
+#else
     table = facing_reach[0] + index / 2;
+#endif
     values.vx += table[0];
     values.vz += table[1];
     farm_settle_on_ground(&values, 0);
@@ -3973,6 +3981,9 @@ void farm_draw_cursor(void *ot, s32 pos_x, s32 pos_y, s32 frame)
     s32 y;
     s32 anim_id;
 
+#ifdef __psyz
+    ui_icons_bind_stage();
+#endif
     anim_id = 0x18;
     anim_select_range(&ui_icon_anim, anim_id);
     x = pos_x;
@@ -4619,7 +4630,24 @@ static s16 player_probe_target(FarmPlayer *player, VECTOR *pos, s32 kind_arg)
     found = 0;
     target = 0;
     probe.vy = pos->vy;
+#ifdef __psyz
+    /* The PS1 probe indexes consecutive tables in its linked data section. */
+    enum { CARDINAL_FACINGS = FACING_RIGHT - FACING_DOWN + 1 };
+    u32 facing = (u16)player->facing38 % CARDINAL_FACINGS;
+    switch (kind) {
+    case ITEM_GOLD_WATERING_CAN:
+        offset = &move_steps_large[(CARDINAL_FACINGS + facing) * 2];
+        break;
+    case ITEM_FISHING_ROD:
+        offset = facing_reach[CARDINAL_FACINGS + facing];
+        break;
+    default:
+        offset = &move_steps_small[facing * 2];
+        break;
+    }
+#else
     offset = &move_steps_small[kind + player->facing38 * 2];
+#endif
     probe.vx = pos->vx + offset[0];
     probe.vz = pos->vz + offset[1];
     player->stateFlags &= ~PLAYER_FLAG_BIT18;
