@@ -8,7 +8,7 @@
 #include <libetc.h>
 #include <libgte.h>
 #include <libgpu.h>
-#include <libmcrd.h>
+#include "sdk_mcrd.h"
 #include <libmcx.h>
 #include "types.h"
 #include "clib.h"
@@ -187,9 +187,15 @@ static u32 pda_menu_last_held;
 static u32 pda_menu_last_arm;
 static PdaAllInfo pda_all_info;
 /* Card-slot results, filled by McxGetApl / McxGetTime / McxGetSerial. */
+#ifdef __psyz
+static int pda_apl_result;
+static PdaCardInfo pda_time_info;
+static unsigned long pda_serial_no;
+#else
 static long pda_apl_result;
 static PdaCardInfo pda_time_info;
 static u_long pda_serial_no;
+#endif
 static u8 pda_getmem_buffer[128];
 static s32 pda_getmem_field;
 static s32 pda_getmem_last_pad;

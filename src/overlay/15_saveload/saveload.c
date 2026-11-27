@@ -5,7 +5,7 @@
 #include <libgte.h>
 #include <libgpu.h>
 #include <libsnd.h>
-#include <libmcrd.h>
+#include "sdk_mcrd.h"
 #include <libmcx.h>
 #include "types.h"
 #include "actor.h"

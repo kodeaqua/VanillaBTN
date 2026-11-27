@@ -7,7 +7,7 @@
 #include <libgte.h>
 #include <libgpu.h>
 #include <libapi.h>
-#include <libmcrd.h>
+#include "sdk_mcrd.h"
 #include <libmcx.h>
 #include "types.h"
 #include "main.h"

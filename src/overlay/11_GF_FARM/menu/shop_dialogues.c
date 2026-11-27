@@ -66,7 +66,11 @@
 #define ANIMAL(index) (game_state.animals.livestock[index])
 #define CHICKEN(index) (game_state.animals.chickens[index])
 /* A name's text, from the names' offset `base` (the snapshot taken with text_offset()). */
+#ifdef __psyz
+#define SHOP_NAME_AT(base, name) ((u16 *)((u8 *)(name) + ((base) - (s32)offsetof(TextBank, names))))
+#else
 #define SHOP_NAME_AT(base, name) ((u16 *)((base) + NAME_OFFSET(name)))
+#endif
 /* The most feed a player can hold, and the days a sheep waits between shearings. */
 #define SHOP_FEED_CAP 1000
 #define SHEARING_INTERVAL_DAYS 7
