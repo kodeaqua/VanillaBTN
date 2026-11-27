@@ -1,5 +1,6 @@
 import errno
 import hashlib
+import struct
 import tempfile
 import unittest
 from pathlib import Path
@@ -9,6 +10,51 @@ from tools import psx_disc
 
 
 class DiscImportTest(unittest.TestCase):
+    def test_extract_checks_file_extent_before_writing(self):
+        root = psx_disc.PVD_LBA + 1
+        pvd = bytearray(psx_disc.USER)
+        pvd[:6] = b"\x01CD001"
+        struct.pack_into("<I", pvd, 158, root)
+        struct.pack_into("<I", pvd, 166, psx_disc.USER)
+        record = bytearray(34)
+        record[0] = len(record)
+        record[32:] = b"\x01A"
+        struct.pack_into("<I", record, 2, root + 1)
+        struct.pack_into("<I", record, 10, 1)
+        image = psx_disc.Image()
+        for _ in range(psx_disc.PVD_LBA):
+            image.empty_form2_sector(psx_disc.SM_FORM2)
+        image.form1_sector(pvd, psx_disc.DATA_LAST)
+        image.form1_sector(record, psx_disc.DATA_LAST)
+        with tempfile.TemporaryDirectory() as temp:
+            disc = Path(temp) / "input.bin"
+            out = Path(temp) / "extracted"
+            disc.write_bytes(image.data)
+            with self.assertRaisesRegex(SystemExit, "extent exceeds"):
+                psx_disc.extract(disc, out)
+            self.assertFalse((out / "A").exists())
+            image.form1_sector(b"x", psx_disc.DATA_LAST)
+            disc.write_bytes(image.data)
+            psx_disc.extract(disc, out)
+            self.assertEqual((out / "A").read_bytes(), b"x")
+
+    def test_directory_record_must_fit_declared_directory_size(self):
+        image = psx_disc.Image()
+        image.form1_sector(bytes([34]) + bytes(31) + bytes([1, 65]), psx_disc.DATA_LAST)
+        self.assertEqual(len(list(psx_disc._records(image.data, 0, 34))), 1)
+        with self.assertRaisesRegex(SystemExit, "Invalid ISO directory record"):
+            list(psx_disc._records(image.data, 0, 33))
+
+    def test_prepare_cue_preserves_hardlinked_input(self):
+        with tempfile.TemporaryDirectory() as temp:
+            disc = Path(temp) / "input.bin"
+            disc.write_bytes(b"synthetic")
+            cue = Path(temp) / "output.cue"
+            cue.hardlink_to(disc)
+            with self.assertRaisesRegex(SystemExit, "separate file"):
+                psx_disc.prepare_cue(disc, cue)
+            self.assertEqual(disc.read_bytes(), b"synthetic")
+
     def test_cue_resolves_a_relative_track_with_spaces(self):
         with tempfile.TemporaryDirectory() as temp:
             folder = Path(temp).resolve()

@@ -32,6 +32,12 @@ from dataclasses import dataclass, field
 from pathlib import Path, PureWindowsPath
 from tempfile import TemporaryDirectory
 
+try:
+    from ntpath import isreserved
+except ImportError:  # Python 3.10-3.12
+    def isreserved(name: str) -> bool:
+        return PureWindowsPath(name).is_reserved()
+
 SECTOR = 2352               # a raw sector
 USER = 2048                 # a Form 1 sector's user data
 RAW = SECTOR - 16           # a sector without its sync and header: what XA files store
@@ -402,8 +408,11 @@ def _user_data(image: bytes, lba: int) -> bytes:
 def _records(image: bytes, lba: int, size: int):
     for n in range((size + USER - 1) // USER):
         data, offset = _user_data(image, lba + n), 0
-        while offset < USER and data[offset]:
+        end = min(USER, size - n * USER)
+        while offset < end and data[offset]:
             length = data[offset]
+            if length < 34 or offset + length > end or not 0 < data[offset + 32] <= length - 33:
+                raise SystemExit("Invalid ISO directory record.")
             yield data[offset:offset + length]
             offset += length
 
@@ -443,7 +452,7 @@ def check_reference_sha1(digest: str) -> None:
 def prepare_cue(disc: Path, out: Path) -> None:
     """Verify the reference and write a single-track CUE for the native loader."""
     binary = (cue_binary(disc) if disc.suffix.lower() == ".cue" else disc).resolve(strict=True)
-    if binary == out.resolve() or disc.resolve() == out.resolve():
+    if out.exists() and (out.samefile(binary) or out.samefile(disc)):
         raise SystemExit("The runtime CUE must be a separate file.")
     path = binary.as_posix()
     if any(character in path for character in '"\r\n'):
@@ -495,38 +504,58 @@ def extract(disc: Path, out: Path, verify_reference: bool = False) -> None:
         for source in staged.rglob("*"):
             if source.is_file():
                 target = out / source.relative_to(staged)
+                if not target.parent.resolve().is_relative_to(out.resolve()):
+                    raise SystemExit("Import directory entry leaves the destination.")
                 target.parent.mkdir(parents=True, exist_ok=True)
                 source.replace(target)
 
 
 def _extract_image(image: bytes, pvd: bytes, out: Path) -> None:
     out.mkdir(parents=True, exist_ok=True)
-    (out / "license_data.dat").write_bytes(
-        b"".join(image[n * SECTOR + 16:(n + 1) * SECTOR] for n in range(LICENSE_SECTORS)))
+    root_path = out.resolve()
+    visited = set()
+
+    def write_file(path: Path, data: bytes) -> None:
+        if path.resolve() != path or (path.exists() and path.stat().st_nlink > 1):
+            raise SystemExit("Refusing to overwrite a linked extraction target.")
+        path.write_bytes(data)
+
+    write_file(root_path / "license_data.dat", b"".join(
+        image[n * SECTOR + 16:(n + 1) * SECTOR] for n in range(LICENSE_SECTORS)))
 
     def walk(lba: int, size: int, directory: Path) -> None:
+        if lba in visited or lba + (size + USER - 1) // USER > len(image) // SECTOR:
+            raise SystemExit("Invalid ISO directory extent.")
+        visited.add(lba)
         directory.mkdir(parents=True, exist_ok=True)
         for record in _records(image, lba, size):
             name = record[33:33 + record[32]]
             if name in (b"\x00", b"\x01"):
                 continue
             (extent,), (length,) = struct.unpack_from("<I", record, 2), struct.unpack_from("<I", record, 10)
-            name = name.decode("ascii").split(";")[0]
+            name = name.partition(b";")[0]
+            if not re.fullmatch(rb"[A-Za-z0-9_][A-Za-z0-9_.-]*", name) or name.endswith(b"."):
+                raise SystemExit("Unsupported ISO entry name.")
+            path = directory / name.decode("ascii")
+            if isreserved(path.name) or path.resolve() != path:
+                raise SystemExit("Unsupported ISO entry path.")
             if record[25] & 2:
-                walk(extent, length, directory / name)
+                walk(extent, length, path)
                 continue
             system_use = record[33 + record[32] + (1 - record[32] % 2):]
             attribute = struct.unpack_from(">H", system_use, 4)[0] if system_use[6:8] == b"XA" else 0
             count = (length + USER - 1) // USER
+            if extent + count > len(image) // SECTOR:
+                raise SystemExit("ISO file extent exceeds the disc image.")
             if attribute & (XA_FORM2 | XA_INTERLEAVED):
                 data = b"".join(image[n * SECTOR + 16:(n + 1) * SECTOR]
                                 for n in range(extent, extent + count))
             else:
                 data = b"".join(_user_data(image, n) for n in range(extent, extent + count))[:length]
-            (directory / name).write_bytes(data)
+            write_file(path, data)
 
     root = pvd[156:190]
-    walk(struct.unpack_from("<I", root, 2)[0], struct.unpack_from("<I", root, 10)[0], out)
+    walk(struct.unpack_from("<I", root, 2)[0], struct.unpack_from("<I", root, 10)[0], root_path)
 
 
 # -- build ---------------------------------------------------------------------------
