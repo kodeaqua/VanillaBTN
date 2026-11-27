@@ -1,7 +1,8 @@
 # VanillaBTN roadmap
 
 VanillaBTN is a planned native source port of *Harvest Moon: Back to Nature* (PS1,
-USA, `SLUS_011.15`) based on `hmbtn-decomp`. The current build targets PS1.
+USA, `SLUS_011.15`) based on `hmbtn-decomp`. The repository has a matching PS1 build
+and a Windows x64 startup executable.
 
 ## Project decisions
 
@@ -71,6 +72,8 @@ for graphics types and build integration.
   and Release.
 - **PS1.** The reference USA disc passed its input checksum. The local Docker
   build matched all 17 outputs against the reference SHA-1 values.
+- **Native startup.** Both Windows x64 presets build and smoke-test the `vanillabtn`
+  target. Milestone 2 also requires the game sources and overlays to build natively.
 - **PsyZ modules.** PsyZ `00fb42e` and its SDL 3.4.20 revision built on Windows x64.
   The upstream overlay sample passed host symbol imports, nested loading, and state
   reset on reload. Start with PsyZ modules for the native game integration and verify

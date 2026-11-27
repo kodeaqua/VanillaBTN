@@ -1,6 +1,14 @@
 # Harvest Moon: Back to Nature (SLUS_011.15), the EXE and its overlays.
 cmake_minimum_required(VERSION 3.20)
 
+option(VANILLABTN_NATIVE "Build the Windows native executable" OFF)
+if(VANILLABTN_NATIVE)
+    project(VanillaBTN LANGUAGES C)
+    enable_testing()
+    add_subdirectory(native)
+    return()
+endif()
+
 if(NOT CMAKE_TOOLCHAIN_FILE)
     set(CMAKE_TOOLCHAIN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/psx-toolchain.cmake)
 endif()

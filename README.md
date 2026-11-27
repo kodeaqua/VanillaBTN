@@ -35,6 +35,23 @@ docker run --rm -v "${PWD}:/src:ro" -v hmbtn-build-vol:/build `
 `disc.cue`. Delete the `hmbtn-build-vol` volume (`docker volume rm`) to start from a clean
 build.
 
+## Native Windows x64 startup build
+
+From a Visual Studio x64 developer shell with CMake 3.21 or newer and Ninja, run:
+
+```powershell
+cmake --preset windows-x64-debug
+cmake --build --preset windows-x64-debug
+ctest --preset windows-x64-debug
+```
+
+Use `windows-x64-release` in the same commands for Release. The executable is under
+`build/native/<preset>/native/`. Debug writes `VanillaBTN.log` beside it and uses
+AddressSanitizer when available. Release builds with link-time optimization.
+
+This target currently runs the startup smoke test. See the roadmap for game and overlay
+integration milestones.
+
 ## Exceptions
 
 Two things in the build are not compiled from source:

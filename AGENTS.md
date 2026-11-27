@@ -1,7 +1,8 @@
 # VanillaBTN: project rules
 
 VanillaBTN aims to run *Harvest Moon: Back to Nature* (PS1, USA) natively, using the
-`hmbtn-decomp` matching decompilation as its base. The current build targets PS1.
+`hmbtn-decomp` matching decompilation as its base. The repository has a matching PS1
+build and a Windows x64 startup executable.
 
 These rules bind every contributor and every AI agent. `CLAUDE.md` and `GEMINI.md`
 import this file. If a rule is unclear or conflicts with a task, stop and ask.
@@ -41,6 +42,7 @@ build type and preset:
 | Define | `VANILLABTN_DEBUG` | none |
 | Log | `VanillaBTN.log` next to the exe, rewritten each run, flushed per line | no log file |
 
+- Use the compiler's equivalent optimization, debug, and warning flags on each platform.
 - Log lines: timestamp, level, module, message. Replace the home directory with `~` before
   writing. Never log secrets or personal data.
 - Keep asset and save input validation enabled in both configurations.
