@@ -40,6 +40,101 @@ static MATRIX base_matrix;
 static MATRIX light_matrix;
 static MATRIX color_matrix;
 static MATRIX saved_matrix;
+#ifdef __psyz
+/* Keep axis-aligned scene models on the base camera matrix so shared edges match the stage mesh. */
+#define NATIVE_WORLD_VERT_CAP 1024u
+#define NATIVE_SVECTOR_MIN (-32768)
+#define NATIVE_SVECTOR_MAX 32767
+static MATRIX native_saved_base;
+static MATRIX native_model_matrix;
+static MATRIX native_composed_matrix;
+static s32 native_world_compose;
+static s32 native_world_verts_active;
+static SVECTOR native_world_verts[NATIVE_WORLD_VERT_CAP];
+
+static s32 native_is_axis_aligned_rotation(const MATRIX *m) {
+    s32 r;
+    s32 c;
+    s32 col_used[3] = {0, 0, 0};
+
+    for (r = 0; r < 3; r++) {
+        s32 nz = 0;
+        for (c = 0; c < 3; c++) {
+            s16 v = m->m[r][c];
+            if (v == 0) {
+                continue;
+            }
+            if (v != FIXED_ONE && v != -FIXED_ONE) {
+                return 0;
+            }
+            if (col_used[c] != 0) {
+                return 0;
+            }
+            col_used[c] = 1;
+            nz++;
+        }
+        if (nz != 1) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+static s32 native_transform_world_verts(const TmdObject *table, const TmdObject *object,
+                                        const MATRIX *m, SVECTOR *out) {
+    const SVECTOR *src = (const SVECTOR *)((const u8 *)table + object->vert_top);
+    u32 i;
+
+    if (object->n_vert > NATIVE_WORLD_VERT_CAP) {
+        return 0;
+    }
+    for (i = 0; i < object->n_vert; i++) {
+        s32 wx = ((s32)m->m[0][0] * src[i].vx + (s32)m->m[0][1] * src[i].vy +
+                  (s32)m->m[0][2] * src[i].vz) /
+                     FIXED_ONE +
+                 (s32)m->t[0];
+        s32 wy = ((s32)m->m[1][0] * src[i].vx + (s32)m->m[1][1] * src[i].vy +
+                  (s32)m->m[1][2] * src[i].vz) /
+                     FIXED_ONE +
+                 (s32)m->t[1];
+        s32 wz = ((s32)m->m[2][0] * src[i].vx + (s32)m->m[2][1] * src[i].vy +
+                  (s32)m->m[2][2] * src[i].vz) /
+                     FIXED_ONE +
+                 (s32)m->t[2];
+        if (wx < NATIVE_SVECTOR_MIN || wx > NATIVE_SVECTOR_MAX || wy < NATIVE_SVECTOR_MIN ||
+            wy > NATIVE_SVECTOR_MAX || wz < NATIVE_SVECTOR_MIN || wz > NATIVE_SVECTOR_MAX) {
+            return 0;
+        }
+        if (out != NULL) {
+            out[i].vx = (s16)wx;
+            out[i].vy = (s16)wy;
+            out[i].vz = (s16)wz;
+            out[i].pad = src[i].pad;
+        }
+    }
+    return 1;
+}
+
+static s32 native_can_use_world_verts(const TmdHeader *tmd, const MATRIX *m) {
+    MATRIX cur;
+    s32 i;
+
+    if (native_world_compose == 0) {
+        return 0;
+    }
+    gte_ReadRotMatrix(&cur);
+    if (memcmp(cur.m, native_composed_matrix.m, sizeof(cur.m)) != 0 ||
+        memcmp(cur.t, native_composed_matrix.t, sizeof(cur.t)) != 0) {
+        return 0;
+    }
+    for (i = 0; i < tmd->n_obj; i++) {
+        if (!native_transform_world_verts(tmd->objects, &tmd->objects[i], m, NULL)) {
+            return 0;
+        }
+    }
+    return 1;
+}
+#endif
 static ClipPlane clip_planes[4];
 static VECTOR view_direction;
 
@@ -246,6 +341,10 @@ static void camera_yaw_matrix(MATRIX *out) {
 /* Save the GTE's current rotation matrix to saved_matrix. */
 void model_save_gte_rot(void) {
     gte_ReadRotMatrix(&saved_matrix);
+#ifdef __psyz
+    native_saved_base = saved_matrix;
+    native_world_compose = 0;
+#endif
 }
 
 /* Multiply m onto saved_matrix and load the result into the GTE. */
@@ -268,6 +367,15 @@ void model_compose_gte_matrix(MATRIX *m) {
     gte_stlvl(saved->t);
     gte_SetRotMatrix(saved);
     gte_SetTransMatrix(saved);
+#ifdef __psyz
+    if (native_is_axis_aligned_rotation(m)) {
+        native_model_matrix = *m;
+        native_composed_matrix = *saved;
+        native_world_compose = 1;
+    } else {
+        native_world_compose = 0;
+    }
+#endif
 }
 
 /* Point light `id` along the normalised direction dir, with colour r, g, b (0 to 255,
@@ -346,9 +454,22 @@ static void model_unbind(Model *model) {
 /* Draw every object of the model, with the model scale applied when one is set. */
 void model_draw(Model *model) {
     s32 i;
+#ifdef __psyz
+    s32 use_world_verts;
+#endif
 
     current_tmd = model->tmd;
     PushMatrix();
+#ifdef __psyz
+    use_world_verts =
+        scale_enabled == 0 && native_can_use_world_verts(current_tmd, &native_model_matrix);
+    native_world_compose = 0;
+    if (use_world_verts != 0) {
+        gte_SetRotMatrix(&native_saved_base);
+        gte_SetTransMatrix(&native_saved_base);
+        native_world_verts_active = 1;
+    }
+#endif
     if (scale_enabled != 0) {
         SCRATCHPAD_STACK_ENTER();
         model_apply_scale();
@@ -359,6 +480,9 @@ void model_draw(Model *model) {
         model_draw_tmd_object(current_tmd->objects, &current_tmd->objects[i]);
         SCRATCHPAD_STACK_LEAVE();
     }
+#ifdef __psyz
+    native_world_verts_active = 0;
+#endif
     PopMatrix();
 }
 
@@ -449,6 +573,12 @@ static void model_draw_tmd_object(TmdObject *table, TmdObject *object) {
     }
     debug_hook_run(0x2000);
     verts = (SVECTOR *)((u8 *)table + object->vert_top);
+#ifdef __psyz
+    if (native_world_verts_active != 0) {
+        native_transform_world_verts(table, object, &native_model_matrix, native_world_verts);
+        verts = native_world_verts;
+    }
+#endif
     prim = current_frame->primCursor.bytes;
     packet = (u8 *)table + object->primitive_top;
     ot = current_frame->ot;
