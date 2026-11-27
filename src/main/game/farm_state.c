@@ -27,5 +27,10 @@ void farm_state_init(void) {
     }
     farm_area.loadWindow = overlay_region_table[OVERLAY_LOW] + rounded;
     farm_area.sectionBuffer = farm_area.loadWindow + FARM_IMAGE_SIZE;
+#ifdef __psyz
+    /* PS1 tolerates NULL dereference in scene_resolve_selection before first section load. */
+    farm_area.mode.data = &farm_area.mode.script;
+    farm_area.mode.previous = &farm_area.mode.previousHead;
+#endif
     game_state.demo = (InputDemo *)(main_get_region_base() - sizeof(InputDemo));
 }

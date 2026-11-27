@@ -742,7 +742,15 @@ static void player_build_result(FarmPlayer *player)
     values.vz += table[1];
     farm_settle_on_ground(&values, 0);
     status_word = &player_status_word;
+#ifdef __psyz
+    /* PS1 tolerates reads through NULL before the first ground hit. */
+    {
+        s32 *hit = (s32 *)ground_hit_primitive();
+        result_value = hit != 0 ? *hit : 0;
+    }
+#else
     result_value = *(s32 *)ground_hit_primitive();
+#endif
     *status_word = result_value;
     if (!(result_value & 0xFFFF0000))
     {
@@ -4384,7 +4392,15 @@ void player_update_position(void)
     {
         player_slide_on_bump();
     }
+#ifdef __psyz
+    /* PS1 tolerates reads through NULL before the first ground hit. */
+    {
+        u32 *hit = (u32 *)ground_hit_primitive();
+        player_status_word = hit != 0 ? *hit : 0;
+    }
+#else
     player_status_word = *(u32 *)ground_hit_primitive();
+#endif
     pos = player->position;
     if (player->stateFlags & PLAYER_FLAG_AIRBORNE)
     {

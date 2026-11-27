@@ -969,10 +969,27 @@ static void scene_link_slot1_reset(void)
     if (event_flag_get(EVENT_FLAG_SLEEPING) == 1)
     {
         scene_handback_state = SCENE_HANDBACK_RETURN;
+#ifdef __psyz
+        /* PS1 allows NULL writes when a scene lacks link entries. */
+        if (scene_link_entries[0] != 0)
+        {
+            scene_link_entries[0]->flags |= SCENE_ENTRY_HIDDEN;
+        }
+        if (scene_link_entries[1] != 0)
+        {
+            scene_link_entries[1]->flags &= ~SCENE_ENTRY_HIDDEN;
+            if (scene_link_entries[1]->morph != 0)
+            {
+                scene_link_entries[1]->morph->step =
+                    scene_link_entries[1]->morph->steps;
+            }
+        }
+#else
         scene_link_entries[0]->flags |= SCENE_ENTRY_HIDDEN;
         scene_link_entries[1]->flags &= ~SCENE_ENTRY_HIDDEN;
         scene_link_entries[1]->morph->step =
             scene_link_entries[1]->morph->steps;
+#endif
     }
 }
 
@@ -1275,8 +1292,20 @@ static void scene_slot_flag_move(void)
             }
         }
     }
+#ifdef __psyz
+    /* PS1 tolerates writes through NULL when a scene has no marked entries. */
+    if (scene_marked_entries[0] != 0)
+    {
+        scene_marked_entries[0]->flags &= ~SCENE_ENTRY_HIDDEN;
+    }
+    if (scene_marked_entries[1] != 0)
+    {
+        scene_marked_entries[1]->flags |= SCENE_ENTRY_HIDDEN;
+    }
+#else
     scene_marked_entries[0]->flags &= ~SCENE_ENTRY_HIDDEN;
     scene_marked_entries[1]->flags |= SCENE_ENTRY_HIDDEN;
+#endif
 }
 
 /* Show the marked entry for the spouse's place: entry 1 when the spouse is at home,
@@ -1287,13 +1316,27 @@ static void scene_spouse_marker_update(void)
     {
         if (event_flag_get(EVENT_FLAG_SPOUSE_AT_HOME) == 1)
         {
+#ifdef __psyz
+            if (scene_marked_entries[1] != 0)
+            {
+                scene_marked_entries[1]->flags &= ~SCENE_ENTRY_HIDDEN;
+            }
+#else
             scene_marked_entries[1]->flags &= ~SCENE_ENTRY_HIDDEN;
+#endif
             scene_marked_entries[0]->flags |= SCENE_ENTRY_HIDDEN;
         }
         else
         {
             scene_marked_entries[0]->flags &= ~SCENE_ENTRY_HIDDEN;
+#ifdef __psyz
+            if (scene_marked_entries[1] != 0)
+            {
+                scene_marked_entries[1]->flags |= SCENE_ENTRY_HIDDEN;
+            }
+#else
             scene_marked_entries[1]->flags |= SCENE_ENTRY_HIDDEN;
+#endif
         }
     }
 }

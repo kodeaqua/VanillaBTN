@@ -266,7 +266,11 @@ s32 field_probe_sweep(s16 restart) {
         do {
             farm_settle_on_ground(&field_probe_point, 0xC000);
             hit = ground_hit_primitive();
+#ifdef __psyz
+            if (hit != 0 && (hit->header & 8)) {
+#else
             if (hit->header & 8) {
+#endif
                 grid->quads[field_row][field_column] = hit;
             }
             field_column++;

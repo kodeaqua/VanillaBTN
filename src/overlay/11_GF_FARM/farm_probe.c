@@ -917,7 +917,12 @@ s32 farm_record_find_key(ZonePoint *point, LimitPair *place) {
 
 /* The top bit of the first byte of the ground hit primitive. The caller passes a primitive. */
 unsigned int farm_status_upper_bits(void) {
+#ifdef __psyz
+    u8 *hit = (u8 *)ground_hit_primitive();
+    return hit != 0 ? ((unsigned int)*hit >> 7) : 0;
+#else
     return *(u8 *)ground_hit_primitive() >> 7;
+#endif
 }
 
 /* The kind of the ground hit primitive's flags: 2 for 0x4, 3 for 0x40, 1 for 0x2, else 0;
