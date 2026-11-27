@@ -6112,11 +6112,19 @@ static s32 wedding_date_allowed(s16 kind, s16 season, s16 day)
         {
             return 0;
         }
+#ifdef __psyz
+        if (slot >= 0 && slot < CHARACTER_COUNT &&
+            game_state.villagers[slot].birthday.season == season &&
+            game_state.villagers[slot].birthday.day == day) {
+            return 0;
+        }
+#else
         if (game_state.villagers[slot].birthday.season == season &&
             game_state.villagers[slot].birthday.day == day)
         {
             return 0;
         }
+#endif
         break;
     case RIVAL_COUPLE_KAREN_RICK:
         if (game_state.days.count0[14] != 0xFF)
@@ -6626,6 +6634,11 @@ static void animal_naming_begin(void)
  * also need their building. */
 static s32 animal_naming_slot_ready(s16 mode)
 {
+#ifdef __psyz
+    if (mode < 0 || mode >= FARM_MODES) {
+        return 0;
+    }
+#endif
     if ((mode == 1 && game_state.progress.estate.barnLevel == 0) ||
         (mode == 3 && game_state.progress.estate.coopLevel == 0))
     {
@@ -6634,17 +6647,37 @@ static s32 animal_naming_slot_ready(s16 mode)
     /* Modes 0 and 1 are livestock, 2 and 3 chickens. */
     if ((mode & 2) == 0)
     {
+#ifdef __psyz
+        s16 animal = game_state.animals.slots[mode].animal;
+        if (animal < 0 || animal >= MAX_LIVESTOCK) {
+            return 0;
+        }
+        if (game_state.animals.livestock[animal].actor.flags & ACTOR_FLAG_NAMING_PENDING) {
+            return 1;
+        }
+#else
         if (game_state.animals.livestock[game_state.animals.slots[mode].animal].actor.flags & ACTOR_FLAG_NAMING_PENDING)
         {
             return 1;
         }
+#endif
     }
     else
     {
+#ifdef __psyz
+        s16 chicken = game_state.animals.slots[mode].value;
+        if (chicken < 0 || chicken >= MAX_CHICKENS) {
+            return 0;
+        }
+        if (game_state.animals.chickens[chicken].actor.kind == ITEM_CHICK) {
+            return 1;
+        }
+#else
         if (game_state.animals.chickens[game_state.animals.slots[mode].value].actor.kind == ITEM_CHICK)
         {
             return 1;
         }
+#endif
     }
     return 0;
 }
@@ -6664,11 +6697,29 @@ static s32 animal_naming_step(s16 mode)
     }
     else if (mode < 2)
     {
+#ifdef __psyz
+        s16 animal = game_state.animals.slots[mode].value;
+        if (animal >= 0 && animal < MAX_LIVESTOCK) {
+            slot = (FarmPayload *)game_state.animals.livestock[animal].actor.name;
+        } else {
+            slot = &name_entry_buffer[0];
+        }
+#else
         slot = (FarmPayload *)game_state.animals.livestock[game_state.animals.slots[mode].value].actor.name;
+#endif
     }
     else if (mode < 4)
     {
+#ifdef __psyz
+        s16 chicken = game_state.animals.slots[mode].value;
+        if (chicken >= 0 && chicken < MAX_CHICKENS) {
+            slot = (FarmPayload *)game_state.animals.chickens[chicken].actor.name;
+        } else {
+            slot = &name_entry_buffer[0];
+        }
+#else
         slot = (FarmPayload *)game_state.animals.chickens[game_state.animals.slots[mode].value].actor.name;
+#endif
     }
     else
     {
@@ -6707,8 +6758,19 @@ static void animal_naming_end(void)
         {
             if ((u32)i < 2)
             {
+#ifdef __psyz
+                s16 animal = game_state.animals.slots[i].animal;
+                s16 value = game_state.animals.slots[i].value;
+                if (animal >= 0 && animal < MAX_LIVESTOCK) {
+                    game_state.animals.livestock[animal].actor.flags &= ~ACTOR_FLAG_NAMING_PENDING;
+                }
+                if (value >= 0 && value < MAX_LIVESTOCK) {
+                    game_state.animals.livestock[value].actor.flags &= ~ACTOR_FLAG_CLAIMED;
+                }
+#else
                 game_state.animals.livestock[game_state.animals.slots[i].animal].actor.flags &= ~ACTOR_FLAG_NAMING_PENDING;
                 game_state.animals.livestock[game_state.animals.slots[i].value].actor.flags &= ~ACTOR_FLAG_CLAIMED;
+#endif
             }
             animal_slot_clear(&game_state.animals.slots[i].value);
         }

@@ -9,11 +9,19 @@
 #include "prim.h"
 #include "ui_icons.h"
 
+#ifdef __psyz
+typedef void (*TileDrawFn)(void *ot, AnimState *sprite, s16 frame, s16 x, s16 y);
+
+static void bg_tile_screen(void *ot, TileDrawFn draw);
+static void bg_tile_draw_sprite(void *ot, AnimState *sprite, s16 frame, s16 x, s16 y);
+static void bg_tile_draw_cursor(void *ot, AnimState *sprite, s16 frame, s16 x, s16 y);
+#else
 typedef void (*TileDrawFn)(void *ot, AnimState *sprite, s16 frame, s32 x, s32 y);
 
 static void bg_tile_screen(void *ot, void *drawArg);
 static void bg_tile_draw_sprite(void *ot, struct AnimState *sprite, int frame, short x, short y);
 static void bg_tile_draw_cursor(void *ot, struct AnimState *sprite, signed short frame, signed short x, signed short y);
+#endif
 
 /* Tile the screen with plain sprites of the staging sprite. */
 void bg_tile_mode_sprite(void *arg) {
@@ -31,6 +39,39 @@ static s16 bg_tile_frame_order[] = {0, 2, 1, 3};
 
 /* Tile the screen with the staging sprite on a 24-pixel grid, scrolling it
  * diagonally one pixel every four calls and cycling frames 0,2,1,3. */
+#ifdef __psyz
+static void bg_tile_screen(void *ot, TileDrawFn draw) {
+    u32 y;
+    s32 x;
+    s32 scroll;
+    s32 frame;
+
+    anim_bind_file(&ui_icon_anim, (AnimFile *)farm_area.stageData);
+    bg_scroll_frames++;
+    scroll = bg_scroll_frames / 4 - bg_scroll_frames / 96 * 24;
+    frame = 0;
+    for (y = 0; y < 264; y += 24) {
+        for (x = -12; x < 344; x += 24) {
+            frame++;
+            frame &= 3;
+            draw(ot, &ui_icon_anim, bg_tile_frame_order[frame], (s16)(x - scroll),
+                 (s16)(y - scroll));
+        }
+    }
+}
+
+/* Draw one tile as a plain sprite of the staging animation. */
+static void bg_tile_draw_sprite(void *ot, AnimState *sprite, s16 frame, s16 x, s16 y) {
+    anim_draw_sprt_cursor(ot, sprite, 0x1D, frame & 0xFF, x, y);
+}
+
+/* Draw one tile through the current frame's primitive cursor. */
+static void bg_tile_draw_cursor(void *ot, AnimState *sprite, s16 frame, s16 x, s16 y) {
+    PrimCursor *cursor;
+    cursor = &current_frame->primCursor;
+    anim_draw_sprt(ot, &cursor->sprt, &cursor->mode, sprite, 0x1D, frame & 0xFF, x, y);
+}
+#else
 static void bg_tile_screen(void *ot, void *drawArg) {
     TileDrawFn draw;
     u32 y;
@@ -63,3 +104,4 @@ static void bg_tile_draw_cursor(void *ot, struct AnimState *sprite, signed short
     cursor = &current_frame->primCursor;
     anim_draw_sprt(ot, &cursor->sprt, &cursor->mode, sprite, 0x1D, frame & 0xFF, x, y);
 }
+#endif
