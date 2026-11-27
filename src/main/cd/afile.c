@@ -147,19 +147,18 @@ static u32 afile_entry_size(s32 index) {
     return (end - start + 3) / 4 * 4;
 }
 
-/* Read the A_FILE.HDT member table into the members' start positions (through game_state,
- * used as scratch), then find the first sector of A_FILE.BIN on the disc. */
+/* Read the 32-bit A_FILE.HDT offsets through game_state scratch, then locate A_FILE.BIN. */
 s32 afile_init(void) {
     CdlFILE file;
-    u_long *src;
+    u32 *src;
     char *hdtName;
     char *binName;
     s32 i;
 
     hdtName = "\\A_FILE.HDT;1";
     binName = "\\A_FILE.BIN;1";
-    src = (u_long *)&game_state;
-    cd_read_file(hdtName, src);
+    src = (u32 *)&game_state;
+    cd_read_file(hdtName, (u_long *)src);
     for (i = 0; i <= 32; i++) {
         afile_members[i].pos = src[i];
     }

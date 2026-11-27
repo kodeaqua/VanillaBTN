@@ -81,6 +81,9 @@ for graphics types and build integration.
 - **Disc and XA.** A local probe opened the reference disc via its CUE, checked the
   A_FILE offset table, and read an archive data sector. It decoded one filtered XA
   stream to nonzero stereo PCM. In-game playback, loops, and fades still need testing.
+- **Overlay archive reads.** A Windows x64 diagnostic ran the shared A_FILE reader
+  against the reference disc. It checked all 33 offsets and verified a low, high, low
+  load sequence against the disc bytes, with region buffers standing in for PS1 RAM.
 
 ## Verification
 
