@@ -9,19 +9,19 @@
 #include "prim.h"
 #include "ui_icons.h"
 
-typedef void (*TileDrawFn)(u_long *ot, AnimState *sprite, s16 frame, s32 x, s32 y);
+typedef void (*TileDrawFn)(void *ot, AnimState *sprite, s16 frame, s32 x, s32 y);
 
-static void bg_tile_screen(u_long *ot, void *drawArg);
-static void bg_tile_draw_sprite(u_long *ot, struct AnimState *sprite, int frame, short x, short y);
-static void bg_tile_draw_cursor(u_long *ot, struct AnimState *sprite, signed short frame, signed short x, signed short y);
+static void bg_tile_screen(void *ot, void *drawArg);
+static void bg_tile_draw_sprite(void *ot, struct AnimState *sprite, int frame, short x, short y);
+static void bg_tile_draw_cursor(void *ot, struct AnimState *sprite, signed short frame, signed short x, signed short y);
 
 /* Tile the screen with plain sprites of the staging sprite. */
-void bg_tile_mode_sprite(u_long *arg) {
+void bg_tile_mode_sprite(void *arg) {
     bg_tile_screen(arg, bg_tile_draw_sprite);
 }
 
 /* Tile the screen with the staging sprite drawn through the frame's primitive cursor. */
-void bg_tile_mode_cursor(u_long *arg) {
+void bg_tile_mode_cursor(void *arg) {
     bg_tile_screen(arg, bg_tile_draw_cursor);
 }
 
@@ -31,7 +31,7 @@ static s16 bg_tile_frame_order[] = {0, 2, 1, 3};
 
 /* Tile the screen with the staging sprite on a 24-pixel grid, scrolling it
  * diagonally one pixel every four calls and cycling frames 0,2,1,3. */
-static void bg_tile_screen(u_long *ot, void *drawArg) {
+static void bg_tile_screen(void *ot, void *drawArg) {
     TileDrawFn draw;
     u32 y;
     s32 x;
@@ -53,12 +53,12 @@ static void bg_tile_screen(u_long *ot, void *drawArg) {
 }
 
 /* Draw one tile as a plain sprite of the staging animation. */
-static void bg_tile_draw_sprite(u_long *ot, struct AnimState *sprite, int frame, short x, short y) {
+static void bg_tile_draw_sprite(void *ot, struct AnimState *sprite, int frame, short x, short y) {
     anim_draw_sprt_cursor(ot, sprite, 0x1D, frame & 0xFF, x, y);
 }
 
 /* Draw one tile through the current frame's primitive cursor. */
-static void bg_tile_draw_cursor(u_long *ot, struct AnimState *sprite, signed short frame, signed short x, signed short y) {
+static void bg_tile_draw_cursor(void *ot, struct AnimState *sprite, signed short frame, signed short x, signed short y) {
     PrimCursor *cursor;
     cursor = &current_frame->primCursor;
     anim_draw_sprt(ot, &cursor->sprt, &cursor->mode, sprite, 0x1D, frame & 0xFF, x, y);

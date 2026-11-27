@@ -1546,7 +1546,7 @@ static void mg3_draw_frame(void) {
     s32 height;
     s32 raw_width;
     s32 raw_height;
-    u_long *display_buffer;
+    OT_TYPE *display_buffer;
 
     anim_select_range(&mg3_state.sprites[1], 0);
     raw_width = HWD0;

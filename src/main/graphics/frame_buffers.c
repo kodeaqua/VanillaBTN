@@ -10,6 +10,31 @@
 #ifdef __psyz
 /* The native entries would overlap the primitive buffers at the PS1 offsets. */
 static OT_TYPE frame_main_ots[2][FRAME_OT_DEPTH];
+enum { FRONT_LAYER_BITS = 6, BACK_LAYER_BITS = 4, BACKDROP_LAYER_BITS = 1 };
+static OT_TYPE frame_layer_ots[2][(1 << FRONT_LAYER_BITS) + (1 << BACK_LAYER_BITS) +
+                                 (1 << BACKDROP_LAYER_BITS)];
+
+static void frame_layers_layout(FrameState *frame, OT_TYPE *entries) {
+    static const s32 lengths[] = {FRONT_LAYER_BITS, BACK_LAYER_BITS, BACKDROP_LAYER_BITS};
+    for (s32 layer = 0; layer < 3; layer++) {
+        s32 length = lengths[layer];
+        s32 count = 1 << length;
+        frame->otTags[layer] = entries;
+        frame->otTagCounts[layer] = count;
+        frame->otLengths[layer] = length;
+        frame->ots[layer] = (GsOT){
+            .length = length,
+            .org = (GsOT_TAG *)entries,
+            .tag = (GsOT_TAG *)&entries[count - 1],
+        };
+        ClearOTagR(entries, count);
+        entries += count;
+    }
+    frame->otTags[3] = 0;
+    frame->otTagCounts[3] = 0;
+    frame->otLengths[3] = 0;
+    frame->ots[3] = (GsOT){0};
+}
 #else
 /* An OT entry is a tag in its top byte and the next entry's address in the other 24 bits. */
 #define OT_TAG_MASK 0xFF000000
@@ -50,7 +75,7 @@ void debug_hook_run(s32 unused0) {
     /* Empty hook. */
 }
 
-/* Lay out and clear both frame buffers' main ordering tables and primitive buffers. */
+/* Lay out and clear both frame buffers' ordering tables and primitive buffers. */
 void frame_buffers_layout(void) {
     s32 i;
     s32 j;
@@ -65,6 +90,7 @@ void frame_buffers_layout(void) {
         fb->primSize = FRAME_PRIM_SIZE;
 #ifdef __psyz
         fb->ot = frame_main_ots[i];
+        frame_layers_layout(fb, frame_layer_ots[i]);
 #else
         fb->ot = (OT_TYPE *)&region[i * 0x2000 + REGION_OT];
 #endif

@@ -364,7 +364,7 @@ void cooking_menu_tick(void)
 {
     s32 saved_mode;
     u8 state;
-    u_long *display;
+    OT_TYPE *display;
     display = &current_frame->otTags[0][30];
     state = cooking_menu_step;
     if (state != 0)
@@ -662,9 +662,9 @@ static void cooking_record_confirm_tick(void)
  * first empty record. */
 static void cooking_draw_result_group(u8 group)
 {
-    u_long *ot;
-    u_long *layer60;
-    u_long *layer70;
+    OT_TYPE *ot;
+    OT_TYPE *layer60;
+    OT_TYPE *layer70;
     s32 column;
     s32 line;
     s16 x;
@@ -767,12 +767,12 @@ static void cooking_draw_value_grid(u8 index, u8 mode)
     u16 y;
     u16 bit;
     s32 i;
-    u_long *ot;
-    u_long *head_frame;
-    u_long *head_text;
-    u_long *head_on;
-    u_long *head_off;
-    u_long *head_mark;
+    OT_TYPE *ot;
+    OT_TYPE *head_frame;
+    OT_TYPE *head_text;
+    OT_TYPE *head_on;
+    OT_TYPE *head_off;
+    OT_TYPE *head_mark;
     FarmRecipe *record;
 
     ot = current_frame->otTags[0];
@@ -916,9 +916,9 @@ static void cooking_load_record(u8 index)
  * cell opens the rows, state 5). */
 static void cooking_grid_input(void)
 {
-    u_long *ot;
-    u_long *frame;
-    u_long *text;
+    OT_TYPE *ot;
+    OT_TYPE *frame;
+    OT_TYPE *text;
     s32 flags;
     s32 slot;
 
@@ -1068,7 +1068,7 @@ static void cooking_utensil_prompt_tick(s8 slot)
 static void cooking_row_input(void)
 {
     s32 flags;
-    u_long *head;
+    OT_TYPE *head;
 
     menu_set_sound_enabled(0);
     text_set_input(0);
@@ -1131,9 +1131,9 @@ static void cooking_draw_pending_flags(void)
     u16 y;
     u8 bit;
     s32 i;
-    u_long *ot;
-    u_long *head_on;
-    u_long *head_off;
+    OT_TYPE *ot;
+    OT_TYPE *head_on;
+    OT_TYPE *head_off;
 
     x = 132;
     y = 20;
@@ -1178,10 +1178,10 @@ static void cooking_draw_utensils(void)
     u16 y;
     u8 bit;
     s32 i;
-    u_long *ot;
-    u_long *head_on;
-    u_long *head_off;
-    u_long *head_mark;
+    OT_TYPE *ot;
+    OT_TYPE *head_on;
+    OT_TYPE *head_off;
+    OT_TYPE *head_mark;
 
     x = 132;
     y = 94;
@@ -1250,9 +1250,9 @@ static u16 cooking_cell_mask(s8 cell)
  * across pages, 0..8) and the buttons pick, drop, confirm or leave. */
 static void cooking_item_menu_input(void)
 {
-    u_long *ot;
-    u_long *frame;
-    u_long *text;
+    OT_TYPE *ot;
+    OT_TYPE *frame;
+    OT_TYPE *text;
     s32 i;
     s16 first_empty;
     u32 flags;
@@ -1498,7 +1498,7 @@ static void cooking_draw_staged_grid(void)
     s32 i;
     s32 slot;
     u16 id;
-    u_long *head;
+    OT_TYPE *head;
 
     x = 132;
     y = 20;
@@ -1549,10 +1549,10 @@ static void cooking_draw_timer_grid(void)
     s32 count;
     s32 status;
     FarmTimerRecord *record;
-    u_long *ot;
-    u_long *head_mark;
-    u_long *head_gauge;
-    u_long *head_icon;
+    OT_TYPE *ot;
+    OT_TYPE *head_mark;
+    OT_TYPE *head_gauge;
+    OT_TYPE *head_icon;
 
     x = 132;
     y = 94;

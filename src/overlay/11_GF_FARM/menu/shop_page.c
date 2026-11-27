@@ -378,9 +378,9 @@ static s32 shop_mode_input(void) {
 
 /* Draw the money panel: its title, then the gold and its unit. */
 static void shop_draw_gold(void) {
-    u_long *display;
-    u_long *line;
-    u_long *source;
+    OT_TYPE *display;
+    OT_TYPE *line;
+    OT_TYPE *source;
     display = current_frame->otTags[0];
     line = &display[22];
     window_frame_draw_at(&display[23], 0, 227, 16, 71, 30);
@@ -393,7 +393,7 @@ static void shop_draw_gold(void) {
 
 /* Draw the race-bet panel: its frame, the race number, the OK label, then the six rows. */
 static void shop_draw_header(void) {
-    u_long *display;
+    OT_TYPE *display;
     u16 index;
     s32 slot;
     FrameState *state;
@@ -458,7 +458,7 @@ static s16 shop_item_name_offsets[40][2] = {
  * player's horse. */
 static void shop_draw_row(s16 slot)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 race;
     s32 rowSet;
     s32 item;

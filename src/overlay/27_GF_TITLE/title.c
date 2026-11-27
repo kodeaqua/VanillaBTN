@@ -3209,7 +3209,7 @@ static void title_logo_reset(void) {
 
 /* Draws the new game summary with the player's birthday. */
 static void title_draw_birthday(void) {
-    u_long *display;
+    OT_TYPE *display;
     display = &current_frame->otTags[0][32];
     text_set_spacing(0, 1);
     window_frame_draw_at(&current_frame->otTags[0][33], 1, 72, 56, 176, 90);
@@ -3272,7 +3272,7 @@ static void title_draw_logo_wipe(s16 wipe) {
 /* Scrolls the two 3x3 tile layers of the title background. Layer A wobbles with a
  * cosine, layer B with a sine. */
 static void title_draw_bg_scroll(void) {
-    u_long *ot;
+    OT_TYPE *ot;
     s16 band_a;
     s16 band_b;
     s16 laps_a;
@@ -3398,7 +3398,7 @@ static void title_anim_columns(void) {
 /* Advance the first title animation column and request its next frame. */
 static void title_anim_column_a(void) {
     s32 frame;
-    u_long *drawing_area;
+    OT_TYPE *drawing_area;
 
     frame = (u16)title_column_a_count + 1;
     frame = frame - ((s16)frame / 1800) * 1800;
@@ -3417,7 +3417,7 @@ static void title_anim_column_a(void) {
  * than the first) and request its next frame. */
 static void title_anim_column_b(void) {
     s32 frame;
-    u_long *drawing_area;
+    OT_TYPE *drawing_area;
 
     frame = (u16)title_column_b_count + 1;
     frame = frame - ((s16)frame / 1800) * 1800;
@@ -3437,7 +3437,7 @@ static void title_anim_column_b(void) {
 /* Advance the third title animation column and request its next frame. */
 static void title_anim_column_c(void) {
     s32 frame;
-    u_long *drawing_area;
+    OT_TYPE *drawing_area;
 
     frame = (u16)title_column_c_count + 1;
     frame = frame - ((s16)frame / 1800) * 1800;

@@ -87,7 +87,7 @@ static s32 storage_spot_is_held(s32 spot);
 static void storage_stack_count(FarmStoredItem *from, FarmStoredItem *to);
 static void storage_item_swap(FarmStoredItem *a, FarmStoredItem *b);
 static FarmStoredItem *storage_spot_item(s32 spot);
-static void storage_draw_spot(u_long *ot, s32 index, FarmStoredItem *item);
+static void storage_draw_spot(OT_TYPE *ot, s32 index, FarmStoredItem *item);
 
 static s32 storage_swap_state = SWAP_IDLE;
 
@@ -195,8 +195,8 @@ static FarmFrameRect storage_swap_frames[4] = {
  * with a second pick, triangle takes the spot (state 2), circle drops the pick and
  * start leaves (state 3). */
 static void storage_swap_screen(void) {
-    u_long *rows;
-    u_long *text;
+    OT_TYPE *rows;
+    OT_TYPE *text;
     s32 i;
     s32 dir;
     s32 refused;
@@ -429,7 +429,7 @@ static FarmStoredItem *storage_spot_item(s32 spot) {
 
 /* Draw the marker for spot `index`; with a stored item there, place it through
  * picture_cell_build_prim and draw its count when it stacks. */
-static void storage_draw_spot(u_long *ot, s32 index, FarmStoredItem *item) {
+static void storage_draw_spot(OT_TYPE *ot, s32 index, FarmStoredItem *item) {
     if (item->id == 0) {
         item_empty_marker_draw(ot, storage_spots[index].x, storage_spots[index].y);
         return;

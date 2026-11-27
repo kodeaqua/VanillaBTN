@@ -212,7 +212,7 @@ s32 name_entry_step(void) {
 
 /* Draw the sound prompt for the current step: the value and its controls. */
 static void name_sound_draw(void) {
-    u_long *sound_data;
+    OT_TYPE *sound_data;
     u16 step;
     s32 value;
     s16 quotient;
@@ -243,8 +243,8 @@ static void name_sound_draw(void) {
 /* Draw the window frame and its localized caption; from PICK_DAY on also draw the
  * chosen icon, and from CONFIRM on the chosen day. */
 static void name_sound_draw_frame(void) {
-    u_long *base;
-    u_long *window;
+    OT_TYPE *base;
+    OT_TYPE *window;
 
     base = current_frame->otTags[0];
     window = &base[25];
@@ -266,8 +266,8 @@ static void name_title_build_display(void) {
     s32 y_pos;
     s32 x_pos;
     s32 terminator;
-    u_long *base;
-    u_long *display;
+    OT_TYPE *base;
+    OT_TYPE *display;
     s32 quotient;
     s32 value;
     s32 remainder;

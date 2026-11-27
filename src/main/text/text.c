@@ -75,7 +75,7 @@ typedef struct
  * in halfwords (text_list_livestock, text_list_flagged_livestock, text_list_chickens). */
 typedef s32 (*TextFill)(s32 arg);
 
-static TextWindowResult text_window_frame(u_long *ot, u16 *text, s16 x, s16 y, s16 unused, s16 height);
+static TextWindowResult text_window_frame(void *ot, u16 *text, s16 x, s16 y, s16 unused, s16 height);
 static void text_window_clear(void);
 static u8 *text_draw_string(void *ot, u8 *prim, u16 *text, s16 x, s16 y, s32 scale, s32 mode, s32 semiTrans,
                             s32 nested, s32 toOrigin);
@@ -86,19 +86,19 @@ static u16 *text_find_nth(u16 *entry, u16 code, s32 nth, s32 limit);
 static u16 text_count_matches(u16 *entries, u16 match, s16 limit, u16 *out_count);
 static u16 *text_advance_line(u16 *text, s32 line);
 static u16 text_count_entries(u16 *entries, u16 stop, s16 limit);
-static void text_draw_typed(u_long *ot, u16 *text, s16 x, s16 y);
+static void text_draw_typed(void *ot, u16 *text, s16 x, s16 y);
 static u16 text_get_state(void);
 static void text_reset_state(void);
-static void *text_draw_lines_centered(u_long *target, void *handle, u16 *text, s16 x, s16 y, s16 width, s32 scale,
+static void *text_draw_lines_centered(void *target, void *handle, u16 *text, s16 x, s16 y, s16 width, s32 scale,
                                       s16 lineStep, s16 spacing);
-static void *text_draw_line_centered(u_long *ot, void *handle, u16 *text, s16 x, s16 y, s16 width,
+static void *text_draw_line_centered(void *ot, void *handle, u16 *text, s16 x, s16 y, s16 width,
                                      s32 scale, s16 spacing);
 static s32 text_measure(u16 *entries, s32 size, s16 spacing);
-static void *text_draw_lines_right(u_long *target, void *handle, u16 *text, s16 x, s16 y, s16 width, s32 scale,
+static void *text_draw_lines_right(void *target, void *handle, u16 *text, s16 x, s16 y, s16 width, s32 scale,
                                    s16 lineHeight, s16 spacing);
 static s32 text_choice_menu(s16 x, s16 y, s16 *cursor, s16 count);
 static s32 text_choice_face_bank(u16 choice);
-static void text_draw_face(u_long *ot, s16 x, s16 y, s16 id);
+static void text_draw_face(void *ot, s16 x, s16 y, s16 id);
 static s16 text_code_to_bank(s32 code);
 static void text_switch_bank(s16 bank);
 static void text_load_bank(s32 bank, s32 wait);
@@ -297,7 +297,7 @@ s16 text_get_wait_frames(void)
     return text_wait_frames;
 }
 
-void text_draw_plain(u_long *ot, u16 *text, s16 x, s16 y)
+void text_draw_plain(void *ot, u16 *text, s16 x, s16 y)
 {
     u8 *packet;
 
@@ -306,7 +306,7 @@ void text_draw_plain(u_long *ot, u16 *text, s16 x, s16 y)
     gs_work_release(packet);
 }
 
-TextWindowResult text_window_draw(u_long *ot, u16 *text, s16 x, s16 y, s16 unused, s16 height)
+TextWindowResult text_window_draw(void *ot, u16 *text, s16 x, s16 y, s16 unused, s16 height)
 {
     return text_window_frame(ot, text, x, y, unused, height);
 }
@@ -333,7 +333,7 @@ void text_set_bank(s32 value)
     text_bank_loaded = value;
 }
 
-static void text_draw_centered(u_long *ot, u16 *text, s16 x, s16 y, s16 width)
+static void text_draw_centered(void *ot, u16 *text, s16 x, s16 y, s16 width)
 {
     u8 *packet;
     s16 limit;
@@ -345,7 +345,7 @@ static void text_draw_centered(u_long *ot, u16 *text, s16 x, s16 y, s16 width)
     gs_work_release(packet);
 }
 
-static void text_draw_right(u_long *ot, u16 *text, s16 x, s16 y, s16 width)
+static void text_draw_right(void *ot, u16 *text, s16 x, s16 y, s16 width)
 {
     u8 *packet;
     s16 limit;
@@ -356,7 +356,7 @@ static void text_draw_right(u_long *ot, u16 *text, s16 x, s16 y, s16 width)
     gs_work_release(packet);
 }
 
-void text_draw_semi(u_long *ot, u16 *text, s16 x, s16 y,
+void text_draw_semi(void *ot, u16 *text, s16 x, s16 y,
                     unsigned int semiTrans)
 {
     u8 *packet;
@@ -624,7 +624,7 @@ static void text_reset_cursor(void)
  * then draw the text clipped to the window and the face. Returns the frame's
  * TextWindowStatus; a picked choice comes back as its face bank (10..13) and a
  * closed window as TEXT_WINDOW_CLOSED. */
-static TextWindowResult text_window_frame(u_long *ot, u16 *text, s16 x, s16 y, s16 unused, s16 height)
+static TextWindowResult text_window_frame(void *ot, u16 *text, s16 x, s16 y, s16 unused, s16 height)
 {
     u16 *p;
     s32 step;
@@ -1254,7 +1254,7 @@ static u16 text_count_entries(u16 *entries, u16 stop, s16 limit)
 }
 
 /* Draw `text` typed out at (x, y): the glyphs up to text_index, as the typing state allows. */
-static void text_draw_typed(u_long *ot, u16 *text, s16 x, s16 y)
+static void text_draw_typed(void *ot, u16 *text, s16 x, s16 y)
 {
     u8 *packet;
 
@@ -1279,7 +1279,7 @@ static void text_reset_state(void)
  * at a time with text_draw_line_centered, stepping y by `lineStep` per line. Each line is
  * copied to a buffer and terminated with TEXT_END there. Returns what the last
  * text_draw_line_centered call returned; `handle` is threaded through the calls. */
-static void *text_draw_lines_centered(u_long *target, void *handle, u16 *text, s16 x, s16 y, s16 width, s32 scale,
+static void *text_draw_lines_centered(void *target, void *handle, u16 *text, s16 x, s16 y, s16 width, s32 scale,
                                       s16 lineStep, s16 spacing)
 {
     TextLine line;
@@ -1315,7 +1315,7 @@ static void *text_draw_lines_centered(u_long *target, void *handle, u16 *text, s
     return handle;
 }
 
-static void *text_draw_line_centered(u_long *ot, void *handle, u16 *text, s16 x, s16 y, s16 width,
+static void *text_draw_line_centered(void *ot, void *handle, u16 *text, s16 x, s16 y, s16 width,
                                      s32 scale, s16 spacing)
 {
     s32 value;
@@ -1363,7 +1363,7 @@ static s32 text_measure(u16 *entries, s32 size, s16 spacing)
     return width - spacing;
 }
 
-static void *text_draw_line_right(u_long *ot, void *handle, u16 *text, s16 x, s16 y, s16 width,
+static void *text_draw_line_right(void *ot, void *handle, u16 *text, s16 x, s16 y, s16 width,
                                   s32 scale, s16 spacing)
 {
     s32 value;
@@ -1377,7 +1377,7 @@ static void *text_draw_line_right(u_long *ot, void *handle, u16 *text, s16 x, s1
  * of the text) is copied out, terminated with TEXT_END and
  * drawn by text_draw_line_right at (x, y); y advances by `lineHeight` per line.
  * Returns the running value text_draw_line_right hands back. */
-static void *text_draw_lines_right(u_long *target, void *handle, u16 *text, s16 x, s16 y, s16 width, s32 scale,
+static void *text_draw_lines_right(void *target, void *handle, u16 *text, s16 x, s16 y, s16 width, s32 scale,
                                    s16 lineHeight, s16 spacing)
 {
     TextLine line;
@@ -1444,7 +1444,7 @@ static s32 text_choice_menu(s16 x, s16 y, s16 *cursor, s16 count)
     return chosen;
 }
 
-void text_draw_cursor(u_long *ot, s16 x, s16 y)
+void text_draw_cursor(void *ot, s16 x, s16 y)
 {
     ui_draw_icon_0b_1(ot, x + 8, y + 6);
 }
@@ -1466,7 +1466,7 @@ static s32 text_choice_face_bank(u16 choice)
 
 /* Queue an 80x80 sprite at (x, y) from texture row v=0xAF, then the texture
  * page it samples, into `ot`; nothing when id is -1. */
-static void text_draw_face(u_long *ot, s16 x, s16 y, s16 id)
+static void text_draw_face(void *ot, s16 x, s16 y, s16 id)
 {
     PrimSprite *sprite;
     PrimDrTPage *tpage;
@@ -2084,7 +2084,7 @@ u16 *text_write_weekday(s32 weekday, u16 *text)
 
 /* Draw `value` as `width` digits (at most 9) at (x, y). A width of -1 draws it
  * nine digits wide with the leading blanks (glyph 0xFFD) skipped. */
-void text_draw_number(s16 value, s16 width, u_long *display, s16 x, s16 y)
+void text_draw_number(s16 value, s16 width, void *display, s16 x, s16 y)
 {
     u16 *digits;
     s32 count;
@@ -2127,7 +2127,7 @@ void text_copy_string(u16 *destination, u16 *source)
 }
 
 /* Draw the message window frame, then `destination` inside it, in text palette 3. */
-void text_draw_in_frame(u_long *frame_slot, u_long *text_slot, u16 *destination)
+void text_draw_in_frame(void *frame_slot, void *text_slot, u16 *destination)
 {
     s32 previous;
 
@@ -2158,7 +2158,7 @@ static void text_select_bank(u16 code)
 }
 
 /* Draw the face for `code` above the message box at (x, y). */
-static void text_draw_face_above(u_long *ot, s32 code, s16 x, s16 y)
+static void text_draw_face_above(void *ot, s32 code, s16 x, s16 y)
 {
     s32 x0 = x;
     s32 y0 = y;
@@ -2189,7 +2189,7 @@ s32 text_bank_ready(s32 code)
 }
 
 /* Draw the face for `code` at (x, y), with no offset. */
-void text_draw_face_by_code(u_long *ot, s32 code, s16 x, s16 y)
+void text_draw_face_by_code(void *ot, s32 code, s16 x, s16 y)
 {
     text_draw_face(ot, x, y, text_code_to_bank(code & 0xFFFF));
 }

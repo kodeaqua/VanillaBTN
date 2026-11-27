@@ -19,10 +19,10 @@ s32 menu_phase_is_result(void);
 void menu_set_sound_enabled(s32 arg);
 void menu_reset(void);
 void menu_begin_close(void);
-s32 menu_box_animate(u_long *ot, s32 unused, s16 x, s16 y, s16 w, s16 h, s32 *frame, s32 duration,
+s32 menu_box_animate(void *ot, s32 unused, s16 x, s16 y, s16 w, s16 h, s32 *frame, s32 duration,
                          s32 mode);
 
-void window_frame_draw_at(u_long *ot, s32 unused, s16 x, s16 y, s16 w, s16 h);
+void window_frame_draw_at(void *ot, s32 unused, s16 x, s16 y, s16 w, s16 h);
 
 /* The menu's animation sprite. */
 extern AnimState menu_anim;

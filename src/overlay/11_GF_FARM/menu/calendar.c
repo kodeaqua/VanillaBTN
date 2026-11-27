@@ -27,19 +27,19 @@ static void farm_calendar_tick(void);
 static void farm_calendar_handle_buttons(void);
 static void farm_calendar_move_cursor(void);
 static void farm_calendar_build_geometry(FarmDate *date);
-static void farm_calendar_mark_events(u_long *ot, s16 season, s16 offset);
-static void farm_calendar_mark_wedding(u_long *ot, s16 year, s16 season, s16 day);
-static void farm_calendar_select_message(u_long *unused0, u_long *unused1, s16 year, s16 season, s16 day);
-static void farm_calendar_draw_cursor(u_long *ot, s16 day, s16 offset);
-static void farm_calendar_draw_today(u_long *ot, s16 x, s16 y);
-static void farm_calendar_draw_event(u_long *ot, s16 a, s16 b);
-static void farm_calendar_draw_wedding(u_long *ot, s16 x, s16 y);
-static void farm_calendar_draw_entry(s32 index, u_long *ot, s16 x, s16 y);
-static void farm_calendar_draw_result(u_long *ot, s16 year, s16 season);
-static void farm_calendar_draw_days(u_long *object, s16 start);
-static void farm_calendar_draw_day_cell(u_long *ot, s16 slot, s16 startOffset, s16 mode_arg);
+static void farm_calendar_mark_events(OT_TYPE *ot, s16 season, s16 offset);
+static void farm_calendar_mark_wedding(OT_TYPE *ot, s16 year, s16 season, s16 day);
+static void farm_calendar_select_message(OT_TYPE *unused0, OT_TYPE *unused1, s16 year, s16 season, s16 day);
+static void farm_calendar_draw_cursor(OT_TYPE *ot, s16 day, s16 offset);
+static void farm_calendar_draw_today(OT_TYPE *ot, s16 x, s16 y);
+static void farm_calendar_draw_event(OT_TYPE *ot, s16 a, s16 b);
+static void farm_calendar_draw_wedding(OT_TYPE *ot, s16 x, s16 y);
+static void farm_calendar_draw_entry(s32 index, OT_TYPE *ot, s16 x, s16 y);
+static void farm_calendar_draw_result(OT_TYPE *ot, s16 year, s16 season);
+static void farm_calendar_draw_days(OT_TYPE *object, s16 start);
+static void farm_calendar_draw_day_cell(OT_TYPE *ot, s16 slot, s16 startOffset, s16 mode_arg);
 static void farm_calendar_cell_position(s16 index, s16 offset, s16 *x, s16 *y);
-static void farm_calendar_draw_weekday_header(u_long *frame_ot, u_long *text_ot);
+static void farm_calendar_draw_weekday_header(OT_TYPE *frame_ot, OT_TYPE *text_ot);
 
 #define CALENDAR_CHOICE_NONE 0xFF
 #define CALENDAR_EVENT_COUNT 18
@@ -137,7 +137,7 @@ void farm_calendar_frame(void) {
  * the chosen day's message is shown or, with no choice pending, the calendar waits
  * for one. */
 static void farm_calendar_tick(void) {
-    u_long *ot;
+    OT_TYPE *ot;
 
     if (menu_phase_is_result() != 0 && (input_pad1->pressed & PAD_START)) {
         if (calendar_close_hook_active == 1) {
@@ -234,9 +234,9 @@ static void farm_calendar_move_cursor(void) {
 static void farm_calendar_build_geometry(FarmDate *date) {
     s16 adjusted;
     s16 angle;
-    u_long *ot;
-    u_long *otRow;
-    u_long *otColumn;
+    OT_TYPE *ot;
+    OT_TYPE *otRow;
+    OT_TYPE *otColumn;
 
     angle = date->day;
     adjusted = (date->weekday + 7 - (angle % 7)) % 7;
@@ -262,7 +262,7 @@ static FarmDateEntry calendar_events[CALENDAR_EVENT_COUNT] = {
 };
 
 /* Mark the event days of the season on the calendar. */
-static void farm_calendar_mark_events(u_long *ot, s16 season, s16 offset) {
+static void farm_calendar_mark_events(OT_TYPE *ot, s16 season, s16 offset) {
     s32 i;
     for (i = 0; i < CALENDAR_EVENT_COUNT; i++) {
         if (calendar_events[i].season == season) farm_calendar_draw_event(ot, calendar_events[i].day, offset);
@@ -270,7 +270,7 @@ static void farm_calendar_mark_events(u_long *ot, s16 season, s16 offset) {
 }
 
 /* Mark the wedding day on the calendar, when it falls in this year and season. */
-static void farm_calendar_mark_wedding(u_long *ot, s16 year, s16 season, s16 day) {
+static void farm_calendar_mark_wedding(OT_TYPE *ot, s16 year, s16 season, s16 day) {
     if (game_state.player.wedding.bride != -1 &&
         game_state.player.wedding.date.year == year && game_state.player.wedding.date.season == season) {
         farm_calendar_draw_wedding(ot, game_state.player.wedding.date.day, day);
@@ -279,7 +279,7 @@ static void farm_calendar_mark_wedding(u_long *ot, s16 year, s16 season, s16 day
 
 /* Open the message for the chosen day: its event's, the wedding's, or the default one.
  * Once the message window has closed, the choice is cleared and the calendar closes. */
-static void farm_calendar_select_message(u_long *unused0, u_long *unused1, s16 year, s16 season, s16 day) {
+static void farm_calendar_select_message(OT_TYPE *unused0, OT_TYPE *unused1, s16 year, s16 season, s16 day) {
     s32 message;
     s32 i;
     if (calendar_choice != CALENDAR_CHOICE_NONE) {
@@ -301,22 +301,22 @@ static void farm_calendar_select_message(u_long *unused0, u_long *unused1, s16 y
     }
 }
 
-static void farm_calendar_draw_cursor(u_long *ot, s16 day, s16 offset) {
+static void farm_calendar_draw_cursor(OT_TYPE *ot, s16 day, s16 offset) {
     u16 x;
     u16 y;
     farm_calendar_cell_position(day, offset, &x, &y);
     ui_draw_icon_0b_1(ot, x + 12, y + 9);
 }
 
-static void farm_calendar_draw_today(u_long *ot, s16 x, s16 y) {
+static void farm_calendar_draw_today(OT_TYPE *ot, s16 x, s16 y) {
     farm_calendar_draw_entry(0, ot, x, y);
 }
 
-static void farm_calendar_draw_event(u_long *ot, s16 a, s16 b) {
+static void farm_calendar_draw_event(OT_TYPE *ot, s16 a, s16 b) {
     farm_calendar_draw_entry(1, ot, a, b);
 }
 
-static void farm_calendar_draw_wedding(u_long *ot, s16 x, s16 y) {
+static void farm_calendar_draw_wedding(OT_TYPE *ot, s16 x, s16 y) {
     farm_calendar_draw_entry(2, ot, x, y);
 }
 
@@ -325,7 +325,7 @@ static FarmDisplayEntry calendar_display_entries[3] = {
 };
 
 /* Draw the calendar icon `index` (0 today, 1 an event, 2 the wedding) at a day cell. */
-static void farm_calendar_draw_entry(s32 index, u_long *ot, s16 x, s16 y) {
+static void farm_calendar_draw_entry(s32 index, OT_TYPE *ot, s16 x, s16 y) {
     FarmDisplayEntry *entry;
     s16 pos_x;
     s16 pos_y;
@@ -339,7 +339,7 @@ static void farm_calendar_draw_entry(s32 index, u_long *ot, s16 x, s16 y) {
 }
 
 /* Draw the year and the season above the calendar. */
-static void farm_calendar_draw_result(u_long *ot, s16 year, s16 season) {
+static void farm_calendar_draw_result(OT_TYPE *ot, s16 year, s16 season) {
     *text_format_number(year + 1, calendar_scratch, 2) = 0xFFFF;
     text_draw_plain(ot, calendar_scratch, 31, 52);
     text_draw_plain(ot, LOCALIZED(text_bank.messages.year), 57, 52);
@@ -350,7 +350,7 @@ static void farm_calendar_draw_result(u_long *ot, s16 year, s16 season) {
 }
 
 /* Draw the thirty day cells, from the starting phase. */
-static void farm_calendar_draw_days(u_long *object, s16 start) {
+static void farm_calendar_draw_days(OT_TYPE *object, s16 start) {
     s32 slot;
     s32 quotient;
     s32 remainder;
@@ -371,7 +371,7 @@ static void farm_calendar_draw_days(u_long *object, s16 start) {
 
 /* Draw the day number in a cell: Saturday and Sunday in their palettes, the rest in the
  * current one. */
-static void farm_calendar_draw_day_cell(u_long *ot, s16 slot, s16 startOffset, s16 mode_arg) {
+static void farm_calendar_draw_day_cell(OT_TYPE *ot, s16 slot, s16 startOffset, s16 mode_arg) {
     s16 x;
     s16 y;
     s32 mode;
@@ -402,7 +402,7 @@ static void farm_calendar_cell_position(s16 index, s16 offset, s16 *x, s16 *y) {
 }
 
 /* Draw the weekday header row and the frame around it. */
-static void farm_calendar_draw_weekday_header(u_long *frame_ot, u_long *text_ot) {
+static void farm_calendar_draw_weekday_header(OT_TYPE *frame_ot, OT_TYPE *text_ot) {
     s32 normalPalette;
     s32 palette;
     s32 i;

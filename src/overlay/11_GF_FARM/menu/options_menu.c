@@ -293,7 +293,7 @@ static void options_settings_tick(void)
     s32 columns;
     s32 column;
     s32 flags;
-    u_long *window;
+    OT_TYPE *window;
     s16 *rowCursor;
     s32 row;
     s16 *columnCursor;

@@ -37,7 +37,7 @@ typedef struct FrameState {
     /* The tag arrays of the four layer OTs (64, 16 and 2 entries; the fourth is
      * unused), drawn around the main OT: 3, 2, `ot`, 1, 0, so layer 0 is the
      * front. */
-    u_long *otTags[4];
+    OT_TYPE *otTags[4];
     u8  padE8[0xEC - 0xE8];
     s32 otTagCounts[4]; /* entries in each */
     u8  padFC[0x100 - 0xFC];

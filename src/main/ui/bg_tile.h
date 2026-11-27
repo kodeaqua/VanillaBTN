@@ -8,7 +8,7 @@
 #include <libgpu.h>
 #include <libgs.h>
 
-void bg_tile_mode_sprite(u_long *arg);
-void bg_tile_mode_cursor(u_long *arg);
+void bg_tile_mode_sprite(void *arg);
+void bg_tile_mode_cursor(void *arg);
 
 #endif /* BG_TILE_H */

@@ -86,12 +86,12 @@ static void item_stack_merge(FarmStoredItem *from, FarmStoredItem *to);
 static void item_swap(FarmStoredItem *a, FarmStoredItem *b);
 static void item_copy(FarmStoredItem *from, FarmStoredItem *to);
 static void item_cursor_move(s32 count);
-static void item_cursor_message(u_long *source, u_long *text, s32 col, s32 row);
-static void item_marker_draw_range(u_long *ot, s32 start, s32 count, FarmStoredItem *entry);
-static void item_marker_draw(u_long *ot, s32 index, FarmStoredItem *item);
-static void item_draw_status_numbers(u_long *display, s32 value);
-static void item_status_draw(u_long *display, u_long *source, u16 *first, u16 *second);
-static void item_picture_draw(u_long *display, s16 slot, s16 x, s16 y);
+static void item_cursor_message(OT_TYPE *source, OT_TYPE *text, s32 col, s32 row);
+static void item_marker_draw_range(OT_TYPE *ot, s32 start, s32 count, FarmStoredItem *entry);
+static void item_marker_draw(OT_TYPE *ot, s32 index, FarmStoredItem *item);
+static void item_draw_status_numbers(OT_TYPE *display, s32 value);
+static void item_status_draw(OT_TYPE *display, OT_TYPE *source, u16 *first, u16 *second);
+static void item_picture_draw(OT_TYPE *display, s16 slot, s16 x, s16 y);
 static void item_picture_queue(void *object, s16 slot, s16 x, s16 y, s32 scale);
 static void item_merge_categories(FarmStoredItem *first, s32 firstSlot, FarmStoredItem *second, s32 secondSlot, s32 context);
 static void item_picture_swap(u16 removed, u16 added, s32 context);
@@ -311,7 +311,7 @@ static void item_picture_load(u16 id) {
 
 /* Draw the picture in the slot holding this id, marking the slot used; id 0
  * draws the empty marker. */
-static void item_entry_find(u_long *ot, u16 key, s16 x, s16 y) {
+static void item_entry_find(OT_TYPE *ot, u16 key, s16 x, s16 y) {
     s32 i;
 
     if (key == 0) {
@@ -330,7 +330,7 @@ static void item_entry_find(u_long *ot, u16 key, s16 x, s16 y) {
 }
 
 /* Refresh the entry with this id, or recycle the last unused one and create it. */
-void item_entry_refresh(u_long *object, u16 value, s16 x, s16 y) {
+void item_entry_refresh(OT_TYPE *object, u16 value, s16 x, s16 y) {
     s32 slot;
 
     if (value == 0) {
@@ -394,7 +394,7 @@ static void item_cursor_draw(void *ot, s32 x, s32 y) {
 }
 
 /* Draw the effect icon at (x, y) as a textured quad. */
-void item_effect_submit(u_long *ot, s16 posX, s16 posY) {
+void item_effect_submit(OT_TYPE *ot, s16 posX, s16 posY) {
     s32 x;
     s32 y;
 
@@ -413,7 +413,7 @@ void item_empty_marker_draw(void *ot, s16 x, s16 y) {
 
 /* Draw a seed's or crop's count as a badge: a fixed icon, then the tens digit (left out
  * when zero) and the units digit. */
-void item_anim_draw(u_long *ot, s16 posX, s16 posY, s32 value) {
+void item_anim_draw(OT_TYPE *ot, s16 posX, s16 posY, s32 value) {
     s16 x;
     s16 y;
     s32 count;
@@ -626,10 +626,10 @@ static void item_result_draw(void) {
     FarmStoredItem *header;
     FarmStoredItem *entries;
     s32 message;
-    u_long *panel;
-    u_long *text;
-    u_long *source;
-    u_long *list;
+    OT_TYPE *panel;
+    OT_TYPE *text;
+    OT_TYPE *source;
+    OT_TYPE *list;
 
     text_set_spacing(0, 2);
     if (menu_phase_is_result() != 0 && (input_pad1->pressed & PAD_START)) {
@@ -1076,7 +1076,7 @@ static void item_cursor_move(s32 count) {
 
 /* Open the message for the item under the cursor (a gift shows its contents' message).
  * When the menu reports TEXT_WINDOW_CLOSED the list is left and the screen closes. */
-static void item_cursor_message(u_long *source, u_long *text, s32 col, s32 row) {
+static void item_cursor_message(OT_TYPE *source, OT_TYPE *text, s32 col, s32 row) {
     FarmStoredItem *record;
     s32 value;
 
@@ -1092,7 +1092,7 @@ static void item_cursor_message(u_long *source, u_long *text, s32 col, s32 row) 
 }
 
 /* Draw the markers of `count` entries from index `start`, taking them in order from `entry`. */
-static void item_marker_draw_range(u_long *ot, s32 start, s32 count, FarmStoredItem *entry) {
+static void item_marker_draw_range(OT_TYPE *ot, s32 start, s32 count, FarmStoredItem *entry) {
     s32 i;
 
     for (i = start; i < start + count; i++) {
@@ -1103,7 +1103,7 @@ static void item_marker_draw_range(u_long *ot, s32 start, s32 count, FarmStoredI
 
 /* Draw the marker for storage entry `index`: an empty entry draws the empty marker, a filled
  * one its picture, and a seed or a grid crop its count badge. */
-static void item_marker_draw(u_long *ot, s32 index, FarmStoredItem *item) {
+static void item_marker_draw(OT_TYPE *ot, s32 index, FarmStoredItem *item) {
     if (item->id == 0) {
         item_empty_marker_draw(&ot[1], item_markers[index].x, item_markers[index].y);
         return;
@@ -1130,7 +1130,7 @@ static void item_marker_draw(u_long *ot, s32 index, FarmStoredItem *item) {
 }
 
 /* Draw the two effect frames of the current page and step the page every 9 ticks. */
-static void item_page_effect_draw(u_long *target) {
+static void item_page_effect_draw(OT_TYPE *target) {
     anim_select_range(&ui_icon_anim, 0xD);
     anim_set_frame(&ui_icon_anim, item_anim_frame);
     anim_draw_sprt_cursor(target, &ui_icon_anim, ui_icon_anim.animation, ui_icon_anim.frame, 125, 144);
@@ -1147,7 +1147,7 @@ static void item_page_effect_draw(u_long *target) {
 }
 
 /* Draw the row number and the page count either side of the slash label. */
-static void item_draw_status_numbers(u_long *display, s32 value) {
+static void item_draw_status_numbers(OT_TYPE *display, s32 value) {
     u16 *end;
 
     end = item_number_scratch;
@@ -1160,7 +1160,7 @@ static void item_draw_status_numbers(u_long *display, s32 value) {
 }
 
 /* Draw the storage screen's three status panels, the page effect and the two list headings. */
-static void item_status_draw(u_long *display, u_long *source, u16 *first, u16 *second) {
+static void item_status_draw(OT_TYPE *display, OT_TYPE *source, u16 *first, u16 *second) {
     window_frame_draw_at(display, 1, 25, 16, 105, 74);
     window_frame_draw_at(display, 1, 121, 16, 174, 74);
     window_frame_draw_at(display, 1, 25, 90, 270, 74);
@@ -1171,8 +1171,8 @@ static void item_status_draw(u_long *display, u_long *source, u16 *first, u16 *s
 
 /* Draw the frame for picture `slot` at (x, y), then the picture as a sprite,
  * centred in a 32 x 32 cell when smaller, with its texture-page primitive after it. */
-static void item_picture_draw(u_long *display, s16 slot, s16 x, s16 y) {
-    u_long *ot = display;
+static void item_picture_draw(OT_TYPE *display, s16 slot, s16 x, s16 y) {
+    OT_TYPE *ot = display;
     s32 pageX;
     s32 pageY;
     SPRT *sprite;

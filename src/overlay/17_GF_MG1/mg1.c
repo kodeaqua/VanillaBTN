@@ -660,9 +660,9 @@ static void mg1_results_screen(void) {
 /* Draw the award window for the round's race, and play the award sound when the leader's bets
  * pay out. Once the window closes, move on to the total. */
 static s32 mg1_draw_award_screen(void) {
-    u_long *base;
-    u_long *text_base;
-    u_long *sub_object;
+    OT_TYPE *base;
+    OT_TYPE *text_base;
+    OT_TYPE *sub_object;
     s32 nextStep;
     s32 leaderTotal;
     u16 mode;
@@ -700,9 +700,9 @@ static s32 mg1_draw_award_screen(void) {
 /* Show the round's total, the results table plus the player's medals (capped at 99999), and
  * record it and whether the horse won in the farm's race bets. */
 static void mg1_show_total(void) {
-    u_long *base;
-    u_long *sub_object;
-    u_long *text_base;
+    OT_TYPE *base;
+    OT_TYPE *sub_object;
+    OT_TYPE *text_base;
     s32 total;
     u16 *digits;
     FarmState *state;
@@ -960,7 +960,7 @@ static inline s32 is_leader(s32 i) {
  * odds and tickets of each entry. Returns the leader's odds times tickets, the amount the
  * player can win, and shows it only when show_total is set. */
 static s32 mg1_draw_results_table(s32 show_total) {
-    u_long *text_base;
+    OT_TYPE *text_base;
     u16 total;
     u16 row;
     s32 i;
@@ -1240,13 +1240,13 @@ static void mg1_reset_entries(void) {
 
 #define MG1_COURSE_SPRITE (&mg1_state.courseSprite)
 /* Draw the course sprite centred on x. */
-static inline void mg1_draw_centred(u_long *ot, s16 x) {
+static inline void mg1_draw_centred(OT_TYPE *ot, s16 x) {
     anim_draw_sprt_cursor(ot, MG1_COURSE_SPRITE, mg1_state.courseSprite.animation, mg1_state.courseSprite.frame, x - 32, 0);
 }
 /* Draw the course background for the camera at frame: the two scrolling rows of tiles, the
  * scenery pieces at the camera, and the track markers near it. */
 static void mg1_draw_background(s32 frame) {
-    u_long *ot;
+    OT_TYPE *ot;
     s16 x;
     s32 scroll;
     s32 i;
@@ -1298,7 +1298,7 @@ static void mg1_draw_entry(Mg1Entry *entry, s32 frame) {
     s16 z;
     s16 code;
     Mg1Slot *slot;
-    u_long *buffer;
+    OT_TYPE *buffer;
     u32 count;
     delta = entry->position - frame;
     depth = delta >> 12;
@@ -1331,7 +1331,7 @@ static void mg1_draw_entry_plain(Mg1Entry *entry, s32 frame) {
     s32 depth;
     s16 z;
     s16 code;
-    u_long *buffer;
+    OT_TYPE *buffer;
     Mg1Slot *slot;
 
     delta = entry->position - frame;
@@ -1414,7 +1414,7 @@ static void mg1_entry_sprite_mode1(Mg1Entry *entry) {
 /* Frame timer: MG1_TIMER_RESET clears it, MG1_TIMER_TICK counts a frame, MG1_TIMER_DRAW
  * draws it as minutes, seconds and hundredths at 30 fps, and MG1_TIMER_TICK_DRAW does both. */
 static void mg1_draw_timer(s16 mode) {
-    u_long *ot;
+    OT_TYPE *ot;
 
     ot = &current_frame->otTags[0][2];
     if (mode == MG1_TIMER_RESET)

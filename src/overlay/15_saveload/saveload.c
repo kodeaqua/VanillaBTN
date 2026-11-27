@@ -779,7 +779,7 @@ static void save_reset_state(void)
  * it finishes (save_retry_flag = 1) or aborts (-1), then fade out and leave. */
 void save_screen_tick(void)
 {
-    u_long *window = &current_frame->otTags[0][11];
+    OT_TYPE *window = &current_frame->otTags[0][11];
     u32 state;
 
     state = game_state.progress.entrySubStep;
@@ -852,7 +852,7 @@ void save_screen_tick(void)
 /* Same frame handler for the screen driven by load_run_step. */
 void load_screen_tick(void)
 {
-    u_long *window = &current_frame->otTags[0][11];
+    OT_TYPE *window = &current_frame->otTags[0][11];
     u32 state;
 
     state = game_state.progress.entrySubStep;
@@ -943,7 +943,7 @@ void load_screen_tick(void)
 /* Same frame handler for the screen driven by save_transfer_run_step. */
 void save_transfer_screen_tick(void)
 {
-    u_long *window = &current_frame->otTags[0][11];
+    OT_TYPE *window = &current_frame->otTags[0][11];
     u32 state;
 
     state = game_state.progress.entrySubStep;
@@ -1145,7 +1145,7 @@ static void save_begin_message(void)
  * the screen: 2 when both slots report 4, otherwise 3. */
 static void save_probe_slots_pick_screen(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 slot;
     s32 status;
 
@@ -1184,7 +1184,7 @@ static void save_probe_slots_pick_screen(void)
 /* Say neither slot holds a card; the confirm press goes on to SAVE_STEP_CONFIRM_RESULT. */
 static void save_no_card_screen(void)
 {
-    u_long *p = current_frame->otTags[0];
+    OT_TYPE *p = current_frame->otTags[0];
     SHOW_MESSAGE(p, LOCALIZED(text_bank.messages.no_memory_card_in_either_slot));
     save_step = save_menu_wait_confirm(SAVE_STEP_NO_CARD, SAVE_STEP_CONFIRM_RESULT);
     save_confirm_flag = 1;
@@ -1199,7 +1199,7 @@ static void save_probe_result_screen(void)
     s32 card_code;
 
     {
-        u_long *ot;
+        OT_TYPE *ot;
         ot = current_frame->otTags[0];
         SHOW_MESSAGE(ot, LOCALIZED(text_bank.messages.searching_the_memory_card));
     }
@@ -1239,7 +1239,7 @@ SAVELOAD_MENU_ENTRY(save_damaged_card_screen, text_bank.messages.memory_card_in_
 /* Read the save header of each of the three slots into save_slot_records and set its status; a damaged card stops at SAVE_STEP_DAMAGED_CARD. */
 static void save_read_slot_headers(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 i;
     s16 card_code;
 
@@ -1291,7 +1291,7 @@ static void save_read_slot_headers(void)
 /* Refresh the save/load display and classify the storage probe result. */
 static void save_slot_select_screen(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 choice;
     s16 status;
 
@@ -1337,7 +1337,7 @@ static void save_slot_select_screen(void)
  * from the confirm prompt's answer. */
 static void save_overwrite_confirm_screen(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 slot;
     s32 answer;
 
@@ -1367,7 +1367,7 @@ static void save_overwrite_confirm_screen(void)
 /* Probe the card once the settle delay has passed and check that it has room to save. */
 static void save_probe_and_check_space(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 card_code;
 
     ot = current_frame->otTags[0];
@@ -1480,7 +1480,7 @@ static void save_format_prompt_screen(void)
 /* Refresh the save/load display and select the storage status message. */
 static void save_format_card(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 card_code;
 
     ot = current_frame->otTags[0];
@@ -1508,7 +1508,7 @@ SAVELOAD_MENU_ENTRY(save_format_failed_screen, text_bank.messages.formatting_fai
 /* Refresh the save/load display and select the storage status message. */
 static void save_create_file_step(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 card_code;
 
     ot = current_frame->otTags[0];
@@ -1546,7 +1546,7 @@ SAVELOAD_MENU_ENTRY(save_no_free_space_screen, text_bank.messages.cannot_save_no
 /* Build the save header and the three icon frames for the selected slot. */
 static void save_build_header(void)
 {
-    u_long *ot = current_frame->otTags[0];
+    OT_TYPE *ot = current_frame->otTags[0];
     const IconOffsets *icon = &save_icon_offsets[save_slot];
     u32 clut;
 
@@ -1574,7 +1574,7 @@ static void save_build_header(void)
 /* Refresh the save/load display, then dispatch the storage result to a screen step. */
 static void save_write_file_step(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 card_code;
 
     ot = current_frame->otTags[0];
@@ -1603,7 +1603,7 @@ SAVELOAD_MENU_ENTRY(save_disconnected_screen, text_bank.messages.memory_card_has
 /* Refresh the save/load display and record the storage probe result. */
 static void save_confirm_result(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 answer;
 
     ot = current_frame->otTags[0];
@@ -1632,7 +1632,7 @@ static void save_abort(void)
 /* Refresh the save/load screen buffer and advance its current state. */
 static void save_done_screen(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
 
     ot = current_frame->otTags[0];
     SHOW_MESSAGE(ot, LOCALIZED(text_bank.messages.data_has_been_saved));
@@ -1757,7 +1757,7 @@ static void load_run_step(void)
 /* Start a load: say the card is being searched, then probe both slots. */
 static void load_begin_message(void)
 {
-    u_long *p = current_frame->otTags[0];
+    OT_TYPE *p = current_frame->otTags[0];
     SHOW_MESSAGE(p, LOCALIZED(text_bank.messages.searching_the_memory_card));
     save_reset_state();
     save_step = LOAD_STEP_PROBE_BOTH;
@@ -1766,7 +1766,7 @@ static void load_begin_message(void)
 /* Refresh the save/load display and record the status of both storage slots. */
 static void load_probe_both_status(void)
 {
-    u_long *ot = current_frame->otTags[0];
+    OT_TYPE *ot = current_frame->otTags[0];
     s32 i;
     s32 status;
 
@@ -1803,7 +1803,7 @@ static void load_probe_both_status(void)
 /* Say neither slot holds a card; the confirm press goes on to LOAD_STEP_ABORT_CONFIRM. */
 static void load_no_card_screen(void)
 {
-    u_long *p = current_frame->otTags[0];
+    OT_TYPE *p = current_frame->otTags[0];
     SHOW_MESSAGE(p, LOCALIZED(text_bank.messages.no_memory_card_in_either_slot));
     save_step = save_menu_wait_confirm(LOAD_STEP_NO_CARD, LOAD_STEP_ABORT_CONFIRM);
     save_confirm_flag = 1;
@@ -1815,7 +1815,7 @@ SAVELOAD_PROBE_ENTRY(load_choose_card_screen, LOAD_STEP_ABORT_CONFIRM, LOAD_STEP
 /* Refresh the save/load display and select the resulting screen. */
 static void load_probe_result_screen(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 card_code;
     s16 *status;
     ot = current_frame->otTags[0];
@@ -1858,7 +1858,7 @@ SAVELOAD_MENU_ENTRY(load_damaged_card_screen, text_bank.messages.memory_card_in_
 /* Probe the three save slots, record each slot's status and pick the next step. */
 static void load_read_slot_headers(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 i;
     s16 card_code;
     s32 check;
@@ -1920,7 +1920,7 @@ SAVELOAD_MENU_ENTRY(load_no_loadable_screen, text_bank.messages.no_loadable_diar
 /* Refresh the save/load display and classify the storage probe result. */
 static void load_slot_select_screen(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 choice;
 
     ot = current_frame->otTags[0];
@@ -1956,7 +1956,7 @@ SAVELOAD_MENU_ENTRY(load_no_diary_here_screen, text_bank.messages.there_is_no_di
 /* Say the chosen slot's file is loading, pick its file name and read it. */
 static void load_begin_file(void)
 {
-    u_long *p = current_frame->otTags[0];
+    OT_TYPE *p = current_frame->otTags[0];
     SHOW_MESSAGE(p, LOCALIZED(text_bank.messages.loading_from_memory_card));
     save_file_name(save_file_name_buf, save_slot);
     save_step = LOAD_STEP_READ_FILE;
@@ -1965,7 +1965,7 @@ static void load_begin_file(void)
 /* Refresh the save/load display, then dispatch the storage result to a screen step. */
 static void load_read_file_step(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 card_code;
 
     ot = current_frame->otTags[0];
@@ -1992,7 +1992,7 @@ static void load_read_file_step(void)
 /* Refresh the load display, check the checksum of the saved image, and choose the next step. */
 static void load_verify_image_step(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 check;
     ot = current_frame->otTags[0];
     text_draw_in_frame(&ot[6], &ot[5], LOCALIZED(text_bank.messages.loading_from_memory_card));
@@ -2020,7 +2020,7 @@ SAVELOAD_MENU_ENTRY(load_disconnected_screen, text_bank.messages.memory_card_has
 /* Ask whether to abort the load; the answer picks the next step. */
 static void load_abort_confirm_screen(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 answer;
 
     ot = current_frame->otTags[0];
@@ -2049,7 +2049,7 @@ static void load_abort(void)
 /* Show that the data has been loaded and wait for the player to confirm. */
 static void load_done_screen(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
 
     ot = current_frame->otTags[0];
     SHOW_MESSAGE(ot, LOCALIZED(text_bank.messages.data_has_been_loaded));
@@ -2214,7 +2214,7 @@ static void save_transfer_run_step(void)
 /* Start a transfer: say the card is being searched, clear the transfer tables and probe the slots. */
 static void save_transfer_begin_message(void)
 {
-    u_long *ot = current_frame->otTags[0];
+    OT_TYPE *ot = current_frame->otTags[0];
     SHOW_MESSAGE(ot, LOCALIZED(text_bank.messages.searching_the_memory_card));
     save_reset_state();
     save_step = TRANSFER_STEP_PROBE_SLOTS;
@@ -2223,7 +2223,7 @@ static void save_transfer_begin_message(void)
 /* Probe the slots once the settle delay has passed. */
 static void save_transfer_probe_slots(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 card_code;
     s32 slot;
 
@@ -2263,7 +2263,7 @@ static void save_transfer_probe_slots(void)
 /* Say neither slot holds a card; the confirm press goes on to TRANSFER_STEP_ABORT_CONFIRM. */
 static void save_transfer_no_card_screen(void)
 {
-    u_long *p = current_frame->otTags[0];
+    OT_TYPE *p = current_frame->otTags[0];
     SHOW_MESSAGE(p, LOCALIZED(text_bank.messages.no_memory_card_in_either_slot));
     save_step = save_menu_wait_confirm(TRANSFER_STEP_NO_CARD, TRANSFER_STEP_ABORT_CONFIRM);
     save_confirm_flag = 1;
@@ -2276,7 +2276,7 @@ static void save_transfer_probe_result_screen(void)
     s32 card_code;
 
     {
-        u_long *ot;
+        OT_TYPE *ot;
         ot = current_frame->otTags[0];
         SHOW_MESSAGE(ot, LOCALIZED(text_bank.messages.searching_the_memory_card));
     }
@@ -2315,7 +2315,7 @@ SAVELOAD_MENU_ENTRY(save_transfer_damaged_card_screen, text_bank.messages.memory
  * error, TRANSFER_STEP_NO_LOADABLE when no slot holds a loadable diary, else TRANSFER_STEP_SLOT_SELECT. */
 static void save_transfer_read_slot_headers(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 i;
     s16 card_code;
     s32 check;
@@ -2377,7 +2377,7 @@ SAVELOAD_MENU_ENTRY(save_transfer_no_loadable_screen, text_bank.messages.no_load
 /* Refresh the save/load display and classify the storage probe result. */
 static void save_transfer_slot_select_screen(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 choice;
 
     ot = current_frame->otTags[0];
@@ -2413,7 +2413,7 @@ SAVELOAD_MENU_ENTRY(save_transfer_no_diary_here_screen, text_bank.messages.there
 /* Say the chosen slot's file is loading, pick its file name and read it. */
 static void save_transfer_begin_file(void)
 {
-    u_long *p = current_frame->otTags[0];
+    OT_TYPE *p = current_frame->otTags[0];
     SHOW_MESSAGE(p, LOCALIZED(text_bank.messages.loading_from_memory_card));
     save_file_name(save_file_name_buf, save_slot);
     save_step = TRANSFER_STEP_READ_FILE;
@@ -2422,7 +2422,7 @@ static void save_transfer_begin_file(void)
 /* Refresh the save/load display, then dispatch the storage result to a screen step. */
 static void save_transfer_read_file_step(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 card_code;
 
     ot = current_frame->otTags[0];
@@ -2449,7 +2449,7 @@ static void save_transfer_read_file_step(void)
 /* Refresh the save/load display and record whether the selected slot is ready. */
 static void save_transfer_verify_image_step(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 check;
     ot = current_frame->otTags[0];
     SHOW_MESSAGE(ot, LOCALIZED(text_bank.messages.loading_from_memory_card));
@@ -2478,7 +2478,7 @@ SAVELOAD_MENU_ENTRY(save_transfer_disconnected_screen, text_bank.messages.memory
 /* Compare the file's header with game_state: a file from this same farm goes to TRANSFER_STEP_SAME_GAME, any other to TRANSFER_STEP_FARM_NAME. */
 static void save_transfer_check_same_game_step(void)
 {
-    u_long *p = current_frame->otTags[0];
+    OT_TYPE *p = current_frame->otTags[0];
     SHOW_MESSAGE(p, LOCALIZED(text_bank.messages.loading_from_memory_card));
     if (memcmp(&((SaveFile *)save_image)->flagWords, &game_state, 8) == 0)
     {
@@ -2494,7 +2494,7 @@ static void save_transfer_check_same_game_step(void)
 /* Say the file is from this same game and cannot be exchanged; the confirm press or a timeout goes back to slot select. */
 static void save_transfer_same_game_screen(void)
 {
-    u_long *p;
+    OT_TYPE *p;
     p = current_frame->otTags[0];
     SHOW_MESSAGE(p, LOCALIZED(text_bank.messages.cannot_exchange_with_diary_from_same));
     save_step = save_menu_wait_confirm(TRANSFER_STEP_SAME_GAME, TRANSFER_STEP_SLOT_SELECT);
@@ -2544,7 +2544,7 @@ static void save_transfer_save_name_step(void)
 /* Check that the queued transfers fit in both the current game and the save file. */
 static void save_check_transfer_fit(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s16 total[2];
     s16 hens[2];
     s16 cows[2];
@@ -2626,7 +2626,7 @@ SAVELOAD_CONFIRM_ENTRY(save_transfer_partner_cows_full_screen, text_bank.message
 static void save_transfer_confirm_screen(void)
 {
     s32 answer;
-    u_long *ot;
+    OT_TYPE *ot;
 
     save_draw_transfer_lists();
     ot = current_frame->otTags[0];
@@ -2681,7 +2681,7 @@ static void save_transfer_slot_confirm_screen(void)
 /* Refresh the save/load display and advance the screen state. */
 static void save_transfer_write_step(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 card_code;
 
     ot = current_frame->otTags[0];
@@ -2732,7 +2732,7 @@ SAVELOAD_MENU_ENTRY(save_transfer_write_failed_screen, text_bank.messages.save_p
 /* Ask whether to abort the exchange; the answer picks the next step. */
 static void save_transfer_abort_confirm_screen(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 answer;
 
     ot = current_frame->otTags[0];
@@ -2761,7 +2761,7 @@ static void save_transfer_abort(void)
 /* Show that the exchange has ended and wait for the player to confirm. */
 static void save_transfer_done_screen(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
 
     ot = current_frame->otTags[0];
     SHOW_MESSAGE(ot, LOCALIZED(text_bank.messages.exchange_has_ended));
@@ -3048,9 +3048,9 @@ static void save_draw_transfer_lists(void)
 /* Draw the save/load name panel: frames, title, row cursor, and the 9-character name of the current farm or the loaded save. */
 static s32 save_draw_name_panel(s16 side)
 {
-    u_long *ot;
-    u_long *cursor_ot;
-    u_long *text_ot;
+    OT_TYPE *ot;
+    OT_TYPE *cursor_ot;
+    OT_TYPE *text_ot;
     u16 *name;
     s32 triggered;
     s32 i;
@@ -3125,8 +3125,8 @@ static s32 save_draw_name_panel(s16 side)
 static s32 save_transfer_list_step(s16 side)
 {
     FarmAnimals *inv;
-    u_long *ot;
-    u_long *list;
+    OT_TYPE *ot;
+    OT_TYPE *list;
     s32 count;
     s32 triggered;
     s32 pressed;
@@ -3364,7 +3364,7 @@ static void save_draw_entry_prompt(s16 kind, s32 selected, u16 *text, s16 affect
 /* Draw the summary line of save entry `index` (two record layouts) at row `y`. */
 static void save_draw_summary_line(FarmAnimals *records, s16 index, s16 y)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     FarmActor *entry;
     s16 selected;
     s16 column;

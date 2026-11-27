@@ -92,7 +92,7 @@ static void mg4_record_advance(Mg4Record *record);
 static void mg4_player_draw(Mg4Player *actor);
 static void mg4_record_draw(Mg4Record *object);
 static void mg4_draw_backdrop(void);
-static u_long *mg4_ot_slot(s32 x);
+static OT_TYPE *mg4_ot_slot(s32 x);
 static s16 mg4_screen_x(s32 trackX);
 static void mg4_player_set_action(Mg4Player *player, s32 kind, s32 dir, s32 timer);
 static void mg4_record_set_state(Mg4Record *record, s16 state, s16 direction, s16 timer);
@@ -1206,7 +1206,7 @@ static void mg4_player_draw(Mg4Player *actor) {
     s32 frame2;
     s16 screenX;
     s16 depthY;
-    u_long *image;
+    OT_TYPE *image;
 
     frame2 = -1;
     switch (actor->kind) {
@@ -1288,7 +1288,7 @@ static void mg4_player_draw(Mg4Player *actor) {
 static void mg4_record_draw(Mg4Record *object) {
     s16 state;
     s16 depthY;
-    u_long *image;
+    OT_TYPE *image;
     s16 screenX;
     s32 mode;
     u16 counter;
@@ -1387,10 +1387,10 @@ static void mg4_draw_backdrop(void)
 
 /* The ordering-table slot for a depth: slot 40 at depth 64, one slot lower for each 4 more
  * units. */
-static u_long *mg4_ot_slot(s32 x) {
+static OT_TYPE *mg4_ot_slot(s32 x) {
     s32 offset;
     s32 result;
-    u_long *p;
+    OT_TYPE *p;
     if (x < 0) x += 0xFFF;
     x >>= 12;
     offset = x - 64;

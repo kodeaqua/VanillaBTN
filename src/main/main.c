@@ -628,13 +628,14 @@ static void main_init_frame_records(void) {
     memset(base, 0, REGION_BYTES);
     frame_ot_base_init = frame_ot_base = (u8 *)0x801F7000;
     for (i = 0; i < 2; i++) {
-        frame_records[i].otTags[0] = (u_long *)(base + i * 0x100);
+#ifndef __psyz
+        frame_records[i].otTags[0] = (OT_TYPE *)(base + i * 0x100);
         frame_records[i].otTagCounts[0] = 64;
         frame_records[i].otLengths[0] = 6;
-        frame_records[i].otTags[1] = (u_long *)(base + REGION_TAGS1 + i * 0x40);
+        frame_records[i].otTags[1] = (OT_TYPE *)(base + REGION_TAGS1 + i * 0x40);
         frame_records[i].otTagCounts[1] = 16;
         frame_records[i].otLengths[1] = 4;
-        frame_records[i].otTags[2] = (u_long *)(base + REGION_TAGS2 + i * 8);
+        frame_records[i].otTags[2] = (OT_TYPE *)(base + REGION_TAGS2 + i * 8);
         frame_records[i].otTagCounts[2] = 2;
         frame_records[i].otLengths[2] = 1;
         frame_records[i].otTags[3] = 0;
@@ -642,7 +643,6 @@ static void main_init_frame_records(void) {
         frame_records[i].otLengths[3] = 0;
         frame_records[i].otDepth = FRAME_OT_DEPTH;
         frame_records[i].otDepthBits = 11;
-#ifndef __psyz
         frame_records[i].ot = (OT_TYPE *)(base + REGION_OT + i * 0x2000);
 #endif
         frame_records[i].drawEnv.dtd = 1;
@@ -651,6 +651,7 @@ static void main_init_frame_records(void) {
         frame_records[i].drawEnv.r0 = 0;
         frame_records[i].drawEnv.g0 = 0;
         frame_records[i].drawEnv.b0 = 0;
+#ifndef __psyz
         frame_records[i].ots[0].length = 6;
         frame_records[i].ots[0].point = 0;
         frame_records[i].ots[0].offset = 0;
@@ -671,6 +672,7 @@ static void main_init_frame_records(void) {
         frame_records[i].ots[3].offset = 0;
         frame_records[i].ots[3].org = 0;
         frame_records[i].ots[3].tag = 0;
+#endif
         frame_records[i].workSize = 0x2EE0;
         frame_records[i].workBase = base + REGION_WORK + i * 0x2EE0;
         frame_records[i].primBuffer = base + REGION_PRIM + i * FRAME_PRIM_SIZE;
@@ -696,13 +698,14 @@ static void main_init_frame_records_wide(void) {
     memset(base, 0, REGION_BYTES);
     frame_ot_base_init = frame_ot_base = (u8 *)0x801FCFF8;
     for (i = 0; i < 2; i++) {
-        frame_records[i].otTags[0] = (u_long *)(base + i * 0x100);
+#ifndef __psyz
+        frame_records[i].otTags[0] = (OT_TYPE *)(base + i * 0x100);
         frame_records[i].otTagCounts[0] = 64;
         frame_records[i].otLengths[0] = 6;
-        frame_records[i].otTags[1] = (u_long *)(base + REGION_TAGS1 + i * 0x40);
+        frame_records[i].otTags[1] = (OT_TYPE *)(base + REGION_TAGS1 + i * 0x40);
         frame_records[i].otTagCounts[1] = 16;
         frame_records[i].otLengths[1] = 4;
-        frame_records[i].otTags[2] = (u_long *)(base + REGION_TAGS2 + i * 8);
+        frame_records[i].otTags[2] = (OT_TYPE *)(base + REGION_TAGS2 + i * 8);
         frame_records[i].otTagCounts[2] = 2;
         frame_records[i].otLengths[2] = 1;
         frame_records[i].otTags[3] = 0;
@@ -710,7 +713,6 @@ static void main_init_frame_records_wide(void) {
         frame_records[i].otLengths[3] = 0;
         frame_records[i].otDepth = FRAME_OT_DEPTH;
         frame_records[i].otDepthBits = 11;
-#ifndef __psyz
         frame_records[i].ot = (OT_TYPE *)(base + REGION_OT + i * 0x2000);
 #endif
         frame_records[i].drawEnv.dtd = 1;
@@ -719,6 +721,7 @@ static void main_init_frame_records_wide(void) {
         frame_records[i].drawEnv.r0 = 0;
         frame_records[i].drawEnv.g0 = 0;
         frame_records[i].drawEnv.b0 = 0;
+#ifndef __psyz
         frame_records[i].ots[0].length = 6;
         frame_records[i].ots[0].point = 0;
         frame_records[i].ots[0].offset = 0;
@@ -739,6 +742,7 @@ static void main_init_frame_records_wide(void) {
         frame_records[i].ots[3].offset = 0;
         frame_records[i].ots[3].org = 0;
         frame_records[i].ots[3].tag = 0;
+#endif
         frame_records[i].workSize = 0x5EDC;
         frame_records[i].workBase = base + REGION_WORK + i * 0x5EDC;
         frame_records[i].primBuffer = base + REGION_PRIM + i * FRAME_PRIM_SIZE;

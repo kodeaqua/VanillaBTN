@@ -1317,7 +1317,7 @@ static void mg5_anims_disable(void) {
 static void mg5_draw_backdrop(void) {
     u32 x;
     u32 y;
-    u_long *q;
+    OT_TYPE *q;
     s32 sx;
     s32 sy;
     anim_select_range(&mg5_state.rowSprites[0], 0);
