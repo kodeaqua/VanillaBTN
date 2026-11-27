@@ -1,0 +1,4 @@
+# The toolchain (GCC 2.95.2) rejects CRLF in macros, so keep every text file LF on checkout.
+* text=auto eol=lf
+*.bin binary
+*.cue binary
