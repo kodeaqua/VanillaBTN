@@ -3,6 +3,13 @@
 #include "types.h"
 #include "math_util.h"
 
+#ifdef __psyz
+/* PsyZ does not export the LibGS identity matrix. */
+const MATRIX GsIDMATRIX = {
+    .m = {{FIXED_ONE, 0, 0}, {0, FIXED_ONE, 0}, {0, 0, FIXED_ONE}},
+};
+#endif
+
 /* Build the vector (x, -y, z) of length `radius` at `angle` (4096 to a turn). */
 void vec_from_polar(s32 *out, s32 radius, s32 y, s32 angle) {
     s32 a = angle & 0xFFF;

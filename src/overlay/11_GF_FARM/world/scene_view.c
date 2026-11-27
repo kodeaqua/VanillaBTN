@@ -11,6 +11,7 @@
 #include "farm_probe.h"
 #include "farm_state.h"
 #include "game_types.h"
+#include "math_util.h"
 #include "model.h"
 #include "scene.h"
 #include "scene_view.h"
