@@ -177,6 +177,9 @@ static void debug_menu_draw(void) {
             }
         } else if (input_pad1->pressed & PAD_CIRCLE) {
             if (debug_menu[debug_cursor].id != DEBUG_ROW_EMPTY) {
+#ifdef __psyz
+                debug_step = 0;
+#endif
                 main_request_scene(debug_menu[debug_cursor].id);
                 switch (debug_cursor) {
                 case DEBUG_ROW_SPRING_HOUSE:

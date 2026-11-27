@@ -2636,6 +2636,12 @@ void title_step_dispatch(void) {
 
 static void title_reset_state(void) {
     title_reset_anim_counters();
+#ifdef __psyz
+    title_step_fn = title_logo_begin;
+    title_idle_frames = 0;
+    title_scroll_a = 0;
+    title_scroll_b = 0;
+#endif
     title_load_state = TITLE_LOAD_FADE_WAIT;
     title_sequence_state = TITLE_SEQ_FADE_IN;
     title_logo_frames = 0;

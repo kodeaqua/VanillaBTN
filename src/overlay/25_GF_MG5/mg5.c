@@ -404,6 +404,20 @@ static void mg5_leave_minigame(void) {
 }
 /* Set the race's tuning values. */
 static void mg5_state_init(void) {
+#ifdef __psyz
+    mg5_request_flag = MG5_SCREEN_REST;
+    mg5_phase_a = MG5_PHASE_A_WAIT;
+    mg5_phase_b = MG5_PHASE_B_WAIT;
+    mg5_landing_anim_on = 0;
+    mg5_screen_pos.vx = 0;
+    mg5_screen_pos.vy = 0;
+    mg5_screen_pos.vz = 0;
+    mg5_lerp_reverse = 0;
+    mg5_lerp_t = 0;
+    mg5_fall_step = 60;
+    mg5_anim4_pos.vx = 1874;
+    mg5_anim5_pos.vx = 2366;
+#endif
     mg5_state.dispatch = 0;
     mg5_state.step = 0;
     mg5_state_reset();

@@ -421,6 +421,9 @@ void swind_window_tick(void) {
     switch (swind_state) {
     case SWIND_STATE_OPEN:
         swind_state = SWIND_STATE_FONT;
+#ifdef __psyz
+        swind_changed = 0;
+#endif
         swind_closable = 1;
         swind_page = 0;
         swind_page_state = 0;

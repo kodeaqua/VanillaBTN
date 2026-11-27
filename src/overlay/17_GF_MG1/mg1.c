@@ -695,6 +695,9 @@ static s32 mg1_draw_award_screen(void) {
         mg1_state.step = nextStep;
         return nextStep;
     }
+#ifdef __psyz
+    return 0;
+#endif
 }
 
 /* Show the round's total, the results table plus the player's medals (capped at 99999), and
@@ -1151,6 +1154,9 @@ static void mg1_audio_start(void) {
 static void mg1_reset_state(void) {
     s32 i;
 
+#ifdef __psyz
+    mg1_second_ticks = 0;
+#endif
     mg1_state.paused = 0;
     mg1_state.step = 0;
     mg1_state.updateInterval = 6;
