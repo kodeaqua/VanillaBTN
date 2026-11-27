@@ -14,6 +14,16 @@ enum { FRONT_LAYER_BITS = 6, BACK_LAYER_BITS = 4, BACKDROP_LAYER_BITS = 1 };
 static OT_TYPE frame_layer_ots[2][(1 << FRONT_LAYER_BITS) + (1 << BACK_LAYER_BITS) +
                                  (1 << BACKDROP_LAYER_BITS)];
 
+/* Widened packets need a work area separate from texture scratch space. */
+#define FRAME_WORK_SCALE (sizeof(OT_TYPE) / sizeof(u32))
+static _Alignas(OT_TYPE) u8 native_frame_work[2][FRAME_WIDE_WORK_BYTES * FRAME_WORK_SCALE];
+_Static_assert(sizeof(native_frame_work[0]) % _Alignof(OT_TYPE) == 0, "frame work alignment");
+
+void frame_buffers_set_work(s32 index, u32 bytes) {
+    frame_records[index].workBase = native_frame_work[index];
+    frame_records[index].workSize = bytes * FRAME_WORK_SCALE;
+}
+
 static void frame_layers_layout(FrameState *frame, OT_TYPE *entries) {
     static const s32 lengths[] = {FRONT_LAYER_BITS, BACK_LAYER_BITS, BACKDROP_LAYER_BITS};
     for (s32 layer = 0; layer < 3; layer++) {

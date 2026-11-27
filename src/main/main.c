@@ -50,13 +50,17 @@
 /* Offsets within the region at region_base where each frame's pieces start: the
  * tag arrays of its three ordering tables (64, 16 and 2 entries), the main OT,
  * the primitive buffer and the work area. */
+#ifdef __psyz
+#define WORK_REGION native_work_region
+#else
 #define WORK_REGION ((u8 *)0x801BE1B0)
+#endif
 #define REGION_TAGS1 0x200
 #define REGION_TAGS2 0x280
 #define REGION_WORK 0x33090
-#define REGION_BYTES 0x3EE50
 /* The active ordering-table block starts here; each frame index moves it by 0x3000. */
 #define REGION_FRAME_OT_BASE 0x38E50
+#define REGION_WIDE_FRAME_OT_BASE 0x3EE48
 
 static void main_run_frame(void);
 static void main_draw_ots(void);
@@ -517,6 +521,7 @@ void gs_work_release(void *end) {
     GsSetWorkBase(end);
 }
 
+#ifndef __psyz
 static s32 main_region_gap_const(void) {
     s32 region = (s32)region_base;
     s32 base = (s32)overlay_region_table[OVERLAY_HIGH];
@@ -527,6 +532,7 @@ static s32 main_region_gap_const(void) {
     region += offset;
     return region - (end - base);
 }
+#endif
 
 /* Free bytes between farm_area.loadWindow and region_base, less farm_section_size and a fixed
  * 0x49000 bytes. */
@@ -554,8 +560,8 @@ u8 *main_region_free_start(void) {
     return region_base - main_region_free_bytes();
 }
 
-s32 main_get_region_base(void) {
-    return (s32)region_base;
+u8 *main_get_region_base(void) {
+    return region_base;
 }
 
 /* Start a frame: point the GS work area at its work base, select its ordering-table block (0x3000
@@ -625,8 +631,12 @@ static void main_init_frame_records(void) {
 
     base = WORK_REGION;
     region_base = base;
-    memset(base, 0, REGION_BYTES);
+    memset(base, 0, FRAME_REGION_BYTES);
+#ifdef __psyz
+    frame_ot_base_init = frame_ot_base = base + REGION_FRAME_OT_BASE;
+#else
     frame_ot_base_init = frame_ot_base = (u8 *)0x801F7000;
+#endif
     for (i = 0; i < 2; i++) {
 #ifndef __psyz
         frame_records[i].otTags[0] = (OT_TYPE *)(base + i * 0x100);
@@ -673,8 +683,12 @@ static void main_init_frame_records(void) {
         frame_records[i].ots[3].org = 0;
         frame_records[i].ots[3].tag = 0;
 #endif
-        frame_records[i].workSize = 0x2EE0;
-        frame_records[i].workBase = base + REGION_WORK + i * 0x2EE0;
+#ifdef __psyz
+        frame_buffers_set_work(i, FRAME_WORK_BYTES);
+#else
+        frame_records[i].workSize = FRAME_WORK_BYTES;
+        frame_records[i].workBase = base + REGION_WORK + i * FRAME_WORK_BYTES;
+#endif
         frame_records[i].primBuffer = base + REGION_PRIM + i * FRAME_PRIM_SIZE;
     }
     frame_buffers_layout();
@@ -695,8 +709,12 @@ static void main_init_frame_records_wide(void) {
 
     base = WORK_REGION;
     region_base = base;
-    memset(base, 0, REGION_BYTES);
+    memset(base, 0, FRAME_REGION_BYTES);
+#ifdef __psyz
+    frame_ot_base_init = frame_ot_base = base + REGION_WIDE_FRAME_OT_BASE;
+#else
     frame_ot_base_init = frame_ot_base = (u8 *)0x801FCFF8;
+#endif
     for (i = 0; i < 2; i++) {
 #ifndef __psyz
         frame_records[i].otTags[0] = (OT_TYPE *)(base + i * 0x100);
@@ -743,8 +761,12 @@ static void main_init_frame_records_wide(void) {
         frame_records[i].ots[3].org = 0;
         frame_records[i].ots[3].tag = 0;
 #endif
-        frame_records[i].workSize = 0x5EDC;
-        frame_records[i].workBase = base + REGION_WORK + i * 0x5EDC;
+#ifdef __psyz
+        frame_buffers_set_work(i, FRAME_WIDE_WORK_BYTES);
+#else
+        frame_records[i].workSize = FRAME_WIDE_WORK_BYTES;
+        frame_records[i].workBase = base + REGION_WORK + i * FRAME_WIDE_WORK_BYTES;
+#endif
         frame_records[i].primBuffer = base + REGION_PRIM + i * FRAME_PRIM_SIZE;
     }
 #ifdef __psyz

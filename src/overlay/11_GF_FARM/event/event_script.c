@@ -1,5 +1,8 @@
 /* Farm event scripts: the step interpreter, the chunks of script data kept in VRAM, the
  * actors the events draw, entering and leaving an event, and the event images. */
+#ifdef __psyz
+#include <stdint.h>
+#endif
 #include <string.h>
 #include <sys/types.h>
 #include <libgte.h>
@@ -125,7 +128,11 @@ static s32 vram_stash_block(u8 *data, s16 x, s16 y)
     u8 *p;
     s32 i;
     s32 size;
+#ifdef __psyz
+    uintptr_t dest;
+#else
     u32 dest;
+#endif
 
     p = data;
     for (i = 0; i < EVENT_CHUNK_COUNT; i++)
@@ -146,12 +153,16 @@ static s32 vram_stash_block(u8 *data, s16 x, s16 y)
         if (main_region_free_bytes() >= size)
         {
             vram_stash_tail = main_get_region_base() - size;
-            dest = vram_stash_tail;
+#ifdef __psyz
+            dest = (uintptr_t)vram_stash_tail;
+#else
+            dest = (u32)vram_stash_tail;
+#endif
             if (dest & 3)
             {
                 dest -= dest & 3;
             }
-            vram_stash_tail = dest;
+            vram_stash_tail = (u8 *)dest;
             memcpy((void *)dest, p, size);
             DrawSync(0);
             return 0;
@@ -166,7 +177,7 @@ static s32 vram_stash_block(u8 *data, s16 x, s16 y)
  * script starts. */
 static u8 *event_script_base;
 static u8 *event_script_cursor;
-u32 event_block_base;
+u8 *event_block_base;
 s32 event_block_offsets[25];
 u32 event_step_index;
 u32 event_script_unused_80129228[2];
@@ -178,7 +189,7 @@ s16 event_sprite_offset_y;
 u32 event_block_size;
 s16 event_request_status[4];
 s32 chunk_checksums[EVENT_CHUNK_COUNT];
-u32 vram_stash_tail;
+u8 *vram_stash_tail;
 
 /* Read chunk `chunk` of the block that vram_stash_block uploaded back into `buffer`.
  * The part of the chunk that is still in VRAM comes back with StoreImage; the
@@ -1460,7 +1471,7 @@ static void event_object_draw(FarmPositionObject *object, AnimState *item)
 static void event_block_unpack(u16 *buffer)
 {
     u32 size;
-    s32 top;
+    u8 *top;
     u32 length;
     s32 entry;
     u8 *results;
