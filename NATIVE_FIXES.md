@@ -76,8 +76,13 @@ sampled in the same frame. [GPU pixel test](native/test_gpu_pixels.c)
   following sprite and blend without an intervening draw-mode command.
 - A VRAM clear executes in packet order with overlapping geometry. A D3D12
   probe checks draws before and after the clear and outside its rectangle.
-- Keep flat polygons, rectangles, oblique and Gouraud lines, and repeated
-  blending open until their probes run.
+- Keep flat polygons, rectangles, oblique lines, and non-degenerate Gouraud
+  lines open until their probes run.
+
+| Open D3D12 RGB555 probe | PS1 reference | Native readback |
+| --- | --- | --- |
+| Mode 0 with red 1 in the foreground and background | `0x0000` after truncating each half | `0x0001` |
+| Mode 1 with 31 consecutive red-1 draws over black | `0x001f` | `0x001e` |
 
 ### First title-demo baseline
 
