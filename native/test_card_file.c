@@ -43,6 +43,17 @@ int main(void) {
     assert(memcmp(original, result, HALF_SIZE) == 0);
     assert(memcmp(replacement, result + HALF_SIZE, HALF_SIZE) == 0);
     assert(CloseHandle(handle));
+
+    assert(card_write_file(path, original, SLOT_SIZE - HALF_SIZE / 2, HALF_SIZE) ==
+           CARD_WRITE_FAILED);
+    handle = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+    assert(handle != INVALID_HANDLE_VALUE);
+    assert(GetFileSize(handle, NULL) == SLOT_SIZE);
+    read_slot(handle, result);
+    assert(memcmp(original, result, HALF_SIZE) == 0);
+    assert(memcmp(replacement, result + HALF_SIZE, HALF_SIZE) == 0);
+    assert(CloseHandle(handle));
+
     assert(DeleteFileA(path));
     assert(card_write_file(path, replacement, HALF_SIZE, HALF_SIZE) == CARD_WRITE_MISSING);
     assert(card_write_file(NULL, replacement, 0, HALF_SIZE) == CARD_WRITE_FAILED);

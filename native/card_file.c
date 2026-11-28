@@ -35,10 +35,13 @@ enum CardWriteResult card_write_file(const char *path, const void *data, long of
     if (CopyFileA(path, staged, FALSE)) {
         HANDLE handle = CreateFileA(staged, GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
         if (handle != INVALID_HANDLE_VALUE) {
+            LARGE_INTEGER capacity;
             LARGE_INTEGER position;
             DWORD count;
             position.QuadPart = offset;
-            written = SetFilePointerEx(handle, position, NULL, FILE_BEGIN) &&
+            written = GetFileSizeEx(handle, &capacity) &&
+                      position.QuadPart + size <= capacity.QuadPart &&
+                      SetFilePointerEx(handle, position, NULL, FILE_BEGIN) &&
                       WriteFile(handle, data, size, &count, NULL) && count == size &&
                       FlushFileBuffers(handle);
             written = CloseHandle(handle) && written;
