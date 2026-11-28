@@ -38,5 +38,15 @@ int main(void) {
         fputs("A valid second half should still draw when the first half is oversized\n", stderr);
         return 1;
     }
+
+    u_long sprite[] = {0x64000000, 0, 0, (8u << 16) | 8u};
+    if (vanillabtn_gpu_push_prim(sprite, 3) != 3 || calls != 3) {
+        fputs("Truncated sprite should be consumed without reading its missing size\n", stderr);
+        return 1;
+    }
+    if (vanillabtn_gpu_push_prim(sprite, 4) != 4 || calls != 4) {
+        fputs("Complete sprite should still draw\n", stderr);
+        return 1;
+    }
     return 0;
 }

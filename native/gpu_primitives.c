@@ -6,9 +6,11 @@ enum {
     GPU_COMMAND_SHIFT = 24,
     GPU_COMMAND_CLASS_MASK = 0xe0,
     GPU_POLYGON = 0x20,
+    GPU_RECTANGLE = 0x60,
     GPU_TEXTURED = 0x04,
     GPU_QUAD = 0x08,
     GPU_GOURAUD = 0x10,
+    GPU_RECTANGLE_SIZE_MASK = 0x18,
     GPU_COORD_SIGN = 1 << 10,
     GPU_COORD_RANGE = GPU_COORD_SIGN * 2,
     GPU_MAX_TRIANGLE_WIDTH = 1023,
@@ -33,7 +35,14 @@ static int gpu_triangle_fits(u_long a, u_long b, u_long c) {
 
 int vanillabtn_gpu_push_prim(u_long *packet, int available_words) {
     unsigned int code = (packet[0] >> GPU_COMMAND_SHIFT) & 0xff;
-    if ((code & GPU_COMMAND_CLASS_MASK) != GPU_POLYGON) {
+    unsigned int command_class = code & GPU_COMMAND_CLASS_MASK;
+    if (command_class == GPU_RECTANGLE) {
+        int words = 2 + ((code & GPU_TEXTURED) != 0) + ((code & GPU_RECTANGLE_SIZE_MASK) == 0);
+        if (available_words < words) {
+            return available_words;
+        }
+    }
+    if (command_class != GPU_POLYGON) {
         return Draw_PushPrim(packet, available_words);
     }
 
