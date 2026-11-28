@@ -73,6 +73,8 @@ sampled in the same frame. [GPU pixel test](native/test_gpu_pixels.c)
 - Textured polygons update the page and blend mode for subsequent draws,
   including when clipping rejects the polygon. The D3D12 probe checks a
   following sprite and blend without an intervening draw-mode command.
+- A VRAM clear executes in packet order with overlapping geometry. A D3D12
+  probe checks draws before and after the clear and outside its rectangle.
 - Keep flat polygons, rectangles, oblique and Gouraud lines, and repeated
   blending open until their probes run.
 

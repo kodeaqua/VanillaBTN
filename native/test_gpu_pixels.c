@@ -164,6 +164,25 @@ static int check_texture(int x, unsigned expected, const char *source) {
     return 0;
 }
 
+static int check_clear_draw_order(void) {
+    enum {
+        FILL_WIDTH = 16,
+        AFTER_X = TILE_ORIGIN + TILE_SIZE,
+        OUTSIDE_X = TILE_ORIGIN + FILL_WIDTH
+    };
+    RECT fill = {TILE_ORIGIN, TILE_ORIGIN, FILL_WIDTH, TILE_SIZE};
+    select_draw_mode(0, 0);
+    draw_tile(TILE_ORIGIN, TILE_ORIGIN, RGB888_MAX, 0, 0, 0);
+    draw_tile(OUTSIDE_X, TILE_ORIGIN, RGB888_MAX, 0, 0, 0);
+    ClearImage(&fill, 0, RGB888_MAX, 0);
+    draw_tile(AFTER_X, TILE_ORIGIN, 0, 0, RGB888_MAX, 0);
+
+    int failures = check_texture(TILE_ORIGIN, rgb555(0, COLOR_MAX, 0), "clear after polygon");
+    failures += check_texture(AFTER_X, rgb555(0, 0, COLOR_MAX), "polygon after clear");
+    failures += check_texture(OUTSIDE_X, COLOR_MAX, "polygon outside clear");
+    return failures;
+}
+
 static int check_copy_visibility(void) {
     enum { COPY_X = 64, COPY_Y = 256, SAMPLE_X = TILE_ORIGIN + TILE_SIZE };
     RECT source = {TILE_ORIGIN, TILE_ORIGIN, TILE_SIZE, TILE_SIZE};
@@ -351,6 +370,7 @@ int main(void) {
     failures += check_blend(1, rgb555(12, 30, COLOR_MAX));
     failures += check_blend(2, rgb555(0, 8, 19));
     failures += check_blend(3, rgb555(6, 21, 30));
+    failures += check_clear_draw_order();
     failures += check_copy_visibility();
     failures += check_clut_visibility();
     failures += check_textured_polygon_dither();

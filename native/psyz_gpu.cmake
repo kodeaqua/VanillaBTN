@@ -96,8 +96,18 @@ string(REPLACE "${polygon_tpage}" "${polygon_tpage_latch}"
 if(gpu_source_with_lines STREQUAL gpu_source_with_tpage)
     message(FATAL_ERROR "Could not patch PsyZ polygon texture page state.")
 endif()
+
+# A VRAM fill must execute after the primitives already queued before it.
+set(clear_image [=[    r = To15BitChannel(r);
+    g = To15BitChannel(g);
+    b = To15BitChannel(b);]=])
+string(REPLACE "${clear_image}" "    Draw_FlushBuffer();\n${clear_image}"
+    gpu_source_with_ordered_fill "${gpu_source_with_tpage}")
+if(gpu_source_with_tpage STREQUAL gpu_source_with_ordered_fill)
+    message(FATAL_ERROR "Could not patch PsyZ VRAM fill order.")
+endif()
 file(CONFIGURE OUTPUT "${psyz_gpu_build}/sdl3_gpu.c"
-    CONTENT "#line 1 \"psyz/src/platform/sdl3_gpu.c\"\n${gpu_source_with_tpage}" @ONLY)
+    CONTENT "#line 1 \"psyz/src/platform/sdl3_gpu.c\"\n${gpu_source_with_ordered_fill}" @ONLY)
 list(REMOVE_ITEM psyz_sources "src/platform/sdl3_gpu.c")
 set_property(TARGET psyz PROPERTY SOURCES "${psyz_sources};${psyz_gpu_build}/sdl3_gpu.c")
 set_property(SOURCE "${psyz_gpu_build}/sdl3_gpu.c"
