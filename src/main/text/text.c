@@ -180,6 +180,15 @@ static u16 text_glyphs[64];
 /* Digit buffer: text_format_number writes one glyph per digit into it. */
 static u16 text_digits[16];
 static u16 *text_sources[12];
+#define TEXT_INSERT_ID_MASK 0xFFF
+#ifdef __psyz
+static u16 *text_registered_source(u16 *const *table, u16 code) {
+    unsigned int slot = code & TEXT_INSERT_ID_MASK;
+    return slot < sizeof(text_sources) / sizeof(text_sources[0]) ? table[slot] : NULL;
+}
+#else
+#define text_registered_source(table, code) ((table)[(code) & TEXT_INSERT_ID_MASK])
+#endif
 /* Name list the expanded text requests are built in. */
 static u16 text_list_buffer[224];
 
@@ -194,7 +203,6 @@ static u16 text_list_buffer[224];
 
 /* A text-insert halfword has TEXT_INSERT_FLAG set; its low 12 bits are the insert id. */
 #define TEXT_INSERT_FLAG 0x4000
-#define TEXT_INSERT_ID_MASK 0xFFF
 
 /* The glyphs of the marks and digits text_char_code and text_format_number write. Letters
  * are not listed: glyph n is letter 'A' + n. */
@@ -1043,7 +1051,7 @@ static u8 *text_draw_string(void *ot, u8 *prim, u16 *text, s16 x, s16 y, s32 sca
             child = text_insert_source(*text);
             if (child == 0)
             {
-                child = text_sources[*text & TEXT_INSERT_ID_MASK];
+                child = text_registered_source(text_sources, *text);
             }
             if (child != 0)
             {
@@ -1201,7 +1209,7 @@ static u16 text_count_matches(u16 *entries, u16 match, s16 limit, u16 *out_count
         {
             child = text_insert_source(*entries);
             if (child == 0)
-                child = table[*entries & TEXT_INSERT_ID_MASK];
+                child = text_registered_source(table, *entries);
             if (child != 0)
             {
                 if (limit != 0)
@@ -1267,7 +1275,7 @@ static u16 text_count_entries(u16 *entries, u16 stop, s16 limit)
             child = text_insert_source(*entries);
             if (child == 0)
             {
-                listed = table[*entries & TEXT_INSERT_ID_MASK];
+                listed = text_registered_source(table, *entries);
                 if (listed == 0)
                 {
                     continue;
@@ -1370,7 +1378,7 @@ static s32 text_measure(u16 *entries, s32 size, s16 spacing)
         entry = *entries;
         if ((entry & 0xF000) == 0x4000)
         {
-            child = text_sources[entry & 0xFFF];
+            child = text_registered_source(text_sources, entry);
             if (child != 0)
             {
                 width += text_measure(child, size, spacing);
