@@ -39,8 +39,15 @@ string(REPLACE "${texture_overlap}" "${wrapped_overlap}" patched_gpu_common "${g
 if(gpu_common STREQUAL patched_gpu_common)
     message(FATAL_ERROR "Could not patch PsyZ wrapped texture dependencies.")
 endif()
+
+# Raw textured polygons copy RGB555 texels without shading or dithering.
+string(REPLACE "(isGouraud || (isTextured && isShadeTex))"
+    "(isTextured ? isShadeTex : isGouraud)" gpu_common_with_raw "${patched_gpu_common}")
+if(patched_gpu_common STREQUAL gpu_common_with_raw)
+    message(FATAL_ERROR "Could not patch PsyZ raw texture dithering.")
+endif()
 file(CONFIGURE OUTPUT "${psyz_gpu_build}/vanillabtn_sdl3_common.h"
-    CONTENT "#line 1 \"psyz/src/platform/sdl3_common.h\"\n${patched_gpu_common}" @ONLY)
+    CONTENT "#line 1 \"psyz/src/platform/sdl3_common.h\"\n${gpu_common_with_raw}" @ONLY)
 
 file(READ "${psyz_gpu_source}" gpu_source)
 string(REPLACE "#include \"shaders/psx_frag_dxil.h\"" "#include \"vanillabtn_psx_frag_dxil.h\""

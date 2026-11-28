@@ -52,24 +52,20 @@ static void read_tile(int x, int y, u16 pixels[TILE_PIXELS]) {
     memcpy(pixels, transfer, sizeof(transfer));
 }
 
-static int check_dither(int x, int y, int enabled) {
+static int check_dither_pixels(int x, int y, int r, int g, int b, int enabled) {
     static const int offsets[TILE_SIZE][TILE_SIZE] = {
         {-4, 0, -3, 1},
         {2, -2, 3, -1},
         {-3, 1, -4, 0},
         {3, -1, 2, -2},
     };
-    enum { RED = 64, GREEN = 65, BLUE = 66 };
     u16 pixels[TILE_PIXELS];
-    select_draw_mode(0, enabled);
-    draw_tile(x, y, RED, GREEN, BLUE, 0);
     read_tile(x, y, pixels);
     for (int row = 0; row < TILE_SIZE; ++row) {
         for (int col = 0; col < TILE_SIZE; ++col) {
             int delta = enabled ? offsets[(y + row) % TILE_SIZE][(x + col) % TILE_SIZE] : 0;
-            unsigned expected =
-                rgb555((RED + delta) >> RGB888_SHIFT, (GREEN + delta) >> RGB888_SHIFT,
-                       (BLUE + delta) >> RGB888_SHIFT);
+            unsigned expected = rgb555((r + delta) >> RGB888_SHIFT, (g + delta) >> RGB888_SHIFT,
+                                       (b + delta) >> RGB888_SHIFT);
             unsigned actual = pixels[row * TILE_SIZE + col] & COLOR_MASK;
             if (actual != expected) {
                 fprintf(stderr, "dither %d at (%d,%d): got %04x, expected %04x\n", enabled, x + col,
@@ -79,6 +75,13 @@ static int check_dither(int x, int y, int enabled) {
         }
     }
     return 0;
+}
+
+static int check_dither(int x, int y, int enabled) {
+    enum { RED = 64, GREEN = 65, BLUE = 66 };
+    select_draw_mode(0, enabled);
+    draw_tile(x, y, RED, GREEN, BLUE, 0);
+    return check_dither_pixels(x, y, RED, GREEN, BLUE, enabled);
 }
 
 static int check_blend(int blend, unsigned expected) {
@@ -178,6 +181,47 @@ static void load_word_block(int x, int y, u16 word) {
     LoadImage(&block, transfer);
 }
 
+static int check_textured_polygon_dither(void) {
+    enum {
+        PAGE_X = 256,
+        PAGE_Y = 256,
+        UV_END = TILE_SIZE - 1,
+        NEUTRAL = 128,
+        RED = 8,
+        GREEN = 9,
+        BLUE = 10,
+    };
+    const u16 texel = rgb555(RED, GREEN, BLUE);
+    for (int y = 0; y < TILE_SIZE; y += WORD_BLOCK_SIZE) {
+        for (int x = 0; x < TILE_SIZE; x += WORD_BLOCK_SIZE) {
+            load_word_block(PAGE_X + x, PAGE_Y + y, texel);
+        }
+    }
+
+    POLY_GT4 quad = {0};
+    const int x = TILE_ORIGIN;
+    const int end = x + TILE_SIZE;
+    SetPolyGT4(&quad);
+    setShadeTex(&quad, 1);
+    setXY4(&quad, x, x, end, x, x, end, end, end);
+    setUV4(&quad, 0, 0, UV_END, 0, 0, UV_END, UV_END, UV_END);
+    quad.tpage = getTPage(DIRECT_COLOR_TEXTURE, 0, PAGE_X, PAGE_Y);
+    termPrim(&quad);
+    select_draw_mode(quad.tpage, 1);
+    DrawOTag((OT_TYPE *)&quad);
+    int failures = check_texture(x, texel, "raw Gouraud polygon with dithering enabled");
+
+    setShadeTex(&quad, 0);
+    setRGB0(&quad, NEUTRAL, NEUTRAL, NEUTRAL);
+    setRGB1(&quad, NEUTRAL, NEUTRAL, NEUTRAL);
+    setRGB2(&quad, NEUTRAL, NEUTRAL, NEUTRAL);
+    setRGB3(&quad, NEUTRAL, NEUTRAL, NEUTRAL);
+    DrawOTag((OT_TYPE *)&quad);
+    failures += check_dither_pixels(x, x, RED << RGB888_SHIFT, GREEN << RGB888_SHIFT,
+                                    BLUE << RGB888_SHIFT, 1);
+    return failures;
+}
+
 static int check_sprite_uv_wrap(void) {
     enum { PAGE_X = 512, PAGE_Y = 256, UV = TEXTURE_PAGE_SIZE - TILE_SIZE / 2 };
     const u16 colors[] = {COLOR_MAX, rgb555(0, COLOR_MAX, 0), rgb555(0, 0, COLOR_MAX),
@@ -250,6 +294,7 @@ int main(void) {
     failures += check_blend(3, rgb555(6, 21, 30));
     failures += check_copy_visibility();
     failures += check_clut_visibility();
+    failures += check_textured_polygon_dither();
     failures += check_sprite_uv_wrap();
     failures += check_direct_page_wrap();
     failures += check_indexed_page_and_clut_wrap();

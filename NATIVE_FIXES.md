@@ -66,8 +66,10 @@ sampled in the same frame. [GPU pixel test](native/test_gpu_pixels.c)
 - D3D12 readback verifies sprite U/V wrap at 255 and right-to-left VRAM wrap
   for 16-bit textures and 8-bit textures/CLUTs. Same-frame cases also verify
   that a draw on the left edge is visible to the wrapped texture read.
-- Keep other dither-eligible primitive types and repeated blending open
-  until their probes run.
+- The D3D12 probe checks that raw Gouraud-textured polygons preserve RGB555
+  texels and that modulated Gouraud-textured polygons apply the dither matrix.
+- Keep flat polygons, lines, rectangles, and repeated blending open until
+  their probes run.
 
 ### First title-demo baseline
 
