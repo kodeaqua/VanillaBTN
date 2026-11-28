@@ -7,10 +7,10 @@ file system with the CD-XA extensions.
         Every file of the disc's file system into DIR, at its path on the disc, and
         the licence sectors as DIR/license_data.dat.
 
-    psx_disc.py import DISC.bin|DISC.cue --out DIR
+    psx_disc.py import DISC.bin|DISC.cue|DISC.iso --out DIR
         Check the USA reference checksum, then extract to DIR.
 
-    psx_disc.py prepare-cue DISC.bin|DISC.cue --out OUT.cue
+    psx_disc.py prepare-cue DISC.bin|DISC.cue|DISC.iso --out OUT.cue [--user-data DIR]
         Check the USA reference checksum, then write a single-track descriptor.
 
     psx_disc.py build LAYOUT.xml --files DIR [--replace NAME=PATH]... -o OUT.bin [--cue OUT.cue]
@@ -24,7 +24,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import os
 import re
+import shutil
 import struct
 import sys
 import xml.etree.ElementTree as ET
@@ -432,11 +434,11 @@ def cue_binary(cue: Path) -> Path:
     if not match:
         raise SystemExit("Expected one BINARY file in the CUE sheet.")
     name = PureWindowsPath(match[1] or match[2])
-    if name.drive or name.root or ".." in name.parts or name.suffix.lower() != ".bin":
-        raise SystemExit("The CUE sheet must use a relative BIN path within its directory.")
+    if name.drive or name.root or ".." in name.parts or name.suffix.lower() not in (".bin", ".iso"):
+        raise SystemExit("The CUE sheet must use a relative BIN or ISO path within its directory.")
     binary = cue.parent.joinpath(*name.parts).resolve()
     if not binary.is_relative_to(cue.parent.resolve()):
-        raise SystemExit("The CUE sheet's BIN path leaves its directory.")
+        raise SystemExit("The CUE sheet's disc path leaves its directory.")
     return binary
 
 
@@ -472,6 +474,27 @@ def prepare_cue(disc: Path, out: Path) -> None:
     out.write_bytes(
         b'FILE "' + encoded_path + b'" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n'
     )
+
+
+def prepare_user_data(directory: Path) -> None:
+    """Copy legacy cards and backups when their Documents directories are absent."""
+    directory.mkdir(parents=True, exist_ok=True)
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if not local_app_data:
+        return
+    legacy = Path(local_app_data) / "VanillaBTN"
+    for name in ("bu00", "bu10", "save-imports"):
+        source, destination = legacy / name, directory / name
+        if not source.is_dir() or destination.exists():
+            continue
+        with TemporaryDirectory(prefix=".vanillabtn-migration-", dir=directory) as temp:
+            staged = Path(temp) / name
+            shutil.copytree(source, staged, symlinks=True)
+            try:
+                staged.rename(destination)
+            except FileExistsError:
+                if not destination.is_dir():
+                    raise
 
 
 def extract(disc: Path, out: Path, verify_reference: bool = False) -> None:
@@ -668,12 +691,13 @@ def main(argv: list[str] | None = None) -> int:
     p = commands.add_parser("extract", help="the disc's files and licence into a directory")
     p.add_argument("disc", type=Path)
     p.add_argument("--out", type=Path, required=True)
-    p = commands.add_parser("import", help="verify and extract the USA reference BIN or CUE")
+    p = commands.add_parser("import", help="verify and extract the USA reference disc")
     p.add_argument("disc", type=Path)
     p.add_argument("--out", type=Path, required=True)
     p = commands.add_parser("prepare-cue", help="verify the USA disc and write a runtime CUE")
     p.add_argument("disc", type=Path)
     p.add_argument("--out", type=Path, required=True)
+    p.add_argument("--user-data", type=Path)
     p = commands.add_parser("build", help="an image from a layout and its files")
     p.add_argument("layout", type=Path)
     p.add_argument("--files", type=Path, required=True)
@@ -688,6 +712,11 @@ def main(argv: list[str] | None = None) -> int:
             prepare_cue(args.disc, args.out)
         except OSError as error:
             raise SystemExit(f"Could not prepare disc ({error.strerror}).") from None
+        if args.user_data is not None:
+            try:
+                prepare_user_data(args.user_data)
+            except OSError:
+                raise SystemExit("Could not prepare the Documents save folder.") from None
     elif args.command == "import":
         try:
             disc = cue_binary(args.disc) if args.disc.suffix.lower() == ".cue" else args.disc

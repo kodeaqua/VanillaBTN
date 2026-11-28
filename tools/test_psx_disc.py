@@ -10,6 +10,30 @@ from tools import psx_disc
 
 
 class DiscImportTest(unittest.TestCase):
+    def test_legacy_cards_migrate_without_overwriting_or_restoring_deleted_saves(self):
+        with tempfile.TemporaryDirectory() as temp:
+            local = Path(temp) / "Local"
+            legacy = local / "VanillaBTN"
+            documents = Path(temp) / "Documents" / "VanillaBTN"
+            for directory in (legacy / "bu00", legacy / "bu10", legacy / "save-imports",
+                              legacy / "disc", documents / "bu00"):
+                directory.mkdir(parents=True)
+            (legacy / "bu00" / "slot").write_bytes(b"old")
+            (legacy / "bu10" / "slot").write_bytes(b"move")
+            (legacy / "save-imports" / "backup").write_bytes(b"backup")
+            (documents / "bu00" / "slot").write_bytes(b"new")
+            with patch.dict("os.environ", {"LOCALAPPDATA": str(local)}):
+                psx_disc.prepare_user_data(documents)
+                saved = documents / "bu10" / "slot"
+                self.assertEqual(saved.read_bytes(), b"move")
+                saved.unlink()
+                psx_disc.prepare_user_data(documents)
+            self.assertFalse(saved.exists())
+            self.assertEqual((documents / "bu00" / "slot").read_bytes(), b"new")
+            self.assertEqual((documents / "save-imports" / "backup").read_bytes(), b"backup")
+            self.assertEqual((legacy / "bu10" / "slot").read_bytes(), b"move")
+            self.assertFalse((documents / "disc").exists())
+
     def test_extract_checks_file_extent_before_writing(self):
         root = psx_disc.PVD_LBA + 1
         pvd = bytearray(psx_disc.USER)

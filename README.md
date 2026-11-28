@@ -73,9 +73,20 @@ ctest --test-dir build/native/game-release --output-on-failure
 ```
 
 Use `windows-x64-debug` and a separate build directory for Debug. The build links
-the game and overlays into `vanillabtn.exe`. `--disc` accepts the USA BIN or CUE
-and verifies it using Python 3.10 or newer on `PATH`. PsyZ stores virtual cards
-under `%LOCALAPPDATA%\VanillaBTN`.
+the game and overlays into `vanillabtn.exe`. It verifies the USA disc with Python
+3.10 or newer on `PATH`.
+
+- **Double-click** `vanillabtn.exe` with the disc next to it. A single CUE takes
+  priority over BIN and ISO images. If several candidates share the highest
+  priority, use `--disc PATH` to choose one.
+- **Drag** a CUE, BIN or ISO onto the EXE to verify it, extract it to the
+  adjacent `disc` folder and start the game. Keep the source image accessible
+  for gameplay and future launches.
+- **Choose a disc explicitly** with `--disc PATH` to start without extracting.
+
+Virtual cards and save backups live in `VanillaBTN` under Windows Documents,
+including redirected Documents. On launch, legacy cards and backups are copied
+from `%LOCALAPPDATA%\VanillaBTN` when the corresponding folders are absent.
 [Transfer diaries with DuckStation](#transfer-diaries-with-duckstation)
 
 In Debug builds only, pass `--debug-menu` with `--disc` to start in `08_DEBUG`
@@ -92,7 +103,7 @@ PocketStation tests report that the device is unavailable on Windows.
 ### Transfer diaries with DuckStation
 
 - Use the USA version (`SLUS-01115`). Close both games before changing card files.
-- VanillaBTN stores one 32 KiB file per diary in `%LOCALAPPDATA%\VanillaBTN\bu00`
+- VanillaBTN stores one 32 KiB file per diary in `Documents\VanillaBTN\bu00`
   (card 1) or `bu10` (card 2). `BASLUS-01115-FARM0` through
   `BASLUS-01115-FARM2` are diaries 1 through 3.
 - DuckStation stores a full card as `.mcd` and exports individual diaries as
@@ -136,23 +147,25 @@ try {
    the card directories. Copy the new diary into `bu00` or `bu10` and choose
    **Continue** in VanillaBTN. Keep the file extensionless and preserve its slot name.
 
-### Import a reference disc locally
+### Extract a reference disc locally
 
-With Python 3.10 or newer on `PATH`, run the native executable with your BIN or CUE:
+Use `--install` to extract the disc without launching the game. With Python 3.10
+or newer on `PATH`, run:
 
 ```powershell
-& .\build\native\windows-x64-release\native\vanillabtn.exe --import-disc 'path\to\disc.cue'
+& .\vanillabtn.exe --install 'path\to\disc.cue'
 ```
 
-The bundled importer checks the USA reference SHA-1 before writing to
-`%LOCALAPPDATA%\VanillaBTN\disc`. To select another output directory, use
-`python tools/psx_disc.py import path/to/disc.cue --out path/to/local-data`.
+- Omit the path to select a disc beside the EXE. `--import-disc PATH` remains
+  an alias for extraction with an explicit path.
+- The importer checks the USA reference SHA-1 before writing to `disc` beside
+  the EXE. Choose a custom output with
+  `python tools/psx_disc.py import path/to/disc.cue --out path/to/extracted-disc`.
+- Keep a CUE and its referenced image together. The CUE must describe one
+  `MODE2/2352` track starting at `00:00:00`. An `.iso` extension works for the
+  same raw 2352-byte-sector dump. Standard 2048-byte-sector ISOs lack the raw layout.
 
-A CUE must describe one `MODE2/2352` track starting at `00:00:00`. Keep the BIN
-with the CUE, and choose an output directory outside the checkout and save directory.
-
-A fresh import publishes the output directory after extraction succeeds. A repeat
-import stages files first and preserves unrelated files in the destination.
+Repeat extraction stages files first and preserves unrelated files in the destination.
 
 ### Stage a Windows startup package
 

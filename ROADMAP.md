@@ -12,7 +12,7 @@ and a Windows x64 startup executable.
 | Matching build | Preserve PSY-Q 4.7, GCC 2.95.2, compiler flags, linker layout, and artifact names. |
 | Native build | Add a CMake target named `vanillabtn` and Debug and Release presets. PsyZ provides the PSY-Q API and uses an SDL3 backend. |
 | Dependencies | Plan to use a submodule at `external/psyz`. Pin a tested PsyZ commit and use its SDL revision. |
-| Game data | Import the user's USA BIN/CUE dump locally on first run. Keep game data and the PSY-Q SDK out of the repository and release packages. |
+| Game data | Verify the user's raw USA image before launch or local extraction. Keep game data and the PSY-Q SDK out of the repository and release packages. |
 | Parity | Preserve gameplay, timing, graphics, audio, input, and save compatibility. Enhancements and quality-of-life features are out of scope. |
 
 Use the VanillaBTN name for the native product and its documentation. The maintainer
@@ -30,10 +30,11 @@ can decide separately whether to rename the GitHub repository.
   [Module support](https://github.com/Xeeynamo/psyz/blob/00fb42e6f49c146ad760a1f605b15d2a4ec598f0/psyz/cmake/module.cmake) ·
   [CD and XA implementation](https://github.com/Xeeynamo/psyz/blob/00fb42e6f49c146ad760a1f605b15d2a4ec598f0/psyz/src/psyz/libcd.c) ·
   [SDL 3.4.20](https://github.com/libsdl-org/SDL/releases/tag/release-3.4.20)
-- **Disc import and runtime reads.** `tools/psx_disc.py import` accepts BIN or CUE and
-  verifies the USA reference before extraction. `tools/afile.py unpack` unpacks A_FILE.
-  The Windows startup executable invokes the importer with `--import-disc`.
-  Interactive disc selection and in-game reads through PsyZ remain separate milestones.
+- **Disc import and runtime reads.** The launcher opens a verified adjacent image.
+  Drag-and-drop extracts it to the adjacent `disc` folder before launch. Use `--install`
+  for extraction alone. The running game reads the original image through PsyZ.
+- **Windows save location.** Virtual cards and save backups use Documents.
+  The launcher's first-run copy preserves legacy files in LocalAppData.
 - **PsyZ licensing needs clarification before public integration.** VanillaBTN
   uses MIT, and `NOTICE` identifies the upstream base as CC0. PsyZ marks
   `psyz/include` and `psyz/src/psyq` as *Unlicensed*. A submodule pins a revision
