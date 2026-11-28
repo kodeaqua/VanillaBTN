@@ -11,6 +11,7 @@
 #include <libgpu.h>
 #include <libgs.h>
 #include <libapi.h>
+#include "card_file.h"
 #include "sdk_mcrd.h"
 #include <libmcx.h>
 
@@ -158,6 +159,7 @@ enum {
     MCRD_SECTOR_ALIGN = 128,
     MCRD_MAX_NAME_LEN = 20,
     MCRD_PATH_CAP = 64,
+    MCRD_HOST_PATH_CAP = 256,
     MCRD_SYNC_IDLE = -1,
     MCRD_SYNC_DONE = 1,
 };
@@ -528,8 +530,7 @@ long MemCardReadFile(long chan, char *file, unsigned long *adrs, long offset, lo
 
 long MemCardWriteFile(long chan, char *file, unsigned long *adrs, long offset, long bytes) {
     char path[MCRD_PATH_CAP];
-    int fd;
-    long err;
+    char host_path[MCRD_HOST_PATH_CAP];
 
     if (mcrd_open_fd >= 0 || bytes <= 0 || (bytes & (MCRD_SECTOR_ALIGN - 1)) != 0) {
         return 0;
@@ -542,14 +543,18 @@ long MemCardWriteFile(long chan, char *file, unsigned long *adrs, long offset, l
         mcrd_finish_async(McFuncWriteFile, McErrFileNotExist);
         return 1;
     }
-    fd = psyz_open(path, FREAD | FWRITE);
-    if (fd < 0) {
+    Psyz_AdjustPath(host_path, path, (int)sizeof(host_path));
+    switch (card_write_file(host_path, adrs, offset, (unsigned long)bytes)) {
+    case CARD_WRITE_OK:
+        mcrd_finish_async(McFuncWriteFile, McErrNone);
+        break;
+    case CARD_WRITE_MISSING:
         mcrd_finish_async(McFuncWriteFile, McErrFileNotExist);
-        return 1;
+        break;
+    case CARD_WRITE_FAILED:
+        mcrd_finish_async(McFuncWriteFile, McErrCardInvalid);
+        break;
     }
-    err = mcrd_write_fd(fd, adrs, offset, bytes);
-    psyz_close(fd);
-    mcrd_finish_async(McFuncWriteFile, err);
     return 1;
 }
 
