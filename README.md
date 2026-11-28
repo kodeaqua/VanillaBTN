@@ -76,6 +76,7 @@ Use `windows-x64-debug` and a separate build directory for Debug. The build link
 the game and overlays into `vanillabtn.exe`. `--disc` accepts the USA BIN or CUE
 and verifies it using Python 3.10 or newer on `PATH`. PsyZ stores virtual cards
 under `%LOCALAPPDATA%\VanillaBTN`.
+[Transfer diaries with DuckStation](#transfer-diaries-with-duckstation)
 
 In Debug builds only, pass `--debug-menu` with `--disc` to start in `08_DEBUG`
 (minigame/scene jump menu and `30_GF_swind` settings window):
@@ -87,6 +88,53 @@ In Debug builds only, pass `--debug-menu` with `--disc` to start in `08_DEBUG`
 Use the D-pad to move and Circle or Start to open an entry. House, minigame,
 save/load, trade and farm-return entries start from a fresh farm session.
 PocketStation tests report that the device is unavailable on Windows.
+
+### Transfer diaries with DuckStation
+
+- Use the USA version (`SLUS-01115`). Close both games before changing card files.
+- VanillaBTN stores one 32 KiB file per diary in `%LOCALAPPDATA%\VanillaBTN\bu00`
+  (card 1) or `bu10` (card 2). `BASLUS-01115-FARM0` through
+  `BASLUS-01115-FARM2` are diaries 1 through 3.
+- DuckStation stores a full card as `.mcd` and exports individual diaries as
+  `.mcs`. An `.mcs` export adds a 128-byte directory record before the diary.
+  [DuckStation memory card format](https://github.com/stenzek/duckstation/blob/master/src/core/memory_card_image.cpp)
+
+**VanillaBTN to DuckStation**
+
+1. Right-click the game in DuckStation and select **Edit Memory Cards…**.
+2. On the destination card, choose **Import… → Import Single Save File…** and
+   select **All Files (*.*)**. Import the extensionless diary with its original name.
+3. Click **Save**, then start the game and choose **Continue**.
+
+**DuckStation to VanillaBTN**
+
+1. In the memory card editor, export the diary as an `.mcs` file to a folder
+   outside `bu00` and `bu10`.
+2. Run this in PowerShell with the export's path. It writes a new raw diary beside
+   the export, using the slot name stored in its directory record.
+
+```powershell
+$export = Get-Item -LiteralPath '.\diary.mcs' -ErrorAction Stop
+$bytes = [IO.File]::ReadAllBytes($export.FullName)
+if ($bytes.Length -ne 32896 -or $bytes[128] -ne 0x53 -or $bytes[129] -ne 0x43) {
+    throw 'Expected a 32 KiB diary in a DuckStation MCS export.'
+}
+$slot = [Text.Encoding]::ASCII.GetString($bytes, 10, 20).Split([char]0)[0]
+if ($slot -cnotmatch '^BASLUS-01115-FARM[0-2]$') {
+    throw 'Expected a Harvest Moon USA diary slot.'
+}
+$raw = Join-Path $export.DirectoryName $slot
+$out = [IO.File]::Open($raw, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write)
+try {
+    $out.Write($bytes, 128, 32768)
+} finally {
+    $out.Dispose()
+}
+```
+
+3. If the destination slot exists, move its file to a backup folder outside
+   the card directories. Copy the new diary into `bu00` or `bu10` and choose
+   **Continue** in VanillaBTN. Keep the file extensionless and preserve its slot name.
 
 ### Import a reference disc locally
 

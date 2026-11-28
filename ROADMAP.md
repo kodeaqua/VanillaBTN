@@ -50,7 +50,7 @@ can decide separately whether to rename the GitHub repository.
 | Layout and addresses | Audit padding, pointer-to-integer casts, and fixed PS1 addresses in code such as `src/main/main.c` and `src/overlay/11_GF_FARM/people/family.c`. Check relevant sizes and offsets with each target's compiler. Use buffers or symbols for native addresses. |
 | CPU and timing | Map GTE, scratchpad, and MIPS assembly to equivalent behavior. Reuse PsyZ interfaces where available. Compare VSync pacing and frame counts with the USA PS1 build. |
 | Audio and assets | Test XA file and channel filtering, looping, stopping, and stream changes. Check SEQ/VAB music, sound effects, A_FILE reads, and texture relocation. |
-| Saves | Load a reference USA PS1 save into a virtual memory card. Save from native, quit, restart, and reload. Verify that the reference PS1 environment can also read the native save. |
+| Saves | Transfer USA diaries in both directions. Save, quit, restart and compare restored state across slots and gameplay milestones. |
 
 See the [PsyZ porting guide](https://github.com/Xeeynamo/psyz/blob/00fb42e6f49c146ad760a1f605b15d2a4ec598f0/PORTING_GUIDE.md)
 for graphics types and build integration.
@@ -111,6 +111,9 @@ for graphics types and build integration.
 - **Milestone 3 save/load flow.** Verified `TITLE` -> Farmhouse -> Diary save
   (32,768-byte PS1 `SC` save via 32-bit `Ps1SaveImage`) -> state wipe -> `TITLE`
   reboot -> `LOAD` -> `FARM_LOADED` -> Outdoor Farm Yard with restored state.
+- **DuckStation save exchange.** Verified one USA diary in each direction. On the
+  return trip the native loader validated the converted export and restored its date.
+  [Transfer instructions](README.md#transfer-diaries-with-duckstation)
 - **Overlay re-entry.** Verified 12 repeated transitions across `TITLE`, `FARM`,
   `MG1`, `MG5`, `STAFF`, `FARM_MINIGAME_EXIT`, and `FARM_STAFF_EXIT` after fixing
   static re-entry resets, missing returns, and unprototyped calls under `__psyz`.
@@ -136,11 +139,13 @@ for graphics types and build integration.
   (`farm_probe.c`, `event_script.c`), and unsigned shifts (`villager.c`, `swind.c`).
 - Debug builds accept `--debug-menu` with `--disc` to boot directly into `08_DEBUG`
   (rejected in Release, verified by `native/smoke.cmake`).
+- All 23 populated debug menu rows passed a 280-frame ASan/UBSan run from direct boot.
+  Seasonal house jumps, minigame projection and both utilities' rendering were checked.
 - Of 451 event archive slots, 12 are empty. Four further slots (261 and 273–275) have an
   invalid offset range or initial opcode. The area trigger tables do not reference those four.
 - Still open for manual playtesting: long multi-stage cutscenes (weddings, endings),
-  interactive minigame completion/rewards, audio/timing parity, and PS1/native save
-  cross-compatibility.
+  interactive minigame completion/rewards, audio/timing parity, and a broader save
+  exchange check across slots and game states.
 
 ### Native SDK compatibility (`native/sdk_compat.c` against PsyZ `00fb42e`)
 
@@ -158,8 +163,8 @@ compatibility layer covers the remaining PsyZ `00fb42e` gaps so all 113 units li
 | PocketStation (`libmcx`) | `McxStartCom`, `McxStopCom`, `McxCardType`, `McxSync`, plus 15 sample-only calls in `10_PdaSamp` | Reports PocketStation absent (`McxErrInvalid` on valid card ports) so regular memory-card probing succeeds. |
 
 All 113 units have 0 pointer-to-integer, buffer-bounds, `-Wstrict-prototypes`,
-and `-Wreturn-type` warnings. Verify PS1/native save cross-compatibility and
-audio, day, and season parity through the local game build.
+and `-Wreturn-type` warnings. Verify audio, day and season parity, and cross-check
+saves across more game states and a physical PS1 if available.
 
 ## Verification
 
