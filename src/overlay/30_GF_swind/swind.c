@@ -843,7 +843,7 @@ static void swind_model_select(void) {
 
 /* Sets (value 1) or clears (value 0) one bit of game_state.debugFlags. */
 static void swind_set_debug_flag_bit(u32 bit, u32 value) {
-    game_state.debugFlags = (game_state.debugFlags & ~(1 << bit)) | (value << bit);
+    game_state.debugFlags = (game_state.debugFlags & ~(1U << bit)) | (value << bit);
 }
 /* Loads the debug font and sets the text origin of the window. */
 static void swind_font_setup(void) {

@@ -362,7 +362,13 @@ s32 farm_callback_capped(VECTOR *pos, LimitPair limits, s32 width, s32 depth, vo
         farm_callbacks_queued = count + 1;
         return farm_tile_occupant(pos, limits, out_tile, out_flags, walker, mask);
     }
+#ifdef __psyz
+    if (out_flags != 0) {
+        *out_flags = 0;
+    }
+#else
     *out_flags = 0;
+#endif
     return 1;
 }
 
@@ -676,6 +682,17 @@ s32 farm_tile_occupant(VECTOR *pos, LimitPair place, void **tile, s32 *flags, vo
     u32 i;
     u32 n;
     u32 bit;
+#ifdef __psyz
+    void *ignored_tile;
+    s32 ignored_flags;
+
+    if (tile == 0) {
+        tile = &ignored_tile;
+    }
+    if (flags == 0) {
+        flags = &ignored_flags;
+    }
+#endif
 
     query.pos = pos;
     query.place = &place;

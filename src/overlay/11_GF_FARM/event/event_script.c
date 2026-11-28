@@ -1122,6 +1122,9 @@ static s32 event_script_start(void)
 
     data = 0;
 #ifdef __psyz
+    if (game_state.request == 0) {
+        return 1;
+    }
     id = game_state.request->args[0];
     if ((unsigned)id >= sizeof(event_script_offsets) / sizeof(event_script_offsets[0]) - 1 ||
         event_script_offsets[id] == event_script_offsets[id + 1]) {

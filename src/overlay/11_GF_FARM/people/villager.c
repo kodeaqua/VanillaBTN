@@ -371,9 +371,9 @@ static inline void move_to_cell(FarmVillager *villager, FarmCell *cell)
     villager->position.vx = cell->x;
     villager->position.vy = cell->y;
     villager->position.vz = cell->z;
-    villager->fixedPosition.vx = cell->x << 16;
-    villager->fixedPosition.vy = cell->y << 16;
-    villager->fixedPosition.vz = cell->z << 16;
+    villager->fixedPosition.vx = (s32)((u32)cell->x << 16);
+    villager->fixedPosition.vy = (s32)((u32)cell->y << 16);
+    villager->fixedPosition.vz = (s32)((u32)cell->z << 16);
 }
 
 /* The villager reached `cell`: stop it there and start the next cell of its route
@@ -1216,9 +1216,9 @@ static s32 villager_route_step_move(FarmVillager *villager, s32 command, s32 res
         villager->position.vx = cell->x;
         villager->position.vy = cell->y;
         villager->position.vz = cell->z;
-        villager->fixedPosition.vx = cell->x << 16;
-        villager->fixedPosition.vy = cell->y << 16;
-        villager->fixedPosition.vz = cell->z << 16;
+        villager->fixedPosition.vx = (s32)((u32)cell->x << 16);
+        villager->fixedPosition.vy = (s32)((u32)cell->y << 16);
+        villager->fixedPosition.vz = (s32)((u32)cell->z << 16);
         if (!resume)
         {
             villager->column = 1;
