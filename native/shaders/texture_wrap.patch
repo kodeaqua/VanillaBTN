@@ -1,0 +1,37 @@
+diff --git a/psyz/src/platform/shaders/psx.frag.glsl b/psyz/src/platform/shaders/psx.frag.glsl
+--- a/psyz/src/platform/shaders/psx.frag.glsl
++++ b/psyz/src/platform/shaders/psx.frag.glsl
+@@ -17,8 +17,13 @@
+
+ uvec2 resolveTexel() {
+     vec2 uv = rawUV + 1.0 / 512.0;
+-    uvec2 texel = uvec2(clamp(floor(uv), vec2(0.0), vec2(255.0)));
++    uvec2 texel = uvec2(ivec2(floor(uv))) & 0xffu;
+     return (texel & texWindow.xy) | texWindow.zw;
++}
++
++vec4 readVram(ivec2 word) {
++    const ivec2 vramMask = ivec2(1023, 511);
++    return texelFetch(texVram, word & vramMask, 0);
+ }
+
+ layout(location = 0) out vec4 FragColor;
+@@ -51,15 +56,15 @@
+     if (textureMode == 0u) { // untextured
+         texColor = vec4(1, 1, 1, 2);
+     } else if (textureMode == 1u) { // 16-bit bitmap
+-        texColor = texelFetch(texVram, pageBase + ivec2(resolveTexel()), 0);
++        texColor = readVram(pageBase + ivec2(resolveTexel()));
+     } else { // indexed
+         ivec2 texel = ivec2(resolveTexel());
+         uint subPixel = uint(texel.x) & subPixelMask;
+         ivec2 texelPos = ivec2(texel.x >> texelShift, texel.y);
+-        uint word16 = rgb5551ToU16(texelFetch(texVram, pageBase + texelPos, 0));
++        uint word16 = rgb5551ToU16(readVram(pageBase + texelPos));
+         uint colorIdx = (word16 >> (subPixel * indexShift)) & indexMask;
+         ivec2 clutBase = ivec2((clut % 64u) * 16u, clut / 64u);
+-        texColor = texelFetch(texVram, clutBase + ivec2(colorIdx, 0), 0);
++        texColor = readVram(clutBase + ivec2(colorIdx, 0));
+     }
+     // check for full transparency
+     if (texColor == vec4(0, 0, 0, 0)) {

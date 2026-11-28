@@ -63,6 +63,9 @@ sampled in the same frame. [GPU pixel test](native/test_gpu_pixels.c)
 - The pinned shader produced `0x7ac7` instead of `0x7aa6` for the mode 3
   vector. Truncating the quarter foreground in RGB555 fixes that vector.
   [Shader patch and regeneration](native/shaders/README.md)
+- D3D12 readback verifies sprite U/V wrap at 255 and right-to-left VRAM wrap
+  for 16-bit textures and 8-bit textures/CLUTs. Same-frame cases also verify
+  that a draw on the left edge is visible to the wrapped texture read.
 - Keep other dither-eligible primitive types and repeated blending open
   until their probes run.
 

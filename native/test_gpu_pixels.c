@@ -13,7 +13,13 @@ enum {
     COLOR_MASK = 0x7fff,
     RGB888_SHIFT = 3,
     INDEXED_TEXTURE = 0,
+    INDEXED_8_BIT_TEXTURE = 1,
     DIRECT_COLOR_TEXTURE = 2,
+    TEXTURE_PAGE_SIZE = 256,
+    VRAM_WIDTH = 1024,
+    LAST_TEXTURE_PAGE_X = VRAM_WIDTH - 64,
+    LAST_CLUT_X = VRAM_WIDTH - 16,
+    WORD_BLOCK_SIZE = 2,
 };
 
 static unsigned rgb555(unsigned r, unsigned g, unsigned b) { return r | (g << 5) | (b << 10); }
@@ -94,12 +100,12 @@ static int check_blend(int blend, unsigned expected) {
     return 0;
 }
 
-static void sample_texture(int x, int clut) {
+static void sample_texture(int x, int clut, int u, int v) {
     SPRT sprite = {0};
     SetSprt(&sprite);
     setXY0(&sprite, x, TILE_ORIGIN);
     setWH(&sprite, TILE_SIZE, TILE_SIZE);
-    setUV0(&sprite, 0, 0);
+    setUV0(&sprite, u, v);
     setShadeTex(&sprite, 1);
     sprite.clut = clut;
     termPrim(&sprite);
@@ -127,7 +133,7 @@ static int check_copy_visibility(void) {
     draw_tile(TILE_ORIGIN, TILE_ORIGIN, COLOR_MAX << RGB888_SHIFT, 0, 0, 0);
     MoveImage(&source, COPY_X, COPY_Y);
     select_draw_mode(getTPage(DIRECT_COLOR_TEXTURE, 0, COPY_X, COPY_Y), 0);
-    sample_texture(SAMPLE_X, 0);
+    sample_texture(SAMPLE_X, 0, 0, 0);
     return check_texture(SAMPLE_X, rgb555(COLOR_MAX, 0, 0), "same-frame copy");
 }
 
@@ -151,16 +157,81 @@ static int check_clut_visibility(void) {
     LoadImage(&texture, texture_data);
     LoadImage(&clut, palette_data);
     select_draw_mode(getTPage(INDEXED_TEXTURE, 0, TEXTURE_X, TEXTURE_Y), 0);
-    sample_texture(TILE_ORIGIN, getClut(CLUT_X, TEXTURE_Y));
+    sample_texture(TILE_ORIGIN, getClut(CLUT_X, TEXTURE_Y), 0, 0);
 
     const unsigned new_color = rgb555(0, COLOR_MAX, 0);
     palette[CLUT_INDEX] = (u16)new_color;
     memcpy(palette_data, palette, sizeof(palette));
     LoadImage(&clut, palette_data);
-    sample_texture(TILE_ORIGIN + TILE_SIZE, getClut(CLUT_X, TEXTURE_Y));
+    sample_texture(TILE_ORIGIN + TILE_SIZE, getClut(CLUT_X, TEXTURE_Y), 0, 0);
     int failures = check_texture(TILE_ORIGIN, COLOR_MAX, "original CLUT");
     failures += check_texture(TILE_ORIGIN + TILE_SIZE, new_color, "updated CLUT");
     return failures;
+}
+
+static void load_word_block(int x, int y, u16 word) {
+    enum { BLOCK_PIXELS = WORD_BLOCK_SIZE * WORD_BLOCK_SIZE };
+    RECT block = {x, y, WORD_BLOCK_SIZE, WORD_BLOCK_SIZE};
+    const u16 pixels[BLOCK_PIXELS] = {word, word, word, word};
+    u_long transfer[BLOCK_PIXELS * sizeof(u16) / sizeof(u_long)];
+    memcpy(transfer, pixels, sizeof(pixels));
+    LoadImage(&block, transfer);
+}
+
+static int check_sprite_uv_wrap(void) {
+    enum { PAGE_X = 512, PAGE_Y = 256, UV = TEXTURE_PAGE_SIZE - TILE_SIZE / 2 };
+    const u16 colors[] = {COLOR_MAX, rgb555(0, COLOR_MAX, 0), rgb555(0, 0, COLOR_MAX),
+                          rgb555(COLOR_MAX, COLOR_MAX, 0)};
+    u16 pixels[TILE_PIXELS];
+    load_word_block(PAGE_X + UV, PAGE_Y + UV, colors[0]);
+    load_word_block(PAGE_X, PAGE_Y + UV, colors[1]);
+    load_word_block(PAGE_X + UV, PAGE_Y, colors[2]);
+    load_word_block(PAGE_X, PAGE_Y, colors[3]);
+    select_draw_mode(getTPage(DIRECT_COLOR_TEXTURE, 0, PAGE_X, PAGE_Y), 0);
+    sample_texture(TILE_ORIGIN, 0, UV, UV);
+    read_tile(TILE_ORIGIN, TILE_ORIGIN, pixels);
+    for (int row = 0; row < TILE_SIZE; ++row) {
+        for (int col = 0; col < TILE_SIZE; ++col) {
+            unsigned quadrant = (row >= TILE_SIZE / 2) * 2 + (col >= TILE_SIZE / 2);
+            unsigned actual = pixels[row * TILE_SIZE + col] & COLOR_MASK;
+            if (actual != colors[quadrant]) {
+                fprintf(stderr, "sprite UV wrap at (%d,%d): got %04x, expected %04x\n", col, row,
+                        actual, colors[quadrant]);
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+static int check_direct_page_wrap(void) {
+    enum { UV = VRAM_WIDTH - LAST_TEXTURE_PAGE_X };
+    select_draw_mode(getTPage(DIRECT_COLOR_TEXTURE, 0, LAST_TEXTURE_PAGE_X, 0), 0);
+    draw_tile(0, 0, 0, 0, COLOR_MAX << RGB888_SHIFT, 0);
+    DrawSync(0);
+    draw_tile(TILE_ORIGIN, TILE_ORIGIN, 0, 0, COLOR_MAX << RGB888_SHIFT, 0);
+    draw_tile(0, 0, COLOR_MAX << RGB888_SHIFT, 0, 0, 0);
+    sample_texture(TILE_ORIGIN, 0, UV, 0);
+    return check_texture(TILE_ORIGIN, COLOR_MAX, "same-frame direct page wrap");
+}
+
+static int check_indexed_page_and_clut_wrap(void) {
+    enum {
+        PAGE_Y = 256,
+        CLUT_Y = 64,
+        TEXELS_PER_WORD = 2,
+        UV = (VRAM_WIDTH - LAST_TEXTURE_PAGE_X) * TEXELS_PER_WORD,
+        CLUT_INDEX = VRAM_WIDTH - LAST_CLUT_X,
+        INDICES = CLUT_INDEX | (CLUT_INDEX << 8)
+    };
+    load_word_block(0, PAGE_Y, INDICES);
+    load_word_block(0, PAGE_Y + WORD_BLOCK_SIZE, INDICES);
+    select_draw_mode(getTPage(INDEXED_8_BIT_TEXTURE, 0, LAST_TEXTURE_PAGE_X, PAGE_Y), 0);
+    draw_tile(TILE_ORIGIN, TILE_ORIGIN, 0, 0, COLOR_MAX << RGB888_SHIFT, 0);
+    draw_tile(0, CLUT_Y, 0, COLOR_MAX << RGB888_SHIFT, 0, 0);
+    sample_texture(TILE_ORIGIN, getClut(LAST_CLUT_X, CLUT_Y), UV, 0);
+    return check_texture(TILE_ORIGIN, rgb555(0, COLOR_MAX, 0),
+                         "same-frame 8-bit page and CLUT wrap");
 }
 
 int main(void) {
@@ -179,5 +250,8 @@ int main(void) {
     failures += check_blend(3, rgb555(6, 21, 30));
     failures += check_copy_visibility();
     failures += check_clut_visibility();
+    failures += check_sprite_uv_wrap();
+    failures += check_direct_page_wrap();
+    failures += check_indexed_page_and_clut_wrap();
     return failures != 0;
 }
