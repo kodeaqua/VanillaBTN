@@ -416,6 +416,13 @@ int main(void) {
             scene_frame_handler = farm_enter_dispatch;
             break;
         }
+#ifdef __psyz
+        if ((main_scene >= SCENE_MG1 && main_scene <= SCENE_MG3) ||
+            main_scene == SCENE_MG4 || main_scene == SCENE_MG5) {
+            /* The 3D stages use screen-centred coordinates after the frame reset. */
+            SetGeomOffset(MAIN_DISPLAY_WIDTH / 2, MAIN_DISPLAY_HEIGHT / 2);
+        }
+#endif
         main_run_frame();
     }
 }
