@@ -56,13 +56,15 @@ interlace where a game route or reachable command stream shows a dependency.
 | Blend and VRAM visibility | Draw all four blend modes over known RGB555 backgrounds with odd channel values. Upload a new CLUT entry and copy the destination to another VRAM region, then sample both updated regions in the same frame. | Readback matches the reference words at the affected coordinates. Both dependent draws use the updated data, including on the first frame. [PS1 blend and transfer rules](https://psx-spx.consoledev.net/graphicsprocessingunitgpu/) |
 | Projection and UVs | Move two adjacent world triangles by fractions of a logical pixel and use an oblique checkerboard with different vertex depths. Submit a nearby HUD sprite and reuse packet storage on the next frame. | Projected XY follows the calculated fractional positions, the shared edge stays joined, and the texture landmarks follow their expected perspective positions. HUD pixels and the next frame's unrelated draw match their own inputs. |
 
-On Windows D3D12, `vanillabtn_gpu_pixels` checks the Gouraud dither phase, one
-RGB555 vector across all four blend modes, and VRAM copies and CLUT updates
+On Windows D3D12, `vanillabtn_gpu_pixels` checks the Gouraud dither phase,
+all four RGB555 blend modes, and VRAM copies and CLUT updates
 sampled in the same frame. [GPU pixel test](native/test_gpu_pixels.c)
 
-- The pinned shader produced `0x7ac7` instead of `0x7aa6` for the mode 3
-  vector. Truncating the quarter foreground in RGB555 fixes that vector.
-  [Shader patch and regeneration](native/shaders/README.md)
+- The blend shader reads the current background and applies each PS1 equation
+  in RGB555. D3D12 and Beetle PSX software readback agree on all 4,096 channel
+  pairs across the four modes. [Shader source and regeneration](native/shaders/README.md)
+- D3D12 probes cover repeated, disjoint, and mixed blends, transparent texels,
+  and the 2× canvas. GP0(E6) mask tests and writes are still open.
 - D3D12 readback verifies sprite U/V wrap at 255 and right-to-left VRAM wrap
   for 16-bit textures and 8-bit textures/CLUTs. Same-frame cases also verify
   that a draw on the left edge is visible to the wrapped texture read.
@@ -81,10 +83,10 @@ sampled in the same frame. [GPU pixel test](native/test_gpu_pixels.c)
 - Keep flat polygons, rectangles, oblique lines, and non-degenerate Gouraud
   lines open until their probes run.
 
-| Open D3D12 RGB555 probe | PS1 reference | Native readback |
+| D3D12 RGB555 probe | Previous readback | Current readback |
 | --- | --- | --- |
-| Mode 0 with red 1 in the foreground and background | `0x0000` after truncating each half | `0x0001` |
-| Mode 1 with 31 consecutive red-1 draws over black | `0x001f` | `0x001e` |
+| Mode 0 with red 5 in the foreground over black | `0x0003` | `0x0002` |
+| Mode 1 with 31 consecutive red-1 draws over black | `0x001e` | `0x001f` |
 
 ### First title-demo baseline
 
@@ -97,6 +99,9 @@ sampled in the same frame. [GPU pixel test](native/test_gpu_pixels.c)
 - Fresh Windows game Debug and Release builds passed all seven CTest tests
   after the blend fix. Both booted the verified USA image on D3D12. The
   changed shader has a separate readback test for its exact RGB555 result.
+- The RGB555 blend update replayed the same inputs at all 10 checkpoints.
+  Ticks 120–1848 took 57.69 s before and after on this host. ETW event loss
+  prevented a comparison of GPU busy times for this update.
 
 Three Release runs of `b92fb8b` used the Radeon RX Vega, D3D12, and a 75 Hz
 display. PresentMon 2.6.0 sampled the common 15–60 second title window.

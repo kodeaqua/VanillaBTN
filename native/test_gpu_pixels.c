@@ -220,6 +220,146 @@ static int check_texture(int x, unsigned expected, const char *source) {
     return 0;
 }
 
+static int check_blend_precision(void) {
+    enum {
+        HALF = 0,
+        ADD = 1,
+        SUBTRACT = 2,
+        QUARTER = 3,
+        LOW_RED = 1 << RGB888_SHIFT,
+        SECOND_X = TILE_ORIGIN + 2 * TILE_SIZE,
+    };
+    select_draw_mode(getTPage(0, HALF, 0, 0), 0);
+    draw_tile(TILE_ORIGIN, TILE_ORIGIN, 0, 0, 0, 0);
+    draw_tile(SECOND_X, TILE_ORIGIN, 0, 0, 0, 0);
+    draw_tile(TILE_ORIGIN, TILE_ORIGIN, 5 << RGB888_SHIFT, 0, 0, 1);
+    draw_tile(SECOND_X, TILE_ORIGIN, 7 << RGB888_SHIFT, 0, 0, 1);
+    int failures = check_texture(TILE_ORIGIN, 2, "truncate odd half blend");
+    failures += check_texture(SECOND_X, 3, "disjoint half blend");
+
+    select_draw_mode(getTPage(0, ADD, 0, 0), 0);
+    draw_tile(TILE_ORIGIN, TILE_ORIGIN, 0, 0, 0, 0);
+    for (int i = 0; i < COLOR_MAX; ++i) {
+        draw_tile(TILE_ORIGIN, TILE_ORIGIN, LOW_RED, 0, 0, 1);
+    }
+    failures += check_texture(TILE_ORIGIN, COLOR_MAX, "add one 31 times");
+
+    select_draw_mode(getTPage(0, SUBTRACT, 0, 0), 0);
+    draw_tile(TILE_ORIGIN, TILE_ORIGIN, LOW_RED, 0, 0, 1);
+    draw_tile(TILE_ORIGIN, TILE_ORIGIN, LOW_RED, 0, 0, 1);
+    select_draw_mode(getTPage(0, QUARTER, 0, 0), 0);
+    draw_tile(TILE_ORIGIN, TILE_ORIGIN, 7 << RGB888_SHIFT, 0, 0, 1);
+    failures += check_texture(TILE_ORIGIN, COLOR_MAX - 1, "mixed subtraction and quarter add");
+    return failures;
+}
+
+static int check_textured_blend(void) {
+    enum { PAGE_X = 448, PAGE_Y = 256, SUBTRACT = 2, DST_RED = 17, SRC_RED = 7, SEMI = 0x8000 };
+    const u16 texels[TILE_SIZE] = {0, SRC_RED, SEMI | SRC_RED, SEMI};
+    const unsigned expected[TILE_SIZE] = {DST_RED, SRC_RED, DST_RED - SRC_RED, DST_RED};
+    RECT rect = {PAGE_X, PAGE_Y, TILE_SIZE, TILE_SIZE};
+    u16 image[TILE_PIXELS];
+    u_long transfer[TILE_PIXELS * sizeof(u16) / sizeof(u_long)];
+    for (int i = 0; i < TILE_SIZE; ++i) {
+        memcpy(&image[i * TILE_SIZE], texels, sizeof(texels));
+    }
+    memcpy(transfer, image, sizeof(image));
+    LoadImage(&rect, transfer);
+
+    SPRT sprite = {0};
+    SetSprt(&sprite);
+    setXY0(&sprite, TILE_ORIGIN, TILE_ORIGIN);
+    setWH(&sprite, TILE_SIZE, TILE_SIZE);
+    setUV0(&sprite, 0, 0);
+    setShadeTex(&sprite, 1);
+    setSemiTrans(&sprite, 1);
+    termPrim(&sprite);
+    select_draw_mode(getTPage(DIRECT_COLOR_TEXTURE, SUBTRACT, PAGE_X, PAGE_Y), 0);
+    draw_tile(TILE_ORIGIN, TILE_ORIGIN, DST_RED << RGB888_SHIFT, 0, 0, 0);
+    DrawOTag((OT_TYPE *)&sprite);
+
+    u16 pixels[TILE_PIXELS];
+    read_tile(TILE_ORIGIN, TILE_ORIGIN, pixels);
+    for (int i = 0; i < TILE_PIXELS; ++i) {
+        unsigned actual = pixels[i] & COLOR_MASK;
+        if (actual != expected[i % TILE_SIZE]) {
+            fprintf(stderr, "textured subtraction at pixel %d: got %04x, expected %04x\n", i,
+                    actual, expected[i % TILE_SIZE]);
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int check_blend_channel_range(void) {
+    enum {
+        COLOR_COUNT = COLOR_MAX + 1,
+        PIXELS = COLOR_COUNT * COLOR_COUNT,
+        PAGE_X = 448,
+        PAGE_Y = 256,
+        SEMI = 0x8000,
+        MODE_COUNT = 4
+    };
+    RECT source = {PAGE_X, PAGE_Y, COLOR_COUNT, COLOR_COUNT};
+    RECT dest = {TILE_ORIGIN, TILE_ORIGIN, COLOR_COUNT, COLOR_COUNT};
+    u16 words[PIXELS];
+    u_long transfer[PIXELS * sizeof(u16) / sizeof(u_long)];
+    for (int i = 0; i < PIXELS; ++i) {
+        words[i] = SEMI | (i % COLOR_COUNT);
+    }
+    memcpy(transfer, words, sizeof(words));
+    LoadImage(&source, transfer);
+
+    SPRT sprite = {0};
+    SetSprt(&sprite);
+    setXY0(&sprite, dest.x, dest.y);
+    setWH(&sprite, COLOR_COUNT, COLOR_COUNT);
+    setUV0(&sprite, 0, 0);
+    setShadeTex(&sprite, 1);
+    setSemiTrans(&sprite, 1);
+    termPrim(&sprite);
+
+    for (int mode = 0; mode < MODE_COUNT; ++mode) {
+        for (int i = 0; i < PIXELS; ++i) {
+            words[i] = i / COLOR_COUNT;
+        }
+        memcpy(transfer, words, sizeof(words));
+        LoadImage(&dest, transfer);
+        select_draw_mode(getTPage(DIRECT_COLOR_TEXTURE, mode, PAGE_X, PAGE_Y), 0);
+        DrawOTag((OT_TYPE *)&sprite);
+        StoreImage(&dest, transfer);
+        DrawSync(0);
+        memcpy(words, transfer, sizeof(words));
+        for (int i = 0; i < PIXELS; ++i) {
+            const int b = i / COLOR_COUNT;
+            const int f = i % COLOR_COUNT;
+            const int mixed[MODE_COUNT] = {(b + f) / 2, b + f, b - f, b + f / 4};
+            const int value = mixed[mode];
+            const int expected = value < 0 ? 0 : value > COLOR_MAX ? COLOR_MAX : value;
+            const int actual = words[i] & COLOR_MASK;
+            if (actual != expected) {
+                fprintf(stderr, "blend %d, B=%d F=%d: got %04x, expected %04x\n", mode, b, f,
+                        actual, expected);
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+static int check_scaled_canvas_blend(void) {
+    enum { DISPLAY_HEIGHT = 240, CANVAS_WIDTH = 480, CANVAS_HEIGHT = 272, SCALE = 2 };
+    DISPENV display;
+    SetDefDispEnv(&display, 0, 0, DRAW_SIZE, DISPLAY_HEIGHT);
+    PutDispEnv(&display);
+    if (Psyz_VideoSetResolution((PsyzSize){CANVAS_WIDTH, CANVAS_HEIGHT}) != 0 ||
+        Psyz_VideoSetInternalResolution(SCALE) != 0 || Psyz_VideoGetInternalResolution() != SCALE) {
+        fputs("Could not configure the 2x native canvas\n", stderr);
+        return 1;
+    }
+    return check_blend_precision() + check_textured_blend();
+}
+
 static int check_clear_draw_order(void) {
     enum {
         FILL_WIDTH = 16,
@@ -431,6 +571,9 @@ int main(void) {
     failures += check_blend(1, rgb555(12, 30, COLOR_MAX));
     failures += check_blend(2, rgb555(0, 8, 19));
     failures += check_blend(3, rgb555(6, 21, 30));
+    failures += check_blend_precision();
+    failures += check_textured_blend();
+    failures += check_blend_channel_range();
     failures += check_clear_draw_order();
     failures += check_copy_visibility();
     failures += check_clut_visibility();
@@ -438,5 +581,6 @@ int main(void) {
     failures += check_sprite_uv_wrap();
     failures += check_direct_page_wrap();
     failures += check_indexed_page_and_clut_wrap();
+    failures += check_scaled_canvas_blend();
     return failures != 0;
 }

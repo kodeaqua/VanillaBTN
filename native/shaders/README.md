@@ -1,13 +1,14 @@
 # PsyZ Windows fragment shader
 
 The game build uses `psx_frag.dxil` with the pinned PsyZ `00fb42e` renderer.
-The shader patches truncate the quarter foreground in RGB555 for blend mode 3
-and wrap 8-bit texture coordinates and VRAM reads at their hardware boundaries.
+The shader blends in RGB555 and wraps 8-bit texture coordinates and VRAM reads
+at their hardware boundaries. The renderer supplies the background from the
+active GPU target before each overlapping draw.
 See [NOTICE](../../NOTICE) for the PsyZ MPL 2.0 terms.
 
-To regenerate the blob in a disposable PsyZ checkout, apply `quarter_blend.patch`
-and `texture_wrap.patch` at the PsyZ repository root. Run the fragment steps from
-PsyZ's `psyz/src/platform/shaders/build_shaders.sh` in the shader directory.
+To regenerate the blob in a disposable PsyZ checkout, apply `texture_wrap.patch`
+followed by `blend_rgb555.patch` at the PsyZ repository root. Run the fragment
+steps from PsyZ's `psyz/src/platform/shaders/build_shaders.sh` in the shader directory.
 
 ```sh
 glslang -V --target-env vulkan1.0 -S frag psx.frag.glsl -o psx.frag.spv

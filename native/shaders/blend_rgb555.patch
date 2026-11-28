@@ -1,0 +1,52 @@
+diff --git a/psyz/src/platform/shaders/psx.frag.glsl b/psyz/src/platform/shaders/psx.frag.glsl
+--- a/psyz/src/platform/shaders/psx.frag.glsl
++++ b/psyz/src/platform/shaders/psx.frag.glsl
+@@ -14,6 +14,7 @@ layout(location = 10) flat in ivec2 pageBase;
+ layout(location = 11) flat in uvec4 texWindow;
+
+ layout(set = 2, binding = 0) uniform sampler2D texVram;
++layout(set = 2, binding = 1) uniform sampler2D texBackground;
+
+ uvec2 resolveTexel() {
+     vec2 uv = rawUV + 1.0 / 512.0;
+@@ -68,8 +69,7 @@ void main() {
+     }
+     // check for full transparency
+     if (texColor == vec4(0, 0, 0, 0)) {
+-        FragColor = vec4(0);
+-        return;
++        discard;
+     }
+     // check for setSemiTrans(p, 1)
+     bool isSemiTrans = vertexColor.a < 0.75;
+@@ -89,18 +89,24 @@ void main() {
+                                 : floor(prod8 / 8.0) / 31.0;
+     }
+     modColor = applyDither(modColor);
+-    // pre-multiplied alpha output for ONE, ONE_MINUS_SRC_ALPHA blending
+     if (colorSemiTrans && isSemiTrans) {
++        vec4 dest = texelFetch(texBackground, ivec2(gl_FragCoord.xy), 0);
++        ivec3 background = ivec3(dest.rgb * 31.0 + 0.5);
++        ivec3 foreground = ivec3(modColor * 31.0 + 0.5);
++        ivec3 blended;
++        float alpha = dest.a;
+         uint abr = (tpage & 0x60u) >> 5u;
+         if (abr == 0u) {
+-            FragColor = vec4(modColor * 0.5, 0.5); // 50% blend
++            blended = (background + foreground) >> 1;
++            alpha = 0.5 + dest.a * 0.5;
+         } else if (abr == 1u) {
+-            FragColor = vec4(modColor, 0.0); // additive
++            blended = background + foreground;
+         } else if (abr == 2u) {
+-            FragColor = vec4(modColor, 0.0); // subtractive
+-        } else {                                  // abr == 3u
+-            FragColor = vec4(modColor * 0.25, 0.0); // B + F/4
++            blended = background - foreground;
++        } else {
++            blended = background + (foreground >> 2);
+         }
++        FragColor = vec4(vec3(clamp(blended, 0, 31)) / 31.0, alpha);
+     } else {
+         FragColor = vec4(modColor, 1.0); // full opacity
+     }

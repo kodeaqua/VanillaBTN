@@ -2,11 +2,13 @@
 set(psyz_platform "${VANILLABTN_PSYZ_SOURCE_DIR}/psyz/src/platform")
 set(psyz_gpu_source "${psyz_platform}/sdl3_gpu.c")
 set(psyz_gpu_common "${psyz_platform}/sdl3_common.h")
+set(psyz_gpu_draw "${psyz_platform}/sdl3_draw.h")
 set(psyz_upstream_shader "${psyz_platform}/shaders/psx_frag_dxil.h")
 set(psyz_patched_shader "${CMAKE_CURRENT_LIST_DIR}/shaders/psx_frag.dxil")
 set(psyz_gpu_build "${CMAKE_CURRENT_BINARY_DIR}/psyz-win-gpu")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-    "${psyz_gpu_source}" "${psyz_gpu_common}" "${psyz_upstream_shader}" "${psyz_patched_shader}")
+    "${psyz_gpu_source}" "${psyz_gpu_common}" "${psyz_gpu_draw}"
+    "${psyz_upstream_shader}" "${psyz_patched_shader}")
 
 function(patch_psyz_renderer source expected replacement description)
     string(FIND "${${source}}" "${expected}" first_match)
@@ -16,6 +18,18 @@ function(patch_psyz_renderer source expected replacement description)
     endif()
     string(REPLACE "${expected}" "${replacement}" patched "${${source}}")
     set(${source} "${patched}" PARENT_SCOPE)
+endfunction()
+
+function(patch_psyz_renderer_section source begin end replacement description)
+    string(FIND "${${source}}" "${begin}" first)
+    string(FIND "${${source}}" "${end}" last)
+    if(first LESS 0 OR last LESS_EQUAL first)
+        message(FATAL_ERROR "Could not locate PsyZ section for ${description}.")
+    endif()
+    math(EXPR length "${last} - ${first}")
+    string(SUBSTRING "${${source}}" ${first} ${length} section)
+    patch_psyz_renderer(${source} "${section}" "${replacement}" "${description}")
+    set(${source} "${${source}}" PARENT_SCOPE)
 endfunction()
 
 file(READ "${psyz_upstream_shader}" upstream_shader)
@@ -122,6 +136,81 @@ set(clear_image [=[    r = To15BitChannel(r);
     b = To15BitChannel(b);]=])
 patch_psyz_renderer(gpu_source "${clear_image}" "    Draw_FlushBuffer();\n${clear_image}"
     "VRAM fill order")
+
+# The fragment shader writes the final RGB555 color with fixed-function blending disabled.
+file(READ "${psyz_gpu_draw}" gpu_draw)
+string(REPLACE "\r\n" "\n" gpu_draw "${gpu_draw}")
+patch_psyz_renderer_section(gpu_draw "static inline bool is_subtract_abr(" "void Draw_SetTexpageMode("
+    "" "obsolete subtract grouping")
+file(CONFIGURE OUTPUT "${psyz_gpu_build}/vanillabtn_sdl3_draw.h"
+    CONTENT "#line 1 \"psyz/src/platform/sdl3_draw.h\"\n${gpu_draw}" @ONLY)
+patch_psyz_renderer(gpu_source "#include \"sdl3_draw.h\""
+    "#include \"vanillabtn_sdl3_draw.h\"" "the draw header include")
+patch_psyz_renderer(gpu_source "static SDL_GPUGraphicsPipeline* pipe_tri[BLEND_COUNT];"
+    [=[static SDL_GPUGraphicsPipeline* pipe_tri;
+static SDL_GPUTexture* blend_background;
+static PsyzSize blend_background_size;]=] "blend resources")
+patch_psyz_renderer(gpu_source "SDL_GPUShader* vs, SDL_GPUShader* fs, BlendMode mode) {"
+    "SDL_GPUShader* vs, SDL_GPUShader* fs) {" "the triangle pipeline signature")
+patch_psyz_renderer_section(gpu_source "    // the shader outputs alpha 0 on B-F texels"
+    "    const SDL_GPUColorTargetDescription target = {" "" "fixed-function blend states")
+patch_psyz_renderer(gpu_source "        .blend_state = blend[mode],\n" "" "the triangle blend state")
+patch_psyz_renderer(gpu_source "psx_frag, psx_frag_len, SDL_GPU_SHADERSTAGE_FRAGMENT, 1, 0);"
+    "psx_frag, psx_frag_len, SDL_GPU_SHADERSTAGE_FRAGMENT, 2, 0);" "the background sampler")
+patch_psyz_renderer_section(gpu_source "        for (int i = 0; i < BLEND_COUNT; i++) {"
+    "        pipe_clear = CreateClearPipeline" "        pipe_tri = CreatePsxPipeline(psx_vs, psx_fs);\n"
+    "the triangle pipeline allocation")
+patch_psyz_renderer(gpu_source [=[    for (int i = 0; i < BLEND_COUNT; i++) {
+        shaders_ok = shaders_ok && pipe_tri[i];
+    }
+    return shaders_ok && pipe_clear;]=] "    return shaders_ok && pipe_tri && pipe_clear;"
+    "the triangle pipeline initialization check")
+patch_psyz_renderer(gpu_source [=[        for (int i = 0; i < BLEND_COUNT; i++) {
+            if (pipe_tri[i]) {
+                SDL_ReleaseGPUGraphicsPipeline(device, pipe_tri[i]);
+                pipe_tri[i] = NULL;
+            }
+        }]=] [=[        if (pipe_tri) {
+            SDL_ReleaseGPUGraphicsPipeline(device, pipe_tri);
+            pipe_tri = NULL;
+        }
+        if (blend_background) {
+            SDL_ReleaseGPUTexture(device, blend_background);
+            blend_background = NULL;
+        }]=] "triangle and background resource cleanup")
+
+set(triangle_runs [=[    const float grid_scale_x = GetDrawGridXScale();
+    const float render_scale = (float)internal_res;
+    const PsyzSize target_size =
+        fb_index >= 0 ? canvas_size : (PsyzSize){VRAM_W, VRAM_H};
+    const PsyzSize scaled_size = {target_size.w * (int)internal_res,
+                                  target_size.h * (int)internal_res};
+    const SDL_Rect target_rect = {0, 0, scaled_size.w, scaled_size.h};
+    const SDL_GPUViewport viewport = {
+        .x = (float)offset.x * render_scale * (1.0f - grid_scale_x),
+        .w = (float)scaled_size.w * grid_scale_x,
+        .h = (float)scaled_size.h,
+        .max_depth = 1.0f,
+    };
+    SDL_Rect clip = ScaleRect(fb_index >= 0 ? canvas_rect : scissor_rect, (int)internal_res);
+    const float offset_ubo[6] = {
+        (float)offset.x, (float)offset.y,
+        0.5f / (render_scale * grid_scale_x), 0.5f / render_scale,
+        (float)target_size.w, (float)target_size.h,
+    };
+    if (!SDL_GetRectIntersection(&clip, &target_rect, &clip) ||
+        !RenderTriangleRuns(cmd, &target, &viewport, &clip, offset_ubo, scaled_size)) {
+        Draw_ResetBuffer();
+        return;
+    }
+]=])
+patch_psyz_renderer(gpu_source "void Draw_FlushBuffer(void) {"
+    "#include \"psyz_gpu_blend.h\"\n\nvoid Draw_FlushBuffer(void) {" "the triangle run renderer")
+patch_psyz_renderer_section(gpu_source
+    "    SDL_GPURenderPass* pass = SDL_BeginGPURenderPass(cmd, &target, 1, NULL);\n    const float grid_scale_x"
+    "    if (fb_index >= 0) {\n        InvalidateCanvas(&layout, fb_index, scissor_rect);"
+    "${triangle_runs}" "ordered triangle runs")
+
 file(CONFIGURE OUTPUT "${psyz_gpu_build}/sdl3_gpu.c"
     CONTENT "#line 1 \"psyz/src/platform/sdl3_gpu.c\"\n${gpu_source}" @ONLY)
 
@@ -132,4 +221,5 @@ endif()
 list(REMOVE_ITEM psyz_sources "src/platform/sdl3_gpu.c")
 set_property(TARGET psyz PROPERTY SOURCES "${psyz_sources};${psyz_gpu_build}/sdl3_gpu.c")
 set_property(SOURCE "${psyz_gpu_build}/sdl3_gpu.c"
-    TARGET_DIRECTORY psyz APPEND PROPERTY INCLUDE_DIRECTORIES "${psyz_platform}")
+    TARGET_DIRECTORY psyz APPEND PROPERTY INCLUDE_DIRECTORIES
+        "${psyz_platform}" "${CMAKE_CURRENT_LIST_DIR}")
