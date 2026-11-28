@@ -53,14 +53,34 @@ file(READ "${psyz_gpu_source}" gpu_source)
 string(REPLACE "#include \"shaders/psx_frag_dxil.h\"" "#include \"vanillabtn_psx_frag_dxil.h\""
     patched_gpu_source "${gpu_source}")
 string(REPLACE "#include \"sdl3_common.h\"" "#include \"vanillabtn_sdl3_common.h\""
-    gpu_source_with_wrap "${patched_gpu_source}")
+    gpu_source_with_common "${patched_gpu_source}")
 get_target_property(psyz_sources psyz SOURCES)
-if(gpu_source STREQUAL patched_gpu_source OR patched_gpu_source STREQUAL gpu_source_with_wrap OR
+if(gpu_source STREQUAL patched_gpu_source OR patched_gpu_source STREQUAL gpu_source_with_common OR
    NOT "src/platform/sdl3_gpu.c" IN_LIST psyz_sources)
     message(FATAL_ERROR "Could not substitute the PsyZ Windows renderer patches.")
 endif()
+
+# Extend axis-aligned draws past the larger coordinate to cover both endpoints.
+set(line_vertex [=[                Vertex* q = vertex_cur;
+                unsigned short base = n_vertices;]=])
+set(line_vertex_with_endpoints [=[                if (dy == 0 && ex < 0) {
+                    ++x0;
+                    ex = 0;
+                } else if (dx == 0 && ey < 0) {
+                    ++y0;
+                    ey = 0;
+                }
+
+                Vertex* q = vertex_cur;
+                unsigned short base = n_vertices;]=])
+string(REPLACE "\r\n" "\n" gpu_source_with_common "${gpu_source_with_common}")
+string(REPLACE "${line_vertex}" "${line_vertex_with_endpoints}"
+    gpu_source_with_lines "${gpu_source_with_common}")
+if(gpu_source_with_common STREQUAL gpu_source_with_lines)
+    message(FATAL_ERROR "Could not patch PsyZ axis-aligned line endpoints.")
+endif()
 file(CONFIGURE OUTPUT "${psyz_gpu_build}/sdl3_gpu.c"
-    CONTENT "#line 1 \"psyz/src/platform/sdl3_gpu.c\"\n${gpu_source_with_wrap}" @ONLY)
+    CONTENT "#line 1 \"psyz/src/platform/sdl3_gpu.c\"\n${gpu_source_with_lines}" @ONLY)
 list(REMOVE_ITEM psyz_sources "src/platform/sdl3_gpu.c")
 set_property(TARGET psyz PROPERTY SOURCES "${psyz_sources};${psyz_gpu_build}/sdl3_gpu.c")
 set_property(SOURCE "${psyz_gpu_build}/sdl3_gpu.c"

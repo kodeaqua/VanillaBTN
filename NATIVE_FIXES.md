@@ -68,8 +68,10 @@ sampled in the same frame. [GPU pixel test](native/test_gpu_pixels.c)
   that a draw on the left edge is visible to the wrapped texture read.
 - The D3D12 probe checks that raw Gouraud-textured polygons preserve RGB555
   texels and that modulated Gouraud-textured polygons apply the dither matrix.
-- Keep flat polygons, lines, rectangles, and repeated blending open until
-  their probes run.
+- Horizontal and vertical monochrome lines include both endpoints in both
+  directions. The D3D12 probe checks their dithering and surrounding pixels.
+- Keep flat polygons, rectangles, oblique and Gouraud lines, and repeated
+  blending open until their probes run.
 
 ### First title-demo baseline
 

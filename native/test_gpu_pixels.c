@@ -84,6 +84,40 @@ static int check_dither(int x, int y, int enabled) {
     return check_dither_pixels(x, y, RED, GREEN, BLUE, enabled);
 }
 
+static int check_flat_line(int vertical, int reverse) {
+    enum { FIRST_PIXEL = 1, LAST_PIXEL = TILE_SIZE - 1, RED = 8 };
+    const unsigned line_pixels[TILE_SIZE] = {0, RED, RED - 1, RED};
+    const int start = TILE_ORIGIN + (reverse ? LAST_PIXEL : FIRST_PIXEL);
+    const int end = TILE_ORIGIN + (reverse ? FIRST_PIXEL : LAST_PIXEL);
+    LINE_F2 line = {0};
+    SetLineF2(&line);
+    setXY2(&line, vertical ? TILE_ORIGIN : start, vertical ? start : TILE_ORIGIN,
+           vertical ? TILE_ORIGIN : end, vertical ? end : TILE_ORIGIN);
+    setRGB0(&line, RED << RGB888_SHIFT, 0, 0);
+    termPrim(&line);
+
+    select_draw_mode(0, 0);
+    draw_tile(TILE_ORIGIN, TILE_ORIGIN, 0, 0, 0, 0);
+    select_draw_mode(0, 1);
+    DrawOTag((OT_TYPE *)&line);
+    u16 pixels[TILE_PIXELS];
+    read_tile(TILE_ORIGIN, TILE_ORIGIN, pixels);
+    for (int row = 0; row < TILE_SIZE; ++row) {
+        for (int col = 0; col < TILE_SIZE; ++col) {
+            int along = vertical ? row : col;
+            int across = vertical ? col : row;
+            unsigned expected = across == 0 ? line_pixels[along] : 0;
+            unsigned actual = pixels[row * TILE_SIZE + col] & COLOR_MASK;
+            if (actual != expected) {
+                fprintf(stderr, "line vertical=%d reverse=%d at (%d,%d): got %04x, expected %04x\n",
+                        vertical, reverse, col, row, actual, expected);
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
 static int check_blend(int blend, unsigned expected) {
     u16 pixels[TILE_PIXELS];
     select_draw_mode(getTPage(0, blend, 0, 0), 0);
@@ -288,6 +322,10 @@ int main(void) {
     int failures = check_dither(TILE_ORIGIN, TILE_ORIGIN, 0);
     failures += check_dither(TILE_ORIGIN, TILE_ORIGIN, 1);
     failures += check_dither(TILE_ORIGIN + 1, TILE_ORIGIN + 2, 1);
+    failures += check_flat_line(0, 0);
+    failures += check_flat_line(0, 1);
+    failures += check_flat_line(1, 0);
+    failures += check_flat_line(1, 1);
     failures += check_blend(0, rgb555(6, 15, 18));
     failures += check_blend(1, rgb555(12, 30, COLOR_MAX));
     failures += check_blend(2, rgb555(0, 8, 19));
