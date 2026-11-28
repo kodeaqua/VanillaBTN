@@ -7,8 +7,9 @@ and a Windows x64 game build. **Windows x64 bring-up is complete.**
 ## Active work
 
 Use the [Windows native correction checklist](NATIVE_FIXES.md) for the next phase.
-Start with repeatable captures, then correct geometry, texture mapping, color, and
-measured host bottlenecks. Keep the original framing and gameplay timing.
+Start with a repeatable PS1 comparison and a Windows CPU/GPU/RAM baseline.
+Use the reproduction results to prioritize PGXP-style geometry, color, timing, and host work.
+This phase covers correctness and performance at the original 4:3 framing.
 
 ## Project decisions
 

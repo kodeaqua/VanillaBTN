@@ -1,10 +1,21 @@
 # Windows native correction checklist
 
 The bring-up build is the starting point. These are investigation and implementation
-tasks. A checkbox closes on a reproducible comparison or a passing regression test.
+tasks. Close each item with a repeatable comparison, a passing regression test,
+or evidence that the game never exercises the behavior.
 Keep 4:3 framing, original assets, gameplay ticks, and PS1-compatible diaries throughout.
 
-## 1. Capture a baseline
+## 1. Confirm what the game exercises
+
+| Area | Observed in source | What to verify in the game |
+|---|---|---|
+| Projection | The model path runs GTE projection and writes packed XY into GPU packets. PsyZ's shader interpolates UVs with the same clip-space W for each vertex. [Model producer](src/main/geometry/model.c), [PsyZ vertex shader](https://github.com/Xeeynamo/psyz/blob/00fb42e6f49c146ad760a1f605b15d2a4ec598f0/psyz/src/platform/shaders/psx.vert.glsl) | Record model and terrain jitter and texture drift. Follow the first rounding step in each producer. |
+| Dithering and color | The game enables dithering in its draw environments. The SDL3 GPU path tags eligible primitives and applies a 4×4 matrix in the fragment shader. [Draw environments](src/main/main.c), [PsyZ fragment shader](https://github.com/Xeeynamo/psyz/blob/00fb42e6f49c146ad760a1f605b15d2a4ec598f0/psyz/src/platform/shaders/psx.frag.glsl) | Verify the matrix phase, primitive eligibility, and quantization in the Windows build. Look for a difference before changing the existing dither path. |
+| Mask bits | The draw decoder forwards GP0(E6h). The pinned hardware draw helper leaves nonzero mask write/test flags unimplemented. [GPU packet decoder](https://github.com/Xeeynamo/psyz/blob/00fb42e6f49c146ad760a1f605b15d2a4ec598f0/psyz/src/psyz/libgpu.c), [PsyZ draw helper](https://github.com/Xeeynamo/psyz/blob/00fb42e6f49c146ad760a1f605b15d2a4ec598f0/psyz/src/platform/sdl3_draw.h) | Trace actual packets and VRAM transfers. Establish whether a mask-sensitive draw occurs before scheduling a game fix. |
+| Display modes | The game sets 320×240 and 640×480 display environments. The backend has a separate RGB24 path and ignores the interlace flag. [Display environments](src/main/graphics/screen_fade.c), [SDL3 GPU backend](https://github.com/Xeeynamo/psyz/blob/00fb42e6f49c146ad760a1f605b15d2a4ec598f0/psyz/src/platform/sdl3_gpu.c) | Record the mode bits the game actually requests. Schedule an interlace or RGB24 fix if a used mode produces a visible mismatch. |
+| Primitive limits | VanillaBTN already tests the PS1 triangle size limits before handing a packet to PsyZ. A quad with one rejected half can be submitted via a temporary packet. [Packet filter](native/gpu_primitives.c), [Existing tests](native/test_gpu_primitives.c) | Verify both halves independently. Carry precise vertices through any packet copy or remap, including a partially rejected quad. |
+
+## 2. Capture a baseline
 
 - [ ] Record a slow camera pan in the farmyard, an oblique textured surface, an actor
   passing behind scenery, and a fade into a dialogue window. Record scene, camera,
@@ -12,11 +23,14 @@ Keep 4:3 framing, original assets, gameplay ticks, and PS1-compatible diaries th
 - [ ] Replay each sequence on the USA PS1 reference or DuckStation's software renderer
   at native resolution with enhancements disabled. Record the emulator settings.
   Mark each symptom as observed in both, native-only, or still unconfirmed.
+- [ ] Add a menu/fade, a 640×480 display transition if used, and a minigame return.
+  Record the draw/display environments and compare logical framebuffer pixels before
+  window scaling. Capture both back buffers across each transition.
 - [ ] In Release, capture CPU frame time, GPU frame time, present intervals, upload and
   readback bytes, and peak host memory on the same route. Record hardware and driver.
   Repeat after warm-up and compare median and 95th-percentile times.
 
-## 2. Prioritize visible defects
+## 3. Prioritize visible defects
 
 | Priority and task | Where to investigate | Acceptance check |
 |---|---|---|
@@ -26,19 +40,20 @@ Keep 4:3 framing, original assets, gameplay ticks, and PS1-compatible diaries th
 | [ ] P2. Correct dithering and color conversion | PS1 draw state can apply ordered dithering before RGB555 quantization. Compare the dither-enabled and disabled paths on a flat-to-shaded gradient. Check primitive eligibility, native pixel coordinates, and single application of quantization. | With dithering enabled, the 4×4 pattern has the reference phase and intensity. With it disabled, the same draw has no pattern. Check fades, unshaded sprites, text, and color band boundaries. |
 | [ ] P2. Check blending, masks, and VRAM copies | Compare semi-transparent primitives over known background colors, palette uploads, and framebuffer copies. Follow PsyZ flushes when a draw samples a region written earlier in the frame. | Blend modes and mask-bit writes match reference pixel samples. Opening a menu or transitioning scenes shows the current texture and palette on the first visible frame. |
 
-PGXP addresses precision loss in emulators. VanillaBTN has the original geometry
-producers, so the first experiment can carry projection data directly from them.
-Treat geometry precision, texture interpolation, and depth ordering as independently testable changes.
+For the PGXP-style correction, carry projection data from the original geometry
+producers into native draw submission. Verify subpixel XY, perspective UVs, and
+visibility independently. Use a depth test only for draw groups that need it.
 
-Hardware and implementation references: [GTE projection](https://psx-spx.consoledev.net/geometrytransformationenginegte/),
-[GPU commands, color and blending](https://psx-spx.consoledev.net/graphicsprocessingunitgpu/),
-[DuckStation's PGXP feature description](https://github.com/stenzek/duckstation#features).
+- [GTE projection and saturation](https://psx-spx.consoledev.net/geometrytransformationenginegte/)
+- [GPU commands, color and blending](https://psx-spx.consoledev.net/graphicsprocessingunitgpu/)
+- [DuckStation's PGXP geometry, texture, culling and depth options](https://github.com/stenzek/duckstation/blob/master/src/duckstation-qt/graphicssettingswidget.cpp)
 
-## 3. Use host hardware where measurements justify it
+## 4. Use host GPU, CPU, and memory
 
-The game and overlays already execute as x64 code. PsyZ's SDL3 GPU backend submits
-indexed draws and handles VRAM transfers. Native frame workspaces already use host RAM.
-The target is correct output with stable frame times and bounded memory use.
+The game and overlays already execute as x64 code. Debug and Release use PsyZ's SDL3 GPU
+backend for rasterization and VRAM transfers. Native frame workspaces already use host RAM.
+Use the hardware for work it can accelerate. Track frame deadlines, load latency,
+and memory peaks as the success metrics.
 
 | Resource | Task | Acceptance check |
 |---|---|---|
@@ -46,10 +61,21 @@ The target is correct output with stable frame times and bounded memory use.
 | [ ] Host CPU | Profile game logic, packet preparation, asset decoding, and audio. If a measured decode or preparation task causes stalls, give a worker immutable input and publish its result at the existing game-thread boundary. | The stall decreases. Input, event order, game clock, and audio stay synchronized at different monitor refresh rates and during area changes. |
 | [ ] Host RAM | Measure peak use and buffer occupancy in [frame buffers](src/main/graphics/frame_buffers.c), [overlay regions](src/main/overlay_regions.c), and [archive reads](src/main/cd/afile.c). Replace a limiting workspace or cache only after identifying its lifetime, owner, and size bound. Keep disc offsets, VRAM addresses, and serialized save fields in their original formats. | Repeated farm, menu, and minigame transitions reach a stable memory plateau. Allocation failure leaves saves intact. Sanitizers and diary round-trips pass. |
 
-Use the [SDL GPU documentation](https://wiki.libsdl.org/SDL3/CategoryGPU) when choosing
-host buffer, texture, transfer, and synchronization operations.
+- [ ] **Verify the GPU path.** Confirm the SDL GPU driver and actual adapter in a
+  Windows capture. Identify time spent in rasterization, copies, and CPU waits.
+  Check that ordinary rendering and any color fixes execute on the GPU.
+  [SDL GPU API](https://wiki.libsdl.org/SDL3/CategoryGPU) ·
+  [PIX GPU captures](https://devblogs.microsoft.com/pix/gpu-captures/)
+- [ ] **Find the limiting CPU thread.** Attribute running time and blocked time to
+  gameplay, packet preparation, CD/archive reads, or audio. Use the trace to choose
+  between removing a wait, reducing CPU work, and scheduling independent work.
+  [PIX timing captures](https://devblogs.microsoft.com/pix/timing-captures-new/)
+- [ ] **Account for memory by owner.** Record process committed bytes and GPU resource
+  bytes alongside frame, asset, and audio allocations. Size native storage from peak
+  live demand. Set a bound for any cache and verify eviction and allocation failure.
+  [Windows Performance Recorder resource profiles](https://learn.microsoft.com/en-us/windows-hardware/test/wpt/recording-for-resource-based-analysis)
 
-## 4. Work queue by subsystem
+## 5. Work queue by subsystem
 
 Start with the farmyard camera pan. Track one fence corner and one ground texture
 landmark at each simulation tick. This separates camera motion, vertex rounding,
@@ -72,6 +98,9 @@ Start in [camera.c](src/main/geometry/camera.c), [model.c](src/main/geometry/mod
 - [ ] **Check the near plane.** Move a triangle across the camera plane one vertex at
   a time. Record winding and clipping decisions. Any visible fragment must have finite
   coordinates and continuous UVs, including where an edge intersects the plane.
+- [ ] **Check GTE saturation and lighting.** Compare screen coordinates, depth, flags,
+  and depth-cue color for near-plane, offscreen, and high-intensity inputs used by the
+  game. Keep the arithmetic that controls gameplay in parity when increasing draw precision.
 - [ ] **Separate camera jumps from vertex jitter.** Trace the view matrix while the
   player is stationary, walking, and returning from a minigame. Verify the first farm
   frame restores the projection center and camera transform together.
@@ -103,11 +132,17 @@ Use small synthetic pixel patterns alongside scene captures.
 - [ ] **Dither coordinates.** Capture the same gradient at two window sizes and after
   a drawing-offset change. Compare at the logical render grid. Resizing the window
   must preserve the pattern attached to a given source pixel.
+- [ ] **Dither eligibility and Windows shaders.** Toggle the draw-environment bit for
+  flat, Gouraud, raw-textured, and modulated polygons, lines, and sprites. Compare
+  all 16 positions of the pattern and the quantized levels in the D3D12 output.
+  If shaders change, verify the embedded DXIL was regenerated and used by that build.
+  [PsyZ shader build script](https://github.com/Xeeynamo/psyz/blob/00fb42e6f49c146ad760a1f605b15d2a4ec598f0/psyz/src/platform/shaders/build_shaders.sh)
 - [ ] **Color arithmetic.** Exercise black, nearly black, channel maxima, and a ramp
   across quantization boundaries. Compare raw texture and modulated draws to locate
   rounding, saturation, or a second color conversion before changing the shader.
 - [ ] **Transparency and mask bits.** Use a known background and foreground for each
-  PS1 semi-transparency equation. Check transparent texels, opaque black, and mask
+  PS1 semi-transparency equation, including odd RGB555 values and repeated overlaps
+  that reveal rounding drift. Check transparent texels, opaque black, and mask
   write/test separately. Preserve draw order through a weather effect and menu fade.
 - [ ] **Palette and framebuffer hazards.** Change a palette, draw with it, copy a VRAM
   rectangle, then sample the result in the same frame. Compare first-use pixels,
@@ -115,6 +150,12 @@ Use small synthetic pixel patterns alongside scene captures.
 - [ ] **Presentation and pixel aspect.** Open a diary or dialogue at several window
   sizes. Check viewport centering, original 4:3 presentation, stable glyph baselines,
   and the absence of stale edge pixels after a resize.
+- [ ] **Display and draw buffer handoff.** Trace display origin, draw offset, clears,
+  and the first shown frame when changing display environments. Check for stale VRAM,
+  a one-frame flash, or a wrong field/stride where the game requests such a mode.
+- [ ] **Line and transfer edges.** Compare one-pixel line endpoints and joins, odd-width
+  uploads, and overlapping copies at the VRAM edges used by the game. Compare destination
+  words as well as the rendered frame, including after the next draw samples the copy.
 
 ### Frame pacing, input, and sound
 
@@ -144,6 +185,9 @@ Reference the [SPU](https://psx-spx.consoledev.net/soundprocessingunitspu/) and
 - [ ] **Audio clock drift.** Record game ticks, sequencer events, and delivered audio
   samples over a repeating passage. Compare at two host refresh rates and through
   a tempo change. Identify whether drift starts in scheduling, mixing, or presentation.
+- [ ] **SPU mix fidelity.** Compare a captured note and effect at several pitches and
+  volumes. Isolate ADPCM loop points, envelope and release, interpolation, reverb sends,
+  and clipping when multiple voices overlap. Fix the first stage with a reproducible mismatch.
 
 ### Disc I/O, host memory, and parallel work
 
@@ -171,24 +215,28 @@ Use repeated area transitions for the following measurements.
   the late result must never install data in the new scene or stall the audio callback.
 - [ ] **RAM capacity and lifetime.** Record requested size, peak occupancy, and lifetime
   of primitive buffers, decoded assets, and overlay workspaces. Exercise the busiest
-  recorded area under sanitizers and repeat entry/exit until warm memory stabilizes.
+  recorded area under sanitizers and repeat entry/exit until warm memory stabilizes. If
+  a PS1-era workspace cap causes a drop or stall, grow the native allocation before
+  issuing references into it and check their lifetime through frame completion.
 - [ ] **Pointer width and persistence.** Pair host allocation changes with a diary
   save, process restart, reload, and slot exchange. Verify the PS1-format payload size
   and restored fields. Exercise allocation failure with disposable saves.
 
-### Which item to pick next
+### Implementation order
 
-1. Start with the capture route and first rounding step. Record the earliest divergence
-   and whether it also appears on PS1. A native-only rendering error takes priority.
-2. Carry precision through one shared 3D producer and consumer. Once shared edges,
-   packet reuse, and 2D isolation pass, use the same path for the other world geometry.
-3. Use independent color, audio, or frame-pacing fixtures while geometry work proceeds.
-   Pick host optimizations by measured frame cost, then rerun the same route and compare.
+1. Capture graphics and host timing on the same route. Triage reproduced port defects
+   first. Start renderer pixel checks with a 4×4 dither fixture and a blend/VRAM probe.
+2. Trace the first rounding step and carry precision through one shared 3D path.
+   Once shared edges, packet reuse, and 2D isolation pass, use it for the other world geometry.
+3. Fix confirmed timing, audio, and rendering issues with their own fixtures. Address
+   bottlenecks that miss frame deadlines or delay transitions, then compare the same route.
 
-## 5. Close each fix
+## 6. Close each fix
 
 - [ ] Keep the smallest failing scene or synthetic fixture and record its before/after result.
   For precision corrections, document the intended visible difference from the PS1.
 - [ ] Run the native Debug and Release suites and the affected gameplay route. Run the
   local PS1 matching check for changes covered by [AGENTS.md](AGENTS.md).
+- [ ] Recheck pixel values and gameplay ticks after GPU, CPU, or RAM changes. Report
+  before/after frame times, loads, or peak memory for the metric the change targets.
 - [ ] Update the relevant row with evidence. Continue long-play coverage alongside development.
