@@ -142,6 +142,20 @@ file(READ "${psyz_gpu_draw}" gpu_draw)
 string(REPLACE "\r\n" "\n" gpu_draw "${gpu_draw}")
 patch_psyz_renderer_section(gpu_draw "static inline bool is_subtract_abr(" "void Draw_SetTexpageMode("
     "" "obsolete subtract grouping")
+patch_psyz_renderer(gpu_draw [=[void Draw_SetMask(int bit0, int bit1) {
+    if (bit0 || bit1) {
+        NOT_IMPLEMENTED;
+    }
+}]=] [=[enum { VRAM_MASK_SET = 1, VRAM_MASK_CHECK = 2 };
+static Uint32 vram_mask_flags;
+
+void Draw_SetMask(int bit0, int bit1) {
+    const Uint32 flags = (bit0 ? VRAM_MASK_SET : 0) | (bit1 ? VRAM_MASK_CHECK : 0);
+    if (flags != vram_mask_flags) {
+        Draw_FlushBuffer();
+        vram_mask_flags = flags;
+    }
+}]=] "packet-ordered VRAM mask flags")
 file(CONFIGURE OUTPUT "${psyz_gpu_build}/vanillabtn_sdl3_draw.h"
     CONTENT "#line 1 \"psyz/src/platform/sdl3_draw.h\"\n${gpu_draw}" @ONLY)
 patch_psyz_renderer(gpu_source "#include \"sdl3_draw.h\""
@@ -156,7 +170,11 @@ patch_psyz_renderer_section(gpu_source "    // the shader outputs alpha 0 on B-F
     "    const SDL_GPUColorTargetDescription target = {" "" "fixed-function blend states")
 patch_psyz_renderer(gpu_source "        .blend_state = blend[mode],\n" "" "the triangle blend state")
 patch_psyz_renderer(gpu_source "psx_frag, psx_frag_len, SDL_GPU_SHADERSTAGE_FRAGMENT, 1, 0);"
-    "psx_frag, psx_frag_len, SDL_GPU_SHADERSTAGE_FRAGMENT, 2, 0);" "the background sampler")
+    "psx_frag, psx_frag_len, SDL_GPU_SHADERSTAGE_FRAGMENT, 2, 1);" "background and mask inputs")
+patch_psyz_renderer(gpu_source "void Draw_Reset() { NOT_IMPLEMENTED; }"
+    "void Draw_Reset() { Draw_SetMask(0, 0); NOT_IMPLEMENTED; }" "mask reset")
+patch_psyz_renderer(gpu_source "void ResetPlatform(void) {\n    cur_tpage = 0;"
+    "void ResetPlatform(void) {\n    vram_mask_flags = 0;\n    cur_tpage = 0;" "device mask reset")
 patch_psyz_renderer_section(gpu_source "        for (int i = 0; i < BLEND_COUNT; i++) {"
     "        pipe_clear = CreateClearPipeline" "        pipe_tri = CreatePsxPipeline(psx_vs, psx_fs);\n"
     "the triangle pipeline allocation")
@@ -178,6 +196,62 @@ patch_psyz_renderer(gpu_source [=[        for (int i = 0; i < BLEND_COUNT; i++) 
             SDL_ReleaseGPUTexture(device, blend_background);
             blend_background = NULL;
         }]=] "triangle and background resource cleanup")
+
+# Masked transfers keep the direct copy paths when both GP0(E6) flags are clear.
+patch_psyz_renderer(gpu_source "// places the image in tex_upload_transfer on the canvas, past the VRAM edges"
+    "#include \"psyz_gpu_blend.h\"\n\n// places the image in tex_upload_transfer on the canvas, past the VRAM edges"
+    "shared GPU draw and transfer helpers")
+patch_psyz_renderer(gpu_source [=[    if (canvas_res == 1) {
+        UploadImage(canvas_tex[fb_index], dst.x, dst.y, rect->w, dst.x - img.x,]=]
+    [=[    if (vram_mask_flags) {
+        UploadMaskedImage(canvas_tex[fb_index], canvas_size, dst, (int)canvas_res, rect->w,
+                          dst.x - img.x, dst.y - img.y);
+        return;
+    }
+    if (canvas_res == 1) {
+        UploadImage(canvas_tex[fb_index], dst.x, dst.y, rect->w, dst.x - img.x,]=]
+    "masked canvas uploads")
+patch_psyz_renderer(gpu_source [=[    UploadImage(vram_render, part.x, part.y, rect->w, part.x - rect->x,
+                part.y - rect->y, part.w, part.h);]=] [=[    if (vram_mask_flags) {
+        if (!UploadMaskedImage(vram_render, (PsyzSize){VRAM_W, VRAM_H}, part, 1, rect->w,
+                               part.x - rect->x, part.y - rect->y)) {
+            return;
+        }
+    } else {
+        UploadImage(vram_render, part.x, part.y, rect->w, part.x - rect->x,
+                    part.y - rect->y, part.w, part.h);
+    }]=] "masked VRAM uploads")
+patch_psyz_renderer(gpu_source [=[    SDL_Rect clamped;
+    if (!layout.native) {]=] [=[    SDL_Rect clamped;
+    if (layout.native && (vram_mask_flags & VRAM_MASK_CHECK)) {
+        SyncDirtyCanvases(&area);
+    }
+    if (!layout.native) {]=] "mask checks see pending canvas draws")
+patch_psyz_renderer(gpu_source "    if (rect->x == x && rect->y == y) {"
+    "    if (rect->x == x && rect->y == y && !(vram_mask_flags & VRAM_MASK_SET)) {"
+    "masked self-copy")
+patch_psyz_renderer(gpu_source [=[    if (layout.native) {
+        SyncDirtyCanvases(&(SDL_Rect){src_x, src_y, copy_w, copy_h});]=] [=[    const SDL_Rect dst = {dst_x, dst_y, copy_w, copy_h};
+    if (layout.native) {
+        SyncDirtyCanvases(&(SDL_Rect){src_x, src_y, copy_w, copy_h});
+        if (vram_mask_flags & VRAM_MASK_CHECK) {
+            SyncDirtyCanvases(&dst);
+        }]=] "masked copy sees pending destination writes")
+patch_psyz_renderer_section(gpu_source
+    [=[    SDL_GPUCopyPass* copy = SDL_BeginGPUCopyPass(cmd);
+    if (!RectsOverlap(src_x, src_y, dst_x, dst_y, copy_w, copy_h)) {]=]
+    "    MarkVramDirty(dst);"
+    "    CopyVram(cmd, dst, (SDL_Rect){src_x, src_y, copy_w, copy_h});\n"
+    "ordered GPU copies")
+
+patch_psyz_renderer_section(gpu_source
+    "    u8* map = SDL_MapGPUTransferBuffer(device, vtx_transfer, true);"
+    "    const SDL_GPUColorTargetInfo target = {\n        .texture = fb_index >= 0"
+    [=[    if (!UploadTriangleData(cmd, vertex_buf, n_vertices, index_buf, n_indices, batch_has_texture)) {
+        return;
+    }
+
+]=] "shared triangle uploads")
 
 set(triangle_runs [=[    const float grid_scale_x = GetDrawGridXScale();
     const float render_scale = (float)internal_res;
@@ -204,8 +278,6 @@ set(triangle_runs [=[    const float grid_scale_x = GetDrawGridXScale();
         return;
     }
 ]=])
-patch_psyz_renderer(gpu_source "void Draw_FlushBuffer(void) {"
-    "#include \"psyz_gpu_blend.h\"\n\nvoid Draw_FlushBuffer(void) {" "the triangle run renderer")
 patch_psyz_renderer_section(gpu_source
     "    SDL_GPURenderPass* pass = SDL_BeginGPURenderPass(cmd, &target, 1, NULL);\n    const float grid_scale_x"
     "    if (fb_index >= 0) {\n        InvalidateCanvas(&layout, fb_index, scissor_rect);"

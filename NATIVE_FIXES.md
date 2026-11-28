@@ -24,7 +24,7 @@ interlace where a game route or reachable command stream shows a dependency.
 |---|---|---|
 | Projection | The model path runs GTE projection and writes packed XY into GPU packets. PsyZ's shader interpolates UVs with the same clip-space W for each vertex. [Model producer](src/main/geometry/model.c), [PsyZ vertex shader](https://github.com/Xeeynamo/psyz/blob/00fb42e6f49c146ad760a1f605b15d2a4ec598f0/psyz/src/platform/shaders/psx.vert.glsl) | Record model and terrain jitter and texture drift. Follow the first rounding step in each producer. |
 | Dithering and color | The game enables dithering in its draw environments. The SDL3 GPU path tags eligible primitives and applies a 4×4 matrix in the fragment shader. [Draw environments](src/main/main.c), [PsyZ fragment shader](https://github.com/Xeeynamo/psyz/blob/00fb42e6f49c146ad760a1f605b15d2a4ec598f0/psyz/src/platform/shaders/psx.frag.glsl) | Verify the matrix phase, primitive eligibility, and quantization in the Windows build. Look for a difference before changing the existing dither path. |
-| Mask bits | The draw decoder forwards GP0(E6h). The pinned hardware draw helper leaves nonzero mask write/test flags unimplemented. [GPU packet decoder](https://github.com/Xeeynamo/psyz/blob/00fb42e6f49c146ad760a1f605b15d2a4ec598f0/psyz/src/psyz/libgpu.c), [PsyZ draw helper](https://github.com/Xeeynamo/psyz/blob/00fb42e6f49c146ad760a1f605b15d2a4ec598f0/psyz/src/platform/sdl3_draw.h) | Trace actual packets and VRAM transfers. Establish whether a mask-sensitive draw occurs before scheduling a game fix. |
+| Mask bits | D3D12 applies GP0(E6h) to primitive writes, uploads and VRAM copies. The fragment shader carries the actual VRAM bit 15. [GPU draw and transfer code](native/psyz_gpu_blend.h) | Check mask-sensitive effects and transfers when expanding the gameplay routes. |
 | Display modes | The game sets 320×240 and 640×480 display environments. The backend has a separate RGB24 path and ignores the interlace flag. [Display environments](src/main/graphics/screen_fade.c), [SDL3 GPU backend](https://github.com/Xeeynamo/psyz/blob/00fb42e6f49c146ad760a1f605b15d2a4ec598f0/psyz/src/platform/sdl3_gpu.c) | Record the mode bits the game actually requests. Schedule an interlace or RGB24 fix if a used mode produces a visible mismatch. |
 | Primitive limits | VanillaBTN already tests the PS1 triangle size limits before handing a packet to PsyZ. A quad with one rejected half can be submitted via a temporary packet. [Packet filter](native/gpu_primitives.c), [Existing tests](native/test_gpu_primitives.c) | Verify both halves independently. Carry precise vertices through any packet copy or remap, including a partially rejected quad. |
 
@@ -64,7 +64,12 @@ sampled in the same frame. [GPU pixel test](native/test_gpu_pixels.c)
   in RGB555. D3D12 and Beetle PSX software readback agree on all 4,096 channel
   pairs across the four modes. [Shader source and regeneration](native/shaders/README.md)
 - D3D12 probes cover repeated, disjoint, and mixed blends, transparent texels,
-  and the 2× canvas. GP0(E6) mask tests and writes are still open.
+  and the 2× canvas.
+- Mask probes check full VRAM words after primitives, uploads, copies, and raw
+  fills. A separate Beetle PSX test confirmed all four transfer flag combinations,
+  the overlapping 128-word copy boundary, and fill behavior.
+- Transfers crossing the physical VRAM edges still follow the backend's clipping
+  rules. Review those edges with the existing transfer acceptance checks.
 - D3D12 readback verifies sprite U/V wrap at 255 and right-to-left VRAM wrap
   for 16-bit textures and 8-bit textures/CLUTs. Same-frame cases also verify
   that a draw on the left edge is visible to the wrapped texture read.

@@ -1,0 +1,86 @@
+diff --git a/psyz/src/platform/shaders/psx.frag.glsl b/psyz/src/platform/shaders/psx.frag.glsl
+--- a/psyz/src/platform/shaders/psx.frag.glsl
++++ b/psyz/src/platform/shaders/psx.frag.glsl
+@@ -15,6 +15,11 @@ layout(location = 11) flat in uvec4 texWindow;
+
+ layout(set = 2, binding = 0) uniform sampler2D texVram;
+ layout(set = 2, binding = 1) uniform sampler2D texBackground;
++layout(set = 3, binding = 0) uniform DrawMask { uint maskFlags; };
++
++const uint MASK_SET = 1u;
++const uint MASK_CHECK = 2u;
++const uint RAW_TRANSFER = 4u;
+
+ uvec2 resolveTexel() {
+     vec2 uv = rawUV + 1.0 / 512.0;
+@@ -53,9 +58,20 @@ vec3 applyDither(vec3 c) {
+ }
+
+ void main() {
++    bool checkMask = (maskFlags & MASK_CHECK) != 0u;
++    bool setMask = (maskFlags & MASK_SET) != 0u;
++    if ((maskFlags & RAW_TRANSFER) != 0u) {
++        if (checkMask && texelFetch(texBackground, ivec2(gl_FragCoord.xy), 0).a >= 0.5) {
++            discard;
++        }
++        vec4 word = readVram(ivec2(floor(rawUV)));
++        FragColor = vec4(word.rgb, setMask ? 1.0 : word.a);
++        return;
++    }
++
+     vec4 texColor;
+     if (textureMode == 0u) { // untextured
+-        texColor = vec4(1, 1, 1, 2);
++        texColor = vec4(1);
+     } else if (textureMode == 1u) { // 16-bit bitmap
+         texColor = readVram(pageBase + ivec2(resolveTexel()));
+     } else { // indexed
+@@ -71,10 +87,15 @@ void main() {
+     if (texColor == vec4(0, 0, 0, 0)) {
+         discard;
+     }
+-    // check for setSemiTrans(p, 1)
+-    bool isSemiTrans = vertexColor.a < 0.75;
+-    // when a color has the 0x8000 bit left then it has the semitrans flag on
+-    bool colorSemiTrans = texColor.a > 0;
++    bool textureMasked = textureMode != 0u && texColor.a >= 0.5;
++    bool blend = vertexColor.a < 0.75 && (textureMode == 0u || textureMasked);
++    vec4 dest = vec4(0);
++    if (checkMask || blend) {
++        dest = texelFetch(texBackground, ivec2(gl_FragCoord.xy), 0);
++        if (checkMask && dest.a >= 0.5) {
++            discard;
++        }
++    }
+     // PS1-accurate texture-color modulation: (tex5 * col8) >> 7, clamp to 31
+     vec3 modColor;
+     if (textureMode == 0u) {
+@@ -89,16 +110,13 @@ void main() {
+                                 : floor(prod8 / 8.0) / 31.0;
+     }
+     modColor = applyDither(modColor);
+-    if (colorSemiTrans && isSemiTrans) {
+-        vec4 dest = texelFetch(texBackground, ivec2(gl_FragCoord.xy), 0);
++    if (blend) {
+         ivec3 background = ivec3(dest.rgb * 31.0 + 0.5);
+         ivec3 foreground = ivec3(modColor * 31.0 + 0.5);
+         ivec3 blended;
+-        float alpha = dest.a;
+         uint abr = (tpage & 0x60u) >> 5u;
+         if (abr == 0u) {
+             blended = (background + foreground) >> 1;
+-            alpha = 0.5 + dest.a * 0.5;
+         } else if (abr == 1u) {
+             blended = background + foreground;
+         } else if (abr == 2u) {
+@@ -106,8 +124,7 @@ void main() {
+         } else {
+             blended = background + (foreground >> 2);
+         }
+-        FragColor = vec4(vec3(clamp(blended, 0, 31)) / 31.0, alpha);
+-    } else {
+-        FragColor = vec4(modColor, 1.0); // full opacity
++        modColor = vec3(clamp(blended, 0, 31)) / 31.0;
+     }
++    FragColor = vec4(modColor, float(textureMasked || setMask));
+ }

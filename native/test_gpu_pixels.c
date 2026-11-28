@@ -11,6 +11,9 @@ enum {
     TILE_ORIGIN = 32,
     COLOR_MAX = 31,
     COLOR_MASK = 0x7fff,
+    PIXEL_MASK_BIT = 0x8000,
+    FORCE_MASK = 1,
+    CHECK_MASK = 2,
     RGB888_MAX = 255,
     RGB888_SHIFT = 3,
     INDEXED_TEXTURE = 0,
@@ -30,6 +33,14 @@ static void select_draw_mode(int tpage, int dither) {
     SetDrawMode(&mode, 1, dither, tpage, NULL);
     termPrim(&mode);
     DrawOTag((OT_TYPE *)&mode);
+}
+
+static void select_mask(unsigned flags) {
+    DR_ENV command = {0};
+    setlen(&command, 1);
+    command.code[0] = 0xe6000000u | flags;
+    termPrim(&command);
+    DrawOTag((OT_TYPE *)&command);
 }
 
 static void draw_tile(int x, int y, unsigned r, unsigned g, unsigned b, int semi_transparent) {
@@ -206,11 +217,11 @@ static void sample_texture(int x, int clut, int u, int v) {
     DrawOTag((OT_TYPE *)&sprite);
 }
 
-static int check_texture(int x, unsigned expected, const char *source) {
+static int check_uniform_tile(int x, unsigned expected, unsigned mask, const char *source) {
     u16 pixels[TILE_PIXELS];
     read_tile(x, TILE_ORIGIN, pixels);
     for (unsigned i = 0; i < TILE_PIXELS; ++i) {
-        unsigned actual = pixels[i] & COLOR_MASK;
+        unsigned actual = pixels[i] & mask;
         if (actual != expected) {
             fprintf(stderr, "%s at pixel %u: got %04x, expected %04x\n", source, i, actual,
                     expected);
@@ -218,6 +229,63 @@ static int check_texture(int x, unsigned expected, const char *source) {
         }
     }
     return 0;
+}
+
+static int check_texture(int x, unsigned expected, const char *source) {
+    return check_uniform_tile(x, expected, COLOR_MASK, source);
+}
+
+static int check_primitive_masks(void) {
+    enum { NEXT_X = TILE_ORIGIN + TILE_SIZE, WORD_MASK = COLOR_MASK | PIXEL_MASK_BIT };
+    select_draw_mode(0, 0);
+    select_mask(0);
+    draw_tile(NEXT_X, TILE_ORIGIN, 0, 0, 0, 0);
+    select_mask(FORCE_MASK);
+    draw_tile(TILE_ORIGIN, TILE_ORIGIN, RGB888_MAX, 0, 0, 0);
+    select_mask(CHECK_MASK);
+    draw_tile(TILE_ORIGIN, TILE_ORIGIN, 0, 0, RGB888_MAX, 0);
+    draw_tile(NEXT_X, TILE_ORIGIN, 0, 0, RGB888_MAX, 0);
+
+    int failures = check_uniform_tile(TILE_ORIGIN, PIXEL_MASK_BIT | COLOR_MAX, WORD_MASK,
+                                      "mask protection follows the preceding draw");
+    failures += check_uniform_tile(NEXT_X, rgb555(0, 0, COLOR_MAX), WORD_MASK,
+                                   "unmasked draw leaves bit 15 clear");
+    select_mask(FORCE_MASK | CHECK_MASK);
+    draw_tile(TILE_ORIGIN, TILE_ORIGIN, 0, RGB888_MAX, 0, 0);
+    draw_tile(NEXT_X, TILE_ORIGIN, 0, RGB888_MAX, 0, 0);
+    failures += check_uniform_tile(TILE_ORIGIN, PIXEL_MASK_BIT | COLOR_MAX, WORD_MASK,
+                                   "force and check preserve a protected pixel");
+    failures += check_uniform_tile(NEXT_X, PIXEL_MASK_BIT | rgb555(0, COLOR_MAX, 0), WORD_MASK,
+                                   "force and check mark an unprotected pixel");
+    select_mask(0);
+    draw_tile(TILE_ORIGIN, TILE_ORIGIN, 0, 0, 0, 1);
+    failures += check_uniform_tile(TILE_ORIGIN, COLOR_MAX / 2, WORD_MASK,
+                                   "untextured blend clears the previous mask bit");
+    return failures;
+}
+
+static int check_vram_fill_mask(void) {
+    enum { FILL_WIDTH = 16, WORD_MASK = COLOR_MASK | PIXEL_MASK_BIT };
+    TILE fill = {0};
+    SetTile(&fill);
+    setcode(&fill, 0x02);
+    setXY0(&fill, TILE_ORIGIN, TILE_ORIGIN);
+    setWH(&fill, FILL_WIDTH, TILE_SIZE);
+    setRGB0(&fill, 0, RGB888_MAX, 0);
+    termPrim(&fill);
+
+    select_draw_mode(0, 0);
+    select_mask(FORCE_MASK);
+    draw_tile(TILE_ORIGIN, TILE_ORIGIN, RGB888_MAX, 0, 0, 0);
+    select_mask(FORCE_MASK | CHECK_MASK);
+    DrawOTag((OT_TYPE *)&fill);
+    int failures = check_uniform_tile(TILE_ORIGIN, rgb555(0, COLOR_MAX, 0), WORD_MASK,
+                                      "VRAM fill ignores both mask settings");
+    draw_tile(TILE_ORIGIN, TILE_ORIGIN, RGB888_MAX, 0, 0, 0);
+    failures += check_uniform_tile(TILE_ORIGIN, PIXEL_MASK_BIT | COLOR_MAX, WORD_MASK,
+                                   "VRAM fill leaves the mask setting active");
+    select_mask(0);
+    return failures;
 }
 
 static int check_blend_precision(void) {
@@ -253,18 +321,118 @@ static int check_blend_precision(void) {
     return failures;
 }
 
-static int check_textured_blend(void) {
-    enum { PAGE_X = 448, PAGE_Y = 256, SUBTRACT = 2, DST_RED = 17, SRC_RED = 7, SEMI = 0x8000 };
-    const u16 texels[TILE_SIZE] = {0, SRC_RED, SEMI | SRC_RED, SEMI};
-    const unsigned expected[TILE_SIZE] = {DST_RED, SRC_RED, DST_RED - SRC_RED, DST_RED};
-    RECT rect = {PAGE_X, PAGE_Y, TILE_SIZE, TILE_SIZE};
+static void load_striped_tile(int x, int y, const u16 row[TILE_SIZE]) {
+    RECT rect = {x, y, TILE_SIZE, TILE_SIZE};
     u16 image[TILE_PIXELS];
     u_long transfer[TILE_PIXELS * sizeof(u16) / sizeof(u_long)];
     for (int i = 0; i < TILE_SIZE; ++i) {
-        memcpy(&image[i * TILE_SIZE], texels, sizeof(texels));
+        memcpy(&image[i * TILE_SIZE], row, TILE_SIZE * sizeof(*row));
     }
     memcpy(transfer, image, sizeof(image));
     LoadImage(&rect, transfer);
+}
+
+static int check_striped_tile(int x, const u16 expected[TILE_SIZE], const char *source) {
+    u16 pixels[TILE_PIXELS];
+    read_tile(x, TILE_ORIGIN, pixels);
+    for (int i = 0; i < TILE_PIXELS; ++i) {
+        if (pixels[i] != expected[i % TILE_SIZE]) {
+            fprintf(stderr, "%s at pixel %d: got %04x, expected %04x\n", source, i, pixels[i],
+                    expected[i % TILE_SIZE]);
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int check_masked_transfers(void) {
+    enum { SOURCE_X = 448, SOURCE_Y = 256, ALL_MASKS = FORCE_MASK | CHECK_MASK };
+    const u16 base[TILE_SIZE] = {PIXEL_MASK_BIT | 3, 6, 9, PIXEL_MASK_BIT | 12};
+    const u16 source[TILE_SIZE] = {5, PIXEL_MASK_BIT | 7, 0, 11};
+    RECT source_rect = {SOURCE_X, SOURCE_Y, TILE_SIZE, TILE_SIZE};
+    RECT self = {TILE_ORIGIN, TILE_ORIGIN, TILE_SIZE, TILE_SIZE};
+    select_mask(0);
+    load_striped_tile(SOURCE_X, SOURCE_Y, source);
+
+    int failures = 0;
+    for (unsigned flags = 0; flags <= ALL_MASKS; ++flags) {
+        u16 expected[TILE_SIZE];
+        for (int i = 0; i < TILE_SIZE; ++i) {
+            expected[i] = (flags & CHECK_MASK) && (base[i] & PIXEL_MASK_BIT)
+                              ? base[i]
+                              : source[i] | ((flags & FORCE_MASK) ? PIXEL_MASK_BIT : 0);
+        }
+        select_mask(0);
+        load_striped_tile(TILE_ORIGIN, TILE_ORIGIN, base);
+        select_mask(flags);
+        load_striped_tile(TILE_ORIGIN, TILE_ORIGIN, source);
+        failures += check_striped_tile(TILE_ORIGIN, expected, "mask on CPU to VRAM transfer");
+
+        select_mask(0);
+        load_striped_tile(TILE_ORIGIN, TILE_ORIGIN, base);
+        select_mask(flags);
+        MoveImage(&source_rect, TILE_ORIGIN, TILE_ORIGIN);
+        failures += check_striped_tile(TILE_ORIGIN, expected, "mask on VRAM to VRAM transfer");
+    }
+    const u16 marked[TILE_SIZE] = {PIXEL_MASK_BIT | 3, PIXEL_MASK_BIT | 6, PIXEL_MASK_BIT | 9,
+                                   PIXEL_MASK_BIT | 12};
+    select_mask(0);
+    load_striped_tile(TILE_ORIGIN, TILE_ORIGIN, base);
+    select_mask(FORCE_MASK);
+    MoveImage(&self, TILE_ORIGIN, TILE_ORIGIN);
+    failures += check_striped_tile(TILE_ORIGIN, marked, "mask on self-copy");
+
+    draw_tile(TILE_ORIGIN, TILE_ORIGIN, RGB888_MAX, 0, 0, 0);
+    select_mask(CHECK_MASK);
+    MoveImage(&source_rect, TILE_ORIGIN, TILE_ORIGIN);
+    failures += check_uniform_tile(TILE_ORIGIN, PIXEL_MASK_BIT | COLOR_MAX,
+                                   PIXEL_MASK_BIT | COLOR_MASK, "copy sees a pending mask write");
+    select_mask(0);
+    return failures;
+}
+
+static int check_masked_overlap(void) {
+    enum { COPY_WIDTH = 132, SHIFT = 2, X = 64, PROTECTED = 4, FIRST_SPILLED = 130 };
+    RECT region = {X, TILE_ORIGIN, COPY_WIDTH + SHIFT, 1};
+    RECT source = {X, TILE_ORIGIN, COPY_WIDTH, 1};
+    u16 words[COPY_WIDTH + SHIFT];
+    u_long transfer[(sizeof(words) + sizeof(u_long) - 1) / sizeof(u_long)] = {0};
+    for (int i = 0; i < COPY_WIDTH + SHIFT; ++i) {
+        words[i] = i + 1;
+    }
+    words[PROTECTED] |= PIXEL_MASK_BIT;
+    memcpy(transfer, words, sizeof(words));
+    select_mask(0);
+    LoadImage(&region, transfer);
+    select_mask(FORCE_MASK | CHECK_MASK);
+    MoveImage(&source, X + SHIFT, TILE_ORIGIN);
+    StoreImage(&region, transfer);
+    DrawSync(0);
+    select_mask(0);
+    memcpy(words, transfer, sizeof(words));
+    for (int i = SHIFT; i < COPY_WIDTH + SHIFT; ++i) {
+        unsigned color = i - 1;
+        if (i == PROTECTED) {
+            color = 5;
+        } else if (i == FIRST_SPILLED || i == FIRST_SPILLED + 1) {
+            color -= SHIFT;
+        }
+        const unsigned expected = PIXEL_MASK_BIT | color;
+        if (words[i] != expected) {
+            fprintf(stderr, "masked overlapping copy at pixel %d: got %04x, expected %04x\n", i,
+                    words[i], expected);
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int check_textured_blend(void) {
+    enum { PAGE_X = 448, PAGE_Y = 256, SUBTRACT = 2, DST_RED = 17, SRC_RED = 7 };
+    const u16 texels[TILE_SIZE] = {0, SRC_RED, PIXEL_MASK_BIT | SRC_RED, PIXEL_MASK_BIT};
+    const u16 expected[TILE_SIZE] = {DST_RED, SRC_RED, PIXEL_MASK_BIT | (DST_RED - SRC_RED),
+                                     PIXEL_MASK_BIT | DST_RED};
+    load_striped_tile(PAGE_X, PAGE_Y, texels);
 
     SPRT sprite = {0};
     SetSprt(&sprite);
@@ -278,17 +446,7 @@ static int check_textured_blend(void) {
     draw_tile(TILE_ORIGIN, TILE_ORIGIN, DST_RED << RGB888_SHIFT, 0, 0, 0);
     DrawOTag((OT_TYPE *)&sprite);
 
-    u16 pixels[TILE_PIXELS];
-    read_tile(TILE_ORIGIN, TILE_ORIGIN, pixels);
-    for (int i = 0; i < TILE_PIXELS; ++i) {
-        unsigned actual = pixels[i] & COLOR_MASK;
-        if (actual != expected[i % TILE_SIZE]) {
-            fprintf(stderr, "textured subtraction at pixel %d: got %04x, expected %04x\n", i,
-                    actual, expected[i % TILE_SIZE]);
-            return 1;
-        }
-    }
-    return 0;
+    return check_striped_tile(TILE_ORIGIN, expected, "textured subtraction");
 }
 
 static int check_blend_channel_range(void) {
@@ -357,7 +515,8 @@ static int check_scaled_canvas_blend(void) {
         fputs("Could not configure the 2x native canvas\n", stderr);
         return 1;
     }
-    return check_blend_precision() + check_textured_blend();
+    return check_blend_precision() + check_textured_blend() + check_primitive_masks() +
+           check_masked_transfers();
 }
 
 static int check_clear_draw_order(void) {
@@ -574,6 +733,10 @@ int main(void) {
     failures += check_blend_precision();
     failures += check_textured_blend();
     failures += check_blend_channel_range();
+    failures += check_primitive_masks();
+    failures += check_vram_fill_mask();
+    failures += check_masked_transfers();
+    failures += check_masked_overlap();
     failures += check_clear_draw_order();
     failures += check_copy_visibility();
     failures += check_clut_visibility();
