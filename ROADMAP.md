@@ -126,10 +126,21 @@ for graphics types and build integration.
 - An ASan/UBSan probe entered and rendered all 255 farm areas (2,165 valid exit zones),
   dispatched all 28 shops, and ran all 5 minigames plus staff, title, save/load, trade,
   memory card, and debug scenes across 2x re-entry passes.
+- A strict ASan/UBSan sweep (`halt_on_error=1`) also passed across all 13 overlays,
+  all 255 farm sections, all 18 festival dates, overnight rollover (`scene_overnight_step`),
+  animal pickup/put-down (dog, chicken, chick, cricket, cow), and `FRAME_OT_AT` bounds.
+- Shared native fixes verified under `__psyz` (PS1 still matches 17/17): widened-`AnimState`
+  shadow struct alignment (`animals.c`, `swind.c`, `player.c`), stack-overflow fixes
+  (`estate.c`, `player.c`), strict indirect handler prototypes (0 `-Wstrict-prototypes`
+  across all 113 C units), direct OT slot clamping (`main.h`), NULL probe/request guards
+  (`farm_probe.c`, `event_script.c`), and unsigned shifts (`villager.c`, `swind.c`).
+- Debug builds accept `--debug-menu` with `--disc` to boot directly into `08_DEBUG`
+  (rejected in Release, verified by `native/smoke.cmake`).
 - Of 451 event archive slots, 12 are empty. Four further slots (261 and 273–275) have an
   invalid offset range or initial opcode. The area trigger tables do not reference those four.
-- Verify event outcomes during play, including festival eligibility, dialogue choices,
-  season rollover and save/reload across transitions.
+- Still open for manual playtesting: long multi-stage cutscenes (weddings, endings),
+  interactive minigame completion/rewards, audio/timing parity, and PS1/native save
+  cross-compatibility.
 
 ### Native SDK compatibility (`native/sdk_compat.c` against PsyZ `00fb42e`)
 
@@ -146,9 +157,9 @@ compatibility layer covers the remaining PsyZ `00fb42e` gaps so all 113 units li
 | Memory card (`libmcrd`) | `MemCardInit`, `MemCardStart`, `MemCardStop`, `MemCardEnd`, `MemCardCallback`, `MemCardAccept`, `MemCardExist`, `MemCardSync`, `MemCardGetDirentry`, `MemCardCreateFile`, `MemCardDeleteFile`, `MemCardOpen`, `MemCardClose`, `MemCardReadData`, `MemCardWriteData`, `MemCardReadFile`, `MemCardWriteFile`, `MemCardFormat`, `MemCardUnformat` | Layered over PsyZ `libcard`/`libapi` (`InitCARD`, `StartCARD`, `firstfile`/`nextfile`, `psyz_open/read/write/lseek/close`, `erase`) with path and alignment validation. |
 | PocketStation (`libmcx`) | `McxStartCom`, `McxStopCom`, `McxCardType`, `McxSync`, plus 15 sample-only calls in `10_PdaSamp` | Reports PocketStation absent (`McxErrInvalid` on valid card ports) so regular memory-card probing succeeds. |
 
-All 113 units have 0 pointer-to-integer, buffer-bounds, and `-Wreturn-type`
-warnings. Verify PS1/native save cross-compatibility and audio, day, and season
-parity through the local game build.
+All 113 units have 0 pointer-to-integer, buffer-bounds, `-Wstrict-prototypes`,
+and `-Wreturn-type` warnings. Verify PS1/native save cross-compatibility and
+audio, day, and season parity through the local game build.
 
 ## Verification
 

@@ -77,6 +77,13 @@ the game and overlays into `vanillabtn.exe`. `--disc` accepts the USA BIN or CUE
 and verifies it using Python 3.10 or newer on `PATH`. PsyZ stores virtual cards
 under `%LOCALAPPDATA%\VanillaBTN`.
 
+In Debug builds only, pass `--debug-menu` with `--disc` to start in `08_DEBUG`
+(minigame/scene jump menu and `30_GF_swind` settings window):
+
+```powershell
+& .\build\native\game-debug\native\vanillabtn.exe --disc 'path\to\disc.cue' --debug-menu
+```
+
 ### Import a reference disc locally
 
 With Python 3.10 or newer on `PATH`, run the native executable with your BIN or CUE:
