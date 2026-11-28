@@ -60,11 +60,16 @@ int vanillabtn_gpu_push_prim(u_long *packet, int available_words) {
     if (first && (!quad || second)) {
         return Draw_PushPrim(packet, available_words);
     }
-    if (first || second) {
+    if (first || second || (code & GPU_TEXTURED)) {
         u_long clipped[GPU_MAX_POLYGON_WORDS];
         memcpy(clipped, packet, words * sizeof(*packet));
-        /* Collapse the rejected half without changing the shared vertices or texture state. */
-        clipped[first ? 1 + 3 * stride : 1] = packet[1 + stride];
+        /* Preserve the texture page update even when both triangles are rejected. */
+        if (!first) {
+            clipped[1] = packet[1 + stride];
+        }
+        if (quad && !second) {
+            clipped[1 + 3 * stride] = packet[1 + stride];
+        }
         return Draw_PushPrim(clipped, words);
     }
     return words;

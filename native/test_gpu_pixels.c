@@ -11,6 +11,7 @@ enum {
     TILE_ORIGIN = 32,
     COLOR_MAX = 31,
     COLOR_MASK = 0x7fff,
+    RGB888_MAX = 255,
     RGB888_SHIFT = 3,
     INDEXED_TEXTURE = 0,
     INDEXED_8_BIT_TEXTURE = 1,
@@ -224,6 +225,10 @@ static int check_textured_polygon_dither(void) {
         RED = 8,
         GREEN = 9,
         BLUE = 10,
+        ADDITIVE_BLEND = 1,
+        SAMPLE_X = TILE_ORIGIN + TILE_SIZE,
+        OVERSIZED_LEFT = -512,
+        OVERSIZED_RIGHT = 512,
     };
     const u16 texel = rgb555(RED, GREEN, BLUE);
     for (int y = 0; y < TILE_SIZE; y += WORD_BLOCK_SIZE) {
@@ -239,11 +244,18 @@ static int check_textured_polygon_dither(void) {
     setShadeTex(&quad, 1);
     setXY4(&quad, x, x, end, x, x, end, end, end);
     setUV4(&quad, 0, 0, UV_END, 0, 0, UV_END, UV_END, UV_END);
-    quad.tpage = getTPage(DIRECT_COLOR_TEXTURE, 0, PAGE_X, PAGE_Y);
+    quad.tpage = getTPage(DIRECT_COLOR_TEXTURE, ADDITIVE_BLEND, PAGE_X, PAGE_Y);
     termPrim(&quad);
-    select_draw_mode(quad.tpage, 1);
+    select_draw_mode(0, 1);
     DrawOTag((OT_TYPE *)&quad);
     int failures = check_texture(x, texel, "raw Gouraud polygon with dithering enabled");
+    draw_tile(SAMPLE_X, TILE_ORIGIN, 0, 0, 0, 0);
+    sample_texture(SAMPLE_X, 0, 0, 0);
+    failures += check_texture(SAMPLE_X, texel, "texture page inherited from polygon");
+
+    draw_tile(SAMPLE_X, TILE_ORIGIN, 0, 0, 0, 0);
+    draw_tile(SAMPLE_X, TILE_ORIGIN, RGB888_MAX, 0, 0, 1);
+    failures += check_texture(SAMPLE_X, COLOR_MAX, "blend mode inherited from polygon");
 
     setShadeTex(&quad, 0);
     setRGB0(&quad, NEUTRAL, NEUTRAL, NEUTRAL);
@@ -253,6 +265,15 @@ static int check_textured_polygon_dither(void) {
     DrawOTag((OT_TYPE *)&quad);
     failures += check_dither_pixels(x, x, RED << RGB888_SHIFT, GREEN << RGB888_SHIFT,
                                     BLUE << RGB888_SHIFT, 1);
+
+    select_draw_mode(0, 0);
+    draw_tile(SAMPLE_X, TILE_ORIGIN, 0, 0, 0, 0);
+    setXY4(&quad, OVERSIZED_LEFT, x, OVERSIZED_RIGHT, x, OVERSIZED_LEFT, end, OVERSIZED_RIGHT, end);
+    DrawOTag((OT_TYPE *)&quad);
+    failures += check_dither_pixels(x, x, RED << RGB888_SHIFT, GREEN << RGB888_SHIFT,
+                                    BLUE << RGB888_SHIFT, 1);
+    sample_texture(SAMPLE_X, 0, 0, 0);
+    failures += check_texture(SAMPLE_X, texel, "texture page inherited from rejected polygon");
     return failures;
 }
 

@@ -79,8 +79,25 @@ string(REPLACE "${line_vertex}" "${line_vertex_with_endpoints}"
 if(gpu_source_with_common STREQUAL gpu_source_with_lines)
     message(FATAL_ERROR "Could not patch PsyZ axis-aligned line endpoints.")
 endif()
+
+# Polygon TPage updates the page, blend mode and depth without changing dither.
+set(polygon_tpage [=[                tpage = cur_tpage | TPAGE_NOTEXTURE;
+            }
+            tpage |= TPAGE_POLYGON;]=])
+set(polygon_tpage_latch [=[                tpage = cur_tpage | TPAGE_NOTEXTURE;
+            } else {
+                enum { TPAGE_RENDER_MASK = 0x1ff };
+                tpage &= TPAGE_RENDER_MASK;
+                cur_tpage = tpage;
+            }
+            tpage |= TPAGE_POLYGON;]=])
+string(REPLACE "${polygon_tpage}" "${polygon_tpage_latch}"
+    gpu_source_with_tpage "${gpu_source_with_lines}")
+if(gpu_source_with_lines STREQUAL gpu_source_with_tpage)
+    message(FATAL_ERROR "Could not patch PsyZ polygon texture page state.")
+endif()
 file(CONFIGURE OUTPUT "${psyz_gpu_build}/sdl3_gpu.c"
-    CONTENT "#line 1 \"psyz/src/platform/sdl3_gpu.c\"\n${gpu_source_with_lines}" @ONLY)
+    CONTENT "#line 1 \"psyz/src/platform/sdl3_gpu.c\"\n${gpu_source_with_tpage}" @ONLY)
 list(REMOVE_ITEM psyz_sources "src/platform/sdl3_gpu.c")
 set_property(TARGET psyz PROPERTY SOURCES "${psyz_sources};${psyz_gpu_build}/sdl3_gpu.c")
 set_property(SOURCE "${psyz_gpu_build}/sdl3_gpu.c"
