@@ -123,6 +123,9 @@ for graphics types and build integration.
   313 distinct IDs. All 50 cached event scripts decoded to the corresponding disc script prefix.
 - An instrumented Debug run completed the new-game intro with simulated controller input.
   Dialogue rendering also passed checks for an absent livestock name and an empty string.
+- An ASan/UBSan probe entered and rendered all 255 farm areas (2,165 valid exit zones),
+  dispatched all 28 shops, and ran all 5 minigames plus staff, title, save/load, trade,
+  memory card, and debug scenes across 2x re-entry passes.
 - Of 451 event archive slots, 12 are empty. Four further slots (261 and 273–275) have an
   invalid offset range or initial opcode. The area trigger tables do not reference those four.
 - Verify event outcomes during play, including festival eligibility, dialogue choices,
