@@ -7,9 +7,9 @@ and a Windows x64 game build. **Windows x64 bring-up is complete.**
 ## Active work
 
 Use the [Windows native correction checklist](NATIVE_FIXES.md) for the next phase.
-Start with a repeatable PS1 comparison and a Windows CPU/GPU/RAM baseline.
-Use the reproduction results to prioritize PGXP-style geometry, color, timing, and host work.
-This phase covers correctness and performance at the original 4:3 framing.
+Start with the [baseline routes and GPU probes](NATIVE_FIXES.md#2-capture-a-baseline).
+Use the [evidence for each stage](NATIVE_FIXES.md#delivery-order-and-acceptance)
+to prioritize PS1 parity fixes, PGXP-style corrections, and host optimization at 4:3.
 
 ## Project decisions
 

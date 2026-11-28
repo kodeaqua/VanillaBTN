@@ -1,9 +1,22 @@
 # Windows native correction checklist
 
-The bring-up build is the starting point. These are investigation and implementation
-tasks. Close each item with a repeatable comparison, a passing regression test,
-or evidence that the game never exercises the behavior.
 Keep 4:3 framing, original assets, gameplay ticks, and PS1-compatible diaries throughout.
+Use the matching USA PS1 build as the behavior reference and the current Windows
+build as the performance baseline.
+
+## Delivery order and acceptance
+
+| Stage | Work | Evidence to advance |
+|---|---|---|
+| 0. Make comparisons repeatable | Capture the title demo on both targets. Run the first RGB555 and VRAM probes through the Windows GPU backend. Measure a Release route. | A second run reaches the same checkpoints. Record expected and observed results for both pixel probes, plus the range of baseline frame and load times. |
+| 1. Restore PS1 behavior | Fix confirmed native differences in rendering, timing, input, and audio. Prioritize crashes, state loss, and broken transitions ahead of small pixel differences. | Each fix reproduces before the change and passes afterward. Check exact VRAM words for pixel fixtures and exact tick/event order for gameplay probes. |
+| 2. Correct PS1 geometry artifacts | Preserve subpixel XY for one 3D producer, carry depth for perspective UVs, and evaluate clipping and draw order separately. Extend to other producers after the first path passes. | The 3D fixtures pass, HUD and sprite probes match the native baseline, and gameplay checkpoints match. Each deliberate difference from the PS1 reference has a recorded expected result. |
+| 3. Remove measured host bottlenecks | Pick the readback, upload, CPU work, or native workspace that accounts for a missed deadline or slow load. Use the same route for the comparison. | The target improves beyond baseline variation, with the same sampled pixels, gameplay checkpoints, and save round-trip. Memory settles across repeated transitions. |
+| Phase complete | Run the route matrix in Windows Debug and Release. Track remaining items against the game commands or scenes they affect. | All reproduced in-scope defects have a passing check. Debug routes report zero sanitizer errors. Record the reason and trigger for revisiting any unused or out-of-scope path. |
+
+A host improvement may land as soon as the affected path has a repeatable baseline
+and passes its correctness checks. Investigate features such as mask writes or
+interlace where a game route or reachable command stream shows a dependency.
 
 ## 1. Confirm what the game exercises
 
@@ -17,18 +30,31 @@ Keep 4:3 framing, original assets, gameplay ticks, and PS1-compatible diaries th
 
 ## 2. Capture a baseline
 
-- [ ] Record a slow camera pan in the farmyard, an oblique textured surface, an actor
-  passing behind scenery, and a fade into a dialogue window. Record scene, camera,
-  input sequence, frame number, viewport, and build revision. Keep captures local.
-- [ ] Replay each sequence on the USA PS1 reference or DuckStation's software renderer
-  at native resolution with enhancements disabled. Record the emulator settings.
-  Mark each symptom as observed in both, native-only, or still unconfirmed.
-- [ ] Add a menu/fade, a 640×480 display transition if used, and a minigame return.
-  Record the draw/display environments and compare logical framebuffer pixels before
-  window scaling. Capture both back buffers across each transition.
-- [ ] In Release, capture CPU frame time, GPU frame time, present intervals, upload and
-  readback bytes, and peak host memory on the same route. Record hardware and driver.
-  Repeat after warm-up and compare median and 95th-percentile times.
+| Route | Setup | Compare |
+|---|---|---|
+| Title demo | Fresh boot, leave the title idle with no controller input. Match the opening scene and input sequence to identify the same recording on both targets. | From first replay tick through return to title, align captures by demo tick. Compare the camera, moving edges, texture landmarks, fade duration, and scene order. [Demo update](src/overlay/11_GF_FARM/demo.c), [Replay seed](src/overlay/11_GF_FARM/farm_frame.c) |
+| Farm and dialogue | Start from an equivalent diary copy. Walk the same path past a fence with the player behind it, then trigger the same dialogue or menu and close it. | Compare the first visible frame, shared edges, sprite alignment, depth order, text, palette, and fade. Record scene, area, camera and update tick. |
+| Minigame and return | Enter a minigame through normal gameplay so the route works on both targets and in Release. Repeat entry and exit. Cover all five by the phase exit. | Compare projection, first frame after a transition, scene/event order, and restored farm camera. Record display mode, origin, draw offset, and both back buffers if the mode changes. |
+| Load and persist | Leave the farmhouse, re-enter and repeat, then save a disposable test diary, restart and reload it. | Time archive read, decode, upload, and first visible frame. Check restored fields, slot selection, and PS1 diary exchange when the change touches storage. |
+
+- [ ] Record the VanillaBTN, PsyZ and SDL revisions, build type, GPU adapter and driver,
+  display refresh rate, starting state, and input/tick range. For DuckStation, record
+  the version and use software rendering at native resolution with enhancements disabled.
+- [ ] Compare logical pixels before window scaling. Keep local captures and traces
+  with the reproducer. Record expected and observed values, reference type, and whether
+  the difference exists only in native or also on PS1.
+- [ ] Run the initial checks in the table below. Use synthetic commands and sample the
+  logical target with `StoreImage`. Wait for `DrawSync(0)` before reading the result.
+  Keep generated test data independent of disc assets.
+  [Packet test](native/test_gpu_primitives.c)
+
+### First regression probes
+
+| Probe | Input and observation | Pass condition |
+|---|---|---|
+| Dither phase and quantization | Draw a constant-color Gouraud polygon at a safe interior VRAM location, using channels just on and around a multiple of eight. Read the 16 positions of one 4×4 tile with dithering on and off. Repeat at an offset in each axis. | Add the documented per-pixel offset to each 8-bit input, clamp to 0–255, and truncate to 5 bits. Use a zero offset with dither off. Verify eligibility separately for raw/modulated textures, lines and rectangles. [PS1 dither rules](https://psx-spx.consoledev.net/graphicsprocessingunitgpu/#24bit-rgb-to-15bit-rgb-dithering-enabled-in-texture-page-attribute) |
+| Blend and VRAM visibility | Draw all four blend modes over known RGB555 backgrounds with odd channel values. Upload a new CLUT entry and copy the destination to another VRAM region, then sample both updated regions in the same frame. | Readback matches the reference words at the affected coordinates. Both dependent draws use the updated data, including on the first frame. [PS1 blend and transfer rules](https://psx-spx.consoledev.net/graphicsprocessingunitgpu/) |
+| Projection and UVs | Move two adjacent world triangles by fractions of a logical pixel and use an oblique checkerboard with different vertex depths. Submit a nearby HUD sprite and reuse packet storage on the next frame. | Projected XY follows the calculated fractional positions, the shared edge stays joined, and the texture landmarks follow their expected perspective positions. HUD pixels and the next frame's unrelated draw match their own inputs. |
 
 ## 3. Prioritize visible defects
 
@@ -54,6 +80,20 @@ The game and overlays already execute as x64 code. Debug and Release use PsyZ's 
 backend for rasterization and VRAM transfers. Native frame workspaces already use host RAM.
 Use the hardware for work it can accelerate. Track frame deadlines, load latency,
 and memory peaks as the success metrics.
+
+### Benchmark protocol
+
+- Use Release with the same adapter, driver, tracing, window settings, and refresh
+  rate. Report first-load results separately. Warm the route once, then take at
+  least three paired baseline/candidate measurements over the same tick range.
+- Report median and 95th-percentile frame times by CPU work, GPU work, and present
+  interval. Report transfer bytes, slow load intervals, and committed memory peaks.
+  Record simulation ticks, vertical blanks, and presents as separate counters.
+- Choose the target metric from the baseline. The difference between baseline and
+  candidate medians of that per-run metric should exceed the baseline's max–min
+  spread. Check pixels and tick counts and report other measurable regressions.
+
+### Resource choices
 
 | Resource | Task | Acceptance check |
 |---|---|---|
@@ -222,21 +262,19 @@ Use repeated area transitions for the following measurements.
   save, process restart, reload, and slot exchange. Verify the PS1-format payload size
   and restored fields. Exercise allocation failure with disposable saves.
 
-### Implementation order
-
-1. Capture graphics and host timing on the same route. Triage reproduced port defects
-   first. Start renderer pixel checks with a 4×4 dither fixture and a blend/VRAM probe.
-2. Trace the first rounding step and carry precision through one shared 3D path.
-   Once shared edges, packet reuse, and 2D isolation pass, use it for the other world geometry.
-3. Fix confirmed timing, audio, and rendering issues with their own fixtures. Address
-   bottlenecks that miss frame deadlines or delay transitions, then compare the same route.
-
 ## 6. Close each fix
 
-- [ ] Keep the smallest failing scene or synthetic fixture and record its before/after result.
-  For precision corrections, document the intended visible difference from the PS1.
+- [ ] Keep the smallest scene or synthetic fixture that fails before the fix and passes
+  after it. For an intentional correction, record the expected 3D output and the
+  unchanged gameplay checkpoints. For parity defects, use the PS1 reference output.
+- [ ] Keep GPU state and shader fixes in the renderer, geometry precision in the
+  producer/submission path, and scheduling fixes in the host layer. Record any PsyZ
+  revision change and regenerate and test the Windows DXIL for shader changes.
 - [ ] Run the native Debug and Release suites and the affected gameplay route. Run the
-  local PS1 matching check for changes covered by [AGENTS.md](AGENTS.md).
+  local PS1 matching check for changes covered by the project rules. Require all 17
+  artifacts with a disc or all 14 code binaries without one. [AGENTS.md](AGENTS.md)
 - [ ] Recheck pixel values and gameplay ticks after GPU, CPU, or RAM changes. Report
   before/after frame times, loads, or peak memory for the metric the change targets.
-- [ ] Update the relevant row with evidence. Continue long-play coverage alongside development.
+- [ ] Update the relevant row with evidence. Leave unverified items open and record how
+  to reach them. For an unused path, record the command/scene coverage that supports
+  that decision. Continue long-play coverage alongside development.
