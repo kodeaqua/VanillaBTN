@@ -1,11 +1,17 @@
 """Read and write the game's CD image.
 
 The disc is one MODE2/2352 data track: raw 2352-byte sectors holding an ISO 9660
-file system with the CD-XA extensions. Two commands:
+file system with the CD-XA extensions.
 
     psx_disc.py extract DISC.bin --out DIR
         Every file of the disc's file system into DIR, at its path on the disc, and
         the licence sectors as DIR/license_data.dat.
+
+    psx_disc.py import DISC.bin|DISC.cue|DISC.iso --out DIR
+        Check the USA reference checksum, then extract to DIR.
+
+    psx_disc.py prepare-cue DISC.bin|DISC.cue|DISC.iso --out OUT.cue [--user-data DIR]
+        Check the USA reference checksum, then write a single-track descriptor.
 
     psx_disc.py build LAYOUT.xml --files DIR [--replace NAME=PATH]... -o OUT.bin [--cue OUT.cue]
         The image LAYOUT.xml describes (an mkpsxiso <iso_project>), its files read
@@ -17,11 +23,22 @@ Standard library only.
 from __future__ import annotations
 
 import argparse
+import hashlib
+import os
+import re
+import shutil
 import struct
 import sys
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
+from tempfile import TemporaryDirectory
+
+try:
+    from ntpath import isreserved
+except ImportError:  # Python 3.10-3.12
+    def isreserved(name: str) -> bool:
+        return PureWindowsPath(name).is_reserved()
 
 SECTOR = 2352               # a raw sector
 USER = 2048                 # a Form 1 sector's user data
@@ -30,6 +47,7 @@ SYNC = b"\x00" + b"\xff" * 10 + b"\x00"
 PREGAP = 150                # the 2 s before LBA 0 (MSF 00:02:00)
 LICENSE_SECTORS = 12        # sectors 0-11: the licence data; 12-15 are empty Form 2
 PVD_LBA = 16
+PSYZ_CUE_PATH_BYTES = 512
 
 # Sub-header sub-modes (CD-XA).
 SM_EOR, SM_DATA, SM_FORM2, SM_EOF = 0x01, 0x08, 0x20, 0x80
@@ -392,46 +410,186 @@ def _user_data(image: bytes, lba: int) -> bytes:
 def _records(image: bytes, lba: int, size: int):
     for n in range((size + USER - 1) // USER):
         data, offset = _user_data(image, lba + n), 0
-        while offset < USER and data[offset]:
+        end = min(USER, size - n * USER)
+        while offset < end and data[offset]:
             length = data[offset]
+            if length < 34 or offset + length > end or not 0 < data[offset + 32] <= length - 33:
+                raise SystemExit("Invalid ISO directory record.")
             yield data[offset:offset + length]
             offset += length
 
 
-def extract(disc: Path, out: Path) -> None:
+def cue_binary(cue: Path) -> Path:
+    """Find the binary for a single MODE2/2352 track starting at sector zero."""
+    try:
+        records = [line.strip() for line in cue.read_text(encoding="utf-8-sig").splitlines()]
+    except UnicodeError:
+        raise SystemExit("The CUE sheet must be UTF-8.") from None
+    records = [line for line in records if line and line.split(maxsplit=1)[0].upper() != "REM"]
+    track = [line.upper().split() for line in records[1:]]
+    if track != [["TRACK", "01", "MODE2/2352"], ["INDEX", "01", "00:00:00"]]:
+        raise SystemExit("Expected one MODE2/2352 CUE track starting at sector zero.")
+
+    match = re.fullmatch(r'FILE\s+(?:"([^"\x00]+)"|([^"\s\x00]+))\s+BINARY', records[0], re.I)
+    if not match:
+        raise SystemExit("Expected one BINARY file in the CUE sheet.")
+    name = PureWindowsPath(match[1] or match[2])
+    if name.drive or name.root or ".." in name.parts or name.suffix.lower() not in (".bin", ".iso"):
+        raise SystemExit("The CUE sheet must use a relative BIN or ISO path within its directory.")
+    binary = cue.parent.joinpath(*name.parts).resolve()
+    if not binary.is_relative_to(cue.parent.resolve()):
+        raise SystemExit("The CUE sheet's disc path leaves its directory.")
+    return binary
+
+
+def check_reference_sha1(digest: str) -> None:
+    manifest = Path(__file__).resolve().parents[1] / "disc" / "disc.sha1"
+    match = re.search(r"(?m)^([0-9a-f]{40})[ \t]+disc\.bin$", manifest.read_text(encoding="ascii"))
+    if not match:
+        raise SystemExit("The disc manifest has no reference SHA-1.")
+    if digest != match[1]:
+        raise SystemExit("The disc does not match the USA reference SHA-1.")
+
+
+def prepare_cue(disc: Path, out: Path) -> None:
+    """Verify the reference and write a single-track CUE for the native loader."""
+    binary = (cue_binary(disc) if disc.suffix.lower() == ".cue" else disc).resolve(strict=True)
+    if out.exists() and (out.samefile(binary) or out.samefile(disc)):
+        raise SystemExit("The runtime CUE must be a separate file.")
+    path = binary.as_posix()
+    if any(character in path for character in '"\r\n'):
+        raise SystemExit("The disc path is not supported by the native loader.")
+    try:
+        encoded_path = path.encode("mbcs" if sys.platform == "win32" else "utf-8")
+    except UnicodeError:
+        raise SystemExit("The disc path is not supported by the native loader.") from None
+    if len(encoded_path) >= PSYZ_CUE_PATH_BYTES:
+        raise SystemExit("The disc path is too long for the native loader.")
+
+    sha1 = hashlib.sha1(usedforsecurity=False)
+    with binary.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            sha1.update(chunk)
+    check_reference_sha1(sha1.hexdigest())
+    out.write_bytes(
+        b'FILE "' + encoded_path + b'" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n'
+    )
+
+
+def prepare_user_data(directory: Path) -> None:
+    """Copy legacy cards and backups when their Documents directories are absent."""
+    directory.mkdir(parents=True, exist_ok=True)
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if not local_app_data:
+        return
+    legacy = Path(local_app_data) / "VanillaBTN"
+    for name in ("bu00", "bu10", "save-imports"):
+        source, destination = legacy / name, directory / name
+        if not source.is_dir() or destination.exists():
+            continue
+        with TemporaryDirectory(prefix=".vanillabtn-migration-", dir=directory) as temp:
+            staged = Path(temp) / name
+            shutil.copytree(source, staged, symlinks=True)
+            try:
+                staged.rename(destination)
+            except FileExistsError:
+                if not destination.is_dir():
+                    raise
+
+
+def extract(disc: Path, out: Path, verify_reference: bool = False) -> None:
+    input_image = disc.resolve()
     image = disc.read_bytes()
+    label = "Disc" if verify_reference else str(disc)
     if len(image) % SECTOR:
-        raise SystemExit(f"{disc}: not a MODE2/2352 image ({len(image)} bytes)")
+        raise SystemExit(f"{label}: not a MODE2/2352 image ({len(image)} bytes)")
     pvd = _user_data(image, PVD_LBA)
     if pvd[:6] != b"\x01CD001":
-        raise SystemExit(f"{disc}: no ISO 9660 volume descriptor at sector {PVD_LBA}")
+        raise SystemExit(f"{label}: no ISO 9660 volume descriptor at sector {PVD_LBA}")
+    if not verify_reference:
+        _extract_image(image, pvd, out, input_image)
+        return
+
+    check_reference_sha1(hashlib.sha1(image, usedforsecurity=False).hexdigest())
+
+    staging_parent = out if out.is_dir() else out.parent
+    staging_parent.mkdir(parents=True, exist_ok=True)
+    with TemporaryDirectory(prefix=".vanillabtn-import-", dir=staging_parent) as temp:
+        staged = Path(temp) / "disc"
+        _extract_image(image, pvd, staged, input_image)
+        if staging_parent != out:
+            try:
+                staged.rename(out)
+                return
+            except OSError:
+                if not out.is_dir():
+                    raise
+        # Check destination conflicts before replacing any files.
+        destination = out.resolve()
+        replacements = []
+        for source in staged.rglob("*"):
+            if source.is_file():
+                target = out / source.relative_to(staged)
+                if not target.parent.resolve().is_relative_to(destination):
+                    raise SystemExit("Import directory entry leaves the destination.")
+                if target.resolve() == input_image:
+                    raise SystemExit("Refusing to overwrite the input disc image.")
+                if target.is_dir():
+                    raise SystemExit("An import file would replace an existing directory.")
+                target.parent.mkdir(parents=True, exist_ok=True)
+                replacements.append((source, target))
+        for source, target in replacements:
+            source.replace(target)
+
+
+def _extract_image(image: bytes, pvd: bytes, out: Path, input_image: Path) -> None:
     out.mkdir(parents=True, exist_ok=True)
-    (out / "license_data.dat").write_bytes(
-        b"".join(image[n * SECTOR + 16:(n + 1) * SECTOR] for n in range(LICENSE_SECTORS)))
+    root_path = out.resolve()
+    visited = set()
+
+    def write_file(path: Path, data: bytes) -> None:
+        if path == input_image:
+            raise SystemExit("Refusing to overwrite the input disc image.")
+        if path.resolve() != path or (path.exists() and path.stat().st_nlink > 1):
+            raise SystemExit("Refusing to overwrite a linked extraction target.")
+        path.write_bytes(data)
+
+    write_file(root_path / "license_data.dat", b"".join(
+        image[n * SECTOR + 16:(n + 1) * SECTOR] for n in range(LICENSE_SECTORS)))
 
     def walk(lba: int, size: int, directory: Path) -> None:
+        if lba in visited or lba + (size + USER - 1) // USER > len(image) // SECTOR:
+            raise SystemExit("Invalid ISO directory extent.")
+        visited.add(lba)
         directory.mkdir(parents=True, exist_ok=True)
         for record in _records(image, lba, size):
             name = record[33:33 + record[32]]
             if name in (b"\x00", b"\x01"):
                 continue
             (extent,), (length,) = struct.unpack_from("<I", record, 2), struct.unpack_from("<I", record, 10)
-            name = name.decode("ascii").split(";")[0]
+            name = name.partition(b";")[0]
+            if not re.fullmatch(rb"[A-Za-z0-9_][A-Za-z0-9_.-]*", name) or name.endswith(b"."):
+                raise SystemExit("Unsupported ISO entry name.")
+            path = directory / name.decode("ascii")
+            if isreserved(path.name) or path.resolve() != path:
+                raise SystemExit("Unsupported ISO entry path.")
             if record[25] & 2:
-                walk(extent, length, directory / name)
+                walk(extent, length, path)
                 continue
             system_use = record[33 + record[32] + (1 - record[32] % 2):]
             attribute = struct.unpack_from(">H", system_use, 4)[0] if system_use[6:8] == b"XA" else 0
             count = (length + USER - 1) // USER
+            if extent + count > len(image) // SECTOR:
+                raise SystemExit("ISO file extent exceeds the disc image.")
             if attribute & (XA_FORM2 | XA_INTERLEAVED):
                 data = b"".join(image[n * SECTOR + 16:(n + 1) * SECTOR]
                                 for n in range(extent, extent + count))
             else:
                 data = b"".join(_user_data(image, n) for n in range(extent, extent + count))[:length]
-            (directory / name).write_bytes(data)
+            write_file(path, data)
 
     root = pvd[156:190]
-    walk(struct.unpack_from("<I", root, 2)[0], struct.unpack_from("<I", root, 10)[0], out)
+    walk(struct.unpack_from("<I", root, 2)[0], struct.unpack_from("<I", root, 10)[0], root_path)
 
 
 # -- build ---------------------------------------------------------------------------
@@ -544,6 +702,13 @@ def main(argv: list[str] | None = None) -> int:
     p = commands.add_parser("extract", help="the disc's files and licence into a directory")
     p.add_argument("disc", type=Path)
     p.add_argument("--out", type=Path, required=True)
+    p = commands.add_parser("import", help="verify and extract the USA reference disc")
+    p.add_argument("disc", type=Path)
+    p.add_argument("--out", type=Path, required=True)
+    p = commands.add_parser("prepare-cue", help="verify the USA disc and write a runtime CUE")
+    p.add_argument("disc", type=Path)
+    p.add_argument("--out", type=Path, required=True)
+    p.add_argument("--user-data", type=Path)
     p = commands.add_parser("build", help="an image from a layout and its files")
     p.add_argument("layout", type=Path)
     p.add_argument("--files", type=Path, required=True)
@@ -553,6 +718,22 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "extract":
         extract(args.disc, args.out)
+    elif args.command == "prepare-cue":
+        try:
+            prepare_cue(args.disc, args.out)
+        except OSError as error:
+            raise SystemExit(f"Could not prepare disc ({error.strerror}).") from None
+        if args.user_data is not None:
+            try:
+                prepare_user_data(args.user_data)
+            except OSError:
+                raise SystemExit("Could not prepare the Documents save folder.") from None
+    elif args.command == "import":
+        try:
+            disc = cue_binary(args.disc) if args.disc.suffix.lower() == ".cue" else args.disc
+            extract(disc, args.out, verify_reference=True)
+        except OSError as error:
+            raise SystemExit(f"Could not import disc ({error.strerror}).") from None
     else:
         replace = {}
         for item in args.replace:

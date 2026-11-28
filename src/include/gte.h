@@ -3,6 +3,18 @@
 
 /* GTE (geometry engine) command macros. Each command is its raw coprocessor encoding. */
 
+#ifdef __psyz
+#include <psyz/gte.h>
+
+/* The software GTE executes commands without the PS1 pipeline delay. */
+#define gte_rtpt_b() gte_rtpt()
+#define gte_nclip_b() gte_nclip()
+#define gte_avsz3_b() gte_avsz3()
+#define gte_avsz4_b() gte_avsz4()
+/* The matching command below includes the GTE translation registers. */
+#undef gte_rtv0
+#define gte_rtv0() gte_rtv0tr()
+#else
 #include <inline_c.h>
 
 #define SDK_GTE_COMMAND(word) __asm__ volatile("nop;" "nop;" ".word " #word)
@@ -37,5 +49,6 @@
 #define gte_rtv0()  SDK_GTE_COMMAND(0x4A480012)
 #undef gte_rtir
 #define gte_rtir()  SDK_GTE_COMMAND(0x4A49E012)
+#endif
 
 #endif

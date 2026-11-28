@@ -121,6 +121,10 @@ u16 door_entry_for_event(s32 event) {
     u32 i;
 
     for (i = 0; i < 10; i++, entry++) {
+#ifdef __psyz
+        /* Unused zone entries clear entry->zone; PS1 tolerates reading address 0x4. */
+        if (entry->zone == 0) continue;
+#endif
         if (entry->zone->event == event) return entry->id;
     }
     return 0;

@@ -5,6 +5,12 @@
 #include <sys/types.h>
 #include <libgte.h>
 #include <libgpu.h>
+#ifdef __psyz
+#include <stddef.h>
+/* PsyZ declares KanjiFntClose/Print with a stream id; PS1 uses the default stream. */
+#define KanjiFntClose() (KanjiFntClose)(-1)
+#define KanjiFntPrint(...) (KanjiFntPrint)(-1, __VA_ARGS__)
+#endif
 #include "types.h"
 #include "actor.h"
 #include "afile.h"
@@ -55,7 +61,15 @@ typedef struct ItemStats {
     s32 speed[3];
     u8  pad54[0x58 - 0x54];
     s32 destination[3];
+#ifdef __psyz
+    s32 destinationPad;
+    VECTOR target;
+    AnimState sprite;
+    ItemCue cue;
+    u32 actorTailPad;
+#else
     u8  pad64[0xAC - 0x64];
+#endif
     u16 grazingTime;
     u16 daysSick;
     u16 growthDays;
@@ -92,7 +106,15 @@ typedef struct SwindRecord {
     s32 speed[3];
     u8 pad54[0x58 - 0x54];
     s32 destination[3];
+#ifdef __psyz
+    s32 destinationPad;
+    VECTOR target;
+    AnimState sprite;
+    ItemCue cue;
+    u32 actorTailPad;
+#else
     u8 pad64[0xAC - 0x64];
+#endif
     u16 grazingTime;
     u16 daysSick;
     u16 pregnancy;
@@ -118,12 +140,33 @@ typedef struct FarmExtraChicken {
     VECTOR position;
     VECTOR speed;
     VECTOR destination;
+#ifdef __psyz
+    VECTOR target;
+    AnimState sprite;
+    ItemCue cue;
+    u32 actorTailPad;
+#else
     u8 pad68[0xAC - 0x68];
+#endif
     s16 grazingTime;
     s16 daysSick;
     s16 pregnancy;
     u8 padB2[0xB4 - 0xB2];
 } FarmExtraChicken;
+
+#ifdef __psyz
+_Static_assert(sizeof(ItemStats) == sizeof(FarmLivestock), "ItemStats size");
+_Static_assert(offsetof(ItemStats, grazingTime) == offsetof(FarmLivestock, grazeCount),
+               "ItemStats grazeCount");
+_Static_assert(offsetof(ItemStats, daysSinceShearing) == offsetof(FarmLivestock, daysSinceShearing),
+               "ItemStats daysSinceShearing");
+_Static_assert(sizeof(SwindRecord) == sizeof(FarmChicken), "SwindRecord size");
+_Static_assert(offsetof(SwindRecord, grazingTime) == offsetof(FarmChicken, grazingTime),
+               "SwindRecord grazingTime");
+_Static_assert(sizeof(FarmExtraChicken) == sizeof(FarmChicken), "FarmExtraChicken size");
+_Static_assert(offsetof(FarmExtraChicken, grazingTime) == offsetof(FarmChicken, grazingTime),
+               "FarmExtraChicken grazingTime");
+#endif
 
 /* One editable line of a debug edit page: the value it edits, its range, its
  * width in bytes and its row kind, and the label shown. */
@@ -383,8 +426,23 @@ static s32 swind_stub_1(void) {
 static void swind_stub_2(void) {
 }
 
+#ifdef __psyz
+/* Save (0) or restore (1) the screen area behind the window. */
+static void swind_screen_area_copy(s32 restore) {
+    u_long *buffer = (u_long *)STAGING_BUFFER;
+
+    if (restore == 0) {
+        StoreImage(&swind_save_rect, buffer);
+    } else {
+        LoadImage(&swind_save_rect, buffer);
+    }
+    DrawSync(0);
+}
+#endif
+
 /* One frame of the window, dispatched on swind_state. */
 void swind_window_tick(void) {
+#ifndef __psyz
     /* Save (0) or restore (1) the screen area behind the window. */
     void swind_screen_area_copy(s32 restore) {
         u_long *buffer = (u_long *)STAGING_BUFFER;
@@ -396,10 +454,14 @@ void swind_window_tick(void) {
         }
         DrawSync(0);
     }
+#endif
 
     switch (swind_state) {
     case SWIND_STATE_OPEN:
         swind_state = SWIND_STATE_FONT;
+#ifdef __psyz
+        swind_changed = 0;
+#endif
         swind_closable = 1;
         swind_page = 0;
         swind_page_state = 0;
@@ -781,7 +843,7 @@ static void swind_model_select(void) {
 
 /* Sets (value 1) or clears (value 0) one bit of game_state.debugFlags. */
 static void swind_set_debug_flag_bit(u32 bit, u32 value) {
-    game_state.debugFlags = (game_state.debugFlags & ~(1 << bit)) | (value << bit);
+    game_state.debugFlags = (game_state.debugFlags & ~(1U << bit)) | (value << bit);
 }
 /* Loads the debug font and sets the text origin of the window. */
 static void swind_font_setup(void) {

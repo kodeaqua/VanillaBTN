@@ -1,7 +1,7 @@
 /* The farm dog: its sprite, its spawn, requests, daily affection and training tick, its
  * phase machine, and its actions: the idle phase, item and action searches, its cues and
  * scripted walks. */
-#include <memory.h>
+#include <string.h>
 #include <sys/types.h>
 #include <libgte.h>
 #include <libgpu.h>
@@ -81,12 +81,25 @@ s32 (*const dog_enter_handlers[19])(FarmPet *) = {
     dog_set_bit2_cue, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 };
 
+#ifdef __psyz
+static s32 dog_script_follow_motion_actor(FarmActor *actor) {
+    return dog_script_follow_motion((FarmPet *)actor);
+}
+
+s32 (*const dog_cue_handlers[19])(FarmActor *) = {
+    dog_idle_cue, dog_cue_1, dog_cue_2, 0, dog_start_action, dog_script_drive_object,
+    dog_script_follow_motion_actor, dog_script_approach_player, dog_cue_8, dog_cue_8, dog_cue_10,
+    dog_cue_11, dog_cue_12, dog_cue_13, dog_cue_14, dog_cue_15,
+    dog_cue_16, dog_start_action, dog_set_idle_action,
+};
+#else
 s32 (*const dog_cue_handlers[19])() = {
     dog_idle_cue, dog_cue_1, dog_cue_2, 0, dog_start_action, dog_script_drive_object,
     dog_script_follow_motion, dog_script_approach_player, dog_cue_8, dog_cue_8, dog_cue_10,
     dog_cue_11, dog_cue_12, dog_cue_13, dog_cue_14, dog_cue_15,
     dog_cue_16, dog_start_action, dog_set_idle_action,
 };
+#endif
 
 /* Daily update. Affection gains 2 for talking today and 2 for BIT2, loses 1 when neither
  * of those nor training happened, and loses 5 outdoors while the weather is not 0. Training
@@ -164,8 +177,13 @@ static s32 dog_promote_record_flags(FarmActor *a) {
  * set ACTOR_FLAG_BIT20 while the action is one of the walks (0x12 to 0x15). Resets
  * dog_action_row to DOG_ROW_OWN. Returns -1 for an unused slot. */
 s32 dog_update_phase(FarmPet *object) {
+#ifdef __psyz
+    s32 (*callback)(FarmActor *);
+    s32 (*const *callbacks)(FarmActor *);
+#else
     s32 (*callback)();
     s32 (*const *callbacks)();
+#endif
     u16 callback_index;
     u16 timer;
     u16 phase;
@@ -178,7 +196,11 @@ s32 dog_update_phase(FarmPet *object) {
     callback_index = object->actor.taskNo;
     callback = callbacks[callback_index];
     if (callback != 0) {
+#ifdef __psyz
+        callback(&object->actor);
+#else
         callback(object);
+#endif
     }
     flags = object->actor.flags;
     if ((flags & ACTOR_FLAG_CUE_RUNNING) == 0 && object->actor.interruptTime >= 300) {

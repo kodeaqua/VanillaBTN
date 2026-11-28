@@ -1,5 +1,5 @@
 /* The family: the wife and child, the daily update of the family, its pregnancy and the child's growth. */
-#include <memory.h>
+#include <string.h>
 #include "types.h"
 #include "event_flags.h"
 #include "family.h"
@@ -77,6 +77,28 @@ void family_daily_update(void) {
     }
 }
 
+#ifdef __psyz
+/* Bachelorette name glyph strings (Karen, Ann, Elli, Mary, Popuri); on PS1 these
+ * live at fixed overlay .data addresses following milestone_group_c_ids[0..3]. */
+static u16 family_wife_name_karen[] = {10, 32, 49, 36, 45, 0xFFFF};
+static u16 family_wife_name_ann[] = {0, 45, 45, 0xFFFF};
+static u16 family_wife_name_elli[] = {4, 43, 43, 40, 0xFFFF};
+static u16 family_wife_name_mary[] = {12, 32, 49, 56, 0xFFFF};
+static u16 family_wife_name_popuri[] = {15, 46, 47, 52, 49, 40, 0xFFFF};
+
+static u16 *family_tables[5] = {
+    family_wife_name_karen,
+    family_wife_name_ann,
+    family_wife_name_elli,
+    family_wife_name_mary,
+    family_wife_name_popuri,
+};
+
+/* The family_tables entry of the current wife. */
+u16 *family_table_lookup(void) {
+    return family_tables[game_state.family.wifeIndex];
+}
+#else
 /* Per wife index, an address in the overlay's data (family_table_lookup reads it). */
 u32 family_tables[5] = {0x80127F98, 0x80127FA4, 0x80127FAC, 0x80127FB8, 0x80127FC4};
 
@@ -84,6 +106,7 @@ u32 family_tables[5] = {0x80127F98, 0x80127FA4, 0x80127FAC, 0x80127FB8, 0x80127F
 s32 family_table_lookup(void) {
     return family_tables[game_state.family.wifeIndex];
 }
+#endif
 
 /* Count the pregnancy: after FAMILY_PREGNANCY_TICKS ticks the days count up, and the
  * pregnancy starts once the wife's affection is past FAMILY_PREGNANCY_AFFECTION. */

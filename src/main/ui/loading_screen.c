@@ -1,4 +1,4 @@
-#include <memory.h>
+#include <string.h>
 #include <sys/types.h>
 #include <libgte.h>
 #include <libgpu.h>
@@ -56,23 +56,40 @@ s32 loading_screen_is_active(void) {
 /* Draw the loading picture into the next frame buffer, once per start. */
 void loading_screen_draw(void) {
     FrameState *state;
+#ifndef __psyz
     s32 index;
+#endif
     LoadingPackets *packets;
-    u_long *ot;
+    OT_TYPE *ot;
     SPRT *sprites;
     DR_MODE *modes;
     packets = &loading_packets;
     if (loading_screen_active != 0) {
         if (loading_screen_started != 1) {
             loading_screen_started = 1;
+#ifdef __psyz
+            /* Finish the new back buffer before selecting it for the next presentation. */
+            PutDrawEnv(&current_frame->drawEnv);
+            ot = packets->ots[frame_index];
+            sprites = packets->sprites[frame_index];
+            modes = packets->modes[frame_index];
+            ClearOTagR(ot, LOADING_OT_LENGTH);
+            anim_draw_sprt_slots_advance(ot, &sprites, &modes, &loading_anim, 160, 120);
+            DrawOTag(&ot[LOADING_OT_LENGTH - 1]);
+            DrawSync(0);
+#else
             DrawSync(0);
             display_on();
             DrawOTag(&packets->ots[frame_index][LOADING_OT_LENGTH - 1]);
+#endif
             state = frame_records;
             if (current_frame == frame_records) state = &frame_records[1];
             current_frame = state;
             frame_index = state != frame_records;
             PutDispEnv(&state->dispEnv);
+#ifdef __psyz
+            display_on();
+#else
             PutDrawEnv(&current_frame->drawEnv);
             index = frame_index;
             ot = packets->ots[index];
@@ -80,6 +97,7 @@ void loading_screen_draw(void) {
             modes = packets->modes[index];
             ClearOTagR(ot, LOADING_OT_LENGTH);
             anim_draw_sprt_slots_advance(ot, &sprites, &modes, &loading_anim, 160, 120);
+#endif
             loading_screen_started = 0;
         }
     }

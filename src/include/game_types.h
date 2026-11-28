@@ -30,7 +30,11 @@ typedef struct {
     MATRIX  translation;
     SVECTOR angle;
     VECTOR  position;
+#ifdef __psyz
+    int     flag;
+#else
     long    flag;
+#endif
 } CameraWork;
 
 #endif /* GAME_TYPES_H */

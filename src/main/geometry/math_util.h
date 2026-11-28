@@ -12,8 +12,16 @@
 /* 1.0 in the 1.12 fixed-point format (a scale of 1.0, or a full step of a 20.12 position). */
 #define FIXED_ONE 0x1000
 
+#ifdef __psyz
+extern const MATRIX GsIDMATRIX;
+#endif
+
 /* bits16_set or bits16_clear, picked at run time. */
+#ifdef __psyz
+typedef void (*Bits16Fn)(u16 *, s32);
+#else
 typedef void (*Bits16Fn)();
+#endif
 void vec_from_polar(s32 *out, s32 radius, s32 y, s32 angle);
 s32 math_int_pow(s32 base, s32 exponent);
 void math_lerp_vec3(s32 step, s32 steps, s32 *from, s32 *to, s32 *out);

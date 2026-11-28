@@ -30,7 +30,7 @@ s32 cue_countdown(ItemCue *cue) {
 }
 
 /* Draw the icon frame for the cue's phase, one frame per 10 phase units; nothing is drawn at phase 0. */
-void cue_draw_frame(ItemCue *object, u_long *ot, s16 x, s16 y) {
+void cue_draw_frame(ItemCue *object, void *ot, s16 x, s16 y) {
     s16 tableValue;
     s32 divisor;
     s16 remainder;

@@ -12,6 +12,14 @@
 #include "prim.h"
 #include "sound.h"
 
+enum { MAIN_DISPLAY_WIDTH = 320, MAIN_DISPLAY_HEIGHT = 240 };
+
+#ifdef __psyz
+/* PsyZ keeps the GsInitGraph dimensions private. */
+#define HWD0 ((long)MAIN_DISPLAY_WIDTH)
+#define VWD0 ((long)MAIN_DISPLAY_HEIGHT)
+#endif
+
 /* Entries in each frame's main ordering table. */
 #define FRAME_OT_DEPTH 2048
 #define FRAME_PRIM_SIZE 0x17700
@@ -29,7 +37,7 @@ typedef struct FrameState {
     /* The tag arrays of the four layer OTs (64, 16 and 2 entries; the fourth is
      * unused), drawn around the main OT: 3, 2, `ot`, 1, 0, so layer 0 is the
      * front. */
-    u_long *otTags[4];
+    OT_TYPE *otTags[4];
     u8  padE8[0xEC - 0xE8];
     s32 otTagCounts[4]; /* entries in each */
     u8  padFC[0x100 - 0xFC];
@@ -39,7 +47,7 @@ typedef struct FrameState {
     PrimCursor primCursor;  /* the next free byte of the primitive buffer; rewound to
                              * primStart each frame */
     s32 primSize;       /* bytes in the primitive buffer */
-    u_long *ot;         /* the main OT, otDepth entries indexed by depth */
+    OT_TYPE *ot;        /* the main OT, otDepth entries indexed by depth */
     u8 *primStart;      /* this frame's primitive buffer */
     u32 workSize;       /* bytes of the GS work area */
     u8 *workBase;       /* the GS work area (gs_work_alloc allocates from it) */
@@ -73,6 +81,9 @@ enum MainScene {
 };
 
 void main_request_scene(s32 scene);
+#if defined(__psyz) && defined(VANILLABTN_DEBUG)
+void vanillabtn_debug_jump(s32 scene);
+#endif
 s32 main_get_previous_scene(void);
 /* The speed mode: a fade runs at half step in HALF, and the cd fade steps and the pad's
  * repeat delays scale by 2 or 3 in FAST_2 and FAST_3. */
@@ -90,7 +101,7 @@ void *gs_work_alloc(s32 size);
 void gs_work_release(void *end);
 s32 main_region_free_bytes(void);
 u8 *main_region_free_start(void);
-s32 main_get_region_base(void);
+u8 *main_get_region_base(void);
 void main_frame_clear(void);
 
 /* Double-buffer parity: 0 or 1. */
@@ -100,7 +111,7 @@ extern InputRecord *input_pad2;
 /* Base of the big scratch/OT region. */
 extern u8 *region_base;
 /* The active one of the two OTs the frame is drawn through. */
-extern u_long *active_ot;
+extern OT_TYPE *active_ot;
 /* The OT base for the current frame. */
 extern u8 *frame_ot_base;
 /* Struct definitions for the game's global data objects. Parts without a name are
@@ -114,5 +125,24 @@ extern InputRecord input_records[2];
 
 /* Deferred one-shot callback, called once at vsync and then cleared. */
 extern void (*vsync_pending_callback)(void);
+
+#ifdef __psyz
+/* Clamp direct OT slot indexing so far or behind-camera depths stay in bounds. */
+static inline s32 frame_ot_slot(s32 index) {
+    s32 limit = current_frame->otDepth;
+    if (index < 0 || limit <= 0) {
+        return 0;
+    }
+    if (index >= limit) {
+        return limit - 1;
+    }
+    return index;
+}
+#define FRAME_OT_SLOT(index) frame_ot_slot(index)
+#define FRAME_OT_AT(index) (&current_frame->ot[frame_ot_slot(index)])
+#else
+#define FRAME_OT_SLOT(index) (index)
+#define FRAME_OT_AT(index) (&current_frame->ot[index])
+#endif
 
 #endif /* MAIN_H */

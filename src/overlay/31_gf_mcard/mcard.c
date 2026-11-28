@@ -7,8 +7,13 @@
 #include <libgte.h>
 #include <libgpu.h>
 #include <libapi.h>
-#include <libmcrd.h>
+#include "sdk_mcrd.h"
 #include <libmcx.h>
+#ifdef __psyz
+/* PS1 libapi rename() translates bu00: paths and returns 1 on success (CRT returns 0). */
+long psyz_card_rename(const char *old_name, const char *new_name);
+#define rename psyz_card_rename
+#endif
 #include "types.h"
 #include "main.h"
 #include "mcard.h"
@@ -74,6 +79,13 @@ static struct DIRENTRY mcard_dirents[MCARD_MAX_ENTRIES];
 /* The directory summary line mcard_list_dir writes. */
 static char mcard_info_text[784];
 
+#ifdef __psyz
+void mcard_screen_enter(void) {
+    mcard_status = 0;
+    FntLoad(960, 0);
+    SetDumpFnt(FntOpen(8, 0, MAIN_DISPLAY_WIDTH, MAIN_DISPLAY_HEIGHT, 0, 512));
+}
+#endif
 
 /* One frame of the test screen: the menu, then the status line while one is showing
  * (a pressed button clears it), else the command for the pressed button. */
@@ -231,7 +243,11 @@ static int mcard_list_dir(void) {
             blocks += q;
         }
     }
+#ifdef __psyz
+    sprintf(mcard_info_text, "%ld file(s) %d block(s)\n", mcard_file_count, blocks);
+#else
     sprintf(mcard_info_text, "%d file(s) %d block(s)\n", mcard_file_count, blocks);
+#endif
     return MCARD_OP_LISTING;
 }
 

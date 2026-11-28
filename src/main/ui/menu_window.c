@@ -13,7 +13,11 @@
 #include "text.h"
 #include "window_frame.h"
 
+#ifdef __psyz
+typedef s32 (*Handler)(void);
+#else
 typedef s32 (*Handler)();
+#endif
 
 /* The menu box: where it opens and closes, and its size. */
 #define MENU_BOX_X 26
@@ -22,7 +26,7 @@ typedef s32 (*Handler)();
 #define MENU_BOX_H 62
 
 /* Draw the bevelled window frame at (x, y), w by h. */
-void window_frame_draw_at(u_long *ot, s32 unused, s16 x, s16 y, s16 w, s16 h) {
+void window_frame_draw_at(void *ot, s32 unused, s16 x, s16 y, s16 w, s16 h) {
     window_frame_draw(ot, x, y, w, h);
 }
 
@@ -64,7 +68,11 @@ int menu_run_state(void) {
     if (index == MENU_STATE_IDLE) {
         return 1;
     }
+#ifdef __psyz
+    return menu_handlers[index]();
+#else
     return menu_handlers[index](&game_state);
+#endif
 }
 
 /* Open menu `id` with its data at `dataIndex`. Returns 0 when it starts, or when it is
@@ -144,7 +152,7 @@ static void menu_set_saved_flags(int flags) {
  * height. Draws the current box (window_frame_draw_at) and returns 0 while running;
  * on the last frame it draws the full box (opening only), pins *frame at the
  * end and returns 1. */
-s32 menu_box_animate(u_long *ot, s32 unused, s16 x, s16 y, s16 w, s16 h, s32 *frame, s32 duration, s32 mode) {
+s32 menu_box_animate(void *ot, s32 unused, s16 x, s16 y, s16 w, s16 h, s32 *frame, s32 duration, s32 mode) {
     s32 heightStep;
     s32 widthStep;
     s32 t;

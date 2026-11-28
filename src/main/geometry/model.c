@@ -1,11 +1,15 @@
 /* Camera, GTE lighting and fog, drawing of TMD models, and the vertex projection. */
 #include <sys/types.h>
 #include <libgte.h>
+#ifndef __psyz
 #include <inline_c.h>
 #include <gtemac.h>
+#else
+#include <stddef.h>
+#endif
 #include <libgpu.h>
 #include <libgs.h>
-#include <memory.h>
+#include <string.h>
 #include "types.h"
 #include "camera.h"
 #include "cpu_asm.h"
@@ -36,12 +40,129 @@ static MATRIX base_matrix;
 static MATRIX light_matrix;
 static MATRIX color_matrix;
 static MATRIX saved_matrix;
+#ifdef __psyz
+/* Keep axis-aligned scene models on the base camera matrix so shared edges match the stage mesh. */
+#define NATIVE_WORLD_VERT_CAP 1024u
+#define NATIVE_SVECTOR_MIN (-32768)
+#define NATIVE_SVECTOR_MAX 32767
+static MATRIX native_saved_base;
+static MATRIX native_model_matrix;
+static MATRIX native_composed_matrix;
+static s32 native_world_compose;
+static s32 native_world_verts_active;
+static SVECTOR native_world_verts[NATIVE_WORLD_VERT_CAP];
+
+static s32 native_is_axis_aligned_rotation(const MATRIX *m) {
+    s32 r;
+    s32 c;
+    s32 col_used[3] = {0, 0, 0};
+
+    for (r = 0; r < 3; r++) {
+        s32 nz = 0;
+        for (c = 0; c < 3; c++) {
+            s16 v = m->m[r][c];
+            if (v == 0) {
+                continue;
+            }
+            if (v != FIXED_ONE && v != -FIXED_ONE) {
+                return 0;
+            }
+            if (col_used[c] != 0) {
+                return 0;
+            }
+            col_used[c] = 1;
+            nz++;
+        }
+        if (nz != 1) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+static s32 native_transform_world_verts(const TmdObject *table, const TmdObject *object,
+                                        const MATRIX *m, SVECTOR *out) {
+    const SVECTOR *src = (const SVECTOR *)((const u8 *)table + object->vert_top);
+    u32 i;
+
+    if (object->n_vert > NATIVE_WORLD_VERT_CAP) {
+        return 0;
+    }
+    for (i = 0; i < object->n_vert; i++) {
+        s32 wx = ((s32)m->m[0][0] * src[i].vx + (s32)m->m[0][1] * src[i].vy +
+                  (s32)m->m[0][2] * src[i].vz) /
+                     FIXED_ONE +
+                 (s32)m->t[0];
+        s32 wy = ((s32)m->m[1][0] * src[i].vx + (s32)m->m[1][1] * src[i].vy +
+                  (s32)m->m[1][2] * src[i].vz) /
+                     FIXED_ONE +
+                 (s32)m->t[1];
+        s32 wz = ((s32)m->m[2][0] * src[i].vx + (s32)m->m[2][1] * src[i].vy +
+                  (s32)m->m[2][2] * src[i].vz) /
+                     FIXED_ONE +
+                 (s32)m->t[2];
+        if (wx < NATIVE_SVECTOR_MIN || wx > NATIVE_SVECTOR_MAX || wy < NATIVE_SVECTOR_MIN ||
+            wy > NATIVE_SVECTOR_MAX || wz < NATIVE_SVECTOR_MIN || wz > NATIVE_SVECTOR_MAX) {
+            return 0;
+        }
+        if (out != NULL) {
+            out[i].vx = (s16)wx;
+            out[i].vy = (s16)wy;
+            out[i].vz = (s16)wz;
+            out[i].pad = src[i].pad;
+        }
+    }
+    return 1;
+}
+
+static s32 native_can_use_world_verts(const TmdHeader *tmd, const MATRIX *m) {
+    MATRIX cur;
+    s32 i;
+
+    if (native_world_compose == 0) {
+        return 0;
+    }
+    gte_ReadRotMatrix(&cur);
+    if (memcmp(cur.m, native_composed_matrix.m, sizeof(cur.m)) != 0 ||
+        memcmp(cur.t, native_composed_matrix.t, sizeof(cur.t)) != 0) {
+        return 0;
+    }
+    for (i = 0; i < tmd->n_obj; i++) {
+        if (!native_transform_world_verts(tmd->objects, &tmd->objects[i], m, NULL)) {
+            return 0;
+        }
+    }
+    return 1;
+}
+#endif
 static ClipPlane clip_planes[4];
 static VECTOR view_direction;
 
 #define PACKET_WORD(p, off) (*(u32 *)((p) + (off)))
 #define PACKET_HALF(p, off) (*(u16 *)((p) + (off)))
-#define PRIM_CODE(p) ((p)[7])
+#ifdef __psyz
+/* Source TMD words retain their disc offsets. Only the GPU packet header grows. */
+#define PRIM_HEADER_DELTA (offsetof(POLY_F3, r0) - sizeof(u32))
+#define LINK_MODEL_PRIM(ot, p, type, words) (setlen(p, words), addPrim(ot, p))
+static inline OT_TYPE *model_ot_slot(OT_TYPE *ot, s32 depth) {
+    s32 index = depth / 4;
+    if (index < 0) {
+        index = 0;
+    } else if (index >= FRAME_OT_DEPTH) {
+        index = FRAME_OT_DEPTH - 1;
+    }
+    return &ot[index];
+}
+#define MODEL_OT_SLOT(ot, depth) model_ot_slot((ot), (depth))
+_Static_assert(sizeof(PolyFT4) == sizeof(POLY_FT4), "packed textured quad size");
+_Static_assert(offsetof(PolyFT4, xy0) == offsetof(POLY_FT4, x0), "packed textured quad XY layout");
+#else
+#define PRIM_HEADER_DELTA 0
+#define LINK_MODEL_PRIM(ot, p, type, words) LINK_PRIM(ot, p, type)
+#define MODEL_OT_SLOT(ot, depth) (&(ot)[(depth) / 4])
+#endif
+#define PRIM_WORD(p, off) PACKET_WORD(p, (off) + PRIM_HEADER_DELTA)
+#define PRIM_CODE(p) ((p)[7 + PRIM_HEADER_DELTA])
 #define PRIM_MODE(p) (*(u16 *)((p) + 2))
 #define PRIM_CLUT(p) (*(u16 *)((p) + 6))
 #define PRIM_TPAGE(p) (*(u16 *)((p) + 0xA))
@@ -129,9 +250,11 @@ static void camera_build_view(void) {
     VECTOR forward;
     VECTOR side;
     MATRIX roll;
+#ifndef __psyz
     s32 i;
     long *forward_words;
     long *side_words;
+#endif
 
     if (model_camera.lockedView == 0) {
         v.vx = model_camera.targetX - model_camera.eyeX;
@@ -147,18 +270,28 @@ static void camera_build_view(void) {
             v.vz = -view_matrix.m[2][0];
         }
         VectorNormalS(&v, (SVECTOR *)view_matrix.m[0]);
+#ifdef __psyz
+        forward = (VECTOR){view_matrix.m[2][0], view_matrix.m[2][1], view_matrix.m[2][2], 0};
+        side = (VECTOR){view_matrix.m[0][0], view_matrix.m[0][1], view_matrix.m[0][2], 0};
+#else
         forward_words = &forward.vx;
         side_words = &side.vx;
         for (i = 0; i < 3; i++) {
             forward_words[i] = view_matrix.m[2][i];
             side_words[i] = view_matrix.m[0][i];
         }
+#endif
         gte_OuterProduct12(&forward, &side, &v);
         VectorNormalS(&v, (SVECTOR *)view_matrix.m[1]);
         if (model_camera.roll != 0) {
             roll = GsIDMATRIX;
             RotMatrixZ(model_camera.roll, &roll);
+#ifdef __psyz
+            MulMatrix(&roll, &view_matrix);
+            memcpy(view_matrix.m, roll.m, sizeof(view_matrix.m));
+#else
             gte_MulMatrix0(&roll, &view_matrix, &view_matrix);
+#endif
         }
         v.vx = -model_camera.eyeX;
         v.vy = -model_camera.eyeY;
@@ -219,6 +352,10 @@ static void camera_yaw_matrix(MATRIX *out) {
 /* Save the GTE's current rotation matrix to saved_matrix. */
 void model_save_gte_rot(void) {
     gte_ReadRotMatrix(&saved_matrix);
+#ifdef __psyz
+    native_saved_base = saved_matrix;
+    native_world_compose = 0;
+#endif
 }
 
 /* Multiply m onto saved_matrix and load the result into the GTE. */
@@ -241,6 +378,15 @@ void model_compose_gte_matrix(MATRIX *m) {
     gte_stlvl(saved->t);
     gte_SetRotMatrix(saved);
     gte_SetTransMatrix(saved);
+#ifdef __psyz
+    if (native_is_axis_aligned_rotation(m)) {
+        native_model_matrix = *m;
+        native_composed_matrix = *saved;
+        native_world_compose = 1;
+    } else {
+        native_world_compose = 0;
+    }
+#endif
 }
 
 /* Point light `id` along the normalised direction dir, with colour r, g, b (0 to 255,
@@ -319,9 +465,22 @@ static void model_unbind(Model *model) {
 /* Draw every object of the model, with the model scale applied when one is set. */
 void model_draw(Model *model) {
     s32 i;
+#ifdef __psyz
+    s32 use_world_verts;
+#endif
 
     current_tmd = model->tmd;
     PushMatrix();
+#ifdef __psyz
+    use_world_verts =
+        scale_enabled == 0 && native_can_use_world_verts(current_tmd, &native_model_matrix);
+    native_world_compose = 0;
+    if (use_world_verts != 0) {
+        gte_SetRotMatrix(&native_saved_base);
+        gte_SetTransMatrix(&native_saved_base);
+        native_world_verts_active = 1;
+    }
+#endif
     if (scale_enabled != 0) {
         SCRATCHPAD_STACK_ENTER();
         model_apply_scale();
@@ -332,6 +491,9 @@ void model_draw(Model *model) {
         model_draw_tmd_object(current_tmd->objects, &current_tmd->objects[i]);
         SCRATCHPAD_STACK_LEAVE();
     }
+#ifdef __psyz
+    native_world_verts_active = 0;
+#endif
     PopMatrix();
 }
 
@@ -412,7 +574,7 @@ static void model_draw_tmd_object(TmdObject *table, TmdObject *object) {
     SVECTOR *verts;
     u8 *packet;
     u8 *prim;
-    u_long *ot;
+    OT_TYPE *ot;
     u32 header;
     s32 depth;
 
@@ -422,6 +584,12 @@ static void model_draw_tmd_object(TmdObject *table, TmdObject *object) {
     }
     debug_hook_run(0x2000);
     verts = (SVECTOR *)((u8 *)table + object->vert_top);
+#ifdef __psyz
+    if (native_world_verts_active != 0) {
+        native_transform_world_verts(table, object, &native_model_matrix, native_world_verts);
+        verts = native_world_verts;
+    }
+#endif
     prim = current_frame->primCursor.bytes;
     packet = (u8 *)table + object->primitive_top;
     ot = current_frame->ot;
@@ -438,13 +606,13 @@ loopF3:
     {
         u8 *out = prim;
         u8 *source = packet;
-        u_long *slot;
+        OT_TYPE *slot;
         gte_ldv3(&verts[PACKET_HALF(packet, 0x8)], &verts[PACKET_HALF(packet, 0xA)],
                  &verts[PACKET_HALF(packet, 0xC)]);
         packet += 0x10;
         count--;
         gte_rtpt_b();
-        PACKET_WORD(out, 0x4) = PACKET_WORD(source, 0x4);
+        PRIM_WORD(out, 0x4) = PACKET_WORD(source, 0x4);
         gte_stflg(&depth);
         if (depth < 0) {
             goto loopF3;
@@ -456,11 +624,11 @@ loopF3:
             goto loopF3;
         }
         gte_stsxy3_f3(out);
-        if (!model_clip_test3(PACKET_WORD(out, 0x8), PACKET_WORD(out, 0xC), PACKET_WORD(out, 0x10))) {
+        if (!model_clip_test3(PRIM_WORD(out, 0x8), PRIM_WORD(out, 0xC), PRIM_WORD(out, 0x10))) {
             goto loopF3;
         }
         gte_avsz3_b();
-        prim += 0x14;
+        prim += sizeof(POLY_F3);
         gte_stotz(&depth);
         if (!(header & 0x8000)) {
             depth += 0x23;
@@ -468,8 +636,8 @@ loopF3:
         if (header & 0x4000) {
             depth += 1;
         }
-        slot = &ot[depth / 4];
-        LINK_PRIM(slot, out, POLY_F3);
+        slot = MODEL_OT_SLOT(ot, depth);
+        LINK_MODEL_PRIM(slot, out, POLY_F3, 4);
         drawn_parts++;
     }
     goto loopF3;
@@ -485,31 +653,31 @@ loopG3:
     {
         u8 *out = prim;
         u8 *source = packet;
-        u_long *slot;
+        OT_TYPE *slot;
         gte_ldv3(&verts[PACKET_HALF(packet, 0x10)], &verts[PACKET_HALF(packet, 0x12)],
                  &verts[PACKET_HALF(packet, 0x14)]);
         packet += 0x18;
         count--;
         gte_rtpt_b();
-        PACKET_WORD(out, 0x4) = PACKET_WORD(source, 0x4);
-        PACKET_WORD(out, 0xC) = PACKET_WORD(source, 0x8);
+        PRIM_WORD(out, 0x4) = PACKET_WORD(source, 0x4);
+        PRIM_WORD(out, 0xC) = PACKET_WORD(source, 0x8);
         gte_stflg(&depth);
         if (depth < 0) {
             goto loopG3;
         }
         gte_nclip_b();
-        PACKET_WORD(out, 0x14) = PACKET_WORD(source, 0xC);
+        PRIM_WORD(out, 0x14) = PACKET_WORD(source, 0xC);
         gte_stopz(&depth);
         if (depth <= 0) {
             goto loopG3;
         }
         gte_stsxy3_g3(out);
-        if (!model_clip_test3(PACKET_WORD(out, 0x8), PACKET_WORD(out, 0x10), PACKET_WORD(out, 0x18))) {
+        if (!model_clip_test3(PRIM_WORD(out, 0x8), PRIM_WORD(out, 0x10), PRIM_WORD(out, 0x18))) {
             goto loopG3;
         }
         gte_avsz3_b();
         PRIM_CODE(out) = 0x30 | ((header >> 24) & 2);
-        prim += 0x1C;
+        prim += sizeof(POLY_G3);
         gte_stotz(&depth);
         if (!(header & 0x8000)) {
             depth += 0x23;
@@ -517,8 +685,8 @@ loopG3:
         if (header & 0x4000) {
             depth += 1;
         }
-        slot = &ot[depth / 4];
-        LINK_PRIM(slot, out, POLY_G3);
+        slot = MODEL_OT_SLOT(ot, depth);
+        LINK_MODEL_PRIM(slot, out, POLY_G3, 6);
         drawn_parts++;
     }
     goto loopG3;
@@ -534,30 +702,30 @@ loopFT3:
     {
         u8 *out = prim;
         u8 *source = packet;
-        u_long *slot;
+        OT_TYPE *slot;
         gte_ldv3(&verts[PACKET_HALF(packet, 0x14)], &verts[PACKET_HALF(packet, 0x16)],
                  &verts[PACKET_HALF(packet, 0x18)]);
         packet += 0x1C;
         count--;
         gte_rtpt_b();
-        PACKET_WORD(out, 0xC) = PACKET_WORD(source, 0x4);
-        PACKET_WORD(out, 0x14) = PACKET_WORD(source, 0x8);
+        PRIM_WORD(out, 0xC) = PACKET_WORD(source, 0x4);
+        PRIM_WORD(out, 0x14) = PACKET_WORD(source, 0x8);
         gte_stflg(&depth);
         if (depth < 0) {
             goto loopFT3;
         }
         gte_nclip_b();
-        PACKET_WORD(out, 0x1C) = PACKET_WORD(source, 0xC);
+        PRIM_WORD(out, 0x1C) = PACKET_WORD(source, 0xC);
         gte_stopz(&depth);
         if (depth <= 0) {
             goto loopFT3;
         }
         gte_stsxy3_ft3(out);
-        if (!model_clip_test3(PACKET_WORD(out, 0x8), PACKET_WORD(out, 0x10), PACKET_WORD(out, 0x18))) {
+        if (!model_clip_test3(PRIM_WORD(out, 0x8), PRIM_WORD(out, 0x10), PRIM_WORD(out, 0x18))) {
             goto loopFT3;
         }
         gte_avsz3_b();
-        PACKET_WORD(out, 0x4) = PACKET_WORD(source, 0x10);
+        PRIM_WORD(out, 0x4) = PACKET_WORD(source, 0x10);
         PRIM_CODE(out) = 0x24 | ((header >> 24) & 2);
         gte_stotz(&depth);
         if (!(header & 0x8000)) {
@@ -566,10 +734,10 @@ loopFT3:
         if (header & 0x4000) {
             depth += 1;
         }
-        slot = &ot[depth / 4];
-        LINK_PRIM(slot, out, POLY_FT3);
+        slot = MODEL_OT_SLOT(ot, depth);
+        LINK_MODEL_PRIM(slot, out, POLY_FT3, 7);
         drawn_parts++;
-        prim += 0x20;
+        prim += sizeof(POLY_FT3);
     }
     goto loopFT3;
     /* textured gouraud triangles */
@@ -584,31 +752,31 @@ loopGT3:
     {
         u8 *out = prim;
         u8 *source = packet;
-        u_long *slot;
+        OT_TYPE *slot;
         gte_ldv3(&verts[PACKET_HALF(packet, 0x1C)], &verts[PACKET_HALF(packet, 0x1E)],
                  &verts[PACKET_HALF(packet, 0x20)]);
         packet += 0x24;
         count--;
         gte_rtpt_b();
-        PACKET_WORD(out, 0x4) = PACKET_WORD(source, 0x10);
-        PACKET_WORD(out, 0x10) = PACKET_WORD(source, 0x14);
+        PRIM_WORD(out, 0x4) = PACKET_WORD(source, 0x10);
+        PRIM_WORD(out, 0x10) = PACKET_WORD(source, 0x14);
         gte_stflg(&depth);
         if (depth < 0) {
             goto loopGT3;
         }
         gte_nclip_b();
-        PACKET_WORD(out, 0x1C) = PACKET_WORD(source, 0x18);
+        PRIM_WORD(out, 0x1C) = PACKET_WORD(source, 0x18);
         gte_stopz(&depth);
         if (depth <= 0) {
             goto loopGT3;
         }
         gte_stsxy3_gt3(out);
-        if (!model_clip_test3(PACKET_WORD(out, 0x8), PACKET_WORD(out, 0x14), PACKET_WORD(out, 0x20))) {
+        if (!model_clip_test3(PRIM_WORD(out, 0x8), PRIM_WORD(out, 0x14), PRIM_WORD(out, 0x20))) {
             goto loopGT3;
         }
         gte_avsz3_b();
-        PACKET_WORD(out, 0xC) = PACKET_WORD(source, 0x4);
-        PACKET_WORD(out, 0x18) = PACKET_WORD(source, 0x8);
+        PRIM_WORD(out, 0xC) = PACKET_WORD(source, 0x4);
+        PRIM_WORD(out, 0x18) = PACKET_WORD(source, 0x8);
         gte_stotz(&depth);
         if (!(header & 0x8000)) {
             depth += 0x23;
@@ -616,12 +784,12 @@ loopGT3:
         if (header & 0x4000) {
             depth += 1;
         }
-        PACKET_WORD(out, 0x24) = PACKET_WORD(source, 0xC);
+        PRIM_WORD(out, 0x24) = PACKET_WORD(source, 0xC);
         PRIM_CODE(out) = 0x34 | ((header >> 24) & 2);
-        slot = &ot[depth / 4];
-        LINK_PRIM(slot, out, POLY_GT3);
+        slot = MODEL_OT_SLOT(ot, depth);
+        LINK_MODEL_PRIM(slot, out, POLY_GT3, 9);
         drawn_parts++;
-        prim += 0x28;
+        prim += sizeof(POLY_GT3);
     }
     goto loopGT3;
     /* flat quads */
@@ -636,13 +804,13 @@ loopF4:
     {
         u8 *out = prim;
         u8 *source = packet;
-        u_long *slot;
+        OT_TYPE *slot;
         gte_ldv3(&verts[PACKET_HALF(packet, 0x8)], &verts[PACKET_HALF(packet, 0xA)],
                  &verts[PACKET_HALF(packet, 0xC)]);
         packet += 0x10;
         count--;
         gte_rtpt_b();
-        PACKET_WORD(out, 0x4) = PACKET_WORD(source, 0x4);
+        PRIM_WORD(out, 0x4) = PACKET_WORD(source, 0x4);
         gte_stflg(&depth);
         if (depth < 0) {
             goto loopF4;
@@ -660,13 +828,13 @@ loopF4:
         if (depth < 0) {
             goto loopF4;
         }
-        gte_stsxy(&PACKET_WORD(out, 0x14));
-        if (!model_clip_test4(PACKET_WORD(out, 0x8), PACKET_WORD(out, 0xC), PACKET_WORD(out, 0x10),
-        PACKET_WORD(out, 0x14))) {
+        gte_stsxy(&PRIM_WORD(out, 0x14));
+        if (!model_clip_test4(PRIM_WORD(out, 0x8), PRIM_WORD(out, 0xC), PRIM_WORD(out, 0x10),
+        PRIM_WORD(out, 0x14))) {
             goto loopF4;
         }
         gte_avsz4_b();
-        prim += 0x18;
+        prim += sizeof(POLY_F4);
         gte_stotz(&depth);
         if (!(header & 0x8000)) {
             depth += 0x23;
@@ -674,8 +842,8 @@ loopF4:
         if (header & 0x4000) {
             depth += 1;
         }
-        slot = &ot[depth / 4];
-        LINK_PRIM(slot, out, POLY_F4);
+        slot = MODEL_OT_SLOT(ot, depth);
+        LINK_MODEL_PRIM(slot, out, POLY_F4, 5);
         drawn_parts++;
     }
     goto loopF4;
@@ -691,20 +859,20 @@ loopG4:
     {
         u8 *out = prim;
         u8 *source = packet;
-        u_long *slot;
+        OT_TYPE *slot;
         gte_ldv3(&verts[PACKET_HALF(packet, 0x14)], &verts[PACKET_HALF(packet, 0x16)],
                  &verts[PACKET_HALF(packet, 0x18)]);
         packet += 0x1C;
         count--;
         gte_rtpt_b();
-        PACKET_WORD(out, 0x4) = PACKET_WORD(source, 0x4);
-        PACKET_WORD(out, 0xC) = PACKET_WORD(source, 0x8);
+        PRIM_WORD(out, 0x4) = PACKET_WORD(source, 0x4);
+        PRIM_WORD(out, 0xC) = PACKET_WORD(source, 0x8);
         gte_stflg(&depth);
         if (depth < 0) {
             goto loopG4;
         }
         gte_nclip_b();
-        PACKET_WORD(out, 0x14) = PACKET_WORD(source, 0xC);
+        PRIM_WORD(out, 0x14) = PACKET_WORD(source, 0xC);
         gte_stopz(&depth);
         if (depth <= 0) {
             goto loopG4;
@@ -712,19 +880,19 @@ loopG4:
         gte_stsxy3_g4(out);
         gte_ldv0(&verts[PACKET_HALF(source, 0x1A)]);
         gte_rtps();
-        PACKET_WORD(out, 0x1C) = PACKET_WORD(source, 0x10);
+        PRIM_WORD(out, 0x1C) = PACKET_WORD(source, 0x10);
         gte_stflg(&depth);
         if (depth < 0) {
             goto loopG4;
         }
-        gte_stsxy(&PACKET_WORD(out, 0x20));
-        if (!model_clip_test4(PACKET_WORD(out, 0x8), PACKET_WORD(out, 0x10), PACKET_WORD(out, 0x18),
-                               PACKET_WORD(out, 0x20))) {
+        gte_stsxy(&PRIM_WORD(out, 0x20));
+        if (!model_clip_test4(PRIM_WORD(out, 0x8), PRIM_WORD(out, 0x10), PRIM_WORD(out, 0x18),
+                               PRIM_WORD(out, 0x20))) {
             goto loopG4;
         }
         gte_avsz4_b();
         PRIM_CODE(out) = 0x38 | ((header >> 24) & 2);
-        prim += 0x24;
+        prim += sizeof(POLY_G4);
         gte_stotz(&depth);
         if (!(header & 0x8000)) {
             depth += 0x23;
@@ -732,8 +900,8 @@ loopG4:
         if (header & 0x4000) {
             depth += 1;
         }
-        slot = &ot[depth / 4];
-        LINK_PRIM(slot, out, POLY_G4);
+        slot = MODEL_OT_SLOT(ot, depth);
+        LINK_MODEL_PRIM(slot, out, POLY_G4, 8);
         drawn_parts++;
     }
     goto loopG4;
@@ -749,20 +917,20 @@ loopFT4:
     {
         u8 *out = prim;
         u8 *source = packet;
-        u_long *slot;
+        OT_TYPE *slot;
         gte_ldv3(&verts[PACKET_HALF(packet, 0x18)], &verts[PACKET_HALF(packet, 0x1A)],
                  &verts[PACKET_HALF(packet, 0x1C)]);
         packet += 0x20;
         count--;
         gte_rtpt_b();
-        PACKET_WORD(out, 0x4) = PACKET_WORD(source, 0x14);
-        PACKET_WORD(out, 0xC) = PACKET_WORD(source, 0x4);
+        PRIM_WORD(out, 0x4) = PACKET_WORD(source, 0x14);
+        PRIM_WORD(out, 0xC) = PACKET_WORD(source, 0x4);
         gte_stflg(&depth);
         if (depth < 0) {
             goto loopFT4;
         }
         gte_nclip_b();
-        PACKET_WORD(out, 0x1C) = PACKET_WORD(source, 0xC);
+        PRIM_WORD(out, 0x1C) = PACKET_WORD(source, 0xC);
         gte_stopz(&depth);
         if (depth <= 0) {
             goto loopFT4;
@@ -770,18 +938,18 @@ loopFT4:
         gte_stsxy3_ft4(out);
         gte_ldv0(&verts[PACKET_HALF(source, 0x1E)]);
         gte_rtps();
-        PACKET_WORD(out, 0x24) = PACKET_WORD(source, 0x10);
+        PRIM_WORD(out, 0x24) = PACKET_WORD(source, 0x10);
         gte_stflg(&depth);
         if (depth < 0) {
             goto loopFT4;
         }
-        gte_stsxy(&PACKET_WORD(out, 0x20));
-        if (!model_clip_test4(PACKET_WORD(out, 0x8), PACKET_WORD(out, 0x10), PACKET_WORD(out, 0x18),
-                               PACKET_WORD(out, 0x20))) {
+        gte_stsxy(&PRIM_WORD(out, 0x20));
+        if (!model_clip_test4(PRIM_WORD(out, 0x8), PRIM_WORD(out, 0x10), PRIM_WORD(out, 0x18),
+                               PRIM_WORD(out, 0x20))) {
             goto loopFT4;
         }
         gte_avsz4_b();
-        PACKET_WORD(out, 0x14) = PACKET_WORD(source, 0x8);
+        PRIM_WORD(out, 0x14) = PACKET_WORD(source, 0x8);
         PRIM_CODE(out) = 0x2C | ((header >> 24) & 2);
         gte_stotz(&depth);
         if (!(header & 0x8000)) {
@@ -790,10 +958,10 @@ loopFT4:
         if (header & 0x4000) {
             depth += 1;
         }
-        slot = &ot[depth / 4];
-        LINK_PRIM(slot, out, POLY_FT4);
+        slot = MODEL_OT_SLOT(ot, depth);
+        LINK_MODEL_PRIM(slot, out, POLY_FT4, 9);
         drawn_parts++;
-        prim += 0x28;
+        prim += sizeof(POLY_FT4);
     }
     goto loopFT4;
     /* textured gouraud quads */
@@ -808,20 +976,20 @@ loopGT4:
     {
         u8 *out = prim;
         u8 *source = packet;
-        u_long *slot;
+        OT_TYPE *slot;
         gte_ldv3(&verts[PACKET_HALF(packet, 0x24)], &verts[PACKET_HALF(packet, 0x26)],
                  &verts[PACKET_HALF(packet, 0x28)]);
         packet += 0x2C;
         count--;
         gte_rtpt_b();
-        PACKET_WORD(out, 0x4) = PACKET_WORD(source, 0x14);
-        PACKET_WORD(out, 0x10) = PACKET_WORD(source, 0x18);
+        PRIM_WORD(out, 0x4) = PACKET_WORD(source, 0x14);
+        PRIM_WORD(out, 0x10) = PACKET_WORD(source, 0x18);
         gte_stflg(&depth);
         if (depth < 0) {
             goto loopGT4;
         }
         gte_nclip_b();
-        PACKET_WORD(out, 0x1C) = PACKET_WORD(source, 0x1C);
+        PRIM_WORD(out, 0x1C) = PACKET_WORD(source, 0x1C);
         gte_stopz(&depth);
         if (depth <= 0) {
             goto loopGT4;
@@ -829,21 +997,21 @@ loopGT4:
         gte_stsxy3_gt4(out);
         gte_ldv0(&verts[PACKET_HALF(source, 0x2A)]);
         gte_rtps();
-        PACKET_WORD(out, 0x28) = PACKET_WORD(source, 0x20);
+        PRIM_WORD(out, 0x28) = PACKET_WORD(source, 0x20);
         gte_stflg(&depth);
         if (depth < 0) {
             goto loopGT4;
         }
-        gte_stsxy(&PACKET_WORD(out, 0x2C));
-        if (!model_clip_test4(PACKET_WORD(out, 0x8), PACKET_WORD(out, 0x14), PACKET_WORD(out, 0x20),
-        PACKET_WORD(out, 0x2C))) {
+        gte_stsxy(&PRIM_WORD(out, 0x2C));
+        if (!model_clip_test4(PRIM_WORD(out, 0x8), PRIM_WORD(out, 0x14), PRIM_WORD(out, 0x20),
+        PRIM_WORD(out, 0x2C))) {
             goto loopGT4;
         }
         gte_avsz4();
-        PACKET_WORD(out, 0xC) = PACKET_WORD(source, 0x4);
-        PACKET_WORD(out, 0x18) = PACKET_WORD(source, 0x8);
-        PACKET_WORD(out, 0x24) = PACKET_WORD(source, 0xC);
-        PACKET_WORD(out, 0x30) = PACKET_WORD(source, 0x10);
+        PRIM_WORD(out, 0xC) = PACKET_WORD(source, 0x4);
+        PRIM_WORD(out, 0x18) = PACKET_WORD(source, 0x8);
+        PRIM_WORD(out, 0x24) = PACKET_WORD(source, 0xC);
+        PRIM_WORD(out, 0x30) = PACKET_WORD(source, 0x10);
         PRIM_CODE(out) = 0x3C | ((header >> 24) & 2);
         gte_stotz(&depth);
         if (!(header & 0x8000)) {
@@ -852,10 +1020,10 @@ loopGT4:
         if (header & 0x4000) {
             depth += 1;
         }
-        slot = &ot[depth / 4];
-        LINK_PRIM(slot, out, POLY_GT4);
+        slot = MODEL_OT_SLOT(ot, depth);
+        LINK_MODEL_PRIM(slot, out, POLY_GT4, 12);
         drawn_parts++;
-        prim += 0x34;
+        prim += sizeof(POLY_GT4);
     }
     goto loopGT4;
 done:

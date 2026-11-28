@@ -1,3 +1,5 @@
+/* This unused routine is kept for the matching PS1 build. */
+#ifndef __psyz
 #include <sys/types.h>
 #include <libgte.h>
 #include "types.h"
@@ -24,3 +26,4 @@ static s32 vec_length_bounded(VECTOR *v, s32 limit) {
     gte_stlvnl(&sq);
     return SquareRoot0(sq.vx + sq.vy + sq.vz);
 }
+#endif

@@ -8,7 +8,7 @@
 #include <libetc.h>
 #include <libgte.h>
 #include <libgpu.h>
-#include <libmcrd.h>
+#include "sdk_mcrd.h"
 #include <libmcx.h>
 #include "types.h"
 #include "clib.h"
@@ -187,9 +187,15 @@ static u32 pda_menu_last_held;
 static u32 pda_menu_last_arm;
 static PdaAllInfo pda_all_info;
 /* Card-slot results, filled by McxGetApl / McxGetTime / McxGetSerial. */
+#ifdef __psyz
+static int pda_apl_result;
+static PdaCardInfo pda_time_info;
+static unsigned long pda_serial_no;
+#else
 static long pda_apl_result;
 static PdaCardInfo pda_time_info;
 static u_long pda_serial_no;
+#endif
 static u8 pda_getmem_buffer[128];
 static s32 pda_getmem_field;
 static s32 pda_getmem_last_pad;
@@ -220,6 +226,11 @@ s32 pda_sample_run(void)
     DisplayBuffer *cdb;
 
     cdb = 0;
+#ifdef __psyz
+    pda_sample_done = 0;
+    pda_selected_command = PDA_CMD_ALL_INFO;
+    pda_armed_command = -1;
+#endif
     pda_device_block.field.device = 1;
     pda_device_block.field.fix[0] = 4;
     pda_device_block.field.fix[1] = 1;
@@ -324,7 +335,11 @@ static void pda_menu_draw(void)
             strcpy(pda_status_line, "card not connected");
             break;
         case PDA_RESULT_FAILED:
+#ifdef __psyz
+            strcpy(pda_status_line, "PocketStation unavailable");
+#else
             strcpy(pda_status_line, "command failed");
+#endif
             break;
         case PDA_RESULT_CARD_CHANGED:
             if (cmd == McxFuncExecFlag) {
@@ -457,7 +472,11 @@ static int pda_get_apl_page(s32 action) {
         FntPrint("    current application : %d \n", pda_apl_result);
         return 0;
     }
+#ifdef __psyz
+    return McxGetApl(0, &pda_apl_result);
+#else
     McxGetApl(0, &pda_apl_result);
+#endif
 }
 
 /* "Get time" page: action 2 reads the card clock, anything else prints it. */
@@ -472,7 +491,11 @@ static int pda_get_time_page(s32 action) {
         FntPrint("%s \n", buf);
         return 0;
     }
+#ifdef __psyz
+    return McxGetTime(0, (unsigned char *)&pda_time_info);
+#else
     McxGetTime(0, (unsigned char *)&pda_time_info);
+#endif
 }
 
 /* "Hide trans" page: action 2 sends the command, anything else prints the no-data line. */
@@ -490,7 +513,11 @@ static int pda_get_serial_page(s32 action) {
         FntPrint("    serial No. : %x \n", pda_serial_no);
         return 0;
     }
+#ifdef __psyz
+    return McxGetSerial(0, &pda_serial_no);
+#else
     McxGetSerial(0, &pda_serial_no);
+#endif
 }
 
 /* Get-memory page. pda_getmem_params[0..3] are the address bytes and [4] the length;

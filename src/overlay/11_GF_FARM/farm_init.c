@@ -1,6 +1,6 @@
 /* Farm start-up and re-entry, the zone entry table, and the event availability checks. */
 
-#include <memory.h>
+#include <string.h>
 #include "types.h"
 #include "actor.h"
 #include "afile.h"
@@ -1242,6 +1242,12 @@ s32 farm_zone_trigger(s16 event, u16 facing) {
 
     entry = farm_zone_entries;
     for (count = 0; count < FARM_ZONE_ENTRY_COUNT; count++, entry++) {
+#ifdef __psyz
+        /* Unused zone entries clear entry->zone; PS1 tolerates reading address 0x4. */
+        if (entry->zone == 0) {
+            continue;
+        }
+#endif
         if (entry->zone->event != event) {
             continue;
         }

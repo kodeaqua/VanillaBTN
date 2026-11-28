@@ -64,7 +64,11 @@ s32 greenhouse_probe_sweep(s16 restart) {
         do {
             farm_settle_on_ground(&greenhouse_probe_point, 0xC000);
             hit = ground_hit_primitive();
+#ifdef __psyz
+            if (hit != 0 && (hit->header & FARM_QUAD_CELL_BIT)) {
+#else
             if (hit->header & FARM_QUAD_CELL_BIT) {
+#endif
                 grid->quads[greenhouse_row][greenhouse_column] = hit;
             }
             greenhouse_column++;

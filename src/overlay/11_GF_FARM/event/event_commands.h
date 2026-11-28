@@ -313,7 +313,11 @@ void event_cmd_init_mode(s16 mode, s16 kind);
 s32 event_cmd_mode_check(s16 mode);
 void *event_var_address(s32 index, s32 value, s32 *output);
 void farm_item_rows_init(void);
+#ifdef __psyz
+void farm_events_load(const u8 *source, u32 size);
+#else
 void farm_events_load(struct FarmTable *source);
+#endif
 s32 event_triggers_run(void);
 void event_trigger_mode_set(s32 arg);
 u32 event_request_force(u32 arg, s32 value);

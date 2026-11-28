@@ -1,7 +1,7 @@
 /* Overlay 19_GF_MG2: minigame 2. */
 
 #include <sys/types.h>
-#include <memory.h>
+#include <string.h>
 #include <libgte.h>
 #include <libgpu.h>
 #include <libgs.h>
@@ -157,8 +157,8 @@ static void mg2_resume_sprites(void);
 static void mg2_sprites_apply(s32 mode);
 static void mg2_draw_pause_icon(void);
 static s32 mg2_message_offset(s32 index);
-static void mg2_sprite_submit(u_long *ot, AnimState *sprite, Mg2Vector *vector, s16 bias);
-static void mg2_draw_scenery_piece(u_long *ot, AnimState *sprite, Mg2Vector *vector, s16 mode);
+static void mg2_sprite_submit(void *ot, AnimState *sprite, Mg2Vector *vector, s16 bias);
+static void mg2_draw_scenery_piece(OT_TYPE *ot, AnimState *sprite, Mg2Vector *vector, s16 mode);
 static void mg2_draw_results_board(void);
 static void mg2_snap_to_ground(Mg2Vector *p);
 static void mg2_load_payload(void);
@@ -1615,10 +1615,11 @@ static s32 mg2_message_offset(s32 index) {
 }
 
 /* Snap the vector to the ground, project it, and draw the sprite there, shifted by bias. */
-static void mg2_sprite_submit(u_long *ot, AnimState *sprite, Mg2Vector *vector, s16 bias) {
+static void mg2_sprite_submit(void *ot, AnimState *sprite, Mg2Vector *vector, s16 bias) {
     s32 slot;
-    u_long *target;
-    u_long *mainSlot;
+    OT_TYPE *table = ot;
+    OT_TYPE *target;
+    OT_TYPE *mainSlot;
 
     mg2_snap_to_ground(vector);
     mg2_project_vec.vx = vector->x;
@@ -1626,8 +1627,8 @@ static void mg2_sprite_submit(u_long *ot, AnimState *sprite, Mg2Vector *vector, 
     mg2_project_vec.vz = vector->z;
     slot = gte_project_vertex(&mg2_project_xy, &mg2_project_vec);
     mg2_project_xy.y += bias;
-    target = &ot[slot >> 3];
-    mainSlot = &current_frame->ot[slot >> 3];
+    target = &table[FRAME_OT_SLOT(slot >> 3)];
+    mainSlot = FRAME_OT_AT(slot >> 3);
     if (sprite == &mg2_state.objects[0].sprite || sprite == &mg2_state.objects[1].sprite ||
         sprite == &mg2_state.objects[2].sprite) {
         anim_draw_ft4_advance(target, sprite, mg2_project_xy.x, mg2_project_xy.y);
@@ -1636,8 +1637,8 @@ static void mg2_sprite_submit(u_long *ot, AnimState *sprite, Mg2Vector *vector, 
         anim_draw_ft4_advance(ot, sprite, mg2_project_xy.x, mg2_project_xy.y);
     } else {
         if (vector->y != MG2_GROUND_Y && vector->z - vector->x >= 0) {
-            target = &ot[slot >> 2];
-            mainSlot = &current_frame->ot[slot >> 2];
+            target = &table[FRAME_OT_SLOT(slot >> 2)];
+            mainSlot = FRAME_OT_AT(slot >> 2);
         }
         anim_draw_ft4_advance(target, sprite, mg2_project_xy.x, mg2_project_xy.y);
         ui_draw_icon_18_sub(mainSlot, mg2_project_xy.x, mg2_project_xy.y - bias, 0);
@@ -1645,7 +1646,7 @@ static void mg2_sprite_submit(u_long *ot, AnimState *sprite, Mg2Vector *vector, 
 }
 
 /* Snap and project a scenery piece, set its frame from mode, and draw it. */
-static void mg2_draw_scenery_piece(u_long *ot, AnimState *sprite, Mg2Vector *vector, s16 mode) {
+static void mg2_draw_scenery_piece(OT_TYPE *ot, AnimState *sprite, Mg2Vector *vector, s16 mode) {
     s32 slot;
 
     mg2_snap_to_ground(vector);
@@ -1654,24 +1655,37 @@ static void mg2_draw_scenery_piece(u_long *ot, AnimState *sprite, Mg2Vector *vec
     mg2_project_vec2.vz = vector->z;
     slot = gte_project_vertex(&mg2_project_xy2, &mg2_project_vec2);
     anim_select_range(sprite, mode & 0xFF);
-    anim_draw_ft4_advance(&ot[slot >> 3], sprite, mg2_project_xy2.x, mg2_project_xy2.y);
-    ui_draw_icon_18_sub(&current_frame->ot[slot >> 3], mg2_project_xy2.x, mg2_project_xy2.y, 0);
+    anim_draw_ft4_advance(&ot[FRAME_OT_SLOT(slot >> 3)], sprite, mg2_project_xy2.x, mg2_project_xy2.y);
+    ui_draw_icon_18_sub(FRAME_OT_AT(slot >> 3), mg2_project_xy2.x, mg2_project_xy2.y, 0);
 }
 
+/* Keep the helper nested for the matching compiler's code layout. */
+#ifndef __psyz
 /* The results board: a 2x4 grid of labels (the farm's text in the first cell, then the messages of picks 1..7), then the markers for the rounds reached. */
 static void mg2_draw_results_board(void) {
     s32 saved;
     s32 row;
     s32 col;
     u16 *text;
+#else
+static
+#endif
+/* Draw frame `frame` of sprite bank `bank`. */
+void mg2_draw_board_marker(s32 bank, s32 frame) {
+    anim_select_range(&mg2_state.iconSprite, bank & 0xFF);
+    anim_set_frame(&mg2_state.iconSprite, frame);
+    anim_draw_sprt_cursor(&current_frame->otTags[0][5], &mg2_state.iconSprite,
+                  mg2_state.iconSprite.animation, mg2_state.iconSprite.frame, 0, 0);
+}
 
-    /* Draw frame `frame` of sprite bank `bank`. */
-    void mg2_draw_board_marker(s32 bank, s32 frame) {
-        anim_select_range(&mg2_state.iconSprite, bank & 0xFF);
-        anim_set_frame(&mg2_state.iconSprite, frame);
-        anim_draw_sprt_cursor(&current_frame->otTags[0][5], &mg2_state.iconSprite,
-                      mg2_state.iconSprite.animation, mg2_state.iconSprite.frame, 0, 0);
-    }
+#ifdef __psyz
+/* The results board: a 2x4 grid of labels (the farm's text in the first cell, then the messages of picks 1..7), then the markers for the rounds reached. */
+static void mg2_draw_results_board(void) {
+    s32 saved;
+    s32 row;
+    s32 col;
+    u16 *text;
+#endif
 
     anim_select_range(&mg2_state.iconSprite, 0);
     anim_draw_sprt_cursor(&current_frame->otTags[0][6], &mg2_state.iconSprite,

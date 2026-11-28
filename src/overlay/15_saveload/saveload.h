@@ -20,7 +20,7 @@ s32 save_menu_wait_confirm(s16 idleResult, s16 pressResult);
  * member of text_bank.messages. */
 #define SAVELOAD_MENU_ENTRY(name, label, step, restart_step)                            \
     void name(void) {                                                         \
-        u_long *ot = current_frame->otTags[0];                                   \
+        OT_TYPE *ot = current_frame->otTags[0];                                   \
         text_draw_in_frame(&ot[6], &ot[5], LOCALIZED(label));                      \
         save_step = save_menu_wait_confirm((step), 0);                            \
         if (save_menu_index >= SAVE_DONE_TIMEOUT) {                                               \
@@ -32,7 +32,7 @@ s32 save_menu_wait_confirm(s16 idleResult, s16 pressResult);
  * the cursor when the answer is not `id`. */
 #define SAVELOAD_CONFIRM_ENTRY(name, label, step, next_step)                               \
     void name(void) {                                                         \
-        u_long *p = current_frame->otTags[0];                                    \
+        OT_TYPE *p = current_frame->otTags[0];                                    \
         text_draw_in_frame(&p[6], &p[5], LOCALIZED(label));                        \
         save_step = save_menu_wait_confirm((step), (next_step));                               \
         if (save_menu_index >= SAVE_DONE_TIMEOUT)                                                 \
@@ -44,7 +44,7 @@ s32 save_menu_wait_confirm(s16 idleResult, s16 pressResult);
 /* The card-choice screens: they differ only in the failure code they fall to. */
 #define SAVELOAD_PROBE_ENTRY(name, code, probe_step)                                      \
     void name(void) {                                                         \
-        u_long *ot;                                                           \
+        OT_TYPE *ot;                                                           \
         s32 result;                                                           \
                                                                               \
         ot = current_frame->otTags[0];                                           \

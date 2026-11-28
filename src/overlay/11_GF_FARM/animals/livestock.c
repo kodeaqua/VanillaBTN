@@ -1,5 +1,5 @@
 /* Livestock on the farm: the overnight update of each cow and sheep, their cue scripts and their walking. */
-#include <memory.h>
+#include <string.h>
 #include <sys/types.h>
 #include "types.h"
 #include "actor.h"
@@ -23,7 +23,11 @@
 #include "scene.h"
 #include "screen_fade.h"
 
+#ifdef __psyz
+typedef s32 (*DefHandler)(FarmActor *);
+#else
 typedef void (*DefHandler)(FarmLivestock *);
+#endif
 
 /* The taskId of a cow or sheep wake cue once its table runs out (not CUE_STEP_STOP). */
 #define LIVESTOCK_WAKE_DONE 4
@@ -353,6 +357,33 @@ static int livestock_growth_kind(FarmLivestock *obj) {
     return ITEM_COW;
 }
 
+#ifdef __psyz
+static s32 livestock_talk_a(FarmActor *a) { return livestock_talk((FarmLivestock *)a); }
+static s32 livestock_cow_cue_a(FarmActor *a) { return livestock_cow_cue((FarmLivestock *)a); }
+static s32 livestock_cure_sickness_a(FarmActor *a) { return livestock_cure_sickness((FarmLivestock *)a); }
+static s32 livestock_start_pregnancy_a(FarmActor *a) { return livestock_start_pregnancy((FarmLivestock *)a); }
+static s32 livestock_approach_player_chance_a(FarmActor *a) { return livestock_approach_player_chance((FarmLivestock *)a); }
+static s32 livestock_approach_player_a(FarmActor *a) { return livestock_approach_player((FarmLivestock *)a); }
+static s32 livestock_action_none_a(FarmActor *a) { (void)a; return livestock_action_none(); }
+static s32 cow_cue_13_a(FarmActor *a) { return cow_cue_13((FarmLivestock *)a); }
+static s32 livestock_walk_cue_a(FarmActor *a) { return livestock_walk_cue((FarmLivestock *)a); }
+
+/* The start handler of each state, by state number; 0 where dispatch does not start the state. */
+s32 (*const livestock_action_start_handlers[20])(FarmActor *) = {
+    0, 0, 0, livestock_start_neglect_cue, livestock_start_scold_cue, livestock_talk_a,
+    livestock_set_bit2_cue, livestock_cow_cue_a, 0, livestock_cure_sickness_a,
+    livestock_start_pregnancy_a, livestock_approach_player_chance_a, livestock_approach_player_a,
+    livestock_position_update, livestock_action_none_a, 0, 0, 0, 0, 0,
+};
+
+/* The tick of each state, by state number: it runs the state's cue or walk every frame. */
+s32 (*const livestock_action_tick_handlers[20])(FarmActor *) = {
+    cow_idle_cue, cow_sleep_cue, cow_wake_cue, cow_neglect_cue, cow_scold_cue,
+    cow_happy_cue, cow_happy_cue, cow_happy_cue, 0, cow_happy_cue, cow_happy_cue, 0, 0,
+    cow_cue_13_a, cow_cue_14, cow_sleep_cue, cow_wake_cue, cow_cue_17,
+    livestock_walk_cue_a, 0,
+};
+#else
 /* The start handler of each state, by state number; 0 where dispatch does not start the state. */
 void *const livestock_action_start_handlers[20] = {
     0, 0, 0, livestock_start_neglect_cue, livestock_start_scold_cue, livestock_talk, livestock_set_bit2_cue, livestock_cow_cue, 0,
@@ -367,6 +398,7 @@ void *const livestock_action_tick_handlers[20] = {
     cow_cue_13, cow_cue_14, cow_sleep_cue, cow_wake_cue, cow_cue_17,
     livestock_walk_cue, 0,
 };
+#endif
 
 /* Advance a cow: load its sprite in the pasture or barn, run its current action's
  * tick, and pick a new state when its timer runs out. */
@@ -377,7 +409,11 @@ s32 livestock_dispatch_tick(FarmLivestock *object) {
         if (object->actor.sprite.source == 0) livestock_load_mode_sprite(object);
     }
     handler = (DefHandler)livestock_action_tick_handlers[(u16)object->actor.taskNo];
+#ifdef __psyz
+    if (handler != 0) handler(&object->actor);
+#else
     if (handler != 0) handler(object);
+#endif
     if ((object->actor.flags & ACTOR_FLAG_CUE_RUNNING) == 0 && object->actor.interruptTime >= 300) {
         livestock_pick_state(object);
         object->actor.interruptTime = 0;
@@ -396,7 +432,11 @@ s32 livestock_action_dispatch(FarmLivestock *action, s32 state) {
         if (action->actor.taskNo == state && (action->actor.flags & ACTOR_FLAG_CUE_RUNNING)) {
             result = -1;
         } else {
+#ifdef __psyz
+            result = livestock_action_start_handlers[state](&action->actor);
+#else
             result = ((s32(*)(FarmLivestock *))livestock_action_start_handlers[state])(action);
+#endif
         }
     }
     if (livestock_action_tick_handlers[state] != 0 && result != -1) {
@@ -1086,6 +1126,32 @@ static s32 livestock_growth_kind_b(FarmLivestock *obj) {
     return ITEM_SHEEP;
 }
 
+#ifdef __psyz
+static s32 livestock_talk_b_a(FarmActor *a) { return livestock_talk_b((FarmLivestock *)a); }
+static s32 livestock_sheep_harvest_a(FarmActor *a) { return livestock_sheep_harvest((FarmLivestock *)a); }
+static s32 livestock_cure_sickness_b_a(FarmActor *a) { return livestock_cure_sickness_b((FarmLivestock *)a); }
+static s32 livestock_start_pregnancy_b_a(FarmActor *a) { return livestock_start_pregnancy_b((FarmLivestock *)a); }
+static s32 livestock_approach_player_chance_b_a(FarmActor *a) { return livestock_approach_player_chance_b((FarmLivestock *)a); }
+static s32 livestock_approach_player_b_a(FarmActor *a) { return livestock_approach_player_b((FarmLivestock *)a); }
+static s32 livestock_action_none_b_a(FarmActor *a) { (void)a; return livestock_action_none_b(); }
+static s32 livestock_action_check_a(FarmActor *a) { return livestock_action_check((FarmLivestock *)a); }
+static s32 livestock_walk_start_a(FarmActor *a) { return livestock_walk_start((FarmLivestock *)a); }
+
+s32 (*const livestock_action_start_handlers_b[20])(FarmActor *) = {
+    0, 0, 0, livestock_start_neglect_cue_b, livestock_start_scold_cue_b, livestock_talk_b_a,
+    livestock_set_bit2_cue_b, 0, livestock_sheep_harvest_a, livestock_cure_sickness_b_a,
+    livestock_start_pregnancy_b_a, livestock_approach_player_chance_b_a,
+    livestock_approach_player_b_a, livestock_position_update_b, livestock_action_none_b_a,
+    0, 0, 0, 0, 0,
+};
+
+s32 (*const livestock_action_tick_handlers_b[20])(FarmActor *) = {
+    sheep_idle_cue, sheep_sleep_cue, sheep_wake_cue, sheep_neglect_cue, sheep_scold_cue,
+    sheep_happy_cue, sheep_happy_cue, 0, sheep_happy_cue, sheep_happy_cue, sheep_happy_cue, 0, 0,
+    livestock_action_check_a, sheep_cue_14, sheep_sleep_cue, sheep_wake_cue, 0,
+    livestock_walk_start_a, 0,
+};
+#else
 void *const livestock_action_start_handlers_b[20] = {
     0, 0, 0, livestock_start_neglect_cue_b, livestock_start_scold_cue_b, livestock_talk_b, livestock_set_bit2_cue_b, 0, livestock_sheep_harvest,
     livestock_cure_sickness_b, livestock_start_pregnancy_b, livestock_approach_player_chance_b, livestock_approach_player_b, livestock_position_update_b,
@@ -1097,12 +1163,18 @@ void *const livestock_action_tick_handlers_b[20] = {
     sheep_happy_cue, sheep_happy_cue, 0, sheep_happy_cue, sheep_happy_cue, sheep_happy_cue, 0, 0,
     livestock_action_check, sheep_cue_14, sheep_sleep_cue, sheep_wake_cue, 0, livestock_walk_start, 0,
 };
+#endif
 
 /* Advance a sheep: load its sprite in the pasture or barn, run its current action's
  * tick, and pick a new state when its timer runs out. */
 s32 livestock_dispatch_tick_b(FarmLivestock *object) {
+#ifdef __psyz
+    DefHandler callback;
+    DefHandler const *callbacks;
+#else
     void (*callback)();
     void (**callbacks)();
+#endif
     u16 callback_index;
     u16 timer;
     s16 mode;
@@ -1116,12 +1188,21 @@ s32 livestock_dispatch_tick_b(FarmLivestock *object) {
             livestock_load_mode_sprite_b(object);
         }
     }
+#ifdef __psyz
+    callbacks = livestock_action_tick_handlers_b;
+    callback_index = object->actor.taskNo;
+    callback = callbacks[callback_index];
+    if (callback != 0) {
+        callback(&object->actor);
+    }
+#else
     callbacks = (void (**)())livestock_action_tick_handlers_b;
     callback_index = object->actor.taskNo;
     callback = callbacks[callback_index];
     if (callback != 0) {
         callback(object);
     }
+#endif
     if ((object->actor.flags & ACTOR_FLAG_CUE_RUNNING) == 0 && object->actor.interruptTime >= 300) {
         livestock_pick_state_b(object);
         object->actor.interruptTime = 0;
@@ -1142,7 +1223,11 @@ s32 livestock_action_dispatch_b(FarmLivestock *action, s32 state) {
         if (action->actor.taskNo == state && (action->actor.flags & ACTOR_FLAG_CUE_RUNNING)) {
             result = -1;
         } else {
+#ifdef __psyz
+            result = livestock_action_start_handlers_b[state](&action->actor);
+#else
             result = ((s32(*)(FarmLivestock *))livestock_action_start_handlers_b[state])(action);
+#endif
         }
     }
     if (livestock_action_tick_handlers_b[state] != 0 && result != -1) {

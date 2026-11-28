@@ -7,4 +7,18 @@ https://github.com/coalslav/hmbtn-decomp
 Third-party:
 - tools/maspsx: own license, see tools/maspsx/LICENSE.
 
+Windows game build dependencies:
+- PsyZ runtime (psyz/src/platform and psyz/src/psyz): MPL 2.0.
+  Obtain the runtime source used by the documented build from:
+  https://github.com/Xeeynamo/psyz/tree/00fb42e6f49c146ad760a1f605b15d2a4ec598f0/psyz/src
+- PsyZ SDK decompilation (decomp): MIT, see the upstream decomp/LICENSE.
+  https://github.com/Xeeynamo/psyz/tree/00fb42e6f49c146ad760a1f605b15d2a4ec598f0/decomp
+- PsyZ SDK headers (psyz/include): listed as Unlicensed upstream.
+  Clarify the redistribution terms before publishing the Windows game build.
+  https://github.com/Xeeynamo/psyz/blob/00fb42e6f49c146ad760a1f605b15d2a4ec598f0/LICENSE
+- SDL 3.4.20: zlib. SDL includes HIDAPI and YUV conversion code with separate notices.
+  https://github.com/libsdl-org/SDL/tree/f00dc919ca35b9756316e86c4777392de442f9b2
+
+The installed Windows game package includes the upstream texts in licenses/.
+
 The game and the PSY-Q SDK belong to their owners and are not included.

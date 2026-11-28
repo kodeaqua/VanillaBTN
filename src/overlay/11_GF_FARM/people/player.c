@@ -1,8 +1,12 @@
 /* The player: input, movement, tools, carried and thrown items. */
 
+#ifdef __psyz
+#include <stddef.h>
+#include <stdint.h>
+#endif
 #include <sys/types.h>
 #include <abs.h>
-#include <memory.h>
+#include <string.h>
 #include <libgte.h>
 #include "types.h"
 #include "actor.h"
@@ -88,6 +92,15 @@ typedef struct ResultCameraTable {
     ResultCameraPair pairs[3];
 } ResultCameraTable;
 
+#ifdef __psyz
+typedef s32 (*WorldToCellHandler)(VECTOR *, s16 *, s16 *);
+typedef WorldToCellHandler CellFromWorldMoveCandidates;
+typedef WorldToCellHandler CellFromWorldMoveRun;
+typedef WorldToCellHandler CellFromWorldMoveUpdate;
+typedef WorldToCellHandler CellFromWorldMoveResolve;
+typedef WorldToCellHandler CellFromWorldToolClearAlt;
+typedef WorldToCellHandler CellFromWorldToolClear;
+#else
 typedef s32 (*CellFromWorldMoveCandidates)(s32 *, u16 *, u16 *);
 
 typedef s32 (*CellFromWorldMoveRun)(s32 *, s16 *, s16 *);
@@ -101,9 +114,17 @@ typedef s32 (*CellFromWorldToolClearAlt)(s32 *, u16 *, u16 *);
 typedef s32 (*CellFromWorldToolClear)(s32 *, u16 *, u16 *);
 
 typedef s32 (*WorldToCellHandler)(VECTOR *, s16 *, s16 *);
+#endif
 
 /* Hop steps indexed [row][facing]: row 0 while the jump crouches, row 1 otherwise. */
-#define HOPS ((FarmHopStep(*)[12])move_steps_large)
+#ifdef __psyz
+/* The PS1 row 1 reads past move_steps_large into hop_steps, which a native link does not lay out
+ * contiguously, so name both tables. */
+#define HOP_STEP(row, facing)                                                                      \
+    ((row) == 0 ? &((FarmHopStep *)move_steps_large)[facing] : &hop_steps[facing])
+#else
+#define HOP_STEP(row, facing) (&((FarmHopStep(*)[12])move_steps_large)[row][facing])
+#endif
 
 /* Tool experience: the base gain, and the gain of a committed move. */
 #define TOOL_EXP_BASE 40
@@ -163,6 +184,17 @@ typedef struct
     u8 pad24[0xAC - 0x24];
     u16 talkVillager;
 } FarmObjectRecord;
+
+#ifdef __psyz
+_Static_assert(offsetof(FarmObjectStatus, talkVillager) == offsetof(FarmVillager, id),
+               "FarmObjectStatus id");
+_Static_assert(offsetof(FarmObjectStatus, mode) == offsetof(FarmVillager, flags),
+               "FarmObjectStatus flags");
+_Static_assert(offsetof(FarmObjectRecord, item) == offsetof(FarmActor, kind),
+               "FarmObjectRecord item");
+_Static_assert(offsetof(FarmObjectRecord, facing) == offsetof(FarmActor, facing),
+               "FarmObjectRecord facing");
+#endif
 
 typedef struct FarmVelocity
 {
@@ -723,7 +755,9 @@ static void player_update_controller_flags(void)
 static void player_build_result(FarmPlayer *player)
 {
     VECTOR values;
+#ifndef __psyz
     s32 index;
+#endif
     s16 *table;
     s32 result_value;
     u32 *status_word;
@@ -731,15 +765,29 @@ static void player_build_result(FarmPlayer *player)
     player_probe_target(player, &player->position, 0x18);
     values.vy = player->position.vy;
     values.pad = player->position.pad;
+#ifndef __psyz
     index = player->facing38 << 2;
+#endif
     values.vx = player->position.vx;
     values.vz = player->position.vz;
+#ifdef __psyz
+    table = facing_reach[player->facing38];
+#else
     table = facing_reach[0] + index / 2;
+#endif
     values.vx += table[0];
     values.vz += table[1];
     farm_settle_on_ground(&values, 0);
     status_word = &player_status_word;
+#ifdef __psyz
+    /* PS1 tolerates reads through NULL before the first ground hit. */
+    {
+        s32 *hit = (s32 *)ground_hit_primitive();
+        result_value = hit != 0 ? *hit : 0;
+    }
+#else
     result_value = *(s32 *)ground_hit_primitive();
+#endif
     *status_word = result_value;
     if (!(result_value & 0xFFFF0000))
     {
@@ -778,7 +826,11 @@ u16 player_anim_banks[28] = {
     0,
 };
 
+#ifdef __psyz
+static CellFromWorldMoveCandidates world_to_cell_handlers[2] = {field_world_to_cell, greenhouse_world_to_cell};
+#else
 static void *world_to_cell_handlers[2] = {field_world_to_cell, greenhouse_world_to_cell};
+#endif
 
 /* Build and validate farm movement candidates for each of nine slots. */
 static void player_build_move_candidates(FarmPlayer *player)
@@ -786,23 +838,40 @@ static void player_build_move_candidates(FarmPlayer *player)
     s32 status;
     s32 slot;
     s16 mode;
+#ifdef __psyz
+    VECTOR values;
+    s16 resultX;
+    s16 resultY;
+#else
     s32 values[3];
     u16 resultX;
     u16 resultY;
+#endif
     s16 deltaX;
     s16 deltaY;
     CellFromWorldMoveCandidates callback;
 
     status = player_location_kind();
+#ifdef __psyz
+    values.vx = player->position.vx;
+    values.vy = player->position.vy;
+    values.vz = player->position.vz;
+    values.pad = 0;
+#else
     values[0] = player->position.vx;
     values[1] = player->position.vy;
     values[2] = player->position.vz;
+#endif
     if (status == 2)
     {
         return;
     }
     callback = world_to_cell_handlers[status];
+#ifdef __psyz
+    callback(&values, &resultX, &resultY);
+#else
     callback(values, &resultX, &resultY);
+#endif
     slot = 0;
     do
     {
@@ -838,14 +907,23 @@ static s32 player_move_record_run(FarmPlayer *player)
         player_add_tool_exp(player, TOOL_EXP_BASE);
         return 0;
     }
+#ifdef __psyz
+    VECTOR pos = {player->position.vx, player->position.vy, player->position.vz, 0};
+#else
     values[0] = player->position.vx;
     values[1] = player->position.vy;
     values[2] = player->position.vz;
+#endif
     mode = (player->toolCharge / TOOL_CHARGE_STEP);
     result = tool_charge_steps_a[mode];
     mode = mode - player->held[HELD_TOOL].modifier;
     callback = world_to_cell_handlers[status];
+#ifdef __psyz
+    (void)values;
+    callback(&pos, &callbackX, &callbackY);
+#else
     callback(values, &callbackX, &callbackY);
+#endif
     player_result_params_init(RESULT_KIND_DIG, status, callbackX, callbackY, mode, result);
     player_set_mode(player, PLAYER_MODE_RESULT_STEP, 0, -2);
     return 1;
@@ -869,9 +947,13 @@ static s32 player_move_record_update(FarmPlayer *player)
         player_add_tool_exp(player, TOOL_EXP_BASE);
         return 0;
     }
+#ifdef __psyz
+    VECTOR pos = {player->position.vx, player->position.vy, player->position.vz, 0};
+#else
     values[0] = player->position.vx;
     values[1] = player->position.vy;
     values[2] = player->position.vz;
+#endif
     mode = (player->toolCharge / TOOL_CHARGE_STEP);
     result = tool_charge_steps_b[mode];
     count = player->held[HELD_TOOL].count;
@@ -883,7 +965,12 @@ static s32 player_move_record_update(FarmPlayer *player)
     if ((difference << 16) < 0)
         player->held[HELD_TOOL].count = 0;
     callback = world_to_cell_handlers[status];
+#ifdef __psyz
+    (void)values;
+    callback(&pos, &callbackX, &callbackY);
+#else
     callback(values, &callbackX, &callbackY);
+#endif
     player_result_params_init(RESULT_KIND_GATE, status, callbackX, callbackY, mode, result);
     player_set_mode(player, PLAYER_MODE_RESULT_STEP, 0, -2);
     return 1;
@@ -918,14 +1005,23 @@ static s32 player_move_record_resolve(FarmPlayer *player)
         }
         return 0;
     }
+#ifdef __psyz
+    VECTOR pos = {player->position.vx, player->position.vy, player->position.vz, 0};
+#else
     values[0] = player->position.vx;
     values[1] = player->position.vy;
     values[2] = player->position.vz;
+#endif
     mode = (player->toolCharge / TOOL_CHARGE_STEP);
     result = tool_charge_steps_c[mode];
     mode = mode - player->held[HELD_TOOL].modifier;
     callback = world_to_cell_handlers[status];
+#ifdef __psyz
+    (void)values;
+    callback(&pos, &callbackX, &callbackY);
+#else
     callback(values, &callbackX, &callbackY);
+#endif
     player_result_params_init(RESULT_KIND_HARVEST, status, callbackX, callbackY, mode, result);
     player_set_mode(player, PLAYER_MODE_RESULT_STEP, 0, -2);
     return 1;
@@ -1047,23 +1143,39 @@ static void player_tool_clear_alt(FarmPlayer *player)
 {
     s32 status;
     s32 found;
+#ifdef __psyz
+    VECTOR values;
+    s16 origin_x;
+    s16 origin_y;
+#else
     s32 values[3];
-    s16 quotient;
-    s16 total;
     u16 origin_x;
     u16 origin_y;
+#endif
+    s16 quotient;
+    s16 total;
     s16 delta_x;
     s16 delta_y;
     s32 delay;
     delay = TOOL_EXP_BASE;
     status = player_location_kind();
     quotient = player->toolCharge / TOOL_CHARGE_STEP;
+#ifdef __psyz
+    values.vx = player->position.vx;
+    values.vy = player->position.vy;
+    values.vz = player->position.vz;
+    values.pad = 0;
+    if (status != 2)
+    {
+        world_to_cell_handlers[status](&values, &origin_x, &origin_y);
+#else
     values[0] = player->position.vx;
     values[1] = player->position.vy;
     values[2] = player->position.vz;
     if (status != 2)
     {
         ((CellFromWorldToolClearAlt)world_to_cell_handlers[status])(values, &origin_x, &origin_y);
+#endif
         found = picture_grid_find_cell(&player->held[HELD_TOOL].id, 0, player->facing38, &delta_x, &delta_y, 0);
         if (found == 1)
         {
@@ -1096,23 +1208,39 @@ static void player_tool_clear(FarmPlayer *player)
 {
     s32 status;
     s32 found;
+#ifdef __psyz
+    VECTOR values;
+    s16 origin_x;
+    s16 origin_y;
+#else
     s32 values[3];
-    s16 quotient;
-    s16 total;
     u16 origin_x;
     u16 origin_y;
+#endif
+    s16 quotient;
+    s16 total;
     s16 delta_x;
     s16 delta_y;
     s32 delay;
     delay = TOOL_EXP_BASE;
     status = player_location_kind();
     quotient = player->toolCharge / TOOL_CHARGE_STEP;
+#ifdef __psyz
+    values.vx = player->position.vx;
+    values.vy = player->position.vy;
+    values.vz = player->position.vz;
+    values.pad = 0;
+    if (status != 2)
+    {
+        world_to_cell_handlers[status](&values, &origin_x, &origin_y);
+#else
     values[0] = player->position.vx;
     values[1] = player->position.vy;
     values[2] = player->position.vz;
     if (status != 2)
     {
         ((CellFromWorldToolClear)world_to_cell_handlers[status])(values, &origin_x, &origin_y);
+#endif
         found = picture_grid_find_cell(&player->held[HELD_TOOL].id, 0, player->facing38, &delta_x, &delta_y, 0);
         if (found == 1)
         {
@@ -2406,7 +2534,11 @@ static s32 player_try_carry_throw(FarmPlayer *player, s32 request)
 
 static s32 player_try_nearby_action(FarmPlayer *player)
 {
+#ifdef __psyz
+    FarmNearbyAction *p = (FarmNearbyAction *)(intptr_t)player_start_nearby_actions(player);
+#else
     FarmNearbyAction *p = (FarmNearbyAction *)player_start_nearby_actions(player);
+#endif
     if (p == 0)
         return 0;
     return (p->value ^ 2) != 0;
@@ -3403,7 +3535,11 @@ static s32 player_confirm_action(FarmPlayer *player, s32 buttons)
     {
         return 0;
     }
+#ifdef __psyz
+    if (player_advance_state(player))
+#else
     if (((s32 (*)())player_advance_state)())
+#endif
     {
         return 1;
     }
@@ -3415,7 +3551,12 @@ static s32 player_confirm_action(FarmPlayer *player, s32 buttons)
             player_reset_pose();
             return 1;
         }
+#ifdef __psyz
+        /* FarmHelper.number sits past FarmActor.sprite, which widens on 64-bit native. */
+        player->talkVillager = ((FarmHelper *)farmTarget)->number;
+#else
         player->talkVillager = ((FarmObjectRecord *)farmTarget)->talkVillager;
+#endif
         player_reset_pose();
     }
     if (farmTargetFlags & 0x200)
@@ -3948,12 +4089,15 @@ static s32 player_exchange_tool(s32 mode)
 }
 
 /* Draw the farm cursor at (pos_x, pos_y). */
-void farm_draw_cursor(u_long *ot, s32 pos_x, s32 pos_y, s32 frame)
+void farm_draw_cursor(void *ot, s32 pos_x, s32 pos_y, s32 frame)
 {
     s32 x;
     s32 y;
     s32 anim_id;
 
+#ifdef __psyz
+    ui_icons_bind_stage();
+#endif
     anim_id = 0x18;
     anim_select_range(&ui_icon_anim, anim_id);
     x = pos_x;
@@ -4005,7 +4149,7 @@ static void player_draw_carried_item(FarmPlayer *player, s32 depth, FarmScreenXY
         dir = 0;
     }
     offset = (s16 *)mark_screen_offsets + (dir * 2 + group);
-    picture_cell_build_prim(key, 0, &current_frame->ot[depth >> 2],
+    picture_cell_build_prim(key, 0, FRAME_OT_AT(depth >> 2),
                             pos->x + offset[0], pos->y + offset[1], 2);
 }
 
@@ -4016,9 +4160,9 @@ static void player_draw_body(FarmPlayer *player, s32 offset, FarmScreenXY *pos)
     s16 tintB;
     s16 tintC;
     AnimState *sprite;
-    u_long *otEntry;
+    OT_TYPE *otEntry;
 
-    otEntry = &current_frame->ot[offset >> 2];
+    otEntry = FRAME_OT_AT(offset >> 2);
 
     if (player->stateFlags & PLAYER_FLAG_EVENT_SPRITE)
     {
@@ -4089,7 +4233,7 @@ void player_draw(VECTOR *position, s32 unused)
                               (game_state.frameCount >> 2) & 1,
                               hand_screen.x, (hand_screen.y - 50));
     }
-    cue_draw_frame(&player->cue, &current_frame->ot[depth >> 2],
+    cue_draw_frame(&player->cue, FRAME_OT_AT(depth >> 2),
                    hand_screen.x, (hand_screen.y - 40));
     if (player->facing38 == FACING_DOWN || player->facing38 == FACING_RIGHT || (player->stateFlags & PLAYER_FLAG_CARRY_ITEM) ||
         player->mode == PLAYER_MODE_SHOW_TOOL || player->mode == PLAYER_MODE_POSE_4 || player->mode == PLAYER_MODE_USE_FEATHER ||
@@ -4125,7 +4269,7 @@ void player_draw(VECTOR *position, s32 unused)
     }
     if (!(player->stateFlags & PLAYER_FLAG_RIDING))
     {
-        farm_draw_cursor(&current_frame->ot[depth >> 2], hand_screen.x, hand_screen.y, 0);
+        farm_draw_cursor(FRAME_OT_AT(depth >> 2), hand_screen.x, hand_screen.y, 0);
     }
     if (player->stateFlags & PLAYER_FLAG_RIDING)
     {
@@ -4377,20 +4521,28 @@ void player_update_position(void)
     {
         player_slide_on_bump();
     }
+#ifdef __psyz
+    /* PS1 tolerates reads through NULL before the first ground hit. */
+    {
+        u32 *hit = (u32 *)ground_hit_primitive();
+        player_status_word = hit != 0 ? *hit : 0;
+    }
+#else
     player_status_word = *(u32 *)ground_hit_primitive();
+#endif
     pos = player->position;
     if (player->stateFlags & PLAYER_FLAG_AIRBORNE)
     {
         if (!(player->stateFlags & PLAYER_FLAG_STILL))
         {
-            hop = &HOPS[1][player->facing38];
+            hop = HOP_STEP(1, player->facing38);
             if (player->mode == PLAYER_MODE_JUMP_CROUCH)
             {
-                hop = &HOPS[0][player->facing38];
+                hop = HOP_STEP(0, player->facing38);
             }
             if (player->mode == PLAYER_MODE_JUMP_LAUNCH)
             {
-                hop = &HOPS[1][player->facing38];
+                hop = HOP_STEP(1, player->facing38);
             }
             player->velocity[0] += hop->dx;
             player->velocity[2] += hop->dz;
@@ -4592,7 +4744,24 @@ static s16 player_probe_target(FarmPlayer *player, VECTOR *pos, s32 kind_arg)
     found = 0;
     target = 0;
     probe.vy = pos->vy;
+#ifdef __psyz
+    /* The PS1 probe indexes consecutive tables in its linked data section. */
+    enum { CARDINAL_FACINGS = FACING_RIGHT - FACING_DOWN + 1 };
+    u32 facing = (u16)player->facing38 % CARDINAL_FACINGS;
+    switch (kind) {
+    case ITEM_GOLD_WATERING_CAN:
+        offset = &move_steps_large[(CARDINAL_FACINGS + facing) * 2];
+        break;
+    case ITEM_FISHING_ROD:
+        offset = facing_reach[CARDINAL_FACINGS + facing];
+        break;
+    default:
+        offset = &move_steps_small[facing * 2];
+        break;
+    }
+#else
     offset = &move_steps_small[kind + player->facing38 * 2];
+#endif
     probe.vx = pos->vx + offset[0];
     probe.vz = pos->vz + offset[1];
     player->stateFlags &= ~PLAYER_FLAG_BIT18;
@@ -5157,7 +5326,7 @@ static void thrown_item_update(FarmThrownItem *effect)
     FarmStoredItem pair;
     s32 landing;
     s32 depth;
-    u_long *ot;
+    OT_TYPE *ot;
 
     landing = 0;
     thrown_item_vertex.vx = effect->position.vx + 150;
@@ -5245,7 +5414,7 @@ static void thrown_item_update(FarmThrownItem *effect)
     {
         return;
     }
-    ot = &current_frame->ot[depth >> 2];
+    ot = FRAME_OT_AT(depth >> 2);
     if (effect->phase == THROWN_ITEM_LANDED || effect->phase == THROWN_ITEM_EGG_LANDED)
     {
         anim_draw_sprt_advance(ot, &thrown_item_anim, thrown_item_screen.x, thrown_item_screen.y);
@@ -5279,7 +5448,7 @@ static void thrown_item_update(FarmThrownItem *effect)
     {
         return;
     }
-    farm_draw_cursor(&current_frame->ot[depth >> 2], thrown_item_screen.x, thrown_item_screen.y, 0);
+    farm_draw_cursor(FRAME_OT_AT(depth >> 2), thrown_item_screen.x, thrown_item_screen.y, 0);
 }
 
 /* Land a thrown item on the ground: its landing animation starts, and fish, fish food, the
@@ -6285,7 +6454,11 @@ s32 player_init_toys(FarmPlayer *player)
     file_offset = ANIM_PACK_START(entry, 0);
     do
     {
+#ifdef __psyz
+        anim_bind_file(&player->toys[i].sprite, (void *)(file_base + file_offset));
+#else
         anim_bind_file(&player->toys[i].sprite, (void *)(file_offset + (s32)file_base));
+#endif
         i++;
     } while (i < PLAYER_TOYS);
 
@@ -6383,7 +6556,7 @@ static void player_draw_toy(VECTOR *point, FarmPlayer *player, s32 mode, s32 slo
     input.vz = point->vz - 150;
     if (estate_point_project(&input, &screen) != 0)
     {
-        sprite_draw_traced(&current_frame->ot[screen.depth >> 2], current_frame->primCursor.ft4, item,
+        sprite_draw_traced(FRAME_OT_AT(screen.depth >> 2), current_frame->primCursor.ft4, item,
                            animation & 0xFF, frame & 0xFF, screen.x, screen.y, item->scale, 0, 0x40);
     }
     if (mode == 0 && (game_state.globalFlags & GLOBAL_FLAG_PAUSED) == 0)

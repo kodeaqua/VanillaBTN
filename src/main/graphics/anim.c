@@ -1,7 +1,10 @@
 /* Animations: binding an .ANI file, the frame clock and the frame lookups, drawing the
  * frames as SPRTs and POLY_FT4s, queueing them at the primitive cursor, and text drawn
  * through sprite parts. */
-#include <memory.h>
+#ifdef __psyz
+#include <stdint.h>
+#endif
+#include <string.h>
 #include <sys/types.h>
 #include <libgte.h>
 #include <libgpu.h>
@@ -37,7 +40,11 @@ void anim_bind_file(AnimState *state, AnimFile *file) {
     u32 caller;
 
     SAVE_RETURN_ADDRESS(&caller);
+#ifdef __psyz
+    if (((uintptr_t)file & 3) != 0) {
+#else
     if ((u32)file != ((u32)file >> 2) << 2) {
+#endif
         ANI_FAIL();
     }
     if (file->magic != ANI_MAGIC) {
@@ -279,19 +286,19 @@ u16 anim_find_bank_image(AnimState *source, ImageBank *bank, s32 key)
     return count;
 }
 
-void anim_draw_ft4_advance(u_long *ot, AnimState *p, s16 x, s16 y)
+void anim_draw_ft4_advance(void *ot, AnimState *p, s16 x, s16 y)
 {
     anim_draw_ft4_cursor(ot, p, p->animation, p->frame, x, y, p->scale, 0, 0);
     anim_tick(p);
 }
 
-void anim_draw_sprt_advance(u_long *ot, AnimState *p, s16 x, s16 y)
+void anim_draw_sprt_advance(void *ot, AnimState *p, s16 x, s16 y)
 {
     anim_draw_sprt_cursor(ot, p, p->animation, p->frame, x, y);
     anim_tick(p);
 }
 
-static POLY_FT4 *anim_draw_ft4_prim_advance(u_long *ot, POLY_FT4 *prim, AnimState *sprite, s16 x, s16 y)
+static POLY_FT4 *anim_draw_ft4_prim_advance(void *ot, POLY_FT4 *prim, AnimState *sprite, s16 x, s16 y)
 {
     POLY_FT4 *result;
 
@@ -301,14 +308,14 @@ static POLY_FT4 *anim_draw_ft4_prim_advance(u_long *ot, POLY_FT4 *prim, AnimStat
     return result;
 }
 
-void anim_draw_sprt_slots_advance(u_long *ot, SPRT **sprites, DR_MODE **modes, AnimState *p, s16 x,
+void anim_draw_sprt_slots_advance(OT_TYPE *ot, SPRT **sprites, DR_MODE **modes, AnimState *p, s16 x,
                                   s16 y)
 {
     anim_draw_sprt(ot, sprites, modes, p, p->animation, p->frame, x, y);
     anim_tick(p);
 }
 
-static void anim_draw_ft4_sized_advance(u_long *ot, AnimState *sprite, s16 x, s16 y, signed int scale,
+static void anim_draw_ft4_sized_advance(void *ot, AnimState *sprite, s16 x, s16 y, signed int scale,
                                         signed int keepPosition, u16 flags)
 {
     anim_draw_ft4_cursor(ot, sprite, sprite->animation, sprite->frame, x, y, scale, keepPosition,
@@ -317,19 +324,19 @@ static void anim_draw_ft4_sized_advance(u_long *ot, AnimState *sprite, s16 x, s1
 }
 
 /* Draw one text sprite with the frame's primitive cursor. Always returns 0. */
-s32 text_queue_sprite(u_long *ot, struct AnimState *sprite, s32 x, s32 y, s32 unused4, s32 unused5, s32 unused6, u8 *base,
+s32 text_queue_sprite(void *ot, struct AnimState *sprite, s32 x, s32 y, s32 unused4, s32 unused5, s32 unused6, u8 *base,
                   struct VramPlace *places) {
     text_sprite_draw(ot, current_frame->primCursor.ft4, sprite, x, y, ANIM_DRAW_CURSOR, base, places, -1, -1,
                   -1);
     return 0;
 }
 
-void anim_draw_sprt(u_long *ot, SPRT **sprites, DR_MODE **modes, struct AnimState *sprite,
+void anim_draw_sprt(void *ot, SPRT **sprites, DR_MODE **modes, struct AnimState *sprite,
                     unsigned char anim, unsigned char frame, signed short x, signed short y) {
     anim_draw_sprt_parts(ot, sprites, modes, sprite, anim, frame, x, y);
 }
 
-POLY_FT4 *anim_draw_ft4(u_long *ot, POLY_FT4 *prim, struct AnimState *sprite, signed int anim, unsigned char frame,
+POLY_FT4 *anim_draw_ft4(void *ot, POLY_FT4 *prim, struct AnimState *sprite, signed int anim, unsigned char frame,
                         signed short x, signed short y, signed int scale, signed int keepPosition,
                         unsigned short flags, signed short pageX, signed short pageY) {
     return sprite_draw_frame(ot, prim, sprite, anim & 0xff, frame, x, y,
@@ -337,14 +344,14 @@ POLY_FT4 *anim_draw_ft4(u_long *ot, POLY_FT4 *prim, struct AnimState *sprite, si
 }
 
 /* The work area holds a sprite and its draw mode in turn. */
-void anim_draw_sprt_cursor(u_long *ot, struct AnimState *sprite, u8 anim, u8 frame, s16 x, s16 y) {
+void anim_draw_sprt_cursor(void *ot, struct AnimState *sprite, u8 anim, u8 frame, s16 x, s16 y) {
     PrimCursor work;
     work.bytes = gs_work_alloc(0);
     anim_draw_sprt_parts(ot, &work.sprt, &work.mode, sprite, anim, frame, x, y);
     gs_work_release(work.bytes);
 }
 
-void anim_draw_ft4_cursor(u_long *ot, struct AnimState *sprite, u8 anim, u8 frame, s16 x, s16 y, s32 scale, s32 keepPosition,
+void anim_draw_ft4_cursor(void *ot, struct AnimState *sprite, u8 anim, u8 frame, s16 x, s16 y, s32 scale, s32 keepPosition,
                           u16 flags) {
     gs_work_release(sprite_draw_frame(ot, gs_work_alloc(0), sprite, anim, frame, x, y, scale, scale,
                                       keepPosition, flags, -1, -1, -1, -1));
@@ -352,20 +359,20 @@ void anim_draw_ft4_cursor(u_long *ot, struct AnimState *sprite, u8 anim, u8 fram
 
 /* Sprite drawing through the work queue: a sprite at the primitive cursor, and the traced variant. */
 
-void sprite_draw_traced(u_long *ot, POLY_FT4 *prim, AnimState *sprite, u8 anim, u8 frame, s16 x, s16 y, s32 scale,
+void sprite_draw_traced(void *ot, POLY_FT4 *prim, AnimState *sprite, u8 anim, u8 frame, s16 x, s16 y, s32 scale,
                    s32 unused, u16 flags) {
     /* Remember the caller's return address in the farm state. */
     SAVE_RETURN_ADDRESS(&game_state.lastCaller);
     sprite_draw_frame(ot, prim, sprite, anim, frame, x, y, scale, scale, 0, flags, -1, -1, -1, -1);
 }
 
-static void sprite_draw_at_cursor(u_long *ot, AnimState *sprite, u8 anim, u8 frame, s16 x, s16 y, s32 scale, s32 keepPosition,
+static void sprite_draw_at_cursor(void *ot, AnimState *sprite, u8 anim, u8 frame, s16 x, s16 y, s32 scale, s32 keepPosition,
                    u16 flags, s16 pageX, s16 pageY, s16 clutX, s16 clutY) {
     gs_work_release(sprite_draw_frame(ot, gs_work_alloc(0), sprite, anim, frame, x, y, scale, scale,
                                 keepPosition, flags, pageX, pageY, clutX, clutY));
 }
 
-static void sprite_draw_at_cursor_simple(u_long *ot, AnimState *sprite, u8 anim, u8 frame, s16 x, s16 y, s32 scaleX, s32 scaleY,
+static void sprite_draw_at_cursor_simple(void *ot, AnimState *sprite, u8 anim, u8 frame, s16 x, s16 y, s32 scaleX, s32 scaleY,
                    u16 flags) {
     gs_work_release(sprite_draw_frame(ot, gs_work_alloc(0), sprite, anim, frame, x, y, scaleX, scaleY, 0,
                                 flags, -1, -1, -1, -1));
@@ -386,7 +393,7 @@ typedef union {
 
 /* Queue frame `frameIndex` of animation `anim` as SPRTs, each with its texture page's
  * DR_MODE, last part first. */
-void anim_draw_sprt_parts(u_long *ot, SPRT **sprites, DR_MODE **modes, AnimState *state, u8 anim,
+void anim_draw_sprt_parts(void *ot, SPRT **sprites, DR_MODE **modes, AnimState *state, u8 anim,
                    u8 frameIndex, s16 x, s16 y) {
     AnimRange *range;
     AnimFrame *frame;
@@ -426,7 +433,11 @@ void anim_draw_sprt_parts(u_long *ot, SPRT **sprites, DR_MODE **modes, AnimState
         }
 
         setSprt(*sprites);
+#ifdef __psyz
+        setRGB0(*sprites, (u8)SPRT_NEUTRAL_RGBC, (u8)SPRT_NEUTRAL_RGBC, (u8)SPRT_NEUTRAL_RGBC);
+#else
         *(u_long *)&(*sprites)->r0 = SPRT_NEUTRAL_RGBC;
+#endif
         setSemiTrans(*sprites, (state->flags & ANIM_FLAG_SEMI_TRANSPARENT) || ((part->attr >> 4) & 1));
         setShadeTex(*sprites, 0);
         setXY0(*sprites, x + dx + part->dx, y + dy + part->dy);
@@ -497,7 +508,7 @@ static inline void setOrientedUV(POLY_FT4 *prim, s32 u, s32 v, s32 w, s32 h, s16
  * left untouched with `keepPosition`; pageX/clutX other than -1 override the VRAM
  * position of the pixels/palette; ANIM_DRAW_FLIP_X and _Y mirror the sprite, and
  * ANIM_DRAW_CURSOR links the primitive as a POLY_FT4 in the cursor pool. */
-POLY_FT4 *sprite_draw_frame(u_long *ot, POLY_FT4 *prim, AnimState *sprite, u8 anim, u8 frameIndex, s16 x,
+POLY_FT4 *sprite_draw_frame(void *ot, POLY_FT4 *prim, AnimState *sprite, u8 anim, u8 frameIndex, s16 x,
                         s16 y, s32 scaleX, s32 scaleY, s32 keepPosition, u16 flags, s16 pageX,
                         s16 pageY, s16 clutX, s16 clutY) {
     AnimFrame *frame;
@@ -624,7 +635,11 @@ POLY_FT4 *sprite_draw_frame(u_long *ot, POLY_FT4 *prim, AnimState *sprite, u8 an
             }
         }
         if (flags & ANIM_DRAW_CURSOR) {
-            LINK_PRIM(ot, prim, POLY_FT4);
+#ifdef __psyz
+            addPrim(ot, prim);
+#else
+            LINK_PRIM((OT_TYPE *)ot, prim, POLY_FT4);
+#endif
             current_frame->primCursor.ft4++;
         } else {
             addPrim(ot, prim);
@@ -662,7 +677,7 @@ s16 text_sprite_key;
  * part may take the caller's palette key `matchPlace`, and a part keyed
  * `matchKey` takes `replaceKey` (when `matchPlace` is not -1). Flags 8 and 0x10
  * mirror the quad. */
-POLY_FT4 *text_sprite_draw(u_long *ot, POLY_FT4 *prim, AnimState *sprite, s16 x, s16 y, u16 flags, u8 *base,
+POLY_FT4 *text_sprite_draw(void *ot, POLY_FT4 *prim, AnimState *sprite, s16 x, s16 y, u16 flags, u8 *base,
                         VramPlace *places, s16 matchPlace, s16 matchKey, s16 replaceKey) {
     AnimFrame *frame;
     s32 count;
@@ -830,7 +845,11 @@ POLY_FT4 *text_sprite_draw(u_long *ot, POLY_FT4 *prim, AnimState *sprite, s16 x,
             prim->x3 = right;
             prim->y3 = bottom;
         }
-        LINK_PRIM(ot, prim, POLY_FT4);
+#ifdef __psyz
+        addPrim(ot, prim);
+#else
+        LINK_PRIM((OT_TYPE *)ot, prim, POLY_FT4);
+#endif
         base += width;
         current_frame->primCursor.ft4++;
     }

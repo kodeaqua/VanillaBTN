@@ -131,7 +131,7 @@ s32 shop_menu_choose(s32 *step, s32 base, s32 next, struct FarmMenuRequest reque
                          ShopMenuHeader *header);
 s32 shop_phase_run(void);
 s32 shop_request_dispatch(s32 arg);
-s32 shop_result_update(u_long *ot, s16 x, s16 y);
+s32 shop_result_update(OT_TYPE *ot, s16 x, s16 y);
 s32 shop_key_value_lookup(s16 key);
 s32 shop_dialogue_current(void);
 s16 shop_livestock_lookup(s16 mode, s16 filter, s16 wanted);

@@ -1,6 +1,6 @@
 /* Harvest sprites: the farm helpers' daily work, their scripts and their talk, and what each harvest is worth. */
 #include <sys/types.h>
-#include <memory.h>
+#include <string.h>
 #include <libgte.h>
 #include "types.h"
 #include "actor.h"
@@ -352,6 +352,25 @@ static s32 harvest_sprite_tick(FarmHelper *helper)
     return 0;
 }
 
+#ifdef __psyz
+static s32 harvest_helper_idle_cue_h(FarmHelper *h) { return harvest_helper_idle_cue(&h->actor); }
+static s32 harvest_helper_cue_1_h(FarmHelper *h) { return harvest_helper_cue_1(&h->actor); }
+static s32 harvest_helper_cue_2_h(FarmHelper *h) { return harvest_helper_cue_2(&h->actor); }
+static s32 harvest_helper_cue_3_h(FarmHelper *h) { return harvest_helper_cue_3(&h->actor); }
+static s32 harvest_helper_cue_4_h(FarmHelper *h) { return harvest_helper_cue_4(&h->actor); }
+static s32 harvest_helper_scold_cue_h(FarmHelper *h) { return harvest_helper_scold_cue(&h->actor); }
+
+s32 (*const harvest_helper_start_handlers[14])(FarmHelper *) = {
+    0, 0, 0, 0, 0, harvest_helper_lower_affection, harvest_helper_talk, 0, 0, 0, 0, 0, 0, harvest_helper_greet,
+};
+
+s32 (*const harvest_helper_tick_handlers[14])(FarmHelper *) = {
+    harvest_helper_idle_cue_h, harvest_helper_cue_1_h, harvest_helper_cue_2_h, harvest_helper_cue_3_h,
+    harvest_helper_cue_4_h, harvest_helper_scold_cue_h, harvest_helper_script_tick,
+    harvest_helper_set_work_state, harvest_obj_move_input_tick, harvest_obj_move_action_tick,
+    harvest_obj_carry_tick, harvest_obj_place_tick, harvest_obj_walk_tick, 0,
+};
+#else
 s32 (*const harvest_helper_start_handlers[14])() = {
     0, 0, 0, 0, 0, harvest_helper_lower_affection, harvest_helper_talk, 0, 0, 0, 0, 0, 0, harvest_helper_greet,
 };
@@ -361,13 +380,19 @@ s32 (*const harvest_helper_tick_handlers[14])() = {
     harvest_helper_scold_cue, harvest_helper_script_tick, harvest_helper_set_work_state, harvest_obj_move_input_tick, harvest_obj_move_action_tick,
     harvest_obj_carry_tick, harvest_obj_place_tick, harvest_obj_walk_tick, 0,
 };
+#endif
 
 /* Run a helper's current action. When its interrupt timer is due, apply a seasonal task
  * and reset the timer. Outside work hours a helper that holds nothing walks home.
  * Then count the timer up. */
 static s32 harvest_helper_timer_tick(FarmHelper *helper) {
+#ifdef __psyz
+    s32 (*const *actions)(FarmHelper *);
+    s32 (*action)(FarmHelper *);
+#else
     s32 (*const *actions)();
     s32 (*action)();
+#endif
     u16 action_id;
     u16 clock;
 
@@ -375,7 +400,11 @@ static s32 harvest_helper_timer_tick(FarmHelper *helper) {
     actions = harvest_helper_tick_handlers;
     action = actions[action_id];
     if (action != 0) {
+#ifdef __psyz
+        action(helper);
+#else
         action();
+#endif
     }
     if (!(helper->actor.flags & ACTOR_FLAG_CUE_RUNNING) && helper->actor.interruptTime >= HELPER_TASK_INTERVAL) {
         harvest_helper_seasonal_task(helper);
@@ -1277,23 +1306,39 @@ static s32 harvest_obj_move_action_tick(FarmHelper *helper) {
  * to, in PLACE_5 it hands over and fetches, in PLACE_4 it fetches and claims. While
  * it runs, its task is saved to be restored later. When it stops it plays action 7
  * and returns 1. */
+/* Keep the helper nested for the matching compiler's code layout. */
+#ifndef __psyz
 static s32 harvest_obj_carry_tick(FarmHelper *object) {
     FarmHelper *self;
     s32 running;
     s32 result;
     VECTOR pos;
-
-    void harvest_helper_arrive_or_wait(FarmHelper *o, s16 kind, u32 mask) {
-        if (o->actor.place.location == kind) {
-            o->targetAnimal = SLOT_NONE;
-            o->actor.taskId = 0;
-            o->actor.flags &= ~mask;
-            o->flags |= HELPER_BIT9;
-        } else {
-            o->actor.flags |= mask;
-            harvest_obj_wait_walk(object, HARVEST_NEAR_PROXIMITY);
-        }
+#else
+static
+#endif
+void harvest_helper_arrive_or_wait(FarmHelper *o, s16 kind, u32 mask) {
+    if (o->actor.place.location == kind) {
+        o->targetAnimal = SLOT_NONE;
+        o->actor.taskId = 0;
+        o->actor.flags &= ~mask;
+        o->flags |= HELPER_BIT9;
+    } else {
+        o->actor.flags |= mask;
+#ifdef __psyz
+        harvest_obj_wait_walk(o, HARVEST_NEAR_PROXIMITY);
+#else
+        harvest_obj_wait_walk(object, HARVEST_NEAR_PROXIMITY);
+#endif
     }
+}
+
+#ifdef __psyz
+static s32 harvest_obj_carry_tick(FarmHelper *object) {
+    FarmHelper *self;
+    s32 running;
+    s32 result;
+    VECTOR pos;
+#endif
 
     self = object;
     running = 1;

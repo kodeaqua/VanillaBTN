@@ -19,8 +19,8 @@ void event_flag_set(u16 flag, u16 on) {
     u32 word = flag >> 5;
     u32 bit = flag & 0x1F;
     if (on) {
-        game_state.eventFlags[word] |= (1 << bit);
+        game_state.eventFlags[word] |= (1u << bit);
     } else {
-        game_state.eventFlags[word] &= ~(1 << bit);
+        game_state.eventFlags[word] &= ~(1u << bit);
     }
 }

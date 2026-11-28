@@ -1,7 +1,7 @@
 /* Farm estate bookkeeping: gold, the message queues, the daily notices and the
  * farm's search records. */
 
-#include <memory.h>
+#include <string.h>
 #include "types.h"
 #include "anim.h"
 #include "animals.h"
@@ -102,7 +102,12 @@ static FarmEstateRecord *estate_record_find(s16 itemId, FarmEstateRecord *items,
 static void estate_gate_results_place(void);
 static s32 estate_season_bit(void);
 static void estate_search_run(void);
+#ifdef __psyz
+typedef s32 (*EstateSearchHandler)(s32, s32 *, s32 *);
+static void estate_search_records(s32 count, FarmEstateRecord *record, EstateSearchHandler callback);
+#else
 static void estate_search_records(s32 count, FarmEstateRecord *record, s32 (*callback)());
+#endif
 static s32 estate_action_status(s32 action, s32 *result, s32 *status);
 static s32 estate_code_status(s32 code, s32 *result, s32 *status);
 static s32 estate_code_lookup(s32 code, s32 *result, s32 *value);
@@ -200,6 +205,13 @@ s32 estate_pending_op_start(void) {
 
 /* Clear the message queues and forget the notices seen. */
 void estate_queues_clear(void) {
+#ifdef __psyz
+    s32 i;
+    for (i = 0; i < MESSAGE_QUEUE_LEN; i++) {
+        game_state.progress.estate.queues[0][i].kind = -1;
+        game_state.progress.estate.queues[1][i].kind = -1;
+    }
+#else
     s32 empty = -1;
     u8 *p = (u8 *)&game_state;
     s32 i;
@@ -208,6 +220,7 @@ void estate_queues_clear(void) {
         p[0x4A36] = empty;
         p += 4;
     }
+#endif
     game_state.progress.estate.noticesSeen = 0;
 }
 
@@ -1518,17 +1531,29 @@ static KindValues estate_kind_values[4] = {
     {0, 0, 0},
 };
 
-/* Set the item of each record from its state flags, using the kind's three values. */
+/* Keep the helper nested for the matching compiler's code layout. */
+#ifndef __psyz
 static void estate_record_ids_update(s16 kind, s16 count, FarmEstateRecord *records) {
-    /* Pick the item value for the record's state flags, or 0 when none is set. */
-    s32 estate_kind_value_for_flags(u16 flags, s16 valueWhenBit13, s16 valueWhenBit11, s16 valueWhenBit12)
-    {
-        if (flags & 0x2000) return valueWhenBit13;
-        if (flags & 0x800) return valueWhenBit11;
-        if (flags & 0x1000) return valueWhenBit12;
-        return 0;
+#else
+static
+#endif
+s32 estate_kind_value_for_flags(u16 flags, s16 valueWhenBit13, s16 valueWhenBit11,
+                                s16 valueWhenBit12) {
+    if (flags & 0x2000) {
+        return valueWhenBit13;
     }
+    if (flags & 0x800) {
+        return valueWhenBit11;
+    }
+    if (flags & 0x1000) {
+        return valueWhenBit12;
+    }
+    return 0;
+}
 
+#ifdef __psyz
+static void estate_record_ids_update(s16 kind, s16 count, FarmEstateRecord *records) {
+#endif
     s32 i;
     s32 itemId;
 
@@ -1803,7 +1828,11 @@ enum EstateSearchKind {
 /* Runs the screen's search handler over the records of the current map, then over the
  * shared records of runs 18 and 16. */
 static void estate_search_run(void) {
+#ifdef __psyz
+    EstateSearchHandler handler;
+#else
     s32 (*handler)();
+#endif
     s32 run;
     FarmEstateRecord record;
 
@@ -1869,6 +1898,17 @@ static void estate_search_run(void) {
 
 /* Draw a sprite at each record of this season and place that is on screen; the handler
  * picks the sprite and its cell. */
+#ifdef __psyz
+static void estate_search_records(s32 count, FarmEstateRecord *record, EstateSearchHandler callback) {
+    SVECTOR input;
+    FarmScreenPoint position;
+    /* All search callbacks write 4 bytes through their second argument (s32 *). */
+    s32 callback_value;
+    s32 callback_result;
+    s32 mode_bits;
+    s32 remaining;
+    EstateSearchHandler callback_fn;
+#else
 static void estate_search_records(s32 count, FarmEstateRecord *record, s32 (*callback)()) {
     SVECTOR input;
     FarmScreenPoint position;
@@ -1877,6 +1917,7 @@ static void estate_search_records(s32 count, FarmEstateRecord *record, s32 (*cal
     s32 mode_bits;
     s32 remaining;
     s32 (*callback_fn)();
+#endif
     FarmModeGlobal *mode_data;
 
     mode_bits = (estate_season_bit() | 1) & 0xFFFF;
@@ -1892,7 +1933,7 @@ static void estate_search_records(s32 count, FarmEstateRecord *record, s32 (*cal
                 input.vz = record->position.vz + ESTATE_SPRITE_OFFSET_Z;
                 if (estate_point_project(&input, &position) != 0 &&
                     callback_fn(record->itemId, &callback_value, &callback_result) != 0) {
-                    anim_draw_sprt_cursor(&current_frame->ot[position.depth >> ESTATE_OT_DEPTH_SHIFT],
+                    anim_draw_sprt_cursor(FRAME_OT_AT(position.depth >> ESTATE_OT_DEPTH_SHIFT),
                                   &game_state.work.sprites[callback_result], callback_value, 0,
                                   position.x, position.y);
                 }

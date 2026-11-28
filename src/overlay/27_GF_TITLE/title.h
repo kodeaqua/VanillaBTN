@@ -6,5 +6,8 @@
 
 
 void title_step_dispatch(void);
+#if defined(__psyz) && defined(VANILLABTN_DEBUG)
+void title_prepare_debug_farm(void);
+#endif
 
 #endif /* TITLE_H */

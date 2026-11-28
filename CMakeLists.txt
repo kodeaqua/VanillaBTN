@@ -1,17 +1,10 @@
 # Harvest Moon: Back to Nature (SLUS_011.15), the EXE and its overlays.
 cmake_minimum_required(VERSION 3.20)
 
-if(NOT CMAKE_TOOLCHAIN_FILE)
-    set(CMAKE_TOOLCHAIN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/psx-toolchain.cmake)
-endif()
-project(hmbtn NONE)
-find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter)
-include(cmake/psx.cmake)
-
-# The compiler and linker flags. The C files, in link order, are listed in src/*/CMakeLists.txt.
+# The C files, in link order, are listed in src/*/CMakeLists.txt.
 # Each header sits next to the source it declares and is included by its bare name, so
 # every directory with headers is on the include path.
-set(PSX_INCLUDE_DIRS
+set(VANILLABTN_INCLUDE_DIRS
     src/include
     src/main src/main/cd src/main/game src/main/geometry src/main/graphics src/main/input
     src/main/sound src/main/text src/main/ui
@@ -23,7 +16,29 @@ set(PSX_INCLUDE_DIRS
     src/overlay/25_GF_MG5 src/overlay/27_GF_TITLE src/overlay/28_GF_STAFF src/overlay/30_GF_swind
     src/overlay/31_gf_mcard
     src)
-list(TRANSFORM PSX_INCLUDE_DIRS PREPEND -I OUTPUT_VARIABLE psx_include_flags)
+set(VANILLABTN_IMAGE_DIRS
+    src/main
+    src/overlay/08_DEBUG src/overlay/10_PdaSamp src/overlay/11_GF_FARM src/overlay/15_saveload
+    src/overlay/17_GF_MG1 src/overlay/19_GF_MG2 src/overlay/21_GF_MG3 src/overlay/23_GF_MG4
+    src/overlay/25_GF_MG5 src/overlay/27_GF_TITLE src/overlay/28_GF_STAFF src/overlay/30_GF_swind
+    src/overlay/31_gf_mcard)
+
+option(VANILLABTN_NATIVE "Build the Windows native executable" OFF)
+if(VANILLABTN_NATIVE)
+    project(VanillaBTN LANGUAGES C)
+    enable_testing()
+    add_subdirectory(native)
+    return()
+endif()
+
+if(NOT CMAKE_TOOLCHAIN_FILE)
+    set(CMAKE_TOOLCHAIN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/psx-toolchain.cmake)
+endif()
+project(hmbtn NONE)
+find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter)
+include(cmake/psx.cmake)
+
+list(TRANSFORM VANILLABTN_INCLUDE_DIRS PREPEND -I OUTPUT_VARIABLE psx_include_flags)
 set(PSX_CPP_FLAGS ${psx_include_flags} -I${PSYQ_INCLUDE_DIR} -D_LANGUAGE_C -D__CHAR_UNSIGNED__)
 set(PSX_CC1_FLAGS -O2 -gcoff -quiet)
 set(PSX_MASPSX_FLAGS --use-comm-section --aspsx-version=2.86)
@@ -42,20 +57,9 @@ psx_overlay_region(high 0x8012DDE8)  # where FARM's image ends: 15_saveload, 30_
 
 # Each image declares itself in its CMakeLists.txt (psx_exe, psx_overlay); then the EXE
 # and the overlays link in one run, from a linker script generated from them.
-add_subdirectory(src/main)
-add_subdirectory(src/overlay/08_DEBUG)
-add_subdirectory(src/overlay/10_PdaSamp)
-add_subdirectory(src/overlay/11_GF_FARM)
-add_subdirectory(src/overlay/15_saveload)
-add_subdirectory(src/overlay/17_GF_MG1)
-add_subdirectory(src/overlay/19_GF_MG2)
-add_subdirectory(src/overlay/21_GF_MG3)
-add_subdirectory(src/overlay/23_GF_MG4)
-add_subdirectory(src/overlay/25_GF_MG5)
-add_subdirectory(src/overlay/27_GF_TITLE)
-add_subdirectory(src/overlay/28_GF_STAFF)
-add_subdirectory(src/overlay/30_GF_swind)
-add_subdirectory(src/overlay/31_gf_mcard)
+foreach(image IN LISTS VANILLABTN_IMAGE_DIRS)
+    add_subdirectory("${image}")
+endforeach()
 psx_program()
 
 # A_FILE and the disc, from the original disc's data (-DORIGINAL_DISC=).

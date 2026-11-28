@@ -4,7 +4,7 @@
 #include "farm_state.h"
 #include "ui_icons.h"
 
-static void ui_draw_icon(u_long *ot, s32 icon, s32 frame, s16 x, s16 y);
+static void ui_draw_icon(void *ot, s32 icon, s32 frame, s16 x, s16 y);
 
 u8 ui_icon_cycle;
 /* Frame counter kept as a seconds field: 0..59. */
@@ -15,23 +15,23 @@ u8 ui_icon_tick;
 #define UI_BLINK_PHASE 30
 #define UI_TICK_SECONDS 60
 
-void ui_draw_icon_2a(u_long *ot, signed short x, signed short y) {
+void ui_draw_icon_2a(void *ot, signed short x, signed short y) {
     ui_draw_icon(ot, 0x2A, 0, x, y);
 }
 
-void ui_draw_icon_27_0(u_long *ot, short x, short y) {
+void ui_draw_icon_27_0(void *ot, short x, short y) {
     ui_draw_icon(ot, 0x27, 0, x, y);
 }
 
-void ui_draw_icon_27_2(u_long *ot, signed short x, signed short y) {
+void ui_draw_icon_27_2(void *ot, signed short x, signed short y) {
     ui_draw_icon(ot, 0x27, 2, x, y);
 }
 
-void ui_draw_icon_27_1(u_long *ot, signed short x, signed short y) {
+void ui_draw_icon_27_1(void *ot, signed short x, signed short y) {
     ui_draw_icon(ot, 0x27, 1, x, y);
 }
 
-void ui_draw_icon_27_3(u_long *ot, signed short x, signed short y) {
+void ui_draw_icon_27_3(void *ot, signed short x, signed short y) {
     ui_draw_icon(ot, 0x27, 3, x, y);
 }
 
@@ -45,31 +45,31 @@ void ui_blink_tick(signed short advance) {
     }
 }
 
-void ui_draw_icon_29_phase(u_long *ot, signed short x, signed short y) {
+void ui_draw_icon_29_phase(void *ot, signed short x, signed short y) {
     ui_draw_icon(ot, 0x29, (ui_icon_cycle / UI_BLINK_PHASE) & 0xFF, x, y);
 }
 
-void ui_draw_icon_28_phase(u_long *ot, signed short x, signed short y) {
+void ui_draw_icon_28_phase(void *ot, signed short x, signed short y) {
     ui_draw_icon(ot, 0x28, (ui_icon_cycle / UI_BLINK_PHASE) & 0xFF, x, y);
 }
 
-void ui_draw_icon_0d_phase(u_long *ot, signed short x, signed short y) {
+void ui_draw_icon_0d_phase(void *ot, signed short x, signed short y) {
     ui_draw_icon(ot, 0xD, (ui_icon_cycle / UI_BLINK_PHASE) & 0xFF, x, y);
 }
 
-void ui_draw_icon_0c_phase(u_long *ot, signed short x, signed short y) {
+void ui_draw_icon_0c_phase(void *ot, signed short x, signed short y) {
     ui_draw_icon(ot, 0xC, (ui_icon_cycle / UI_BLINK_PHASE) & 0xFF, x, y);
 }
 
-void ui_draw_icon_0b_1(u_long *ot, signed short x, signed short y) {
+void ui_draw_icon_0b_1(void *ot, signed short x, signed short y) {
     ui_draw_icon(ot, 0xB, 1, x, y);
 }
 
-void ui_draw_icon_18_sub(u_long *ot, s16 x, s16 y, s16 sub) {
+void ui_draw_icon_18_sub(void *ot, s16 x, s16 y, s16 sub) {
     ui_draw_icon(ot, 0x18, sub, x, y);
 }
 
-void ui_draw_icon_1e(u_long *ot, s16 x, s16 y) {
+void ui_draw_icon_1e(void *ot, s16 x, s16 y) {
     ui_draw_icon(ot, 0x1E, 0, x, y);
 }
 
@@ -83,20 +83,32 @@ void ui_blink_tick_60(signed short advance) {
     }
 }
 
-void ui_draw_icon_07_phase(u_long *ot, signed short x, signed short y) {
+void ui_draw_icon_07_phase(void *ot, signed short x, signed short y) {
     ui_draw_icon(ot, 7, (ui_icon_tick / 30) & 0xFF, x, y);
 }
 
-void ui_draw_icon_2b_sub(u_long *ot, s16 x, s16 y, s16 sub) {
+void ui_draw_icon_2b_sub(void *ot, s16 x, s16 y, s16 sub) {
     ui_draw_icon(ot, 0x2B, sub, x, y);
 }
 
 AnimState ui_icon_anim;
 
-/* Draw one UI icon from the shared icon animation, binding its file on first use. */
-static void ui_draw_icon(u_long *ot, s32 icon, s32 frame, s16 x, s16 y) {
+#ifdef __psyz
+void ui_icons_bind_stage(void) {
     if (ui_icon_anim.source != (AnimFile *)farm_area.stageData) {
         anim_bind_file(&ui_icon_anim, (AnimFile *)farm_area.stageData);
     }
+}
+#endif
+
+/* Draw one UI icon from the shared icon animation, binding its file on first use. */
+static void ui_draw_icon(void *ot, s32 icon, s32 frame, s16 x, s16 y) {
+#ifdef __psyz
+    ui_icons_bind_stage();
+#else
+    if (ui_icon_anim.source != (AnimFile *)farm_area.stageData) {
+        anim_bind_file(&ui_icon_anim, (AnimFile *)farm_area.stageData);
+    }
+#endif
     anim_draw_sprt_cursor(ot, &ui_icon_anim, icon & 0xFF, frame & 0xFF, x, y);
 }

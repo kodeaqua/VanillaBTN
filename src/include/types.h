@@ -11,4 +11,9 @@ typedef signed char s8;
 typedef signed short s16;
 typedef signed int s32;
 
+/* PSY-Q addresses ordering tables as words. PsyZ defines OT_TYPE in libgpu.h. */
+#ifndef __psyz
+#define OT_TYPE u_long
+#endif
+
 #endif /* TYPES_H */

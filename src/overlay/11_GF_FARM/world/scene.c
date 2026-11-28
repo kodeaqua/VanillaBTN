@@ -4,7 +4,7 @@
 #include <libgte.h>
 #include <libgpu.h>
 #include <libgs.h>
-#include <memory.h>
+#include <string.h>
 #include "types.h"
 #include "cd_audio.h"
 #include "clock.h"
@@ -853,31 +853,51 @@ static void scene_assign_slots(void)
     }
 }
 
+/* Keep the helper nested for the matching compiler's code layout. */
+#ifndef __psyz
 /* Pass the hidden flag around the three slot entries. The first stage waits until
  * the item is shipped; then each slot counts up to its limit and hands the flag on.
  * The last stage clears the shipped flag when it completes. */
 static void scene_flag_stage_tick(void)
 {
-    /* Count one step on `owner`'s counter; when it reaches its limit, reset both
-     * counters, hide `owner`, show `other`, record `nextStage` as the next stage and
-     * return 1. */
-    s32 scene_slot_handoff_step(FarmSceneModel * owner, FarmSceneModel * other, s32 nextStage)
-    {
-        FarmMorph *counter;
+#else
+static
+#endif
+/* Count one step on `owner`'s counter; when it reaches its limit, reset both
+ * counters, hide `owner`, show `other`, record `nextStage` as the next stage and
+ * return 1. */
+s32 scene_slot_handoff_step(FarmSceneModel *owner, FarmSceneModel *other, s32 nextStage)
+{
+    FarmMorph *counter;
 
-        owner->morph->step++;
-        counter = owner->morph;
-        if (counter->step < counter->steps)
-        {
-            return 0;
-        }
-        other->morph->step = 0;
-        counter->step = 0;
-        owner->flags |= SCENE_ENTRY_HIDDEN;
-        other->flags &= ~SCENE_ENTRY_HIDDEN;
-        scene_flag_stage = nextStage;
-        return 1;
+#ifdef __psyz
+    /* Guard partial slot setups where PS1 would tolerate NULL dereferences. */
+    if (owner == 0 || other == 0 || owner->morph == 0 || other->morph == 0)
+    {
+        return 0;
     }
+#endif
+    owner->morph->step++;
+    counter = owner->morph;
+    if (counter->step < counter->steps)
+    {
+        return 0;
+    }
+    other->morph->step = 0;
+    counter->step = 0;
+    owner->flags |= SCENE_ENTRY_HIDDEN;
+    other->flags &= ~SCENE_ENTRY_HIDDEN;
+    scene_flag_stage = nextStage;
+    return 1;
+}
+
+#ifdef __psyz
+/* Pass the hidden flag around the three slot entries. The first stage waits until
+ * the item is shipped; then each slot counts up to its limit and hands the flag on.
+ * The last stage clears the shipped flag when it completes. */
+static void scene_flag_stage_tick(void)
+{
+#endif
 
     FarmSceneModel *slot0 = scene_slot_entries[0];
     u32 stage;
@@ -956,10 +976,27 @@ static void scene_link_slot1_reset(void)
     if (event_flag_get(EVENT_FLAG_SLEEPING) == 1)
     {
         scene_handback_state = SCENE_HANDBACK_RETURN;
+#ifdef __psyz
+        /* PS1 allows NULL writes when a scene lacks link entries. */
+        if (scene_link_entries[0] != 0)
+        {
+            scene_link_entries[0]->flags |= SCENE_ENTRY_HIDDEN;
+        }
+        if (scene_link_entries[1] != 0)
+        {
+            scene_link_entries[1]->flags &= ~SCENE_ENTRY_HIDDEN;
+            if (scene_link_entries[1]->morph != 0)
+            {
+                scene_link_entries[1]->morph->step =
+                    scene_link_entries[1]->morph->steps;
+            }
+        }
+#else
         scene_link_entries[0]->flags |= SCENE_ENTRY_HIDDEN;
         scene_link_entries[1]->flags &= ~SCENE_ENTRY_HIDDEN;
         scene_link_entries[1]->morph->step =
             scene_link_entries[1]->morph->steps;
+#endif
     }
 }
 
@@ -974,10 +1011,18 @@ static void scene_link_handback(void)
     FarmSceneModel *other;
     FarmMorph *link;
 
+#ifdef __psyz
+    if (scene_link_entries[0] == 0 || scene_link_entries[1] == 0 ||
+        scene_link_entries[0]->morph == 0 || scene_link_entries[1]->morph == 0)
+    {
+        return;
+    }
+#else
     if (scene_link_entries[0] == 0)
     {
         return;
     }
+#endif
     switch (scene_handback_state)
     {
     case SCENE_HANDBACK_WAIT:
@@ -1262,8 +1307,20 @@ static void scene_slot_flag_move(void)
             }
         }
     }
+#ifdef __psyz
+    /* PS1 tolerates writes through NULL when a scene has no marked entries. */
+    if (scene_marked_entries[0] != 0)
+    {
+        scene_marked_entries[0]->flags &= ~SCENE_ENTRY_HIDDEN;
+    }
+    if (scene_marked_entries[1] != 0)
+    {
+        scene_marked_entries[1]->flags |= SCENE_ENTRY_HIDDEN;
+    }
+#else
     scene_marked_entries[0]->flags &= ~SCENE_ENTRY_HIDDEN;
     scene_marked_entries[1]->flags |= SCENE_ENTRY_HIDDEN;
+#endif
 }
 
 /* Show the marked entry for the spouse's place: entry 1 when the spouse is at home,
@@ -1274,13 +1331,27 @@ static void scene_spouse_marker_update(void)
     {
         if (event_flag_get(EVENT_FLAG_SPOUSE_AT_HOME) == 1)
         {
+#ifdef __psyz
+            if (scene_marked_entries[1] != 0)
+            {
+                scene_marked_entries[1]->flags &= ~SCENE_ENTRY_HIDDEN;
+            }
+#else
             scene_marked_entries[1]->flags &= ~SCENE_ENTRY_HIDDEN;
+#endif
             scene_marked_entries[0]->flags |= SCENE_ENTRY_HIDDEN;
         }
         else
         {
             scene_marked_entries[0]->flags &= ~SCENE_ENTRY_HIDDEN;
+#ifdef __psyz
+            if (scene_marked_entries[1] != 0)
+            {
+                scene_marked_entries[1]->flags |= SCENE_ENTRY_HIDDEN;
+            }
+#else
             scene_marked_entries[1]->flags |= SCENE_ENTRY_HIDDEN;
+#endif
         }
     }
 }

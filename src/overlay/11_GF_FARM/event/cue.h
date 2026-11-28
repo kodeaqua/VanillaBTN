@@ -132,6 +132,6 @@ enum CueStep {
 void cue_reset(ItemCue *cue);
 void cue_set(ItemCue *cue, s16 id, s16 phase);
 s32 cue_countdown(ItemCue *cue);
-void cue_draw_frame(ItemCue *cue, u_long *ot, s16 x, s16 y);
+void cue_draw_frame(ItemCue *cue, void *ot, s16 x, s16 y);
 
 #endif /* CUE_H */

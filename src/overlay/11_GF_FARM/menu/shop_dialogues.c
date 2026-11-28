@@ -66,7 +66,11 @@
 #define ANIMAL(index) (game_state.animals.livestock[index])
 #define CHICKEN(index) (game_state.animals.chickens[index])
 /* A name's text, from the names' offset `base` (the snapshot taken with text_offset()). */
+#ifdef __psyz
+#define SHOP_NAME_AT(base, name) ((u16 *)((u8 *)(name) + ((base) - (s32)offsetof(TextBank, names))))
+#else
 #define SHOP_NAME_AT(base, name) ((u16 *)((base) + NAME_OFFSET(name)))
+#endif
 /* The most feed a player can hold, and the days a sheep waits between shearings. */
 #define SHOP_FEED_CAP 1000
 #define SHEARING_INTERVAL_DAYS 7
@@ -117,9 +121,9 @@ static s32 shop_plot_check_marked(void);
 static u16 shop_condition_message(void);
 static s32 shop_medal_affordable(FarmMenu *menu);
 static void shop_menu_entry_buy(FarmMenu *menu);
-static void shop_draw_text_row(FarmActor *actor, u_long *ot, s16 x, s16 y);
+static void shop_draw_text_row(FarmActor *actor, OT_TYPE *ot, s16 x, s16 y);
 static s16 shop_read_value(s16 *p);
-static void shop_draw_livestock_row(s16 raw_count, u_long *ot, s16 raw_x, s16 raw_y);
+static void shop_draw_livestock_row(s16 raw_count, OT_TYPE *ot, s16 raw_x, s16 raw_y);
 static s16 shop_livestock_find(s16 kind, s16 filter, s16 wanted);
 static s32 ending_offer_find(void);
 static void shop_menu_disable_input(void);
@@ -179,10 +183,10 @@ static s32 shop_can_afford(s32 price);
 static void shop_set_step(s32 start, s32 end);
 static void shop_set_step_offset(s32 start, s32 end, s32 offset);
 static void shop_restore_step(void);
-static void shop_draw_short_panel(u_long *ot, s32 x, s32 y, s32 columns);
-static void shop_draw_panel(s32 large, u_long *display, s16 left, s16 top, s16 columnCount);
+static void shop_draw_short_panel(OT_TYPE *ot, s32 x, s32 y, s32 columns);
+static void shop_draw_panel(s32 large, OT_TYPE *display, s16 left, s16 top, s16 columnCount);
 static s32 shop_yes_no_input(s16 *value);
-static s32 shop_yes_no_prompt(u_long *ot, s16 x, s16 y);
+static s32 shop_yes_no_prompt(OT_TYPE *ot, s16 x, s16 y);
 static void shop_menu_clear(FarmMenu *menu);
 static void shop_menu_draw(FarmMenu *menu, s16 x, s16 y);
 static s32 shop_menu_input(FarmMenu *menu);
@@ -1352,9 +1356,16 @@ static s16 shop_plot_find_marked(void) {
 /* 1 when the marked plot (shop_plot_find_marked) has its 0x40 status bit, else 0. */
 static s32 shop_plot_check_marked(void) {
     s32 i = shop_plot_find_marked();
+#ifdef __psyz
+    if (i >= 0 && i < MAX_CHICKENS &&
+        (game_state.animals.chickens[i].actor.flags & ACTOR_FLAG_PRIZE_WINNER)) {
+        return 1;
+    }
+#else
     u8 *base = (u8 *)&game_state;
     FarmPlotStatus *records = (FarmPlotStatus *)(base + 0x7AE8);
     if (records[i].value & 0x40) return 1;
+#endif
     return 0;
 }
 
@@ -1772,7 +1783,7 @@ static void shop_menu_entry_buy(FarmMenu *menu) {
     }
 }
 
-static void (*shop_livestock_icon_draws[4])(u_long *ot, s16 x, s16 y) = {
+static void (*shop_livestock_icon_draws[4])(void *ot, s16 x, s16 y) = {
     ui_draw_icon_27_0, ui_draw_icon_27_2, ui_draw_icon_27_1, ui_draw_icon_27_3};
 
 /* One frame of the record list for `kind` (0 chickens, 1 cows, 2 sheep): the title,
@@ -1781,8 +1792,8 @@ static void (*shop_livestock_icon_draws[4])(u_long *ot, s16 x, s16 y) = {
  * when action is 0), -2 on cancel, else -1. */
 s32 shop_record_list(s16 kind, s16 filter, s16 action)
 {
-    u_long *text;
-    u_long *list;
+    OT_TYPE *text;
+    OT_TYPE *list;
     s16 mode;
     s32 result;
     s32 count;
@@ -1904,7 +1915,7 @@ s32 shop_record_list(s16 kind, s16 filter, s16 action)
 
 /* Draw one record row at (x, y): the name, the affection icons on the row below, the date
  * (day and year) and the season icon. */
-static void shop_draw_text_row(FarmActor *actor, u_long *ot, s16 x, s16 y) {
+static void shop_draw_text_row(FarmActor *actor, OT_TYPE *ot, s16 x, s16 y) {
     s16 column;
     s16 row;
     u16 *work;
@@ -1943,9 +1954,9 @@ static s16 shop_read_value(s16 *p) {
 
 /* Draw `raw_count` icons (the affection, one per 25 points) in a row from raw_x, each 8
  * pixels left of the last. */
-static void shop_draw_livestock_row(s16 raw_count, u_long *ot, s16 raw_x, s16 raw_y) {
+static void shop_draw_livestock_row(s16 raw_count, OT_TYPE *ot, s16 raw_x, s16 raw_y) {
     s32 remaining;
-    u_long *draw_ot;
+    OT_TYPE *draw_ot;
     s32 pos;
     s32 step;
     s16 y;
@@ -2708,11 +2719,19 @@ s32 shop_menu_choose(s32 *step, s32 base, s32 next, FarmMenuRequest request, Sho
 }
 
 /* The callback tables the farm phase dispatches through: by screen id, and by request. */
+#ifdef __psyz
+s32 (*const shop_dialogue_tick_handlers[8])(void) = {
+#else
 s32 (*const shop_dialogue_tick_handlers[8])() = {
+#endif
     0, shop_menu_count_draw, shop_gold_panel_step, shop_gold_panel_redraw_step,
     shop_gold_choice_step, shop_panel_submit, shop_panel_submit_both, shop_medals_choice_step,
 };
+#ifdef __psyz
+s32 (*const shop_screen_run_handlers[29])(void) = {
+#else
 s32 (*const shop_screen_run_handlers[29])() = {
+#endif
     0, 0, shop_buy_stock_step, shop_buy_item_step,
     shop_grant_rice_ball, shop_grant_bread, shop_grant_oil, shop_grant_flour,
     shop_grant_curry_powder, shop_grant_rucksack_upgrade, shop_basket_step, shop_result_request,
@@ -2723,7 +2742,11 @@ s32 (*const shop_screen_run_handlers[29])() = {
     shop_plot_sale_step,
 };
 void (*const shop_screen_start_handlers[1])(void) = {0};
+#ifdef __psyz
+s32 (*const shop_phase_complete_handlers[28])(void) = {
+#else
 s32 (*const shop_phase_complete_handlers[28])() = {
+#endif
     shop_dialogue_finish, shop_fish_food_menu_setup, shop_dialogue_03_start, shop_start_default,
     shop_start_default, shop_start_default, shop_start_default, shop_start_default,
     shop_start_default, shop_start_default, shop_seed_menu_setup_a, shop_seed_menu_setup_b,
@@ -2749,7 +2772,11 @@ s32 shop_phase_run(void) {
             }
         }
         if (shop_dialogue_tick_handlers[shop_dialogue_tick_index] != 0) {
+#ifdef __psyz
+            shop_dialogue_tick_handlers[shop_dialogue_tick_index]();
+#else
             shop_dialogue_tick_handlers[shop_dialogue_tick_index](shop_dialogue_tick_handlers);
+#endif
         }
     }
     return completed;
@@ -2781,9 +2808,18 @@ s32 shop_request_dispatch(s32 arg) {
         }
         result = 0;
         shop_screen_id = arg;
+#ifdef __psyz
+        /* PS1 lays shop_phase_complete_handlers directly after the 1-entry start table. */
+        if (arg >= 1 && arg <= (s32)(sizeof(shop_phase_complete_handlers) /
+                                     sizeof(shop_phase_complete_handlers[0])) &&
+            shop_phase_complete_handlers[arg - 1] != 0) {
+            shop_phase_complete_handlers[arg - 1]();
+        }
+#else
         if (shop_screen_start_handlers[arg] != 0) {
             shop_screen_start_handlers[arg]();
         }
+#endif
     }
     return result;
 }
@@ -2792,7 +2828,7 @@ static s16 shop_short_panel_state[2] = {0x0000, 0x0000};
 
 /* Draw the short yes/no panel at (x, y) and report the answer: 0 still open, 1 yes, 2 no.
  * x -1 puts the cursor back on yes and x -2 on no; both draw nothing. */
-s32 shop_result_update(u_long *ot, s16 x, s16 y) {
+s32 shop_result_update(OT_TYPE *ot, s16 x, s16 y) {
     if (x == -1) {
         shop_short_panel_state[0] = 0;
         return 0;
@@ -3125,7 +3161,11 @@ static s32 shop_basket_step(void) {
         menu_request_open(2, 0xD6);
         return 1;
     }
+#ifdef __psyz
+    return shop_item_grant(ITEM_BASKET, 2, 0xD5, SHOP_GRANT_ITEM);
+#else
     shop_item_grant(ITEM_BASKET, 2, 0xD5, SHOP_GRANT_ITEM);
+#endif
 }
 
 /* The spring result: without a greenhouse it runs only in spring (done at once otherwise); a
@@ -4914,7 +4954,7 @@ static void shop_draw_medals_panel(void) {
  * the title and the frame. */
 static void shop_draw_currency_panel(s32 medals) {
     s32 amount;
-    u_long *panel;
+    OT_TYPE *panel;
     s32 number;
     s32 titleOffset;
     s32 height;
@@ -4950,7 +4990,7 @@ static void shop_draw_currency_panel(s32 medals) {
  * without a title. */
 static void shop_draw_count_total(ShopMenuHeader block, s16 count, s32 total, s16 x, s16 y) {
     s16 row;
-    u_long *panel;
+    OT_TYPE *panel;
     s32 shrink;
 
     row = y + 4;
@@ -5040,7 +5080,7 @@ static void shop_restore_step(void) {
     shop_step = shop_return_step;
 }
 
-static void shop_draw_short_panel(u_long *ot, s32 x, s32 y, s32 columns) {
+static void shop_draw_short_panel(OT_TYPE *ot, s32 x, s32 y, s32 columns) {
     shop_draw_panel(0, ot, x, y, columns);
 }
 
@@ -5050,7 +5090,7 @@ static void shop_draw_long_panel(void *display, s16 x, s16 y, s16 columns) {
 
 /* Draw a framed text panel at (x, y): the long text (9 rows) when `large`
  * is set, the short one (4 rows) otherwise. */
-static void shop_draw_panel(s32 large, u_long *display, s16 left, s16 top, s16 columnCount)
+static void shop_draw_panel(s32 large, OT_TYPE *display, s16 left, s16 top, s16 columnCount)
 {
     s16 x = left;
     s16 y = top;
@@ -5115,7 +5155,7 @@ static s16 shop_long_panel_state = 0;
 
 /* Draw the long yes/no panel at (x, y) and report the answer: 0 still open, 1 yes, 2 no.
  * x -1 puts the cursor back on yes and x -2 on no; both draw nothing. */
-static s32 shop_yes_no_prompt(u_long *ot, s16 x, s16 y) {
+static s32 shop_yes_no_prompt(OT_TYPE *ot, s16 x, s16 y) {
     if (x == -1) {
         shop_long_panel_state = 0;
         return 0;
@@ -5145,12 +5185,31 @@ static void shop_menu_clear(FarmMenu *menu) {
     }
 }
 
+/* Keep the helper nested for the matching compiler's code layout. */
+#ifndef __psyz
+static void shop_menu_draw(FarmMenu *menu, s16 x, s16 y) {
+#else
+static
+#endif
+s32 has_medal_price(u8 *flags) {
+    s32 j;
+
+    for (j = 0; j < 10; j++, flags++) {
+        if (*flags == 2) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 /* Draw `menu` at (x, y): up to ten rows of label, value and cursor, then the
  * frame around them. A value is drawn by its row's flag: 0 a price in gold, 2 a
  * price in medals, 3 a row of dashes as wide as the value column, anything else
  * nothing. */
+#ifdef __psyz
 static void shop_menu_draw(FarmMenu *menu, s16 x, s16 y) {
-    u_long *display;
+#endif
+    OT_TYPE *display;
     s16 valueX;
     s32 span;
     s16 width; /* the value column's width in characters */
@@ -5161,18 +5220,6 @@ static void shop_menu_draw(FarmMenu *menu, s16 x, s16 y) {
     s16 *values;
     u8 *flags;
     s32 i;
-
-    /* Whether any row's value is a medal price (flag 2). */
-    s32 has_medal_price(u8 *flags) {
-        s32 j;
-
-        for (j = 0; j < 10; j++, flags++) {
-            if (*flags == 2) {
-                return 1;
-            }
-        }
-        return 0;
-    }
 
     display = &current_frame->otTags[0][15];
     valueX = menu->columns[0] * 8 + 28;

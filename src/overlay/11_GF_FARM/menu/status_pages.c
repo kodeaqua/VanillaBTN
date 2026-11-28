@@ -131,6 +131,15 @@ static s16 status_recipe_count;
 static AnimState status_page_sprites[3];
 AnimState status_cursor_sprite;
 AnimState status_mark_sprite;
+#ifdef __psyz
+static AnimState *const status_sprite_slots[] = {
+    &status_page_sprites[0], &status_page_sprites[1], &status_page_sprites[2],
+    &status_cursor_sprite, &status_mark_sprite,
+};
+#define STATUS_SPRITE(index) (status_sprite_slots[(index)])
+#else
+#define STATUS_SPRITE(index) (&status_page_sprites[(index)])
+#endif
 
 /* A one-shot latch: set once, drawn while set, cleared to reset. */
 static s32 status_latch = 0;
@@ -161,8 +170,8 @@ void status_latch_draw_clock(void) {
  * digit, a 0, and the half-ten marker) from the game clock. */
 static void status_draw_clock(void)
 {
-    u_long *ot;
-    u_long *text;
+    OT_TYPE *ot;
+    OT_TYPE *text;
     s32 morning;
     s32 saved;
     s32 color;
@@ -312,7 +321,11 @@ static void status_summary_build(void) {
     status_list_top = 0;
     status_cycle_frames = 0;
     for (i = 0; i < 14; i++) {
+#ifdef __psyz
+        u16 c = i < NAME_LENGTH ? game_state.progress.estate.farmName[i] : TEXT_END;
+#else
         u16 c = (game_state.progress.estate.farmName)[i];
+#endif
 
         if (c != TEXT_END) {
             status_text_line[i] = c;
@@ -421,8 +434,13 @@ static void status_load_sprites(void) {
     }
     texture_pack_load(STAGING_BUFFER + sizeof(FarmPack));
     status_pack = *(FarmPack *)STAGING_BUFFER;
+#ifdef __psyz
+    _Static_assert(sizeof(status_sprite_slots) / sizeof(status_sprite_slots[0]) ==
+                       sizeof(status_sprite_offsets) / sizeof(status_sprite_offsets[0]),
+                   "each status sprite needs a pack offset");
+#endif
     for (i = 0; i < 5; i++) {
-        anim_bind_file(&status_page_sprites[i], (AnimFile *)(status_pack.bytes + status_sprite_offsets[i]));
+        anim_bind_file(STATUS_SPRITE(i), (AnimFile *)(status_pack.bytes + status_sprite_offsets[i]));
     }
 }
 
@@ -551,8 +569,7 @@ static void status_draw_summary(void) {
 }
 
 static void status_draw_sprite_label(s32 sprite, s32 anim, u16 *text, s16 x, s16 y) {
-    anim_draw_sprt_cursor(&current_frame->otTags[0][26], &status_page_sprites[sprite], anim & 0xFF, 0,
-                  x, y);
+    anim_draw_sprt_cursor(&current_frame->otTags[0][26], STATUS_SPRITE(sprite), anim & 0xFF, 0, x, y);
     text_draw_plain(&current_frame->otTags[0][21], text, x + 24, y + 4);
 }
 
@@ -631,8 +648,8 @@ typedef struct FarmStatusMark {
 } FarmStatusMark;
 
 static void status_draw_entry(s32 value, s32 sprite, s32 animation, s32 frame, u16 *text, s16 x, s16 y) {
-    anim_draw_sprt_cursor(&current_frame->otTags[0][26], &status_page_sprites[sprite], animation & 0xFF,
-                  frame & 0xFF, x, y);
+    anim_draw_sprt_cursor(&current_frame->otTags[0][26], STATUS_SPRITE(sprite), animation & 0xFF,
+                          frame & 0xFF, x, y);
     text_draw_plain(&current_frame->otTags[0][21], text, x + 24, y + 2);
     status_draw_glyph_run_4(value, x + 96, y + 16);
 }
@@ -919,7 +936,7 @@ static void status_page_helpers(void) {
 static void status_draw_helper(s16 stage, s16 y)
 {
     FarmHelper *helper;
-    u_long *ot;
+    OT_TYPE *ot;
     s32 icon;
     u16 *src;
     u16 *text;
@@ -959,7 +976,7 @@ static void status_draw_helper(s16 stage, s16 y)
 /* Draw the ledger page: the two headings, the first season's earnings and
  * expenses as seven-digit numbers, then the four season rows. */
 static void status_page_ledger(void) {
-    u_long *ot;
+    OT_TYPE *ot;
     u16 *text;
     s32 amount;
     s32 value;
@@ -1020,7 +1037,7 @@ static void status_draw_ledger_row(s16 slot, s16 y) {
     s32 expenseGrade;
     s32 earningsGrade;
     u16 *text;
-    u_long *dst;
+    OT_TYPE *dst;
 
     dst = &current_frame->otTags[0][21];
     season = game_state.progress.clock.date.season;
@@ -1060,9 +1077,9 @@ static inline s32 pick(s32 cond, s32 a, s32 b) {
  * (64 pixels full). A figure that reaches 10000 gets an icon and the count of
  * ten-thousands (mod 100) beside it. */
 static void status_draw_ledger_bars(FarmLedger *entry, s16 y) {
-    u_long *line_ot;
-    u_long *bar_ot;
-    u_long *icon_ot;
+    OT_TYPE *line_ot;
+    OT_TYPE *bar_ot;
+    OT_TYPE *icon_ot;
     s32 i;
     s16 bar_y;
     s16 fill;
@@ -1239,7 +1256,7 @@ static void status_draw_gauge(s16 level, u16 value, s16 x, s16 y) {
     s32 colorA;
     s32 colorB;
     s16 width;
-    u_long *ot;
+    OT_TYPE *ot;
 
     i = 0;
     ot = &current_frame->otTags[0][24];
@@ -1350,7 +1367,7 @@ static void options_draw_glyph_run(s32 count, s32 glyph_arg, s32 y_arg, s32 heig
 /* Draw the left and right page arrows, pulsing with the cycle timer. */
 void status_draw_side_arrows(void) {
     s32 phase;
-    u_long *display_list;
+    OT_TYPE *display_list;
 
     phase = (s16)status_cycle_frames / 30;
     display_list = &current_frame->otTags[0][26];
@@ -1370,7 +1387,7 @@ void status_draw_arrow_down(void) {
     s32 value = (s16)status_cycle_frames;
     s32 calc = value / 30;
     s32 arg = calc & 0xFF;
-    u_long *base = current_frame->otTags[0];
+    OT_TYPE *base = current_frame->otTags[0];
     anim_draw_sprt_cursor(&base[26], &status_cursor_sprite, 3, arg, 288, 200);
 }
 

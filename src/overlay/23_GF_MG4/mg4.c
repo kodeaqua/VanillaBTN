@@ -1,7 +1,7 @@
 /* Minigame 4: its state machine, the players and records, and the drawing. */
 
 #include <sys/types.h>
-#include <memory.h>
+#include <string.h>
 #include <abs.h>
 #include <libgte.h>
 #include <libgpu.h>
@@ -92,7 +92,7 @@ static void mg4_record_advance(Mg4Record *record);
 static void mg4_player_draw(Mg4Player *actor);
 static void mg4_record_draw(Mg4Record *object);
 static void mg4_draw_backdrop(void);
-static u_long *mg4_ot_slot(s32 x);
+static OT_TYPE *mg4_ot_slot(s32 x);
 static s16 mg4_screen_x(s32 trackX);
 static void mg4_player_set_action(Mg4Player *player, s32 kind, s32 dir, s32 timer);
 static void mg4_record_set_state(Mg4Record *record, s16 state, s16 direction, s16 timer);
@@ -145,10 +145,17 @@ enum Mg4StateId {
 };
 
 /* Indexed by Mg4State.state (mg4_state_tick). */
+#ifdef __psyz
+static Func mg4_state_handlers[7] = {
+    mg4_state_start, mg4_state_intro, mg4_state_confirm, mg4_state_after_confirm,
+    mg4_state_show_results, mg4_state_result_wait, mg4_play_frame,
+};
+#else
 static Fn mg4_state_handlers[7] = {
     (Fn)mg4_state_start, (Fn)mg4_state_intro, (Fn)mg4_state_confirm, (Fn)mg4_state_after_confirm,
     (Fn)mg4_state_show_results, (Fn)mg4_state_result_wait, (Fn)mg4_play_frame,
 };
+#endif
 
 /* Start offsets of the ten messages in mg4_message_text. */
 static s32 mg4_message_offsets[10] = {0x00, 0x26, 0x4A, 0x6C, 0x8E, 0xB8, 0xE8, 0x114, 0x136, 0x162};
@@ -275,7 +282,11 @@ static void mg4_step_intro_wait(void) {
 /* Runs the menu, then the handler for mg4_state.state. */
 static void mg4_state_tick(void) {
     menu_run_state();
+#ifdef __psyz
+    mg4_state_handlers[mg4_state.state]();
+#else
     mg4_state_handlers[mg4_state.state](mg4_state_handlers);
+#endif
 }
 /* Start the blend-out of the screen and the music's fade, and move to the next step. */
 static void mg4_fade_out(void) {
@@ -1206,7 +1217,7 @@ static void mg4_player_draw(Mg4Player *actor) {
     s32 frame2;
     s16 screenX;
     s16 depthY;
-    u_long *image;
+    OT_TYPE *image;
 
     frame2 = -1;
     switch (actor->kind) {
@@ -1288,7 +1299,7 @@ static void mg4_player_draw(Mg4Player *actor) {
 static void mg4_record_draw(Mg4Record *object) {
     s16 state;
     s16 depthY;
-    u_long *image;
+    OT_TYPE *image;
     s16 screenX;
     s32 mode;
     u16 counter;
@@ -1387,10 +1398,10 @@ static void mg4_draw_backdrop(void)
 
 /* The ordering-table slot for a depth: slot 40 at depth 64, one slot lower for each 4 more
  * units. */
-static u_long *mg4_ot_slot(s32 x) {
+static OT_TYPE *mg4_ot_slot(s32 x) {
     s32 offset;
     s32 result;
-    u_long *p;
+    OT_TYPE *p;
     if (x < 0) x += 0xFFF;
     x >>= 12;
     offset = x - 64;

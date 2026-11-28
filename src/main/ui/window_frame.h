@@ -9,6 +9,6 @@
 #include <libgs.h>
 #include "types.h"
 
-void window_frame_draw(u_long *ot, s16 x, s16 y, s16 w, s16 h);
+void window_frame_draw(void *ot, s16 x, s16 y, s16 w, s16 h);
 
 #endif /* WINDOW_FRAME_H */

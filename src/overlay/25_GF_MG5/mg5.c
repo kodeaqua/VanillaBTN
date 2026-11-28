@@ -2,7 +2,7 @@
  * player steers one of them. */
 
 #include <sys/types.h>
-#include <memory.h>
+#include <string.h>
 #include <libgte.h>
 #include <libgpu.h>
 #include <libgs.h>
@@ -404,6 +404,20 @@ static void mg5_leave_minigame(void) {
 }
 /* Set the race's tuning values. */
 static void mg5_state_init(void) {
+#ifdef __psyz
+    mg5_request_flag = MG5_SCREEN_REST;
+    mg5_phase_a = MG5_PHASE_A_WAIT;
+    mg5_phase_b = MG5_PHASE_B_WAIT;
+    mg5_landing_anim_on = 0;
+    mg5_screen_pos.vx = 0;
+    mg5_screen_pos.vy = 0;
+    mg5_screen_pos.vz = 0;
+    mg5_lerp_reverse = 0;
+    mg5_lerp_t = 0;
+    mg5_fall_step = 60;
+    mg5_anim4_pos.vx = 1874;
+    mg5_anim5_pos.vx = 2366;
+#endif
     mg5_state.dispatch = 0;
     mg5_state.step = 0;
     mg5_state_reset();
@@ -1317,7 +1331,7 @@ static void mg5_anims_disable(void) {
 static void mg5_draw_backdrop(void) {
     u32 x;
     u32 y;
-    u_long *q;
+    OT_TYPE *q;
     s32 sx;
     s32 sy;
     anim_select_range(&mg5_state.rowSprites[0], 0);
@@ -1333,7 +1347,7 @@ static void mg5_draw_backdrop(void) {
 /* Projects the object's position and draws it. Before the race the racers' bodies get the
  * marker icon; the extras get it throughout, and the fixed animations always do. */
 static void mg5_anim_draw_at(AnimState *object, SVECTOR *position) {
-    u_long *drawing_area;
+    OT_TYPE *drawing_area;
     SVECTOR *converted;
 
     converted = &mg5_converted_vec;
@@ -1341,7 +1355,7 @@ static void mg5_anim_draw_at(AnimState *object, SVECTOR *position) {
     converted->vy = position->vy - 100;
     converted->vz = position->vz - 150;
     converted->pad = position->pad;
-    drawing_area = &current_frame->ot[gte_project_vertex(&mg5_project_xy, converted) >> 2];
+    drawing_area = FRAME_OT_AT(gte_project_vertex(&mg5_project_xy, converted) >> 2);
     anim_draw_ft4_advance(drawing_area, object, mg5_project_xy.x, mg5_project_xy.y);
 
     if (mg5_state.dispatch == 0) {
@@ -1372,7 +1386,7 @@ static void mg5_sprite_draw_at(AnimState *sprite, SVECTOR *vec) {
     mg5_project_vec.pad = vec->pad;
     depth = gte_project_vertex(&mg5_project_xy2, &mg5_project_vec);
     depth += MG5_HEAD_DEPTH_BIAS;
-    anim_draw_ft4_advance(&current_frame->ot[depth >> 2], sprite, mg5_project_xy2.x,
+    anim_draw_ft4_advance(FRAME_OT_AT(depth >> 2), sprite, mg5_project_xy2.x,
                   mg5_project_xy2.y);
 }
 

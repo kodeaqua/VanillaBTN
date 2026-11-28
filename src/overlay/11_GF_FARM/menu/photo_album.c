@@ -6,7 +6,7 @@
 #include <libgte.h>
 #include <libgpu.h>
 #include <libgs.h>
-#include <memory.h>
+#include <string.h>
 #include "types.h"
 #include "actor.h"
 #include "afile.h"

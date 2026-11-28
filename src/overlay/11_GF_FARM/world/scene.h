@@ -236,6 +236,10 @@ typedef struct FarmModeScriptImage {
     u8 bytes[0xBDC];
 } FarmModeScriptImage;
 
+#ifdef __psyz
+_Static_assert(sizeof(FarmModeScript) == sizeof(FarmModeScriptImage), "Area header layout");
+#endif
+
 /* The slot table: eight VRAM-copy animation slots. */
 typedef struct FarmSlotTable {
     u8 pad0[0x4];

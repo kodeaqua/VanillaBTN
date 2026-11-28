@@ -2,6 +2,15 @@
 
 #include <sys/types.h>
 #include <libgte.h>
+#ifdef __psyz
+#include <string.h>
+#ifdef VANILLABTN_DEBUG
+#include <libetc.h>
+#endif
+/* PsyZ implements rsin/rcos (same 4096-unit Q4.12 trig) without csin/ccos aliases. */
+#define csin rsin
+#define ccos rcos
+#endif
 #include <libgpu.h>
 #include <libgs.h>
 #include "types.h"
@@ -2595,9 +2604,30 @@ static s16 title_column_c_count = 0;
 static s16 title_logo_slide = -160;
 static s16 title_drop_count = 48;
 static s16 title_logo_wipe = 320;
+#ifdef __psyz
+static const struct {
+    const u8 *data;
+    size_t size;
+} title_images[] = {
+    {title_image_0, sizeof(title_image_0)},
+    {title_image_1, sizeof(title_image_1)},
+    {title_image_2, sizeof(title_image_2)},
+};
+_Static_assert(sizeof(title_image_0) <= sizeof(loading_data) &&
+                   sizeof(title_image_1) <= sizeof(loading_data) &&
+                   sizeof(title_image_2) <= sizeof(loading_data),
+               "title pictures must fit in the loading buffer");
+
+static void title_prepare_loading_picture(void) {
+    s32 index = rand_range(sizeof(title_images) / sizeof(title_images[0]));
+    memset(&loading_data, 0, sizeof(loading_data));
+    memcpy(&loading_data, title_images[index].data, title_images[index].size);
+}
+#else
 static TitleImage *title_image_ptrs[3] = {
     (TitleImage *)title_image_0, (TitleImage *)title_image_1, (TitleImage *)title_image_2,
 };
+#endif
 static s16 title_scroll_a = 0;
 static s16 title_scroll_b = 0;
 static s32 title_caption_offsets[4] = {
@@ -2631,6 +2661,12 @@ void title_step_dispatch(void) {
 
 static void title_reset_state(void) {
     title_reset_anim_counters();
+#ifdef __psyz
+    title_step_fn = title_logo_begin;
+    title_idle_frames = 0;
+    title_scroll_a = 0;
+    title_scroll_b = 0;
+#endif
     title_load_state = TITLE_LOAD_FADE_WAIT;
     title_sequence_state = TITLE_SEQ_FADE_IN;
     title_logo_frames = 0;
@@ -2682,15 +2718,21 @@ static void title_enter_state(void) {
 /* Shows a random title picture once the sprite file is in. Continuing a saved game
  * skips straight to the next state; otherwise the picture fades in. */
 static void title_state_show_image(void) {
+#ifndef __psyz
     TitleImage *image;
     TitleImage *const *images;
+#endif
     FrameState *framebuffer;
     FrameState *other;
 
     if (title_load_sprite_file() != 0) {
+#ifdef __psyz
+        title_prepare_loading_picture();
+#else
         image = (TitleImage *)&loading_data;
         images = title_image_ptrs;
         *image = *images[rand_range(3)];
+#endif
         if (title_saved_flags & GLOBAL_FLAG_CONTINUE) {
             title_load_state = TITLE_LOAD_MUSIC;
             game_state.progress.entryStep++;
@@ -3209,7 +3251,7 @@ static void title_logo_reset(void) {
 
 /* Draws the new game summary with the player's birthday. */
 static void title_draw_birthday(void) {
-    u_long *display;
+    OT_TYPE *display;
     display = &current_frame->otTags[0][32];
     text_set_spacing(0, 1);
     window_frame_draw_at(&current_frame->otTags[0][33], 1, 72, 56, 176, 90);
@@ -3272,7 +3314,7 @@ static void title_draw_logo_wipe(s16 wipe) {
 /* Scrolls the two 3x3 tile layers of the title background. Layer A wobbles with a
  * cosine, layer B with a sine. */
 static void title_draw_bg_scroll(void) {
-    u_long *ot;
+    OT_TYPE *ot;
     s16 band_a;
     s16 band_b;
     s16 laps_a;
@@ -3398,7 +3440,7 @@ static void title_anim_columns(void) {
 /* Advance the first title animation column and request its next frame. */
 static void title_anim_column_a(void) {
     s32 frame;
-    u_long *drawing_area;
+    OT_TYPE *drawing_area;
 
     frame = (u16)title_column_a_count + 1;
     frame = frame - ((s16)frame / 1800) * 1800;
@@ -3417,7 +3459,7 @@ static void title_anim_column_a(void) {
  * than the first) and request its next frame. */
 static void title_anim_column_b(void) {
     s32 frame;
-    u_long *drawing_area;
+    OT_TYPE *drawing_area;
 
     frame = (u16)title_column_b_count + 1;
     frame = frame - ((s16)frame / 1800) * 1800;
@@ -3437,7 +3479,7 @@ static void title_anim_column_b(void) {
 /* Advance the third title animation column and request its next frame. */
 static void title_anim_column_c(void) {
     s32 frame;
-    u_long *drawing_area;
+    OT_TYPE *drawing_area;
 
     frame = (u16)title_column_c_count + 1;
     frame = frame - ((s16)frame / 1800) * 1800;
@@ -3578,6 +3620,31 @@ static int title_load_small_finish(void) {
     return 0;
 }
 
+#if defined(__psyz) && defined(VANILLABTN_DEBUG)
+void title_prepare_debug_farm(void) {
+    u32 flags = game_state.debugFlags;
+    farm_state_init();
+    game_state.debugFlags = flags;
+    title_fill_field_layout(rand_range(3));
+    title_player_reset_for_new_game();
+    title_reset_world_options();
+    title_copy_new_game_toolbox();
+    title_prepare_loading_picture();
+    title_load_block_start();
+    while (!title_load_block_finish()) {
+        VSync(0);
+    }
+    title_load_small_start();
+    while (!title_load_small_finish()) {
+        VSync(0);
+    }
+    title_load_image_start();
+    while (!title_load_image_poll()) {
+        VSync(0);
+    }
+}
+#endif
+
 /* Empty hook, kept as a load step. */
 static void title_load_func_hook(void) {
 }
@@ -3601,6 +3668,13 @@ static void title_fill_field_layout(s32 layout) {
     s32 row;
     s32 col;
     u8 kind;
+#ifdef __psyz
+    u16 demo_field[FIELD_ROWS * FIELD_COLS];
+    enum { DEMO_HEAD_BYTES = sizeof(title_layout3_cells) + sizeof(D_800BC998) };
+    _Static_assert(DEMO_HEAD_BYTES < sizeof(demo_field) &&
+                       sizeof(demo_field) - DEMO_HEAD_BYTES <= sizeof(D_800BCAEC),
+                   "the three demo tables must cover the field");
+#endif
 
     switch (layout) {
     case TITLE_LAYOUT_NEW_1:
@@ -3610,7 +3684,15 @@ static void title_fill_field_layout(s32 layout) {
         source = title_layout2_cells;
         break;
     case TITLE_LAYOUT_DEMO:
+#ifdef __psyz
+        /* The matching PS1 layout continues through the next two static tables. */
+        memcpy(demo_field, title_layout3_cells, sizeof(title_layout3_cells));
+        memcpy((u8 *)demo_field + sizeof(title_layout3_cells), D_800BC998, sizeof(D_800BC998));
+        memcpy((u8 *)demo_field + DEMO_HEAD_BYTES, D_800BCAEC, sizeof(demo_field) - DEMO_HEAD_BYTES);
+        source = demo_field;
+#else
         source = title_layout3_cells;
+#endif
         break;
     case TITLE_LAYOUT_NEW_0:
     default:

@@ -58,7 +58,7 @@ static void staff_clear_screen(void);
 static s32 staff_load_sprites(void);
 static void staff_load_images(void);
 static s32 staff_load_roll_file(void);
-static void staff_gouraud_rect(u_long *ot, s16 x, s16 y, s16 w, s16 h, s32 c0, s32 c1, s32 c2, s32 c3,
+static void staff_gouraud_rect(OT_TYPE *ot, s16 x, s16 y, s16 w, s16 h, s32 c0, s32 c1, s32 c2, s32 c3,
                    s16 semiTrans, u8 blend);
 static void staff_fade_draw(void);
 static void staff_fade_out_begin(s16 x, s16 y);
@@ -238,6 +238,10 @@ static void staff_reset_state(void) {
     staff_line_text = 0;
     staff_line_x = 0;
     staff_line_y = 0;
+#ifdef __psyz
+    staff_fade_mode = STAFF_FADE_IDLE;
+    staff_fade_level = 0;
+#endif
 }
 
 static void staff_enter(void) {
@@ -454,7 +458,7 @@ static void staff_scroll_init(void) {
 /* Each credit line: pick the next credit, wait for its text, fade its panel out (revealing
  * the text), hold it under a tinted panel, then fade the panel back in. */
 static void staff_scroll_tick(void) {
-    u_long *ot = &current_frame->otTags[0][4];
+    OT_TYPE *ot = &current_frame->otTags[0][4];
 
     if (staff_block_on != 1) {
         return;
@@ -612,7 +616,7 @@ static s32 staff_load_roll_file(void) {
 
 /* Queue a gouraud rectangle (four corner colours 0xRRGGBB) and the draw-mode
  * packet that sets its blend rate. */
-static void staff_gouraud_rect(u_long *ot, s16 x, s16 y, s16 w, s16 h, s32 c0, s32 c1, s32 c2, s32 c3,
+static void staff_gouraud_rect(OT_TYPE *ot, s16 x, s16 y, s16 w, s16 h, s32 c0, s32 c1, s32 c2, s32 c3,
                    s16 semiTrans, u8 blend) {
     POLY_G4 *poly;
     DR_TPAGE *mode;
@@ -655,7 +659,7 @@ static void staff_gouraud_rect(u_long *ot, s16 x, s16 y, s16 w, s16 h, s32 c0, s
 /* Step the staff-roll fade (StaffFadeMode) and draw the translucent rectangle
  * staff_fade_rect; stop once it is fully faded in or out. */
 static void staff_fade_draw(void) {
-    u_long *ot;
+    OT_TYPE *ot;
 
     if (staff_fade_mode == STAFF_FADE_IDLE) return;
 

@@ -8,7 +8,7 @@
 
 /* Draw a bevelled window frame at (x, y), w by h pixels: corner pixels, a
  * light and a dark edge pair on each side, and a gradient-filled interior. */
-void window_frame_draw(u_long *ot, s16 x, s16 y, s16 w, s16 h) {
+void window_frame_draw(void *ot, s16 x, s16 y, s16 w, s16 h) {
     s16 right;
     s16 outer_right;
     s16 inner_right;

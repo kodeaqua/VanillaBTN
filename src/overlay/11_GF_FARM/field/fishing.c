@@ -3,6 +3,10 @@
 
 #include <sys/types.h>
 #include <libgte.h>
+#ifdef __psyz
+/* PsyZ implements rsin/rcos (same 4096-unit Q4.12 trig) without csin/ccos aliases. */
+#define csin rsin
+#endif
 #include <libgpu.h>
 #include "types.h"
 #include "anim.h"
@@ -417,7 +421,7 @@ void fishing_draw_marker(s32 animate)
     if (animate != 0) {
         fishing_marker_frame++;
     }
-    anim_draw_sprt_cursor(&current_frame->ot[depth >> 2], &ui_icon_anim, fishing_marker_value, 0,
+    anim_draw_sprt_cursor(FRAME_OT_AT(depth >> 2), &ui_icon_anim, fishing_marker_value, 0,
                           fishing_marker_screen.x, bob + (fishing_marker_screen.y + (fishing_marker_frame & 3)));
 }
 

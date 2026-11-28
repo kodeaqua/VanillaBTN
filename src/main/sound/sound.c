@@ -5,8 +5,23 @@
 #include <libcd.h>
 #include <libsnd.h>
 #include <libspu.h>
-#include <memory.h>
+#include <string.h>
 #include <libetc.h>
+#ifdef __psyz
+#include <psyz/audio.h>
+#include "seq_player.h"
+#define SsSeqClose(h) vanillabtn_seq_close(h)
+#define SsSeqPlay(h, mode, count) vanillabtn_seq_play((h), (mode), (count))
+#define SsSeqStop(h) vanillabtn_seq_stop(h)
+#define SsSeqPause(h) vanillabtn_seq_pause(h)
+#define SsSeqReplay(h) vanillabtn_seq_replay(h)
+#define SsSeqSetVol(h, l, r) vanillabtn_seq_set_vol((h), (l), (r))
+#define SsVabOpenHead(addr, id) vanillabtn_seq_vab_open_head((addr), (id))
+#define SsVabClose(id) vanillabtn_seq_vab_close(id)
+#define SsUtAllKeyOff(mode) vanillabtn_seq_all_key_off(mode)
+#define SsSetStereo() vanillabtn_seq_set_stereo_psyz(1)
+#define SsSetMono() vanillabtn_seq_set_stereo_psyz(0)
+#endif
 #include "types.h"
 #include "afile.h"
 #include "cd_audio.h"
@@ -86,6 +101,9 @@ static Vol seq_slots[8];
 static u8 *vab_bodies[8];
 static u8 *vab_ends[8];
 static u8 *seq_data[8];
+#ifdef __psyz
+static size_t seq_sizes[8];
+#endif
 static s32 seq_offsets[8];
 static s32 seq_vabs[8];
 /* Per-slot state, parallel to seq_slots. */
@@ -143,6 +161,11 @@ void sound_init(void) {
     SsSetSerialVol(0, 0, 0);
     CdControl(9, 0, 0);
     sound_reset_slots();
+#ifdef __psyz
+    /* Host playback and the native SEQ player must be ready before audio starts. */
+    vanillabtn_seq_init_psyz();
+    (void)Psyz_AudioInit();
+#endif
 }
 
 /* Sound offsets, read in adjacent pairs: an entry and the next one bound a sound's data. */
@@ -374,6 +397,9 @@ static s16 sound_replace_tone(s32 vabId, s32 id, s32 voll, s32 volr) {
     next_fine = sound_defs[id].fine;
     SsUtKeyOff(tone_voice, vabId, playing_prog, playing_tone, playing_note);
     voice = SsUtKeyOn(vabId, next_prog, next_tone, next_note, next_fine, voll, volr);
+#ifdef __psyz
+    vanillabtn_seq_disown_voice(voice);
+#endif
     tone_voice = voice;
     playing_prog = next_prog;
     playing_tone = next_tone;
@@ -384,6 +410,9 @@ static s16 sound_replace_tone(s32 vabId, s32 id, s32 voll, s32 volr) {
 /* Key a sound's program/tone/note on `voice` from bank `vabId` at the given
  * volumes, and remember the request for that voice. Returns 0. */
 static s32 sound_key_on_voice(s32 vabId, s32 id, s32 voll, s32 volr, s32 arg4, s32 voice) {
+#ifdef __psyz
+    vanillabtn_seq_disown_voice(voice);
+#endif
     SsUtKeyOnV(voice, vabId, sound_defs[id].prog, sound_defs[id].tone, sound_defs[id].note,
                sound_defs[id].fine, voll, volr);
     voice_plays[voice].vabId = vabId;
@@ -426,9 +455,15 @@ s32 sound_update(void) {
 
     sentinel = -1;
     for (i = 0; i < 6; i++) {
+#ifdef __psyz
+        if (seq_data[i] != SOUND_BUFFER_NONE && *(s32 *)&seq_slots[i] == sentinel) {
+            *(s32 *)&seq_slots[i] = vanillabtn_seq_open_sized(seq_data[i], seq_sizes[i], seq_vabs[i]);
+        }
+#else
         if ((s32)seq_data[i] != sentinel && *(s32 *)&seq_slots[i] == sentinel) {
             *(s32 *)&seq_slots[i] = SsSeqOpen((u_long *)seq_data[i], seq_vabs[i]);
         }
+#endif
     }
     if (sound_ss_running == 0) {
         SsStart();
@@ -630,6 +665,9 @@ s32 sound_load_step(void) {
         memcpy(sound_write_ptr, sound_read_ptr, sound_seq_bytes);
         sound_load_state = SOUND_LOAD_IDLE;
         seq_data[seq_slot] = sound_write_ptr;
+#ifdef __psyz
+        seq_sizes[seq_slot] = (size_t)sound_seq_bytes;
+#endif
         seq_vabs[seq_slot] = vab_ids[entry_args[current_entry]];
         sound_write_ptr += SOUND_OFFSET(2) - SOUND_OFFSET(0);
         seq_slot++;
@@ -719,6 +757,9 @@ s32 sound_key_on_free_voice(s32 id, s32 from, s32 to) {
         voll = rand_range(28) + 100;
         volr = rand_range(28) + 100;
     }
+#ifdef __psyz
+    vanillabtn_seq_disown_voice(voice);
+#endif
     SsUtKeyOnV(voice, vabId, prog, tone, note, fine, voll, volr);
     voice_stamps[voice] = now;
     return voice;
@@ -806,8 +847,13 @@ static s32 sound_vab_stream_step(void) {
                 SsVabTransBodyPartly(stream->dest, stream->chunkSize, stream->vabId);
                 vab_stream_copy = *stream;
                 stream->state = VAB_STREAM_READ_START;
+#ifdef __psyz
+                /* PsyZ 00fb42e transfers synchronously and returns 0 for wait flag 1. */
+                SsVabTransCompleted(0);
+#else
                 while (SsVabTransCompleted(1) == 0) {
                 }
+#endif
                 vab_stream.offset += vab_stream.chunkSize;
                 vab_stream.chunkIndex++;
             }

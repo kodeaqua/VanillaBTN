@@ -1,6 +1,10 @@
 /* Farm event scripts: the step interpreter, the chunks of script data kept in VRAM, the
  * actors the events draw, entering and leaving an event, and the event images. */
-#include <memory.h>
+#ifdef __psyz
+#include <stdint.h>
+#include "event_decode.h"
+#endif
+#include <string.h>
 #include <sys/types.h>
 #include <libgte.h>
 #include <libgpu.h>
@@ -91,7 +95,11 @@ typedef struct FarmEventBlock
     u16 header;
     s16 entryBase;
     s16 slotFlags[24];
+#ifdef __psyz
+    s32 entryOffsets[];
+#else
     s32 entryOffsets[24];
+#endif
 } FarmEventBlock;
 
 static s32 event_chunk_checksum(u32 *src, u32 size);
@@ -125,7 +133,11 @@ static s32 vram_stash_block(u8 *data, s16 x, s16 y)
     u8 *p;
     s32 i;
     s32 size;
+#ifdef __psyz
+    uintptr_t dest;
+#else
     u32 dest;
+#endif
 
     p = data;
     for (i = 0; i < EVENT_CHUNK_COUNT; i++)
@@ -140,18 +152,25 @@ static s32 vram_stash_block(u8 *data, s16 x, s16 y)
     rect.y += y;
     LoadImage(&rect, (u_long *)p);
     p += vram_stash_rect.w * vram_stash_rect.h * 2;
+#ifdef __psyz
+    vram_stash_tail = NULL;
+#endif
     if (event_flag_get(EVENT_FLAG_REQUEST_BUSY) != 1)
     {
         size = (data + vram_chunk_offsets[EVENT_CHUNK_COUNT] - vram_chunk_offsets[0]) - p;
         if (main_region_free_bytes() >= size)
         {
             vram_stash_tail = main_get_region_base() - size;
-            dest = vram_stash_tail;
+#ifdef __psyz
+            dest = (uintptr_t)vram_stash_tail;
+#else
+            dest = (u32)vram_stash_tail;
+#endif
             if (dest & 3)
             {
                 dest -= dest & 3;
             }
-            vram_stash_tail = dest;
+            vram_stash_tail = (u8 *)dest;
             memcpy((void *)dest, p, size);
             DrawSync(0);
             return 0;
@@ -166,7 +185,11 @@ static s32 vram_stash_block(u8 *data, s16 x, s16 y)
  * script starts. */
 static u8 *event_script_base;
 static u8 *event_script_cursor;
-u32 event_block_base;
+#ifdef __psyz
+static size_t event_script_size;
+_Static_assert(sizeof(FarmScriptStep) == 16, "Event steps must match the disc layout");
+#endif
+u8 *event_block_base;
 s32 event_block_offsets[25];
 u32 event_step_index;
 u32 event_script_unused_80129228[2];
@@ -178,7 +201,7 @@ s16 event_sprite_offset_y;
 u32 event_block_size;
 s16 event_request_status[4];
 s32 chunk_checksums[EVENT_CHUNK_COUNT];
-u32 vram_stash_tail;
+u8 *vram_stash_tail;
 
 /* Read chunk `chunk` of the block that vram_stash_block uploaded back into `buffer`.
  * The part of the chunk that is still in VRAM comes back with StoreImage; the
@@ -219,6 +242,11 @@ u8 *event_chunk_read_back(u8 *buffer, s16 x, s16 y, u32 chunk)
     rect.y += row;
     if (rect.y + rect.h > image.y + image.h)
     {
+#ifdef __psyz
+        if (vram_stash_tail == NULL) {
+            return NULL;
+        }
+#endif
         if (rect.y < image.y + image.h)
         {
             rect.h -= rect.y + rect.h - (image.y + image.h);
@@ -778,7 +806,11 @@ static s32 event_chunk_checksum(u32 *src, u32 size)
 {
     u32 i;
     s32 sum;
+#ifdef __psyz
+    if ((uintptr_t)src & 3)
+#else
     if ((u32)src & 3)
+#endif
     {
         SystemError(0x43, 0x190);
     }
@@ -1060,7 +1092,11 @@ void event_map_upload(u8 *dst)
 s32 event_current_script_id(void)
 {
     s32 result;
+#ifdef __psyz
+    if (event_flag_get(EVENT_FLAG_REQUEST_BUSY) != 0 && game_state.request != 0)
+#else
     if (event_flag_get(EVENT_FLAG_REQUEST_BUSY) != 0)
+#endif
         result = game_state.request->args[0];
     else
         result = 0;
@@ -1085,6 +1121,16 @@ static s32 event_script_start(void)
     FarmState *farm;
 
     data = 0;
+#ifdef __psyz
+    if (game_state.request == 0) {
+        return 1;
+    }
+    id = game_state.request->args[0];
+    if ((unsigned)id >= sizeof(event_script_offsets) / sizeof(event_script_offsets[0]) - 1 ||
+        event_script_offsets[id] == event_script_offsets[id + 1]) {
+        return 1;
+    }
+#endif
     if (game_state.request->args[2] != 1)
     {
         event_flag_set(game_state.request->args[0] + EVENT_DONE_FLAG_BASE, 1);
@@ -1101,7 +1147,14 @@ static s32 event_script_start(void)
     if ((u32)(id - ITEM_HORSE) < EVENT_CHUNK_COUNT)
     {
         data = rle_load_cached(game_state.work.sector, id);
+#ifdef __psyz
+        event_script_size = data ? event_decode(game_state.work.results,
+                                                sizeof(game_state.work.results), data,
+                                                event_chunk_size(id)) : 0;
+        load = event_script_size == 0;
+#else
         load = (data == 0);
+#endif
     }
     background = 0;
     if (load)
@@ -1143,11 +1196,13 @@ static s32 event_script_start(void)
     }
     else
     {
+#ifndef __psyz
         rle_expand(game_state.work.results, data, event_chunk_size(id));
         if ((u32)event_chunk_size(id) >= 3297)
         {
             SystemError('S', game_state.request->args[0]);
         }
+#endif
         villager_sprites_copy();
     }
     event_script_base = event_script_cursor = game_state.work.results;
@@ -1178,12 +1233,31 @@ static s32 event_script_run(void)
     {
         while (1)
         {
+#ifdef __psyz
+            size_t offset = event_step_index * sizeof(FarmScriptStep);
+            if (offset >= event_script_size) {
+                game_state.requests.state = FARM_REQUEST_FINISH;
+                break;
+            }
+            event_script_cursor = event_script_base + offset;
+#endif
             if (CURRENT_EVENT->type == EVENT_STEP_END)
             {
                 game_state.requests.state = FARM_REQUEST_FINISH;
                 break;
             }
             event = CURRENT_EVENT;
+#ifdef __psyz
+            if (sizeof(*event) > event_script_size - offset ||
+                event->type >= sizeof(event_script_handlers) / sizeof(event_script_handlers[0])) {
+                game_state.requests.state = FARM_REQUEST_FINISH;
+                break;
+            }
+            int done = event_script_handlers[event->type](event->command, event->operand,
+                                                         event->x, event->y);
+            u8 next = done == EVENT_STEP_DONE ? event->nextDone : event->nextOther;
+            event_step_index = next == EVENT_STEP_NEXT ? event_step_index + 1 : next;
+#else
             if (event_script_handlers[event->type](event->command, event->operand, event->x, event->y) == EVENT_STEP_DONE)
             {
                 if (CURRENT_EVENT->nextDone == EVENT_STEP_NEXT)
@@ -1210,6 +1284,7 @@ static s32 event_script_run(void)
                     event_step_index = CURRENT_EVENT->nextOther;
                 }
             }
+#endif
             if (event->flags & EVENT_STEP_STOP)
             {
                 break;
@@ -1378,7 +1453,7 @@ static void event_image_draw(void)
         input.vz = game_state.camera.vz - 150;
         if (estate_point_project(&input, &result) != 0)
         {
-            farm_image_queue(&current_frame->ot[result.depth >> 2], result.x, result.y);
+            farm_image_queue(FRAME_OT_AT(result.depth >> 2), result.x, result.y);
         }
     }
 }
@@ -1391,7 +1466,7 @@ static void event_villager_tick(FarmVillager *villager)
     FarmScreenPoint screen;
     SVECTOR input;
     s32 paused;
-    u_long *position;
+    OT_TYPE *position;
     s16 scene;
 
     paused = game_state.globalFlags & GLOBAL_FLAG_PAUSED;
@@ -1411,11 +1486,20 @@ static void event_villager_tick(FarmVillager *villager)
     input.vz = villager->ePosition.vz - 150;
     if (estate_point_project(&input, &screen) != 0)
     {
+#ifdef __psyz
+        s32 slot = screen.depth >> 2;
+        if (event_flag_get(EVENT_FLAG_SPOUSE_AT_HOME) != 0 && villager->id == game_state.family.wifeVillager)
+        {
+            slot -= VILLAGER_SPOUSE_DEPTH_STEP;
+        }
+        position = FRAME_OT_AT(slot);
+#else
         position = &current_frame->ot[screen.depth >> 2];
         if (event_flag_get(EVENT_FLAG_SPOUSE_AT_HOME) != 0 && villager->id == game_state.family.wifeVillager)
         {
             position -= VILLAGER_SPOUSE_DEPTH_STEP;
         }
+#endif
         anim_set_tick_flag(0);
         sprite_draw_traced(position, current_frame->primCursor.ft4, &villager->sprite, villager->sprite.animation, villager->sprite.frame,
                            screen.x, screen.y, villager->sprite.scale, 0, ANIM_DRAW_CURSOR);
@@ -1444,7 +1528,7 @@ static void event_object_draw(FarmPositionObject *object, AnimState *item)
     input.vz = object->z - 150;
     if (estate_point_project(&input, &result) != 0)
     {
-        sprite_draw_traced(&current_frame->ot[result.depth >> 2], current_frame->primCursor.ft4, item,
+        sprite_draw_traced(FRAME_OT_AT(result.depth >> 2), current_frame->primCursor.ft4, item,
                            item->animation, item->frame, result.x, result.y, item->scale, 0, ANIM_DRAW_CURSOR);
     }
     if ((game_state.globalFlags & GLOBAL_FLAG_PAUSED) == 0)
@@ -1460,7 +1544,7 @@ static void event_object_draw(FarmPositionObject *object, AnimState *item)
 static void event_block_unpack(u16 *buffer)
 {
     u32 size;
-    s32 top;
+    u8 *top;
     u32 length;
     s32 entry;
     u8 *results;
@@ -1475,6 +1559,47 @@ static void event_block_unpack(u16 *buffer)
         game_state.statusFlags |= STATUS_FLAG_EVENT_HOLDS_RESOURCE_E;
     }
     block = (FarmEventBlock *)buffer;
+#ifdef __psyz
+    int id = game_state.request->args[0];
+    size_t block_bytes = event_script_offsets[id + 1] - event_script_offsets[id];
+    event_script_size = 0;
+    event_block_base = NULL;
+    event_block_size = 0;
+    size_t slots = sizeof(block->slotFlags) / sizeof(block->slotFlags[0]);
+    if (block_bytes < sizeof(*block) || (unsigned)block->entryBase > slots) {
+        return;
+    }
+    size_t header_bytes = sizeof(*block) + (block->entryBase + 1) * sizeof(s32);
+    if (header_bytes > block_bytes) {
+        return;
+    }
+    for (int i = 0; i <= block->entryBase; i++) {
+        if ((unsigned)block->entryOffsets[i] > block_bytes - header_bytes ||
+            (i > 0 && block->entryOffsets[i] < block->entryOffsets[i - 1])) {
+            return;
+        }
+    }
+    for (size_t i = 0; i < slots; i++) {
+        u16 flags = block->slotFlags[i];
+        if ((i >= (unsigned)block->entryBase && flags) ||
+            ((flags & EVENT_SLOT_VILLAGER) && (flags & ~EVENT_SLOT_FLAG_BITS) >= CHARACTER_COUNT)) {
+            return;
+        }
+    }
+    for (entry = 0; entry < block->entryBase; entry++) {
+        if (block->slotFlags[entry] & EVENT_SLOT_MARKED) {
+            break;
+        }
+    }
+    if (entry == block->entryBase) {
+        return;
+    }
+    length = block->entryOffsets[entry + 1] - block->entryOffsets[entry];
+    if (length > sizeof(game_state.work.results)) {
+        return;
+    }
+    event_script_size = length;
+#endif
     size = event_block_first_size(block);
     top = main_get_region_base();
     event_block_size = size;
@@ -1535,7 +1660,11 @@ static s32 event_block_first_size(FarmEventBlock *block)
 /* Offset of entry index in the block. */
 static s32 event_block_entry(FarmEventBlock *block, s32 index)
 {
+#ifdef __psyz
+    return block->entryOffsets[index];
+#else
     return *(s32 *)((index << 2) + (s32)block->entryOffsets);
+#endif
 }
 
 /* Data of entry index in the block. */
@@ -1706,6 +1835,7 @@ static void event_actors_load_sprites(FarmEventBlock *block)
 #define PENDING_RESULT_NONE -1
 #define PENDING_RESULT_COUNT 5
 
+#ifndef __psyz
 typedef struct FarmCopyWords {
     u32 words[12];
 } FarmCopyWords;
@@ -1713,9 +1843,19 @@ typedef struct FarmCopyRecord {
     FarmCopyWords copy;
     u8 pad[0x1D4 - 0x30];
 } FarmCopyRecord;
+#endif
 /* Copy each villager's sprite80 over its sprite, and call villager_load_request for
  * each one when the request is 0x82. */
 void villager_sprites_copy(void) {
+#ifdef __psyz
+    for (s32 i = 0; i < CHARACTER_COUNT; i++) {
+        FarmVillager *villager = &game_state.villagers[i];
+        villager->sprite = villager->sprite80;
+        if (game_state.request->args[0] == 0x82) {
+            villager_load_request((s16)i, &villager->sprite);
+        }
+    }
+#else
     FarmCopyRecord *destination;
     FarmCopyRecord *source;
     FarmCopyWords *source_words;
@@ -1733,6 +1873,7 @@ void villager_sprites_copy(void) {
         }
         index++;
     } while (index < CHARACTER_COUNT);
+#endif
 }
 
 /* Bind file to the first free staging sprite, and record result as its item id. */
@@ -1876,8 +2017,12 @@ void rle_expand(u8 *dst, u8 *src, s32 count) {
 
 /* A textured sprite primitive, and a draw-mode primitive for its texture page. */
 typedef struct {
+#ifdef __psyz
+    O_TAG;
+#else
     u8 addr[3];
     u8 len;
+#endif
     u8 r0, g0, b0, code;
     s16 x0, y0;
     u8 u0, v0;
@@ -1886,8 +2031,12 @@ typedef struct {
 } SpritePrim;
 
 typedef struct {
+#ifdef __psyz
+    O_TAG;
+#else
     u8 addr[3];
     u8 len;
+#endif
     u32 code[2];
 } DrawModePrim;
 

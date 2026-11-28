@@ -1,7 +1,7 @@
 /* Entry point, the frame loop, and the frame records: the ordering tables and
  * primitive buffers that each frame is drawn into. */
 
-#include <memory.h>
+#include <string.h>
 #include <sys/types.h>
 #include <libetc.h>
 #include <libgte.h>
@@ -9,7 +9,7 @@
 #include <libgs.h>
 #include <libcd.h>
 #include <libapi.h>
-#include <libmcrd.h>
+#include "sdk_mcrd.h"
 #include <libmcx.h>
 #include "types.h"
 #include "afile.h"
@@ -50,13 +50,17 @@
 /* Offsets within the region at region_base where each frame's pieces start: the
  * tag arrays of its three ordering tables (64, 16 and 2 entries), the main OT,
  * the primitive buffer and the work area. */
+#ifdef __psyz
+#define WORK_REGION native_work_region
+#else
 #define WORK_REGION ((u8 *)0x801BE1B0)
+#endif
 #define REGION_TAGS1 0x200
 #define REGION_TAGS2 0x280
 #define REGION_WORK 0x33090
-#define REGION_BYTES 0x3EE50
 /* The active ordering-table block starts here; each frame index moves it by 0x3000. */
 #define REGION_FRAME_OT_BASE 0x38E50
+#define REGION_WIDE_FRAME_OT_BASE 0x3EE48
 
 static void main_run_frame(void);
 static void main_draw_ots(void);
@@ -67,6 +71,12 @@ static void main_frame_reset(int index);
 static void main_init_frame_records(void);
 static void main_init_frame_records_wide(void);
 static void main_copy_prim_buffer(s32 enabled, s32 frame_count);
+
+#ifdef __psyz
+static void main_run_pda_sample(void) {
+    pda_sample_run();
+}
+#endif
 
 s32 prim_copy_frame_count;
 void (*scene_frame_handler)(void);
@@ -82,14 +92,14 @@ s32 frame_index;
 InputRecord *input_pad1;
 InputRecord *input_pad2;
 u8 *region_base;
-u_long *active_ot;
+OT_TYPE *active_ot;
 u8 *frame_ot_base_init;
 u8 *frame_ot_base;
 FrameState *current_frame;
 
 /* Two ordering tables of two entries each (the active one is active_ot), then the
  * two frame records and the controller input records. */
-static u_long frame_ots[4];
+static OT_TYPE frame_ots[4];
 FrameState frame_records[2];
 VabStream vab_stream_copy;
 InputRecord input_records[2];
@@ -109,6 +119,42 @@ static void vsync_frame_callback(void) {
     loading_screen_draw();
 }
 
+#if defined(__psyz) && defined(VANILLABTN_DEBUG)
+static s32 vanillabtn_start_scene = SCENE_TITLE;
+static s32 debug_scene_after_farm = SCENE_FARM;
+static int debug_farm_pending;
+
+void vanillabtn_start_debug_menu(void) {
+    vanillabtn_start_scene = SCENE_DEBUG;
+}
+
+void vanillabtn_debug_jump(s32 scene) {
+    switch (scene) {
+    case SCENE_FARM:
+    case SCENE_MG1:
+    case SCENE_MG2:
+    case SCENE_MG3:
+    case SCENE_MG4:
+    case SCENE_MG5:
+    case SCENE_SAVE:
+    case SCENE_LOAD:
+    case SCENE_LIVESTOCK_TRADE:
+    case SCENE_MG_DEBUG:
+    case SCENE_FARM_MINIGAME_EXIT:
+    case SCENE_FARM_MENU_RETURN:
+    case SCENE_FARM_STAFF_EXIT:
+        /* These scenes depend on resources or state normally provided by the farm. */
+        debug_farm_pending = 1;
+        debug_scene_after_farm = scene;
+        main_request_scene(SCENE_FARM);
+        break;
+    default:
+        main_request_scene(scene);
+        break;
+    }
+}
+#endif
+
 u8 main_speed_mode = MAIN_SPEED_FAST_2;
 s32 main_put_env_enabled = 1;
 s32 main_clear_screen_enabled = 1;
@@ -121,15 +167,21 @@ s32 scene_overlay_loaded = 0;
  * overlay for the requested scene (main_scene), installs its per-frame handler
  * (scene_frame_handler), and runs one frame (main_run_frame). */
 int main(void) {
-    u_long *env;
+    OT_TYPE *env;
     FrameState *fb;
 
     input_pad1 = input_records;
     input_pad2 = &input_records[1];
     vsync_pending_callback = 0;
     ResetCallback();
+#ifdef __psyz
+    /* PS1 BIOS initializes libgpu before main(); PsyZ requires ResetGraph before ClearImage. */
+    ResetGraph(0);
+#endif
     CdInit();
+#ifndef __psyz
     SetMem(2);
+#endif
     VSync(3);
     VSync(3);
     VSync(3);
@@ -147,7 +199,11 @@ int main(void) {
     sound_init();
     SetVideoMode(0);
     ResetGraph(0);
+#if defined(__psyz) && defined(VANILLABTN_DEBUG)
+    main_scene = vanillabtn_start_scene;
+#else
     main_scene = SCENE_TITLE;
+#endif
     afile_init();
 
     fb = frame_records;
@@ -169,7 +225,7 @@ int main(void) {
     InitGeom();
     SetGeomOffset(0, 0);
     SetGeomScreen(1000);
-    GsInitGraph(320, 240, 0, 0, 0);
+    GsInitGraph(MAIN_DISPLAY_WIDTH, MAIN_DISPLAY_HEIGHT, 0, 0, 0);
     GsDefDispBuff(0, 0, 0, 0);
     GsSetOffset(0, 0);
     GsSetDrawBuffOffset();
@@ -195,6 +251,12 @@ int main(void) {
     farm_state_init();
     sound_init_stereo_xa();
     sound_update();
+#if defined(__psyz) && defined(VANILLABTN_DEBUG)
+    if (main_scene == SCENE_DEBUG) {
+        sound_set_seq_arg(0, STAGING_BUFFER);
+        sound_request(SOUND_REQUEST_RESET, 0);
+    }
+#endif
     text_set_palette(3);
     text_set_speed(3);
     prim_copy_pending = 0;
@@ -220,9 +282,27 @@ int main(void) {
             main_set_debug_mode(0);
             LOAD_OVERLAY(AFILE_PDA_SAMPLE, OVERLAY_LOW);
             scene_overlay_loaded = 0;
+#ifdef __psyz
+            scene_frame_handler = main_run_pda_sample;
+#else
             scene_frame_handler = (void (*)(void))pda_sample_run;
+#endif
             break;
+#ifdef __psyz
+        case SCENE_PDA:
+            /* The native card backend reports PocketStation absent. Resume the invoking menu. */
+            main_request_scene(main_previous_scene == SCENE_DEBUG ? SCENE_DEBUG
+                                                                  : SCENE_FARM_MENU_RETURN);
+            continue;
+#endif
         case SCENE_FARM:
+#if defined(__psyz) && defined(VANILLABTN_DEBUG)
+            if (debug_farm_pending) {
+                debug_farm_pending = 0;
+                title_prepare_debug_farm();
+                scene_overlay_loaded = 0;
+            }
+#endif
             if (scene_overlay_loaded == 0) {
                 loading_screen_init();
                 main_set_debug_mode(0);
@@ -346,6 +426,9 @@ int main(void) {
             main_set_debug_mode(0);
             LOAD_OVERLAY(AFILE_MCARD, OVERLAY_LOW);
             farm_entry_args_clear();
+#ifdef __psyz
+            mcard_screen_enter();
+#endif
             scene_frame_handler = mcard_screen_tick;
             scene_overlay_loaded = 0;
             break;
@@ -371,6 +454,13 @@ int main(void) {
             scene_frame_handler = farm_enter_dispatch;
             break;
         }
+#ifdef __psyz
+        if ((main_scene >= SCENE_MG1 && main_scene <= SCENE_MG3) ||
+            main_scene == SCENE_MG4 || main_scene == SCENE_MG5) {
+            /* The 3D stages use screen-centred coordinates after the frame reset. */
+            SetGeomOffset(MAIN_DISPLAY_WIDTH / 2, MAIN_DISPLAY_HEIGHT / 2);
+        }
+#endif
         main_run_frame();
     }
 }
@@ -380,7 +470,7 @@ int main(void) {
  * drawn at the next VSync (main_draw_ots). */
 static void main_run_frame(void) {
     FrameState *fb;
-    u_long *env;
+    OT_TYPE *env;
 
     vsync_after_draw = 0;
     vsync_before_draw = 0;
@@ -424,6 +514,15 @@ static void main_run_frame(void) {
             vsync_pending_callback = main_draw_ots;
             VSync(2);
         }
+#if defined(__psyz) && defined(VANILLABTN_DEBUG)
+        if (main_scene == SCENE_FARM && debug_scene_after_farm != SCENE_FARM &&
+            game_state.progress.entryStep == 2 && !loading_screen_is_active()) {
+            s32 scene = debug_scene_after_farm;
+            debug_scene_after_farm = SCENE_FARM;
+            game_state.progress.entrySubStep = 0;
+            main_request_scene(scene);
+        }
+#endif
     } while (main_loop_running == 1);
 }
 
@@ -453,6 +552,11 @@ static void main_draw_ots(void) {
         DrawOTag(current_frame->otTags[0] + current_frame->otTagCounts[0] - 1);
     }
     DrawOTag(active_ot + 1);
+#ifdef __psyz
+    if (scene_frame_handler == mcard_screen_tick || scene_frame_handler == swind_window_tick) {
+        FntFlush(-1);
+    }
+#endif
 }
 
 /* Does nothing: the scene argument is ignored. */
@@ -495,15 +599,27 @@ void main_set_clear_screen(s32 value) {
     main_clear_screen_enabled = value;
 }
 
+#ifdef __psyz
+/* PsyZ keeps GsOUT_PACKET_P private and omits GsGetWorkBase; mirror it locally. */
+static u8 *native_gs_work_base;
+#endif
+
 /* Allocate `size` bytes of packets from the GS work area. */
 void *gs_work_alloc(s32 size) {
     u8 *limit = current_frame->workBase + current_frame->workSize;
+#ifdef __psyz
+    u8 *packet = native_gs_work_base;
+#else
     u8 *packet = GsGetWorkBase();
+#endif
     if (limit < packet + size) {
         do {
         } while (host_poll() != 0);
         SystemError(0x50, 0);
     }
+#ifdef __psyz
+    native_gs_work_base = packet + size;
+#endif
     GsSetWorkBase(packet + size);
     return packet;
 }
@@ -514,9 +630,13 @@ void gs_work_release(void *end) {
         do {
         } while (host_poll() != 0);
     }
+#ifdef __psyz
+    native_gs_work_base = (u8 *)end;
+#endif
     GsSetWorkBase(end);
 }
 
+#ifndef __psyz
 static s32 main_region_gap_const(void) {
     s32 region = (s32)region_base;
     s32 base = (s32)overlay_region_table[OVERLAY_HIGH];
@@ -527,6 +647,7 @@ static s32 main_region_gap_const(void) {
     region += offset;
     return region - (end - base);
 }
+#endif
 
 /* Free bytes between farm_area.loadWindow and region_base, less farm_section_size and a fixed
  * 0x49000 bytes. */
@@ -554,8 +675,8 @@ u8 *main_region_free_start(void) {
     return region_base - main_region_free_bytes();
 }
 
-s32 main_get_region_base(void) {
-    return (s32)region_base;
+u8 *main_get_region_base(void) {
+    return region_base;
 }
 
 /* Start a frame: point the GS work area at its work base, select its ordering-table block (0x3000
@@ -563,6 +684,9 @@ s32 main_get_region_base(void) {
 static void main_frame_begin(void) {
     s32 ot_base;
 
+#ifdef __psyz
+    native_gs_work_base = current_frame->workBase;
+#endif
     GsSetWorkBase(current_frame->workBase);
     ot_base = ((frame_index * 3) << 12) + REGION_FRAME_OT_BASE;
     frame_ot_base = region_base + ot_base;
@@ -625,16 +749,21 @@ static void main_init_frame_records(void) {
 
     base = WORK_REGION;
     region_base = base;
-    memset(base, 0, REGION_BYTES);
+    memset(base, 0, FRAME_REGION_BYTES);
+#ifdef __psyz
+    frame_ot_base_init = frame_ot_base = base + REGION_FRAME_OT_BASE;
+#else
     frame_ot_base_init = frame_ot_base = (u8 *)0x801F7000;
+#endif
     for (i = 0; i < 2; i++) {
-        frame_records[i].otTags[0] = (u_long *)(base + i * 0x100);
+#ifndef __psyz
+        frame_records[i].otTags[0] = (OT_TYPE *)(base + i * 0x100);
         frame_records[i].otTagCounts[0] = 64;
         frame_records[i].otLengths[0] = 6;
-        frame_records[i].otTags[1] = (u_long *)(base + REGION_TAGS1 + i * 0x40);
+        frame_records[i].otTags[1] = (OT_TYPE *)(base + REGION_TAGS1 + i * 0x40);
         frame_records[i].otTagCounts[1] = 16;
         frame_records[i].otLengths[1] = 4;
-        frame_records[i].otTags[2] = (u_long *)(base + REGION_TAGS2 + i * 8);
+        frame_records[i].otTags[2] = (OT_TYPE *)(base + REGION_TAGS2 + i * 8);
         frame_records[i].otTagCounts[2] = 2;
         frame_records[i].otLengths[2] = 1;
         frame_records[i].otTags[3] = 0;
@@ -642,13 +771,15 @@ static void main_init_frame_records(void) {
         frame_records[i].otLengths[3] = 0;
         frame_records[i].otDepth = FRAME_OT_DEPTH;
         frame_records[i].otDepthBits = 11;
-        frame_records[i].ot = (u_long *)(base + REGION_OT + i * 0x2000);
+        frame_records[i].ot = (OT_TYPE *)(base + REGION_OT + i * 0x2000);
+#endif
         frame_records[i].drawEnv.dtd = 1;
         frame_records[i].drawEnv.dfe = 1;
         frame_records[i].drawEnv.isbg = 1;
         frame_records[i].drawEnv.r0 = 0;
         frame_records[i].drawEnv.g0 = 0;
         frame_records[i].drawEnv.b0 = 0;
+#ifndef __psyz
         frame_records[i].ots[0].length = 6;
         frame_records[i].ots[0].point = 0;
         frame_records[i].ots[0].offset = 0;
@@ -669,8 +800,13 @@ static void main_init_frame_records(void) {
         frame_records[i].ots[3].offset = 0;
         frame_records[i].ots[3].org = 0;
         frame_records[i].ots[3].tag = 0;
-        frame_records[i].workSize = 0x2EE0;
-        frame_records[i].workBase = base + REGION_WORK + i * 0x2EE0;
+#endif
+#ifdef __psyz
+        frame_buffers_set_work(i, FRAME_WORK_BYTES);
+#else
+        frame_records[i].workSize = FRAME_WORK_BYTES;
+        frame_records[i].workBase = base + REGION_WORK + i * FRAME_WORK_BYTES;
+#endif
         frame_records[i].primBuffer = base + REGION_PRIM + i * FRAME_PRIM_SIZE;
     }
     frame_buffers_layout();
@@ -681,24 +817,31 @@ static void main_init_frame_records(void) {
  * primitive buffer is zeroed and its cursor rewound. */
 static void main_init_frame_records_wide(void) {
     s32 i;
+#ifndef __psyz
     s32 k;
     s32 j;
     FrameState *fb;
     u8 *region;
+#endif
     u8 *base;
 
     base = WORK_REGION;
     region_base = base;
-    memset(base, 0, REGION_BYTES);
+    memset(base, 0, FRAME_REGION_BYTES);
+#ifdef __psyz
+    frame_ot_base_init = frame_ot_base = base + REGION_WIDE_FRAME_OT_BASE;
+#else
     frame_ot_base_init = frame_ot_base = (u8 *)0x801FCFF8;
+#endif
     for (i = 0; i < 2; i++) {
-        frame_records[i].otTags[0] = (u_long *)(base + i * 0x100);
+#ifndef __psyz
+        frame_records[i].otTags[0] = (OT_TYPE *)(base + i * 0x100);
         frame_records[i].otTagCounts[0] = 64;
         frame_records[i].otLengths[0] = 6;
-        frame_records[i].otTags[1] = (u_long *)(base + REGION_TAGS1 + i * 0x40);
+        frame_records[i].otTags[1] = (OT_TYPE *)(base + REGION_TAGS1 + i * 0x40);
         frame_records[i].otTagCounts[1] = 16;
         frame_records[i].otLengths[1] = 4;
-        frame_records[i].otTags[2] = (u_long *)(base + REGION_TAGS2 + i * 8);
+        frame_records[i].otTags[2] = (OT_TYPE *)(base + REGION_TAGS2 + i * 8);
         frame_records[i].otTagCounts[2] = 2;
         frame_records[i].otLengths[2] = 1;
         frame_records[i].otTags[3] = 0;
@@ -706,13 +849,15 @@ static void main_init_frame_records_wide(void) {
         frame_records[i].otLengths[3] = 0;
         frame_records[i].otDepth = FRAME_OT_DEPTH;
         frame_records[i].otDepthBits = 11;
-        frame_records[i].ot = (u_long *)(base + REGION_OT + i * 0x2000);
+        frame_records[i].ot = (OT_TYPE *)(base + REGION_OT + i * 0x2000);
+#endif
         frame_records[i].drawEnv.dtd = 1;
         frame_records[i].drawEnv.dfe = 1;
         frame_records[i].drawEnv.isbg = 1;
         frame_records[i].drawEnv.r0 = 0;
         frame_records[i].drawEnv.g0 = 0;
         frame_records[i].drawEnv.b0 = 0;
+#ifndef __psyz
         frame_records[i].ots[0].length = 6;
         frame_records[i].ots[0].point = 0;
         frame_records[i].ots[0].offset = 0;
@@ -733,16 +878,24 @@ static void main_init_frame_records_wide(void) {
         frame_records[i].ots[3].offset = 0;
         frame_records[i].ots[3].org = 0;
         frame_records[i].ots[3].tag = 0;
-        frame_records[i].workSize = 0x5EDC;
-        frame_records[i].workBase = base + REGION_WORK + i * 0x5EDC;
+#endif
+#ifdef __psyz
+        frame_buffers_set_work(i, FRAME_WIDE_WORK_BYTES);
+#else
+        frame_records[i].workSize = FRAME_WIDE_WORK_BYTES;
+        frame_records[i].workBase = base + REGION_WORK + i * FRAME_WIDE_WORK_BYTES;
+#endif
         frame_records[i].primBuffer = base + REGION_PRIM + i * FRAME_PRIM_SIZE;
     }
+#ifdef __psyz
+    frame_buffers_layout();
+#else
     region = region_base;
     for (k = 0; k < 2; k++) {
         fb = &frame_records[k];
         fb->otDepth = FRAME_OT_DEPTH;
         fb->otDepthBits = 11;
-        fb->ot = (u_long *)&region[k * 0x2000 + REGION_OT];
+        fb->ot = (OT_TYPE *)&region[k * 0x2000 + REGION_OT];
         fb->primSize = FRAME_PRIM_SIZE;
         fb->primStart = &region[k * FRAME_PRIM_SIZE + REGION_PRIM];
         ClearOTagR(fb->ot, FRAME_OT_DEPTH);
@@ -751,6 +904,7 @@ static void main_init_frame_records_wide(void) {
         }
         fb->primCursor.bytes = fb->primStart;
     }
+#endif
 }
 
 /* Save the high overlay region into a frame's primitive buffer (enabled == 0), or restore it from

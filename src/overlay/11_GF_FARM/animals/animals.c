@@ -1,9 +1,12 @@
 /* The farm's animals, pets, spawned objects and walkers. */
 
+#ifdef __psyz
+#include <stddef.h>
+#endif
 #include <abs.h>
 #include <sys/types.h>
 #include <libgte.h>
-#include <memory.h>
+#include <string.h>
 #include "types.h"
 #include "actor.h"
 #include "anim.h"
@@ -55,9 +58,33 @@ typedef struct FarmActionSlot {
     s32 flags;
     u8 pad38[0x48 - 0x38];
     VECTOR payload48;
+#ifdef __psyz
+    /* AnimState grows with 64-bit pointers, so cue sits past PS1 offset 0xA8. */
+    VECTOR destination;
+    VECTOR target;
+    AnimState sprite;
+#else
     u8 pad58[0xA8 - 0x58];
+#endif
     ItemCue cue;
 } FarmActionSlot;
+
+#ifdef __psyz
+_Static_assert(offsetof(FarmActionSlot, kind) == offsetof(FarmActor, kind), "FarmActionSlot kind");
+_Static_assert(offsetof(FarmActionSlot, taskNo) == offsetof(FarmActor, taskNo),
+               "FarmActionSlot taskNo");
+_Static_assert(offsetof(FarmActionSlot, taskId) == offsetof(FarmActor, taskId),
+               "FarmActionSlot taskId");
+_Static_assert(offsetof(FarmActionSlot, taskTime) == offsetof(FarmActor, taskTime),
+               "FarmActionSlot taskTime");
+_Static_assert(offsetof(FarmActionSlot, interruptTime) == offsetof(FarmActor, interruptTime),
+               "FarmActionSlot interruptTime");
+_Static_assert(offsetof(FarmActionSlot, flags) == offsetof(FarmActor, flags),
+               "FarmActionSlot flags");
+_Static_assert(offsetof(FarmActionSlot, payload48) == offsetof(FarmActor, speed),
+               "FarmActionSlot speed");
+_Static_assert(offsetof(FarmActionSlot, cue) == offsetof(FarmActor, cue), "FarmActionSlot cue");
+#endif
 
 /* One entry of the cue table farm_mode_cues. farm_cue_matches_mode scans for `id` and
  * answers whether the current mode bit (farm_season_mode_bit) is in `mask`. `x`, `y` and
@@ -96,7 +123,7 @@ static s32 farm_cue_matches_mode(s32 id);
 static void farm_spawn_mode_object(void);
 static void farm_spawn_table_objects(void);
 static void farm_roll_stray_dogs(void);
-static void farm_draw_unless_hidden(u32 flags, u_long *ot, u32 x, u32 y);
+static void farm_draw_unless_hidden(u32 flags, void *ot, u32 x, u32 y);
 static u16 farm_walker_pick_heading(FarmActor *walker, s32 blocked, s32 flags);
 static u16 farm_walker_pick_turn(u16 heading, u16 turn, u16 bias);
 static u16 farm_heading_classify(FarmActor *state);
@@ -971,28 +998,41 @@ static void farm_roll_stray_dogs(void) {
     game_state.progress.estate.estateFlags |= ESTATE_FLAG_STRAY_DOGS;
 }
 
+/* Keep the helper nested for the matching compiler's code layout. */
+#ifndef __psyz
 /* Is a dead farm item of a kind `kind` selects? `kind` bit 1 matches items that died of age, bit 2
  * the others. `mode` picks the tables: bit 4 the chickens, and bits 1 and 2 the livestock (bit 2
  * for records with ACTOR_FLAG_BIT16, bit 1 for the rest). */
 s32 farm_kind_selected(s32 mode, u32 kind)
 {
-    s32 farm_kind_matches_flags(FarmActor *object, u32 kind)
-    {
-        u32 flags;
-        u32 diedOfAge;
+#else
+static
+#endif
+s32 farm_kind_matches_flags(FarmActor *object, u32 kind)
+{
+    u32 flags;
+    u32 diedOfAge;
 
-        flags = object->flags;
-        diedOfAge = flags & ACTOR_FLAG_DIED_OF_AGE;
-        if (flags & ACTOR_FLAG_DIED) {
-            if ((kind & 1) && diedOfAge == 1) {
-                return 1;
-            }
-            if ((kind & 2) && diedOfAge == 0) {
-                return 1;
-            }
+    flags = object->flags;
+    diedOfAge = flags & ACTOR_FLAG_DIED_OF_AGE;
+    if (flags & ACTOR_FLAG_DIED) {
+        if ((kind & 1) && diedOfAge == 1) {
+            return 1;
         }
-        return 0;
+        if ((kind & 2) && diedOfAge == 0) {
+            return 1;
+        }
     }
+    return 0;
+}
+
+#ifdef __psyz
+/* Is a dead farm item of a kind `kind` selects? `kind` bit 1 matches items that died of age, bit 2
+ * the others. `mode` picks the tables: bit 4 the chickens, and bits 1 and 2 the livestock (bit 2
+ * for records with ACTOR_FLAG_BIT16, bit 1 for the rest). */
+s32 farm_kind_selected(s32 mode, u32 kind)
+{
+#endif
 
     s32 i;
 
@@ -1084,14 +1124,14 @@ void farm_spawn_chicken_sources(void) {
  * during a transition. */
 void farm_draw_actor(FarmActor *object) {
     FarmScreenPoint result;
-    u_long *primitive;
+    OT_TYPE *primitive;
 
     if ((game_state.globalFlags & GLOBAL_FLAG_TRANSITION) == 0) {
         farm_draw_point.vx = object->position.vx + 150;
         farm_draw_point.vy = object->position.vy - 100;
         farm_draw_point.vz = object->position.vz - 150;
         if (estate_point_project(&farm_draw_point, &result) != 0) {
-            primitive = &current_frame->ot[result.depth >> 2];
+            primitive = FRAME_OT_AT(result.depth >> 2);
             cue_draw_frame(&object->cue, primitive, result.x,
                           result.y + farm_kind_draw_offset((s16)object->kind));
             sprite_draw_traced(primitive, current_frame->primCursor.ft4, &object->sprite, object->sprite.animation,
@@ -1101,7 +1141,7 @@ void farm_draw_actor(FarmActor *object) {
                 farm_draw_point.vy = -100;
                 farm_draw_point.vz = object->position.vz - 150;
                 primitive =
-                    &current_frame->ot[gte_project_vertex(&farm_draw_screen_xy, &farm_draw_point) >> 2];
+                    FRAME_OT_AT(gte_project_vertex(&farm_draw_screen_xy, &farm_draw_point) >> 2);
             } else {
                 farm_draw_screen_xy.x = *&result.x;
                 farm_draw_screen_xy.y = *&result.y;
@@ -1119,7 +1159,7 @@ void farm_draw_actor(FarmActor *object) {
 void farm_draw_object(FarmHelper *helper) {
     SVECTOR input;
     FarmScreenPoint result;
-    u_long *primitive;
+    OT_TYPE *primitive;
 
     if ((game_state.globalFlags & GLOBAL_FLAG_TRANSITION) != 0) {
         return;
@@ -1129,7 +1169,7 @@ void farm_draw_object(FarmHelper *helper) {
     input.vy = helper->actor.position.vy - 100;
     input.vz = helper->actor.position.vz - 150;
     if (estate_point_project(&input, &result) != 0) {
-        primitive = &current_frame->ot[result.depth >> 2];
+        primitive = FRAME_OT_AT(result.depth >> 2);
         cue_draw_frame(&helper->actor.cue, primitive, result.x, result.y - 20);
         if (helper->item != ITEM_NOTHING) {
             anim_draw_sprt_cursor(primitive, &helper->itemSprite, 0, 0, result.x, result.y - 16);
@@ -1148,14 +1188,14 @@ void farm_draw_object(FarmHelper *helper) {
 void farm_request_project(FarmActor *request, VramPlace *places, s32 base)
 {
     FarmScreenPoint result;
-    u_long *object;
+    OT_TYPE *object;
 
     if ((game_state.globalFlags & GLOBAL_FLAG_TRANSITION) == 0) {
         farm_request_draw_point.vx = request->position.vx + 150;
         farm_request_draw_point.vy = request->position.vy - 100;
         farm_request_draw_point.vz = request->position.vz - 150;
         if (estate_point_project(&farm_request_draw_point, &result) != 0) {
-            object = &current_frame->ot[result.depth >> 2];
+            object = FRAME_OT_AT(result.depth >> 2);
             text_queue_sprite(object, &request->sprite, (s16)result.x, (s16)result.y, 0x1000, 0, 0,
                           frame_ot_base + base, places);
             cue_draw_frame(&request->cue, object, result.x,
@@ -1164,7 +1204,7 @@ void farm_request_project(FarmActor *request, VramPlace *places, s32 base)
                 farm_request_draw_point.vx = request->position.vx + 150;
                 farm_request_draw_point.vy = -100;
                 farm_request_draw_point.vz = request->position.vz - 150;
-                object = &current_frame->ot[gte_project_vertex(&farm_request_screen_xy, &farm_request_draw_point) >> 2];
+                object = FRAME_OT_AT(gte_project_vertex(&farm_request_screen_xy, &farm_request_draw_point) >> 2);
             } else {
                 farm_request_screen_xy.x = result.x;
                 farm_request_screen_xy.y = result.y;
@@ -1177,7 +1217,7 @@ void farm_request_project(FarmActor *request, VramPlace *places, s32 base)
     }
 }
 
-static void farm_draw_unless_hidden(u32 flags, u_long *ot, u32 x, u32 y) {
+static void farm_draw_unless_hidden(u32 flags, void *ot, u32 x, u32 y) {
     if (!(flags & 0x1000)) {
         farm_draw_cursor(ot, x, y, flags >> 31);
     }
@@ -1306,19 +1346,30 @@ static u16 farm_move_compare_table[10] = {
     FARM_MOVE_X_GT_Z_EQ, FARM_MOVE_X_GT_Z_LT, FARM_MOVE_X_GT_Z_GT, FARM_MOVE_SAME,
 };
 
+/* Keep the helper nested for the matching compiler's code layout. */
+#ifndef __psyz
 /* Compare both coordinate pairs three ways and look the pair up in the table. */
 static u16 farm_move_table_lookup(FarmActor *state)
 {
-    s32 farm_move_compare(s32 a, s32 b)
-    {
-        if (a == b) {
-            return 0;
-        }
-        if (a < b) {
-            return 1;
-        }
-        return 2;
+#else
+static
+#endif
+s32 farm_move_compare(s32 a, s32 b)
+{
+    if (a == b) {
+        return 0;
     }
+    if (a < b) {
+        return 1;
+    }
+    return 2;
+}
+
+#ifdef __psyz
+/* Compare both coordinate pairs three ways and look the pair up in the table. */
+static u16 farm_move_table_lookup(FarmActor *state)
+{
+#endif
 
     s32 first;
     s32 second;
@@ -1964,20 +2015,32 @@ static u16 farm_heading_table[10] = {
     0x0000, 0x0005, 0x0007, 0x0006, 0x0001, 0x0002, 0x0008, 0x0004, 0x0003, 0x0000,
 };
 
+/* Keep the helper nested for the matching compiler's code layout. */
+#ifndef __psyz
 /* Classify the object's heading from its two coordinate pairs; when it is close to its target on
  * both axes, clear ACTOR_FLAG_APPROACHING_PLAYER (0x2000) and report 0 instead. */
 static u16 farm_heading_classify(FarmActor *state)
 {
-    s32 farm_heading_compare(s32 a, s32 b)
-    {
-        if (a == b) {
-            return 0;
-        }
-        if (a < b) {
-            return 1;
-        }
-        return 2;
+#else
+static
+#endif
+s32 farm_heading_compare(s32 a, s32 b)
+{
+    if (a == b) {
+        return 0;
     }
+    if (a < b) {
+        return 1;
+    }
+    return 2;
+}
+
+#ifdef __psyz
+/* Classify the object's heading from its two coordinate pairs; when it is close to its target on
+ * both axes, clear ACTOR_FLAG_APPROACHING_PLAYER (0x2000) and report 0 instead. */
+static u16 farm_heading_classify(FarmActor *state)
+{
+#endif
 
     s32 x1;
     s32 y1;

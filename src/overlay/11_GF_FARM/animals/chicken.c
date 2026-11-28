@@ -1,7 +1,7 @@
 /* Chickens on the farm: their spawn, daily tick, state and timers, their sprites and the
  * animals' sprite table, their next state, following the player, their cue scripts and
  * their walking. */
-#include <memory.h>
+#include <string.h>
 #include "types.h"
 #include "actor.h"
 #include "anim.h"
@@ -303,10 +303,26 @@ s32 chicken_timer_tick(FarmChicken *object) {
     return 0;
 }
 
+#ifdef __psyz
+static s32 farm_chicken_clear_sick_actor(FarmActor *actor) {
+    return farm_chicken_clear_sick((FarmChicken *)actor);
+}
+
+static s32 farm_chicken_action_none_actor(FarmActor *unused) {
+    (void)unused;
+    return farm_chicken_action_none();
+}
+
+static s32 (*const farm_actor_enter_handlers[20])(FarmActor *) = {
+    0, 0, 0, farm_chicken_follow_player, farm_chicken_tick_offset, 0, 0, 0, 0,
+    farm_chicken_clear_sick_actor, 0, 0, 0, 0, farm_chicken_action_none_actor, 0, 0, 0, 0, 0,
+};
+#else
 static s32 (*const farm_actor_enter_handlers[20])() = {
     0, 0, 0, farm_chicken_follow_player, farm_chicken_tick_offset, 0, 0, 0, 0, farm_chicken_clear_sick, 0, 0, 0, 0,
     farm_chicken_action_none, 0, 0, 0, 0, 0,
 };
+#endif
 
 s32 (*const farm_actor_cue_handlers[20])(FarmActor *) = {
     farm_chicken_cue_run, chicken_cue_1, chicken_cue_2, chicken_cue_walk, chicken_cue_walk_quick, 0, 0, 0, 0,
@@ -337,7 +353,11 @@ s32 farm_actor_dispatch_state(FarmActor *object, s32 state) {
 }
 
 void chicken_clear(FarmChicken *p) {
+#ifdef __psyz
+    memset(p, 0, sizeof(FarmChicken));
+#else
     memset(p, 0, 0xB4);
+#endif
     p->actor.kind = 0;
 }
 

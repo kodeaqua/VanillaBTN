@@ -1,11 +1,14 @@
 /* The save/load screens: choosing a slot, saving and loading the farm to the memory card. */
 
 #include <sys/types.h>
-#include <memory.h>
+#include <string.h>
+#ifdef __psyz
+#include <stddef.h>
+#endif
 #include <libgte.h>
 #include <libgpu.h>
 #include <libsnd.h>
-#include <libmcrd.h>
+#include "sdk_mcrd.h"
 #include <libmcx.h>
 #include "types.h"
 #include "actor.h"
@@ -352,6 +355,151 @@ typedef struct SaveImage
     Block34 family;
     State8007AFD8 ending;
 } SaveImage;
+
+#ifdef __psyz
+/* Exact 32-bit PS1 save-image wire layouts so native saves remain binary-compatible with PS1. */
+typedef struct {
+    u8 head[0x14];
+    u32 ptrs[7];
+} Ps1AnimState;
+
+typedef struct {
+    u8 head[0x78];
+    Ps1AnimState sprite;
+    ItemCue cue;
+} Ps1FarmActor;
+
+typedef struct {
+    Ps1FarmActor actor;
+    u16 grazingTime;
+    u16 daysSick;
+    u16 pregnancy;
+    s16 unusedValue;
+} Ps1FarmChicken;
+
+typedef struct {
+    Ps1FarmActor actor;
+    u16 grazeCount;
+    u16 daysSick;
+    u16 growthDays;
+    u16 pregnancy;
+    u16 daysSinceShearing;
+    s16 helperNumber;
+} Ps1FarmLivestock;
+
+typedef struct {
+    Ps1FarmActor actor;
+    s16 training;
+    u8 padAE[0xE0 - 0xAE];
+    VramPlace projectCoords[2];
+} Ps1FarmPet;
+
+typedef struct {
+    Ps1FarmActor actor;
+    s16 countdown;
+    u16 padAE;
+} Ps1FarmAction;
+
+typedef struct {
+    Ps1FarmChicken chickens[MAX_CHICKENS];
+    Ps1FarmLivestock livestock[MAX_LIVESTOCK];
+    FarmPond pond;
+    u8 pad16F6[0x16F8 - 0x16F6];
+    Ps1FarmPet dog;
+    Ps1FarmPet horse;
+    Ps1FarmAction actions[FARM_ACTIONS];
+    Ps1FarmChicken extraChickens[EXTRA_CHICKENS];
+    FarmModeSlot slots[FARM_MODES];
+    u16 spawnGate;
+    s16 moveSpeeds[5];
+    s16 fishCount;
+    s16 pendingTrack;
+} Ps1FarmAnimals;
+
+typedef struct {
+    u8 pad00[0x04];
+    Ps1AnimState sprite;
+} Ps1FarmPlayerToy;
+
+typedef struct {
+    u8 head[0x4A];
+    u8 pad4A[2];
+    u32 scriptSteps;
+    u32 target;
+    u8 mid[0x20C];
+    Ps1AnimState secondSprite;
+    Ps1AnimState sprite;
+    FarmWedding wedding;
+    ItemCue cue;
+    Ps1FarmPlayerToy toys[PLAYER_TOYS];
+    TrailPose poses[TRAIL_LENGTH];
+} Ps1FarmPlayer;
+
+typedef struct {
+    Ps1FarmActor actor;
+    u8 mid[0x1C];
+    Ps1AnimState itemSprite;
+} Ps1FarmHelper;
+
+/* PS1 RAM address of &game_state.requests.items[0] (0x800742AC + 4). */
+#define PS1_REQUEST_HEAD_ADDR 0x800742B0u
+
+typedef struct {
+    Ps1FarmAnimals animals;
+    SaveRecord records[CHARACTER_COUNT];
+    u8 pad213A[2];
+    BlockF0 run16;
+    Block30 run18;
+    u32 flagWords[6];
+    u32 itemInfo;
+    u32 pictureGrids;
+    u32 tileRules;
+    u32 cropTable;
+    u32 request;
+    u32 pictureCodes;
+    Block94 eventFlags;
+    SavedProgress progress;
+    Ps1FarmPlayer player;
+    Block2328 fieldTiles;
+    Block188 slots7x7;
+    Block40 requests;
+    Block74 runs;
+    Ps1FarmHelper helpers[HELPER_COUNT];
+    State8007AD00 world;
+    u8 pad60D4[0x6200 - 0x60D4];
+    Block108 days;
+    Block24 drift;
+    Block34 family;
+    State8007AFD8 ending;
+} Ps1SaveImage;
+
+_Static_assert(sizeof(Ps1AnimState) == 0x30, "Ps1AnimState size");
+_Static_assert(sizeof(Ps1FarmActor) == 0xAC, "Ps1FarmActor size");
+_Static_assert(sizeof(Ps1FarmChicken) == 0xB4, "Ps1FarmChicken size");
+_Static_assert(sizeof(Ps1FarmLivestock) == 0xB8, "Ps1FarmLivestock size");
+_Static_assert(sizeof(Ps1FarmPet) == 0xF0, "Ps1FarmPet size");
+_Static_assert(sizeof(Ps1FarmAction) == 0xB0, "Ps1FarmAction size");
+_Static_assert(sizeof(Ps1FarmAnimals) == 0x1F34, "Ps1FarmAnimals size");
+_Static_assert(sizeof(Ps1FarmPlayer) == 0x3FC, "Ps1FarmPlayer size");
+_Static_assert(sizeof(Ps1FarmHelper) == 0xF8, "Ps1FarmHelper size");
+_Static_assert(sizeof(Ps1SaveImage) == 0x6378, "Ps1SaveImage size");
+_Static_assert(offsetof(Ps1SaveImage, flagWords) == 0x225C, "Ps1SaveImage flagWords");
+_Static_assert(offsetof(Ps1SaveImage, progress) == 0x2320, "Ps1SaveImage progress");
+_Static_assert(offsetof(Ps1SaveImage, player) == 0x3060, "Ps1SaveImage player");
+_Static_assert(offsetof(Ps1SaveImage, helpers) == 0x59C0, "Ps1SaveImage helpers");
+_Static_assert(offsetof(Ps1SaveImage, days) == 0x6200, "Ps1SaveImage days");
+_Static_assert(offsetof(Ps1SaveImage, ending) == 0x6360, "Ps1SaveImage ending");
+_Static_assert(offsetof(AnimState, clutOffY) + sizeof(s16) == 0x14, "AnimState head");
+_Static_assert(offsetof(FarmActor, sprite) == 0x78, "FarmActor head");
+_Static_assert(offsetof(FarmPlayer, toolExp) + sizeof(((FarmPlayer *)0)->toolExp) == 0x4A,
+               "FarmPlayer head");
+_Static_assert(offsetof(FarmPlayer, slowTrail) + sizeof(((FarmPlayer *)0)->slowTrail) -
+                   offsetof(FarmPlayer, targetFlags) == 0x20C,
+               "FarmPlayer mid");
+_Static_assert(offsetof(FarmHelper, pairC4) + sizeof(FarmInitPair) -
+                   offsetof(FarmHelper, number) == 0x1C,
+               "FarmHelper mid");
+#endif
 
 /* The loaded file image, copied whole into the working buffer. */
 typedef struct
@@ -715,18 +863,47 @@ static SaveSlotRecord save_slot_records[3];
 static u8 saveload_unused_801377A0[128];
 static s16 save_slot_status[4];
 static u8 *save_icon_base;
+#ifdef __psyz
+/* PS1 BSS lays out the header, three icon frames, slot record, and image data
+ * contiguously across SAVE_FILE_BYTES (0x9690); keep one object for native safety. */
+static union {
+    u8 raw[SAVE_FILE_BYTES];
+    struct {
+        u8 header[0x80];
+        IconFrame icon_frame_0;
+        IconFrame icon_frame_1;
+        IconFrame icon_frame_2;
+        u8 slot_record[0x80];
+        u8 image_data[SAVE_FILE_BYTES - 0x280];
+    } fields;
+} save_file_buf;
+#define save_file_header (save_file_buf.raw)
+#define save_icon_frame_0 (save_file_buf.fields.icon_frame_0)
+#define save_icon_frame_1 (save_file_buf.fields.icon_frame_1)
+#define save_icon_frame_2 (save_file_buf.fields.icon_frame_2)
+#define save_slot_record (save_file_buf.fields.slot_record)
+#define save_image_data (save_file_buf.fields.image_data)
+#else
 static u8 save_file_header[0x80];
 static IconFrame save_icon_frame_0;
 static IconFrame save_icon_frame_1;
 static IconFrame save_icon_frame_2;
 static u8 save_slot_record[0x80];
 static u8 save_image_data[0x9690 - 0x280];
+#endif
 static char save_file_name_buf[32];
 static u16 save_name_line[24];
 static SaveHeader save_header;
 static SaveEntry save_entries[2][SAVE_LIST_ENTRIES];
 static u8 save_work_table[5488];
+#ifdef __psyz
+static u8 save_out_buffer[sizeof(FarmLivestock) * SAVE_LIST_ENTRIES];
+static FarmAnimals save_partner_animals;
+static void save_pack_animals(Ps1FarmAnimals *dst, const FarmAnimals *src);
+static void save_unpack_animals(FarmAnimals *dst, const Ps1FarmAnimals *src);
+#else
 static u8 save_out_buffer[928];
+#endif
 static u8 save_sheet[sizeof(SaveSheet)];
 /* The five sprites save_load_image_file unpacks from file 0xE; [1] is the cursor. */
 static AnimState save_sprites[5];
@@ -779,7 +956,7 @@ static void save_reset_state(void)
  * it finishes (save_retry_flag = 1) or aborts (-1), then fade out and leave. */
 void save_screen_tick(void)
 {
-    u_long *window = &current_frame->otTags[0][11];
+    OT_TYPE *window = &current_frame->otTags[0][11];
     u32 state;
 
     state = game_state.progress.entrySubStep;
@@ -852,7 +1029,7 @@ void save_screen_tick(void)
 /* Same frame handler for the screen driven by load_run_step. */
 void load_screen_tick(void)
 {
-    u_long *window = &current_frame->otTags[0][11];
+    OT_TYPE *window = &current_frame->otTags[0][11];
     u32 state;
 
     state = game_state.progress.entrySubStep;
@@ -943,7 +1120,7 @@ void load_screen_tick(void)
 /* Same frame handler for the screen driven by save_transfer_run_step. */
 void save_transfer_screen_tick(void)
 {
-    u_long *window = &current_frame->otTags[0][11];
+    OT_TYPE *window = &current_frame->otTags[0][11];
     u32 state;
 
     state = game_state.progress.entrySubStep;
@@ -1145,7 +1322,7 @@ static void save_begin_message(void)
  * the screen: 2 when both slots report 4, otherwise 3. */
 static void save_probe_slots_pick_screen(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 slot;
     s32 status;
 
@@ -1184,7 +1361,7 @@ static void save_probe_slots_pick_screen(void)
 /* Say neither slot holds a card; the confirm press goes on to SAVE_STEP_CONFIRM_RESULT. */
 static void save_no_card_screen(void)
 {
-    u_long *p = current_frame->otTags[0];
+    OT_TYPE *p = current_frame->otTags[0];
     SHOW_MESSAGE(p, LOCALIZED(text_bank.messages.no_memory_card_in_either_slot));
     save_step = save_menu_wait_confirm(SAVE_STEP_NO_CARD, SAVE_STEP_CONFIRM_RESULT);
     save_confirm_flag = 1;
@@ -1199,7 +1376,7 @@ static void save_probe_result_screen(void)
     s32 card_code;
 
     {
-        u_long *ot;
+        OT_TYPE *ot;
         ot = current_frame->otTags[0];
         SHOW_MESSAGE(ot, LOCALIZED(text_bank.messages.searching_the_memory_card));
     }
@@ -1239,7 +1416,7 @@ SAVELOAD_MENU_ENTRY(save_damaged_card_screen, text_bank.messages.memory_card_in_
 /* Read the save header of each of the three slots into save_slot_records and set its status; a damaged card stops at SAVE_STEP_DAMAGED_CARD. */
 static void save_read_slot_headers(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 i;
     s16 card_code;
 
@@ -1291,7 +1468,7 @@ static void save_read_slot_headers(void)
 /* Refresh the save/load display and classify the storage probe result. */
 static void save_slot_select_screen(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 choice;
     s16 status;
 
@@ -1337,7 +1514,7 @@ static void save_slot_select_screen(void)
  * from the confirm prompt's answer. */
 static void save_overwrite_confirm_screen(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 slot;
     s32 answer;
 
@@ -1367,7 +1544,7 @@ static void save_overwrite_confirm_screen(void)
 /* Probe the card once the settle delay has passed and check that it has room to save. */
 static void save_probe_and_check_space(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 card_code;
 
     ot = current_frame->otTags[0];
@@ -1480,7 +1657,7 @@ static void save_format_prompt_screen(void)
 /* Refresh the save/load display and select the storage status message. */
 static void save_format_card(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 card_code;
 
     ot = current_frame->otTags[0];
@@ -1508,7 +1685,7 @@ SAVELOAD_MENU_ENTRY(save_format_failed_screen, text_bank.messages.formatting_fai
 /* Refresh the save/load display and select the storage status message. */
 static void save_create_file_step(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 card_code;
 
     ot = current_frame->otTags[0];
@@ -1546,7 +1723,7 @@ SAVELOAD_MENU_ENTRY(save_no_free_space_screen, text_bank.messages.cannot_save_no
 /* Build the save header and the three icon frames for the selected slot. */
 static void save_build_header(void)
 {
-    u_long *ot = current_frame->otTags[0];
+    OT_TYPE *ot = current_frame->otTags[0];
     const IconOffsets *icon = &save_icon_offsets[save_slot];
     u32 clut;
 
@@ -1574,7 +1751,7 @@ static void save_build_header(void)
 /* Refresh the save/load display, then dispatch the storage result to a screen step. */
 static void save_write_file_step(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 card_code;
 
     ot = current_frame->otTags[0];
@@ -1603,7 +1780,7 @@ SAVELOAD_MENU_ENTRY(save_disconnected_screen, text_bank.messages.memory_card_has
 /* Refresh the save/load display and record the storage probe result. */
 static void save_confirm_result(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 answer;
 
     ot = current_frame->otTags[0];
@@ -1632,7 +1809,7 @@ static void save_abort(void)
 /* Refresh the save/load screen buffer and advance its current state. */
 static void save_done_screen(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
 
     ot = current_frame->otTags[0];
     SHOW_MESSAGE(ot, LOCALIZED(text_bank.messages.data_has_been_saved));
@@ -1757,7 +1934,7 @@ static void load_run_step(void)
 /* Start a load: say the card is being searched, then probe both slots. */
 static void load_begin_message(void)
 {
-    u_long *p = current_frame->otTags[0];
+    OT_TYPE *p = current_frame->otTags[0];
     SHOW_MESSAGE(p, LOCALIZED(text_bank.messages.searching_the_memory_card));
     save_reset_state();
     save_step = LOAD_STEP_PROBE_BOTH;
@@ -1766,7 +1943,7 @@ static void load_begin_message(void)
 /* Refresh the save/load display and record the status of both storage slots. */
 static void load_probe_both_status(void)
 {
-    u_long *ot = current_frame->otTags[0];
+    OT_TYPE *ot = current_frame->otTags[0];
     s32 i;
     s32 status;
 
@@ -1803,7 +1980,7 @@ static void load_probe_both_status(void)
 /* Say neither slot holds a card; the confirm press goes on to LOAD_STEP_ABORT_CONFIRM. */
 static void load_no_card_screen(void)
 {
-    u_long *p = current_frame->otTags[0];
+    OT_TYPE *p = current_frame->otTags[0];
     SHOW_MESSAGE(p, LOCALIZED(text_bank.messages.no_memory_card_in_either_slot));
     save_step = save_menu_wait_confirm(LOAD_STEP_NO_CARD, LOAD_STEP_ABORT_CONFIRM);
     save_confirm_flag = 1;
@@ -1815,7 +1992,7 @@ SAVELOAD_PROBE_ENTRY(load_choose_card_screen, LOAD_STEP_ABORT_CONFIRM, LOAD_STEP
 /* Refresh the save/load display and select the resulting screen. */
 static void load_probe_result_screen(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 card_code;
     s16 *status;
     ot = current_frame->otTags[0];
@@ -1858,7 +2035,7 @@ SAVELOAD_MENU_ENTRY(load_damaged_card_screen, text_bank.messages.memory_card_in_
 /* Probe the three save slots, record each slot's status and pick the next step. */
 static void load_read_slot_headers(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 i;
     s16 card_code;
     s32 check;
@@ -1920,7 +2097,7 @@ SAVELOAD_MENU_ENTRY(load_no_loadable_screen, text_bank.messages.no_loadable_diar
 /* Refresh the save/load display and classify the storage probe result. */
 static void load_slot_select_screen(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 choice;
 
     ot = current_frame->otTags[0];
@@ -1956,7 +2133,7 @@ SAVELOAD_MENU_ENTRY(load_no_diary_here_screen, text_bank.messages.there_is_no_di
 /* Say the chosen slot's file is loading, pick its file name and read it. */
 static void load_begin_file(void)
 {
-    u_long *p = current_frame->otTags[0];
+    OT_TYPE *p = current_frame->otTags[0];
     SHOW_MESSAGE(p, LOCALIZED(text_bank.messages.loading_from_memory_card));
     save_file_name(save_file_name_buf, save_slot);
     save_step = LOAD_STEP_READ_FILE;
@@ -1965,7 +2142,7 @@ static void load_begin_file(void)
 /* Refresh the save/load display, then dispatch the storage result to a screen step. */
 static void load_read_file_step(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 card_code;
 
     ot = current_frame->otTags[0];
@@ -1992,7 +2169,7 @@ static void load_read_file_step(void)
 /* Refresh the load display, check the checksum of the saved image, and choose the next step. */
 static void load_verify_image_step(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 check;
     ot = current_frame->otTags[0];
     text_draw_in_frame(&ot[6], &ot[5], LOCALIZED(text_bank.messages.loading_from_memory_card));
@@ -2020,7 +2197,7 @@ SAVELOAD_MENU_ENTRY(load_disconnected_screen, text_bank.messages.memory_card_has
 /* Ask whether to abort the load; the answer picks the next step. */
 static void load_abort_confirm_screen(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 answer;
 
     ot = current_frame->otTags[0];
@@ -2049,7 +2226,7 @@ static void load_abort(void)
 /* Show that the data has been loaded and wait for the player to confirm. */
 static void load_done_screen(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
 
     ot = current_frame->otTags[0];
     SHOW_MESSAGE(ot, LOCALIZED(text_bank.messages.data_has_been_loaded));
@@ -2214,7 +2391,7 @@ static void save_transfer_run_step(void)
 /* Start a transfer: say the card is being searched, clear the transfer tables and probe the slots. */
 static void save_transfer_begin_message(void)
 {
-    u_long *ot = current_frame->otTags[0];
+    OT_TYPE *ot = current_frame->otTags[0];
     SHOW_MESSAGE(ot, LOCALIZED(text_bank.messages.searching_the_memory_card));
     save_reset_state();
     save_step = TRANSFER_STEP_PROBE_SLOTS;
@@ -2223,7 +2400,7 @@ static void save_transfer_begin_message(void)
 /* Probe the slots once the settle delay has passed. */
 static void save_transfer_probe_slots(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 card_code;
     s32 slot;
 
@@ -2263,7 +2440,7 @@ static void save_transfer_probe_slots(void)
 /* Say neither slot holds a card; the confirm press goes on to TRANSFER_STEP_ABORT_CONFIRM. */
 static void save_transfer_no_card_screen(void)
 {
-    u_long *p = current_frame->otTags[0];
+    OT_TYPE *p = current_frame->otTags[0];
     SHOW_MESSAGE(p, LOCALIZED(text_bank.messages.no_memory_card_in_either_slot));
     save_step = save_menu_wait_confirm(TRANSFER_STEP_NO_CARD, TRANSFER_STEP_ABORT_CONFIRM);
     save_confirm_flag = 1;
@@ -2276,7 +2453,7 @@ static void save_transfer_probe_result_screen(void)
     s32 card_code;
 
     {
-        u_long *ot;
+        OT_TYPE *ot;
         ot = current_frame->otTags[0];
         SHOW_MESSAGE(ot, LOCALIZED(text_bank.messages.searching_the_memory_card));
     }
@@ -2315,7 +2492,7 @@ SAVELOAD_MENU_ENTRY(save_transfer_damaged_card_screen, text_bank.messages.memory
  * error, TRANSFER_STEP_NO_LOADABLE when no slot holds a loadable diary, else TRANSFER_STEP_SLOT_SELECT. */
 static void save_transfer_read_slot_headers(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 i;
     s16 card_code;
     s32 check;
@@ -2377,7 +2554,7 @@ SAVELOAD_MENU_ENTRY(save_transfer_no_loadable_screen, text_bank.messages.no_load
 /* Refresh the save/load display and classify the storage probe result. */
 static void save_transfer_slot_select_screen(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 choice;
 
     ot = current_frame->otTags[0];
@@ -2413,7 +2590,7 @@ SAVELOAD_MENU_ENTRY(save_transfer_no_diary_here_screen, text_bank.messages.there
 /* Say the chosen slot's file is loading, pick its file name and read it. */
 static void save_transfer_begin_file(void)
 {
-    u_long *p = current_frame->otTags[0];
+    OT_TYPE *p = current_frame->otTags[0];
     SHOW_MESSAGE(p, LOCALIZED(text_bank.messages.loading_from_memory_card));
     save_file_name(save_file_name_buf, save_slot);
     save_step = TRANSFER_STEP_READ_FILE;
@@ -2422,7 +2599,7 @@ static void save_transfer_begin_file(void)
 /* Refresh the save/load display, then dispatch the storage result to a screen step. */
 static void save_transfer_read_file_step(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 card_code;
 
     ot = current_frame->otTags[0];
@@ -2449,7 +2626,7 @@ static void save_transfer_read_file_step(void)
 /* Refresh the save/load display and record whether the selected slot is ready. */
 static void save_transfer_verify_image_step(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 check;
     ot = current_frame->otTags[0];
     SHOW_MESSAGE(ot, LOCALIZED(text_bank.messages.loading_from_memory_card));
@@ -2465,6 +2642,9 @@ static void save_transfer_verify_image_step(void)
     else
     {
         save_image_shift_out();
+#ifdef __psyz
+        save_unpack_animals(&save_partner_animals, &((Ps1SaveImage *)save_image)->animals);
+#endif
         save_step = TRANSFER_STEP_CHECK_SAME_GAME;
     }
 }
@@ -2478,9 +2658,13 @@ SAVELOAD_MENU_ENTRY(save_transfer_disconnected_screen, text_bank.messages.memory
 /* Compare the file's header with game_state: a file from this same farm goes to TRANSFER_STEP_SAME_GAME, any other to TRANSFER_STEP_FARM_NAME. */
 static void save_transfer_check_same_game_step(void)
 {
-    u_long *p = current_frame->otTags[0];
+    OT_TYPE *p = current_frame->otTags[0];
     SHOW_MESSAGE(p, LOCALIZED(text_bank.messages.loading_from_memory_card));
+#ifdef __psyz
+    if (memcmp(((Ps1SaveImage *)save_image)->flagWords, &game_state, 8) == 0)
+#else
     if (memcmp(&((SaveFile *)save_image)->flagWords, &game_state, 8) == 0)
+#endif
     {
         save_step = TRANSFER_STEP_SAME_GAME;
     }
@@ -2494,7 +2678,7 @@ static void save_transfer_check_same_game_step(void)
 /* Say the file is from this same game and cannot be exchanged; the confirm press or a timeout goes back to slot select. */
 static void save_transfer_same_game_screen(void)
 {
-    u_long *p;
+    OT_TYPE *p;
     p = current_frame->otTags[0];
     SHOW_MESSAGE(p, LOCALIZED(text_bank.messages.cannot_exchange_with_diary_from_same));
     save_step = save_menu_wait_confirm(TRANSFER_STEP_SAME_GAME, TRANSFER_STEP_SLOT_SELECT);
@@ -2544,7 +2728,7 @@ static void save_transfer_save_name_step(void)
 /* Check that the queued transfers fit in both the current game and the save file. */
 static void save_check_transfer_fit(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s16 total[2];
     s16 hens[2];
     s16 cows[2];
@@ -2578,6 +2762,21 @@ static void save_check_transfer_fit(void)
         total[i] = hens[i] + cows[i];
     }
     haveHens[0] = save_count_records(&game_state.animals, SAVE_TABLE_CHICKENS);
+#ifdef __psyz
+    haveHens[1] = save_count_records(&save_partner_animals, SAVE_TABLE_CHICKENS);
+    haveCows[0] = save_count_records(&game_state.animals, SAVE_TABLE_LIVESTOCK);
+    haveCows[1] = save_count_records(&save_partner_animals, SAVE_TABLE_LIVESTOCK);
+    hensLimit[0] =
+        game_state.progress.estate.coopLevel == 0 ? COOP_CAPACITY_BASIC : COOP_CAPACITY_UPGRADED;
+    hensLimit[1] = ((FarmEstate *)&((Ps1SaveImage *)save_image)->progress.estate)->coopLevel == 0
+                       ? COOP_CAPACITY_BASIC
+                       : COOP_CAPACITY_UPGRADED;
+    cowsLimit[0] =
+        game_state.progress.estate.barnLevel == 0 ? BARN_CAPACITY_BASIC : BARN_CAPACITY_UPGRADED;
+    cowsLimit[1] = ((FarmEstate *)&((Ps1SaveImage *)save_image)->progress.estate)->barnLevel == 0
+                       ? BARN_CAPACITY_BASIC
+                       : BARN_CAPACITY_UPGRADED;
+#else
     haveHens[1] = save_count_records(save_image, SAVE_TABLE_CHICKENS);
     haveCows[0] = save_count_records(&game_state.animals, SAVE_TABLE_LIVESTOCK);
     haveCows[1] = save_count_records(save_image, SAVE_TABLE_LIVESTOCK);
@@ -2585,6 +2784,7 @@ static void save_check_transfer_fit(void)
     hensLimit[1] = ((FarmEstate *)&((SaveFile *)save_image)->estate)->coopLevel == 0 ? COOP_CAPACITY_BASIC : COOP_CAPACITY_UPGRADED;
     cowsLimit[0] = game_state.progress.estate.barnLevel == 0 ? BARN_CAPACITY_BASIC : BARN_CAPACITY_UPGRADED;
     cowsLimit[1] = ((FarmEstate *)&((SaveFile *)save_image)->estate)->barnLevel == 0 ? BARN_CAPACITY_BASIC : BARN_CAPACITY_UPGRADED;
+#endif
     if (total[0] == 0 && total[1] == 0)
     {
         save_step = TRANSFER_STEP_NO_ANIMAL;
@@ -2626,7 +2826,7 @@ SAVELOAD_CONFIRM_ENTRY(save_transfer_partner_cows_full_screen, text_bank.message
 static void save_transfer_confirm_screen(void)
 {
     s32 answer;
-    u_long *ot;
+    OT_TYPE *ot;
 
     save_draw_transfer_lists();
     ot = current_frame->otTags[0];
@@ -2681,7 +2881,7 @@ static void save_transfer_slot_confirm_screen(void)
 /* Refresh the save/load display and advance the screen state. */
 static void save_transfer_write_step(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 card_code;
 
     ot = current_frame->otTags[0];
@@ -2732,7 +2932,7 @@ SAVELOAD_MENU_ENTRY(save_transfer_write_failed_screen, text_bank.messages.save_p
 /* Ask whether to abort the exchange; the answer picks the next step. */
 static void save_transfer_abort_confirm_screen(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     s32 answer;
 
     ot = current_frame->otTags[0];
@@ -2761,7 +2961,7 @@ static void save_transfer_abort(void)
 /* Show that the exchange has ended and wait for the player to confirm. */
 static void save_transfer_done_screen(void)
 {
-    u_long *ot;
+    OT_TYPE *ot;
 
     ot = current_frame->otTags[0];
     SHOW_MESSAGE(ot, LOCALIZED(text_bank.messages.exchange_has_ended));
@@ -2820,7 +3020,11 @@ static void save_place_row_spot(FarmActor *object, s16 slot) {
     object->place.location = 5;
 }
 
+#ifdef __psyz
+#define SAVE_CHARS (&save_partner_animals)
+#else
 #define SAVE_CHARS ((FarmAnimals *)save_image)
+#endif
 #define FARM_CHARS (game_state.animals)
 /* Pack the entries selected in list 1 into save_out_buffer and clear them from the farm's animals. */
 static void save_transfer_stash(void)
@@ -2875,7 +3079,7 @@ static void save_transfer_stash(void)
         switch (kind)
         {
         case SAVE_PANEL_CHICKENS:
-            dst = save_find_free_record(save_image, SAVE_TABLE_CHICKENS, &slot);
+            dst = save_find_free_record(SAVE_CHARS, SAVE_TABLE_CHICKENS, &slot);
             FARM_CHARS.chickens[index].actor.sprite.source = 0;
             save_place_grid_spot(&FARM_CHARS.chickens[index].actor, slot);
             memcpy(dst, &FARM_CHARS.chickens[index], sizeof(FarmChicken));
@@ -2883,7 +3087,7 @@ static void save_transfer_stash(void)
             break;
         case SAVE_PANEL_CATTLE:
         case SAVE_PANEL_SHEEP:
-            dst = save_find_free_record(save_image, SAVE_TABLE_LIVESTOCK, &slot);
+            dst = save_find_free_record(SAVE_CHARS, SAVE_TABLE_LIVESTOCK, &slot);
             FARM_CHARS.livestock[index].actor.sprite.source = 0;
             save_place_row_spot(&FARM_CHARS.livestock[index].actor, slot);
             memcpy(dst, &FARM_CHARS.livestock[index], sizeof(FarmLivestock));
@@ -2891,6 +3095,9 @@ static void save_transfer_stash(void)
             break;
         }
     }
+#ifdef __psyz
+    save_pack_animals(&((Ps1SaveImage *)save_image)->animals, &save_partner_animals);
+#endif
 }
 #undef SAVE_CHARS
 #undef FARM_CHARS
@@ -2914,13 +3121,21 @@ static void save_transfer_restore(void)
         {
         case SAVE_PANEL_CHICKENS:
             dst = save_find_free_record(&game_state.animals, SAVE_TABLE_CHICKENS, &slot);
+#ifdef __psyz
+            *(FarmChicken *)dst = *(FarmChicken *)save_entries[1][i].data;
+#else
             *(FarmChickenImage *)dst = *(FarmChickenImage *)save_entries[1][i].data;
+#endif
             save_place_grid_spot(&game_state.animals.chickens[slot].actor, slot);
             break;
         case SAVE_PANEL_CATTLE:
         case SAVE_PANEL_SHEEP:
             dst = save_find_free_record(&game_state.animals, SAVE_TABLE_LIVESTOCK, &slot);
+#ifdef __psyz
+            *(FarmLivestock *)dst = *(FarmLivestock *)save_entries[1][i].data;
+#else
             *(FarmLivestockImage *)dst = *(FarmLivestockImage *)save_entries[1][i].data;
+#endif
             save_place_row_spot(&game_state.animals.livestock[slot].actor, slot);
             break;
         }
@@ -3015,7 +3230,11 @@ static void save_draw_transfer_lists(void)
     {
         if (side != 0)
         {
+#ifdef __psyz
+            records = &save_partner_animals;
+#else
             records = save_image;
+#endif
         }
         else
         {
@@ -3048,9 +3267,9 @@ static void save_draw_transfer_lists(void)
 /* Draw the save/load name panel: frames, title, row cursor, and the 9-character name of the current farm or the loaded save. */
 static s32 save_draw_name_panel(s16 side)
 {
-    u_long *ot;
-    u_long *cursor_ot;
-    u_long *text_ot;
+    OT_TYPE *ot;
+    OT_TYPE *cursor_ot;
+    OT_TYPE *text_ot;
     u16 *name;
     s32 triggered;
     s32 i;
@@ -3098,7 +3317,11 @@ static s32 save_draw_name_panel(s16 side)
     }
     else
     {
+#ifdef __psyz
+        name = ((FarmEstate *)&((Ps1SaveImage *)save_image)->progress.estate)->farmName;
+#else
         name = (u16 *)&((SaveImage *)save_image)->progress.estate.words[5];
+#endif
     }
     for (i = 0; i < NAME_LENGTH; i++)
     {
@@ -3125,8 +3348,8 @@ static s32 save_draw_name_panel(s16 side)
 static s32 save_transfer_list_step(s16 side)
 {
     FarmAnimals *inv;
-    u_long *ot;
-    u_long *list;
+    OT_TYPE *ot;
+    OT_TYPE *list;
     s32 count;
     s32 triggered;
     s32 pressed;
@@ -3138,7 +3361,11 @@ static s32 save_transfer_list_step(s16 side)
     result = 0;
     if (side)
     {
+#ifdef __psyz
+        inv = &save_partner_animals;
+#else
         inv = save_image;
+#endif
     }
     else
     {
@@ -3364,7 +3591,7 @@ static void save_draw_entry_prompt(s16 kind, s32 selected, u16 *text, s16 affect
 /* Draw the summary line of save entry `index` (two record layouts) at row `y`. */
 static void save_draw_summary_line(FarmAnimals *records, s16 index, s16 y)
 {
-    u_long *ot;
+    OT_TYPE *ot;
     FarmActor *entry;
     s16 selected;
     s16 column;
@@ -3511,7 +3738,11 @@ static void save_reset_work_tables(void)
             save_entries[i][j].data = 0;
         }
     }
+#ifdef __psyz
+    memset(save_out_buffer, 0, sizeof(save_out_buffer));
+#else
     memset(save_out_buffer, 0, 0x398);
+#endif
 }
 
 /* Reset the transfer list to the chickens page, the top row and an empty transfer count. */
@@ -3594,6 +3825,302 @@ static void save_slot_record_fill(s16 slot)
     memcpy(save_file_header + SAVE_HEADER_OFFSET, &save_slot_records[slot], sizeof(SaveSlotRecord));
 }
 
+#ifdef __psyz
+_Static_assert(sizeof(FarmProgress) == sizeof(SavedProgress), "FarmProgress size");
+_Static_assert(sizeof(FarmWorld) == sizeof(State8007AD00), "FarmWorld size");
+_Static_assert(sizeof(FarmEnding) == sizeof(State8007AFD8), "FarmEnding size");
+
+static void save_pack_anim(Ps1AnimState *dst, const AnimState *src)
+{
+    memcpy(dst->head, src, sizeof(dst->head));
+    memset(dst->ptrs, 0, sizeof(dst->ptrs));
+}
+
+static void save_unpack_anim(AnimState *dst, const Ps1AnimState *src)
+{
+    memset(dst, 0, sizeof(*dst));
+    memcpy(dst, src->head, sizeof(src->head));
+}
+
+static void save_pack_actor(Ps1FarmActor *dst, const FarmActor *src)
+{
+    memcpy(dst->head, src, sizeof(dst->head));
+    save_pack_anim(&dst->sprite, &src->sprite);
+    dst->cue = src->cue;
+}
+
+static void save_unpack_actor(FarmActor *dst, const Ps1FarmActor *src)
+{
+    memset(dst, 0, sizeof(*dst));
+    memcpy(dst, src->head, sizeof(src->head));
+    save_unpack_anim(&dst->sprite, &src->sprite);
+    dst->cue = src->cue;
+}
+
+static void save_pack_animals(Ps1FarmAnimals *dst, const FarmAnimals *src)
+{
+    s32 i;
+
+    memset(dst, 0, sizeof(*dst));
+    for (i = 0; i < MAX_CHICKENS; i++)
+    {
+        save_pack_actor(&dst->chickens[i].actor, &src->chickens[i].actor);
+        dst->chickens[i].grazingTime = src->chickens[i].grazingTime;
+        dst->chickens[i].daysSick = src->chickens[i].daysSick;
+        dst->chickens[i].pregnancy = src->chickens[i].pregnancy;
+        dst->chickens[i].unusedValue = src->chickens[i].unusedValue;
+    }
+    for (i = 0; i < MAX_LIVESTOCK; i++)
+    {
+        save_pack_actor(&dst->livestock[i].actor, &src->livestock[i].actor);
+        dst->livestock[i].grazeCount = src->livestock[i].grazeCount;
+        dst->livestock[i].daysSick = src->livestock[i].daysSick;
+        dst->livestock[i].growthDays = src->livestock[i].growthDays;
+        dst->livestock[i].pregnancy = src->livestock[i].pregnancy;
+        dst->livestock[i].daysSinceShearing = src->livestock[i].daysSinceShearing;
+        dst->livestock[i].helperNumber = src->livestock[i].helperNumber;
+    }
+    dst->pond = src->pond;
+    save_pack_actor(&dst->dog.actor, &src->dog.actor);
+    dst->dog.training = src->dog.training;
+    memcpy(dst->dog.padAE, src->dog.padAE, sizeof(dst->dog.padAE));
+    memcpy(dst->dog.projectCoords, src->dog.projectCoords, sizeof(dst->dog.projectCoords));
+    save_pack_actor(&dst->horse.actor, &src->horse.actor);
+    dst->horse.training = src->horse.training;
+    memcpy(dst->horse.padAE, src->horse.padAE, sizeof(dst->horse.padAE));
+    memcpy(dst->horse.projectCoords, src->horse.projectCoords, sizeof(dst->horse.projectCoords));
+    for (i = 0; i < FARM_ACTIONS; i++)
+    {
+        save_pack_actor(&dst->actions[i].actor, &src->actions[i].actor);
+        dst->actions[i].countdown = src->actions[i].countdown;
+    }
+    for (i = 0; i < EXTRA_CHICKENS; i++)
+    {
+        save_pack_actor(&dst->extraChickens[i].actor, &src->extraChickens[i].actor);
+        dst->extraChickens[i].grazingTime = src->extraChickens[i].grazingTime;
+        dst->extraChickens[i].daysSick = src->extraChickens[i].daysSick;
+        dst->extraChickens[i].pregnancy = src->extraChickens[i].pregnancy;
+        dst->extraChickens[i].unusedValue = src->extraChickens[i].unusedValue;
+    }
+    memcpy(dst->slots, src->slots, sizeof(dst->slots));
+    dst->spawnGate = src->spawnGate;
+    memcpy(dst->moveSpeeds, src->moveSpeeds, sizeof(dst->moveSpeeds));
+    dst->fishCount = src->fishCount;
+    dst->pendingTrack = src->pendingTrack;
+}
+
+static void save_unpack_animals(FarmAnimals *dst, const Ps1FarmAnimals *src)
+{
+    s32 i;
+
+    memset(dst, 0, sizeof(*dst));
+    for (i = 0; i < MAX_CHICKENS; i++)
+    {
+        save_unpack_actor(&dst->chickens[i].actor, &src->chickens[i].actor);
+        dst->chickens[i].grazingTime = src->chickens[i].grazingTime;
+        dst->chickens[i].daysSick = src->chickens[i].daysSick;
+        dst->chickens[i].pregnancy = src->chickens[i].pregnancy;
+        dst->chickens[i].unusedValue = src->chickens[i].unusedValue;
+    }
+    for (i = 0; i < MAX_LIVESTOCK; i++)
+    {
+        save_unpack_actor(&dst->livestock[i].actor, &src->livestock[i].actor);
+        dst->livestock[i].grazeCount = src->livestock[i].grazeCount;
+        dst->livestock[i].daysSick = src->livestock[i].daysSick;
+        dst->livestock[i].growthDays = src->livestock[i].growthDays;
+        dst->livestock[i].pregnancy = src->livestock[i].pregnancy;
+        dst->livestock[i].daysSinceShearing = src->livestock[i].daysSinceShearing;
+        dst->livestock[i].helperNumber = src->livestock[i].helperNumber;
+    }
+    dst->pond = src->pond;
+    save_unpack_actor(&dst->dog.actor, &src->dog.actor);
+    dst->dog.training = src->dog.training;
+    memcpy(dst->dog.padAE, src->dog.padAE, sizeof(dst->dog.padAE));
+    memcpy(dst->dog.projectCoords, src->dog.projectCoords, sizeof(dst->dog.projectCoords));
+    save_unpack_actor(&dst->horse.actor, &src->horse.actor);
+    dst->horse.training = src->horse.training;
+    memcpy(dst->horse.padAE, src->horse.padAE, sizeof(dst->horse.padAE));
+    memcpy(dst->horse.projectCoords, src->horse.projectCoords, sizeof(dst->horse.projectCoords));
+    for (i = 0; i < FARM_ACTIONS; i++)
+    {
+        save_unpack_actor(&dst->actions[i].actor, &src->actions[i].actor);
+        dst->actions[i].countdown = src->actions[i].countdown;
+    }
+    for (i = 0; i < EXTRA_CHICKENS; i++)
+    {
+        save_unpack_actor(&dst->extraChickens[i].actor, &src->extraChickens[i].actor);
+        dst->extraChickens[i].grazingTime = src->extraChickens[i].grazingTime;
+        dst->extraChickens[i].daysSick = src->extraChickens[i].daysSick;
+        dst->extraChickens[i].pregnancy = src->extraChickens[i].pregnancy;
+        dst->extraChickens[i].unusedValue = src->extraChickens[i].unusedValue;
+    }
+    memcpy(dst->slots, src->slots, sizeof(dst->slots));
+    dst->spawnGate = src->spawnGate;
+    memcpy(dst->moveSpeeds, src->moveSpeeds, sizeof(dst->moveSpeeds));
+    dst->fishCount = src->fishCount;
+    dst->pendingTrack = src->pendingTrack;
+}
+
+static void save_pack_player(Ps1FarmPlayer *dst, const FarmPlayer *src)
+{
+    s32 i;
+
+    memset(dst, 0, sizeof(*dst));
+    memcpy(dst->head, src, sizeof(dst->head));
+    memcpy(dst->mid, &src->targetFlags, sizeof(dst->mid));
+    save_pack_anim(&dst->secondSprite, &src->secondSprite);
+    save_pack_anim(&dst->sprite, &src->sprite);
+    dst->wedding = src->wedding;
+    dst->cue = src->cue;
+    for (i = 0; i < PLAYER_TOYS; i++)
+    {
+        memcpy(dst->toys[i].pad00, src->toys[i].pad00, sizeof(dst->toys[i].pad00));
+        save_pack_anim(&dst->toys[i].sprite, &src->toys[i].sprite);
+    }
+    memcpy(dst->poses, src->poses, sizeof(dst->poses));
+}
+
+static void save_unpack_player(FarmPlayer *dst, const Ps1FarmPlayer *src)
+{
+    s32 i;
+
+    memset(dst, 0, sizeof(*dst));
+    memcpy(dst, src->head, sizeof(src->head));
+    memcpy(&dst->targetFlags, src->mid, sizeof(src->mid));
+    save_unpack_anim(&dst->secondSprite, &src->secondSprite);
+    save_unpack_anim(&dst->sprite, &src->sprite);
+    dst->wedding = src->wedding;
+    dst->cue = src->cue;
+    for (i = 0; i < PLAYER_TOYS; i++)
+    {
+        memcpy(dst->toys[i].pad00, src->toys[i].pad00, sizeof(dst->toys[i].pad00));
+        save_unpack_anim(&dst->toys[i].sprite, &src->toys[i].sprite);
+    }
+    memcpy(dst->poses, src->poses, sizeof(dst->poses));
+}
+
+static void save_pack_helpers(Ps1FarmHelper *dst, const FarmHelper *src)
+{
+    s32 i;
+
+    for (i = 0; i < HELPER_COUNT; i++)
+    {
+        memset(&dst[i], 0, sizeof(dst[i]));
+        save_pack_actor(&dst[i].actor, &src[i].actor);
+        memcpy(dst[i].mid, &src[i].number, sizeof(dst[i].mid));
+        save_pack_anim(&dst[i].itemSprite, &src[i].itemSprite);
+    }
+}
+
+static void save_unpack_helpers(FarmHelper *dst, const Ps1FarmHelper *src)
+{
+    s32 i;
+
+    for (i = 0; i < HELPER_COUNT; i++)
+    {
+        memset(&dst[i], 0, sizeof(dst[i]));
+        save_unpack_actor(&dst[i].actor, &src[i].actor);
+        memcpy(&dst[i].number, src[i].mid, sizeof(src[i].mid));
+        save_unpack_anim(&dst[i].itemSprite, &src[i].itemSprite);
+    }
+}
+
+/* Pack the farm state into the 32-bit PS1 save-file wire layout at save_image_data. */
+static void save_pack_farm_state(void)
+{
+    Ps1SaveImage *dst;
+    s32 i;
+
+    save_image = save_image_data;
+    dst = (Ps1SaveImage *)save_image;
+    memset(dst, 0, sizeof(*dst));
+    save_pack_animals(&dst->animals, &game_state.animals);
+    for (i = 0; i < CHARACTER_COUNT; i++)
+    {
+        dst->records[i].birthday = game_state.villagers[i].birthday;
+        dst->records[i].friendship = game_state.villagers[i].friendship;
+        dst->records[i].affection = game_state.villagers[i].affection;
+        dst->records[i].flags = game_state.villagers[i].flags;
+        dst->records[i].placeFlags = game_state.villagers[i].placeFlags;
+        dst->records[i].step = game_state.villagers[i].step;
+    }
+    if (game_state.runs.records[16] != 0)
+    {
+        memcpy(&dst->run16, game_state.runs.records[16], sizeof(dst->run16));
+    }
+    if (game_state.runs.records[18] != 0)
+    {
+        memcpy(&dst->run18, game_state.runs.records[18], sizeof(dst->run18));
+    }
+    dst->flagWords[0] = game_state.unk00;
+    dst->flagWords[1] = game_state.unk04;
+    dst->flagWords[2] = game_state.frameCount;
+    dst->flagWords[3] = game_state.globalFlags;
+    dst->flagWords[4] = game_state.debugFlags;
+    dst->flagWords[5] = (u32)game_state.lastCaller;
+    dst->request = (game_state.request != 0) ? PS1_REQUEST_HEAD_ADDR : 0;
+    memcpy(&dst->eventFlags, game_state.eventFlags, sizeof(dst->eventFlags));
+    memcpy(&dst->progress, &game_state.progress, sizeof(dst->progress));
+    save_pack_player(&dst->player, &game_state.player);
+    memcpy(&dst->fieldTiles, game_state.fieldTiles, sizeof(dst->fieldTiles));
+    memcpy(&dst->slots7x7, game_state.slots7x7, sizeof(dst->slots7x7));
+    memcpy(&dst->requests, &game_state.requests, sizeof(dst->requests));
+    save_pack_helpers(dst->helpers, game_state.helpers);
+    memcpy(&dst->world, &game_state.world, sizeof(dst->world));
+    memcpy(&dst->days, &game_state.days, sizeof(dst->days));
+    memcpy(&dst->drift, &game_state.drift, sizeof(dst->drift));
+    memcpy(&dst->family, &game_state.family, sizeof(dst->family));
+    memcpy(&dst->ending, &game_state.ending, sizeof(dst->ending));
+}
+
+/* Copy the loaded 32-bit PS1 save image into the native 64-bit game state. */
+static void save_unpack_farm_state(void)
+{
+    const Ps1SaveImage *src;
+    s32 i;
+
+    save_image = save_image_data;
+    src = (const Ps1SaveImage *)save_image;
+    if (game_state.runs.records[16] != 0)
+    {
+        memcpy(game_state.runs.records[16], &src->run16, sizeof(src->run16));
+    }
+    if (game_state.runs.records[18] != 0)
+    {
+        memcpy(game_state.runs.records[18], &src->run18, sizeof(src->run18));
+    }
+    for (i = 0; i < CHARACTER_COUNT; i++)
+    {
+        game_state.villagers[i].birthday = src->records[i].birthday;
+        game_state.villagers[i].friendship = src->records[i].friendship;
+        game_state.villagers[i].affection = src->records[i].affection;
+        game_state.villagers[i].flags = src->records[i].flags;
+        game_state.villagers[i].placeFlags = src->records[i].placeFlags;
+        game_state.villagers[i].step = src->records[i].step;
+    }
+    save_unpack_animals(&game_state.animals, &src->animals);
+    game_state.unk00 = src->flagWords[0];
+    game_state.unk04 = src->flagWords[1];
+    game_state.frameCount = src->flagWords[2];
+    game_state.globalFlags = src->flagWords[3];
+    game_state.debugFlags = src->flagWords[4];
+    game_state.lastCaller = (s32)src->flagWords[5];
+    /* Preserve native table pointers; map PS1 request pointer to requests.items[0]. */
+    game_state.request = (src->request != 0) ? &game_state.requests.items[0] : 0;
+    memcpy(game_state.eventFlags, &src->eventFlags, sizeof(src->eventFlags));
+    memcpy(&game_state.progress, &src->progress, sizeof(src->progress));
+    save_unpack_player(&game_state.player, &src->player);
+    memcpy(game_state.fieldTiles, &src->fieldTiles, sizeof(src->fieldTiles));
+    memcpy(game_state.slots7x7, &src->slots7x7, sizeof(src->slots7x7));
+    memcpy(&game_state.requests, &src->requests, sizeof(src->requests));
+    save_unpack_helpers(game_state.helpers, src->helpers);
+    memcpy(&game_state.world, &src->world, sizeof(src->world));
+    memcpy(&game_state.days, &src->days, sizeof(src->days));
+    memcpy(&game_state.drift, &src->drift, sizeof(src->drift));
+    memcpy(&game_state.family, &src->family, sizeof(src->family));
+    memcpy(&game_state.ending, &src->ending, sizeof(src->ending));
+}
+#else
 #define SAVE_FILE ((SaveFile *)save_image)
 #define PACK_800742EC (*(Pack800742EC *)&game_state.animals.chickens)
 #define PACK_8006C838 (*(Pack8006C838 *)&game_state)
@@ -3741,6 +4268,7 @@ static void save_unpack_farm_state(void)
 }
 #undef SAVE_IMAGE
 #undef SAVED_PROGRESS
+#endif
 
 /* Shift the save image's 0x80-byte blocks by one byte before a save; save_image_shift_out undoes it. */
 static void save_image_shift_in(void)

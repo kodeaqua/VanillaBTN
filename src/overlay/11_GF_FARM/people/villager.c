@@ -3,7 +3,7 @@
 
 #include <sys/types.h>
 #include <abs.h>
-#include <memory.h>
+#include <string.h>
 #include <libgte.h>
 #include "types.h"
 #include "anim.h"
@@ -371,9 +371,9 @@ static inline void move_to_cell(FarmVillager *villager, FarmCell *cell)
     villager->position.vx = cell->x;
     villager->position.vy = cell->y;
     villager->position.vz = cell->z;
-    villager->fixedPosition.vx = cell->x << 16;
-    villager->fixedPosition.vy = cell->y << 16;
-    villager->fixedPosition.vz = cell->z << 16;
+    villager->fixedPosition.vx = (s32)((u32)cell->x << 16);
+    villager->fixedPosition.vy = (s32)((u32)cell->y << 16);
+    villager->fixedPosition.vz = (s32)((u32)cell->z << 16);
 }
 
 /* The villager reached `cell`: stop it there and start the next cell of its route
@@ -458,7 +458,11 @@ static void villager_reached_cell(FarmVillager *villager, FarmRouteRow *grid, Fa
         return;
     case ROUTE_CELL_SCHEDULE:
         villager->step++;
+#ifdef __psyz
+        villager_set_destination(villager);
+#else
         ((void (*)())villager_set_destination)(villager);
+#endif
         villager->place.value = villager->schedule[villager->step].place.value;
         villager->place.location = villager->schedule[villager->step].place.location;
         villager->schedule[villager->step].time = game_state.progress.clock.minuteOfDay;
@@ -685,7 +689,11 @@ static void villager_schedule_advance(FarmVillager *villager)
         villager->placeFlags &= ~VILLAGER_PLACE_KEPT_PLACE;
     }
     villager->step++;
+#ifdef __psyz
+    villager_set_destination(villager);
+#else
     ((void (*)())villager_set_destination)(villager);
+#endif
     if (old_location != villager->place.location)
     {
         moved = 1;
@@ -1131,13 +1139,24 @@ static void villager_draw(FarmVillager *villager)
 {
     SVECTOR input;
     FarmScreenPoint result;
-    u_long *ot_slot;
+    OT_TYPE *ot_slot;
 
     input.vx = villager->position.vx + 150;
     input.vy = villager->position.vy - 100;
     input.vz = villager->position.vz - 150;
     if (estate_point_project(&input, &result) != 0)
     {
+#ifdef __psyz
+        s32 slot = result.depth >> 2;
+        if (villager->id == game_state.family.wifeVillager)
+        {
+            if (event_flag_get(EVENT_FLAG_SPOUSE_AT_HOME) != 0)
+            {
+                slot -= 5;
+            }
+        }
+        ot_slot = FRAME_OT_AT(slot);
+#else
         ot_slot = &current_frame->ot[result.depth >> 2];
         if (villager->id == game_state.family.wifeVillager)
         {
@@ -1146,6 +1165,7 @@ static void villager_draw(FarmVillager *villager)
                 ot_slot -= 5;
             }
         }
+#endif
         cue_draw_frame(&villager->cue, ot_slot, result.x, result.y - 40);
         sprite_draw_traced(ot_slot, current_frame->primCursor.ft4, &villager->sprite80, villager->sprite80.animation, villager->sprite80.frame,
                            result.x, result.y, villager->sprite80.scale, 0, 64);
@@ -1196,9 +1216,9 @@ static s32 villager_route_step_move(FarmVillager *villager, s32 command, s32 res
         villager->position.vx = cell->x;
         villager->position.vy = cell->y;
         villager->position.vz = cell->z;
-        villager->fixedPosition.vx = cell->x << 16;
-        villager->fixedPosition.vy = cell->y << 16;
-        villager->fixedPosition.vz = cell->z << 16;
+        villager->fixedPosition.vx = (s32)((u32)cell->x << 16);
+        villager->fixedPosition.vy = (s32)((u32)cell->y << 16);
+        villager->fixedPosition.vz = (s32)((u32)cell->z << 16);
         if (!resume)
         {
             villager->column = 1;

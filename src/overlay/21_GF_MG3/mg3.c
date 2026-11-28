@@ -2,8 +2,12 @@
  * targets. Each record has its own state, sprite and target group. */
 
 #include <sys/types.h>
-#include <memory.h>
+#include <string.h>
 #include <libgte.h>
+#ifdef __psyz
+/* PsyZ implements rsin/rcos (same 4096-unit Q4.12 trig) without csin/ccos aliases. */
+#define ccos rcos
+#endif
 #include <libgpu.h>
 #include <libgs.h>
 #include <libspu.h>
@@ -1546,7 +1550,7 @@ static void mg3_draw_frame(void) {
     s32 height;
     s32 raw_width;
     s32 raw_height;
-    u_long *display_buffer;
+    OT_TYPE *display_buffer;
 
     anim_select_range(&mg3_state.sprites[1], 0);
     raw_width = HWD0;
@@ -1560,12 +1564,12 @@ static void mg3_draw_frame(void) {
 /* Project a point (its coordinates moved by a fixed view offset) to the screen and draw the sprite
  * there; records 0, 1, 2 and 5 also get the small icon over it. */
 static void mg3_draw_sprite_at(AnimState *object, s16 *coordinates) {
-    u_long *drawing_area;
+    OT_TYPE *drawing_area;
 
     mg3_offset_vec.vx = coordinates[0] + 150;
     mg3_offset_vec.vy = coordinates[1] - 100;
     mg3_offset_vec.vz = coordinates[2] - 150;
-    drawing_area = &current_frame->ot[gte_project_vertex(&mg3_offset_xy, &mg3_offset_vec) >> 2];
+    drawing_area = FRAME_OT_AT(gte_project_vertex(&mg3_offset_xy, &mg3_offset_vec) >> 2);
     anim_draw_ft4_advance(drawing_area, object, mg3_offset_xy.x, mg3_offset_xy.y);
     if (object == mg3_state.records[0].sprite || object == mg3_state.records[1].sprite ||
         object == mg3_state.records[2].sprite || object == mg3_state.records[5].sprite) {
