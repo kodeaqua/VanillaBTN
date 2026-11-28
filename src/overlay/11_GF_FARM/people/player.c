@@ -1,6 +1,7 @@
 /* The player: input, movement, tools, carried and thrown items. */
 
 #ifdef __psyz
+#include <stddef.h>
 #include <stdint.h>
 #endif
 #include <sys/types.h>
@@ -173,6 +174,17 @@ typedef struct
     u8 pad24[0xAC - 0x24];
     u16 talkVillager;
 } FarmObjectRecord;
+
+#ifdef __psyz
+_Static_assert(offsetof(FarmObjectStatus, talkVillager) == offsetof(FarmVillager, id),
+               "FarmObjectStatus id");
+_Static_assert(offsetof(FarmObjectStatus, mode) == offsetof(FarmVillager, flags),
+               "FarmObjectStatus flags");
+_Static_assert(offsetof(FarmObjectRecord, item) == offsetof(FarmActor, kind),
+               "FarmObjectRecord item");
+_Static_assert(offsetof(FarmObjectRecord, facing) == offsetof(FarmActor, facing),
+               "FarmObjectRecord facing");
+#endif
 
 typedef struct FarmVelocity
 {
@@ -3449,7 +3461,12 @@ static s32 player_confirm_action(FarmPlayer *player, s32 buttons)
             player_reset_pose();
             return 1;
         }
+#ifdef __psyz
+        /* FarmHelper.number sits past FarmActor.sprite, which widens on 64-bit native. */
+        player->talkVillager = ((FarmHelper *)farmTarget)->number;
+#else
         player->talkVillager = ((FarmObjectRecord *)farmTarget)->talkVillager;
+#endif
         player_reset_pose();
     }
     if (farmTargetFlags & 0x200)

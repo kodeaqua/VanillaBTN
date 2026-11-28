@@ -6,6 +6,7 @@
 #include <libgte.h>
 #include <libgpu.h>
 #ifdef __psyz
+#include <stddef.h>
 /* PsyZ declares KanjiFntClose/Print with a stream id; PS1 uses the default stream. */
 #define KanjiFntClose() (KanjiFntClose)(-1)
 #define KanjiFntPrint(...) (KanjiFntPrint)(-1, __VA_ARGS__)
@@ -60,7 +61,15 @@ typedef struct ItemStats {
     s32 speed[3];
     u8  pad54[0x58 - 0x54];
     s32 destination[3];
+#ifdef __psyz
+    s32 destinationPad;
+    VECTOR target;
+    AnimState sprite;
+    ItemCue cue;
+    u32 actorTailPad;
+#else
     u8  pad64[0xAC - 0x64];
+#endif
     u16 grazingTime;
     u16 daysSick;
     u16 growthDays;
@@ -97,7 +106,15 @@ typedef struct SwindRecord {
     s32 speed[3];
     u8 pad54[0x58 - 0x54];
     s32 destination[3];
+#ifdef __psyz
+    s32 destinationPad;
+    VECTOR target;
+    AnimState sprite;
+    ItemCue cue;
+    u32 actorTailPad;
+#else
     u8 pad64[0xAC - 0x64];
+#endif
     u16 grazingTime;
     u16 daysSick;
     u16 pregnancy;
@@ -123,12 +140,33 @@ typedef struct FarmExtraChicken {
     VECTOR position;
     VECTOR speed;
     VECTOR destination;
+#ifdef __psyz
+    VECTOR target;
+    AnimState sprite;
+    ItemCue cue;
+    u32 actorTailPad;
+#else
     u8 pad68[0xAC - 0x68];
+#endif
     s16 grazingTime;
     s16 daysSick;
     s16 pregnancy;
     u8 padB2[0xB4 - 0xB2];
 } FarmExtraChicken;
+
+#ifdef __psyz
+_Static_assert(sizeof(ItemStats) == sizeof(FarmLivestock), "ItemStats size");
+_Static_assert(offsetof(ItemStats, grazingTime) == offsetof(FarmLivestock, grazeCount),
+               "ItemStats grazeCount");
+_Static_assert(offsetof(ItemStats, daysSinceShearing) == offsetof(FarmLivestock, daysSinceShearing),
+               "ItemStats daysSinceShearing");
+_Static_assert(sizeof(SwindRecord) == sizeof(FarmChicken), "SwindRecord size");
+_Static_assert(offsetof(SwindRecord, grazingTime) == offsetof(FarmChicken, grazingTime),
+               "SwindRecord grazingTime");
+_Static_assert(sizeof(FarmExtraChicken) == sizeof(FarmChicken), "FarmExtraChicken size");
+_Static_assert(offsetof(FarmExtraChicken, grazingTime) == offsetof(FarmChicken, grazingTime),
+               "FarmExtraChicken grazingTime");
+#endif
 
 /* One editable line of a debug edit page: the value it edits, its range, its
  * width in bytes and its row kind, and the label shown. */

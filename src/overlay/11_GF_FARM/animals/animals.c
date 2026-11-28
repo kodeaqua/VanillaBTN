@@ -1,5 +1,8 @@
 /* The farm's animals, pets, spawned objects and walkers. */
 
+#ifdef __psyz
+#include <stddef.h>
+#endif
 #include <abs.h>
 #include <sys/types.h>
 #include <libgte.h>
@@ -55,9 +58,33 @@ typedef struct FarmActionSlot {
     s32 flags;
     u8 pad38[0x48 - 0x38];
     VECTOR payload48;
+#ifdef __psyz
+    /* AnimState grows with 64-bit pointers, so cue sits past PS1 offset 0xA8. */
+    VECTOR destination;
+    VECTOR target;
+    AnimState sprite;
+#else
     u8 pad58[0xA8 - 0x58];
+#endif
     ItemCue cue;
 } FarmActionSlot;
+
+#ifdef __psyz
+_Static_assert(offsetof(FarmActionSlot, kind) == offsetof(FarmActor, kind), "FarmActionSlot kind");
+_Static_assert(offsetof(FarmActionSlot, taskNo) == offsetof(FarmActor, taskNo),
+               "FarmActionSlot taskNo");
+_Static_assert(offsetof(FarmActionSlot, taskId) == offsetof(FarmActor, taskId),
+               "FarmActionSlot taskId");
+_Static_assert(offsetof(FarmActionSlot, taskTime) == offsetof(FarmActor, taskTime),
+               "FarmActionSlot taskTime");
+_Static_assert(offsetof(FarmActionSlot, interruptTime) == offsetof(FarmActor, interruptTime),
+               "FarmActionSlot interruptTime");
+_Static_assert(offsetof(FarmActionSlot, flags) == offsetof(FarmActor, flags),
+               "FarmActionSlot flags");
+_Static_assert(offsetof(FarmActionSlot, payload48) == offsetof(FarmActor, speed),
+               "FarmActionSlot speed");
+_Static_assert(offsetof(FarmActionSlot, cue) == offsetof(FarmActor, cue), "FarmActionSlot cue");
+#endif
 
 /* One entry of the cue table farm_mode_cues. farm_cue_matches_mode scans for `id` and
  * answers whether the current mode bit (farm_season_mode_bit) is in `mask`. `x`, `y` and
