@@ -119,6 +119,14 @@ static void vsync_frame_callback(void) {
     loading_screen_draw();
 }
 
+#if defined(__psyz) && defined(VANILLABTN_DEBUG)
+static s32 vanillabtn_start_scene = SCENE_TITLE;
+
+void vanillabtn_start_debug_menu(void) {
+    vanillabtn_start_scene = SCENE_DEBUG;
+}
+#endif
+
 u8 main_speed_mode = MAIN_SPEED_FAST_2;
 s32 main_put_env_enabled = 1;
 s32 main_clear_screen_enabled = 1;
@@ -163,7 +171,11 @@ int main(void) {
     sound_init();
     SetVideoMode(0);
     ResetGraph(0);
+#if defined(__psyz) && defined(VANILLABTN_DEBUG)
+    main_scene = vanillabtn_start_scene;
+#else
     main_scene = SCENE_TITLE;
+#endif
     afile_init();
 
     fb = frame_records;
@@ -211,6 +223,12 @@ int main(void) {
     farm_state_init();
     sound_init_stereo_xa();
     sound_update();
+#if defined(__psyz) && defined(VANILLABTN_DEBUG)
+    if (main_scene == SCENE_DEBUG) {
+        sound_set_seq_arg(0, STAGING_BUFFER);
+        sound_request(SOUND_REQUEST_RESET, 0);
+    }
+#endif
     text_set_palette(3);
     text_set_speed(3);
     prim_copy_pending = 0;

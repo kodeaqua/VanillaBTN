@@ -8,6 +8,9 @@
 #include <psyz/cd.h>
 
 int vanillabtn_game_main(void);
+#ifdef VANILLABTN_DEBUG
+void vanillabtn_start_debug_menu(void);
+#endif
 #endif
 
 #if !defined(_M_X64)
@@ -165,6 +168,18 @@ int wmain(int argc, wchar_t *argv[]) {
         if (argc == 3 && wcscmp(argv[1], L"--disc") == 0) {
             return launch_game(argv[2]);
         }
+#ifdef VANILLABTN_DEBUG
+        if (argc == 4 && wcscmp(argv[1], L"--disc") == 0 &&
+            wcscmp(argv[3], L"--debug-menu") == 0) {
+            vanillabtn_start_debug_menu();
+            return launch_game(argv[2]);
+        }
+        if (argc == 4 && wcscmp(argv[1], L"--debug-menu") == 0 &&
+            wcscmp(argv[2], L"--disc") == 0) {
+            vanillabtn_start_debug_menu();
+            return launch_game(argv[3]);
+        }
+#endif
 #endif
         if (argc != 3 || wcscmp(argv[1], L"--import-disc") != 0) {
 #ifdef VANILLABTN_HAS_GAME

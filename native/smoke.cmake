@@ -34,6 +34,13 @@ if(HAS_GAME)
     if(NOT result STREQUAL "1" OR NOT diagnostic MATCHES "does not match the USA reference SHA-1")
         message(FATAL_ERROR "A mismatched disc must be rejected before boot.")
     endif()
+    if(BUILD_CONFIG STREQUAL "Release")
+        execute_process(COMMAND "${EXECUTABLE}" --disc unused --debug-menu RESULT_VARIABLE result
+            ERROR_VARIABLE diagnostic)
+        if(NOT result STREQUAL "2" OR NOT diagnostic MATCHES "Usage: vanillabtn")
+            message(FATAL_ERROR "Release must not expose --debug-menu.")
+        endif()
+    endif()
 endif()
 
 # A valid environment value can leave too little room for the application directory.
