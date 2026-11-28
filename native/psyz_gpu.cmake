@@ -1,4 +1,4 @@
-# Compile PsyZ with the patched Windows pixel shader without editing the checkout.
+# Compile PsyZ with the Windows renderer fixes without editing the checkout.
 set(psyz_platform "${VANILLABTN_PSYZ_SOURCE_DIR}/psyz/src/platform")
 set(psyz_gpu_source "${psyz_platform}/sdl3_gpu.c")
 set(psyz_gpu_common "${psyz_platform}/sdl3_common.h")
@@ -7,6 +7,16 @@ set(psyz_patched_shader "${CMAKE_CURRENT_LIST_DIR}/shaders/psx_frag.dxil")
 set(psyz_gpu_build "${CMAKE_CURRENT_BINARY_DIR}/psyz-win-gpu")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${psyz_gpu_source}" "${psyz_gpu_common}" "${psyz_upstream_shader}" "${psyz_patched_shader}")
+
+function(patch_psyz_renderer source expected replacement description)
+    string(FIND "${${source}}" "${expected}" first_match)
+    string(FIND "${${source}}" "${expected}" last_match REVERSE)
+    if(first_match LESS 0 OR NOT first_match EQUAL last_match)
+        message(FATAL_ERROR "Expected one PsyZ patch location for ${description}.")
+    endif()
+    string(REPLACE "${expected}" "${replacement}" patched "${${source}}")
+    set(${source} "${patched}" PARENT_SCOPE)
+endfunction()
 
 file(READ "${psyz_upstream_shader}" upstream_shader)
 string(REPLACE "\r\n" "\n" upstream_shader "${upstream_shader}")
@@ -35,30 +45,21 @@ set(wrapped_overlap [=[    if (OverlapsDirtyCanvas(page, pending) ||
     pal.x -= VRAM_W;
     return (page.x + page.w > 0 && OverlapsDirtyCanvas(page, pending)) ||
            (bpp < 2 && pal.x + pal.w > 0 && OverlapsDirtyCanvas(pal, pending));]=])
-string(REPLACE "${texture_overlap}" "${wrapped_overlap}" patched_gpu_common "${gpu_common}")
-if(gpu_common STREQUAL patched_gpu_common)
-    message(FATAL_ERROR "Could not patch PsyZ wrapped texture dependencies.")
-endif()
+patch_psyz_renderer(gpu_common "${texture_overlap}" "${wrapped_overlap}"
+    "wrapped texture dependencies")
 
 # Raw textured polygons copy RGB555 texels without shading or dithering.
-string(REPLACE "(isGouraud || (isTextured && isShadeTex))"
-    "(isTextured ? isShadeTex : isGouraud)" gpu_common_with_raw "${patched_gpu_common}")
-if(patched_gpu_common STREQUAL gpu_common_with_raw)
-    message(FATAL_ERROR "Could not patch PsyZ raw texture dithering.")
-endif()
+patch_psyz_renderer(gpu_common "(isGouraud || (isTextured && isShadeTex))"
+    "(isTextured ? isShadeTex : isGouraud)" "raw texture dithering")
 file(CONFIGURE OUTPUT "${psyz_gpu_build}/vanillabtn_sdl3_common.h"
-    CONTENT "#line 1 \"psyz/src/platform/sdl3_common.h\"\n${gpu_common_with_raw}" @ONLY)
+    CONTENT "#line 1 \"psyz/src/platform/sdl3_common.h\"\n${gpu_common}" @ONLY)
 
 file(READ "${psyz_gpu_source}" gpu_source)
-string(REPLACE "#include \"shaders/psx_frag_dxil.h\"" "#include \"vanillabtn_psx_frag_dxil.h\""
-    patched_gpu_source "${gpu_source}")
-string(REPLACE "#include \"sdl3_common.h\"" "#include \"vanillabtn_sdl3_common.h\""
-    gpu_source_with_common "${patched_gpu_source}")
-get_target_property(psyz_sources psyz SOURCES)
-if(gpu_source STREQUAL patched_gpu_source OR patched_gpu_source STREQUAL gpu_source_with_common OR
-   NOT "src/platform/sdl3_gpu.c" IN_LIST psyz_sources)
-    message(FATAL_ERROR "Could not substitute the PsyZ Windows renderer patches.")
-endif()
+string(REPLACE "\r\n" "\n" gpu_source "${gpu_source}")
+patch_psyz_renderer(gpu_source "#include \"shaders/psx_frag_dxil.h\""
+    "#include \"vanillabtn_psx_frag_dxil.h\"" "the pixel shader include")
+patch_psyz_renderer(gpu_source "#include \"sdl3_common.h\""
+    "#include \"vanillabtn_sdl3_common.h\"" "the common header include")
 
 # Extend axis-aligned draws past the larger coordinate to cover both endpoints.
 set(line_vertex [=[                Vertex* q = vertex_cur;
@@ -73,12 +74,8 @@ set(line_vertex_with_endpoints [=[                if (dy == 0 && ex < 0) {
 
                 Vertex* q = vertex_cur;
                 unsigned short base = n_vertices;]=])
-string(REPLACE "\r\n" "\n" gpu_source_with_common "${gpu_source_with_common}")
-string(REPLACE "${line_vertex}" "${line_vertex_with_endpoints}"
-    gpu_source_with_lines "${gpu_source_with_common}")
-if(gpu_source_with_common STREQUAL gpu_source_with_lines)
-    message(FATAL_ERROR "Could not patch PsyZ axis-aligned line endpoints.")
-endif()
+patch_psyz_renderer(gpu_source "${line_vertex}" "${line_vertex_with_endpoints}"
+    "axis-aligned line endpoints")
 
 # Reject lines beyond the PS1 span before expanding them into geometry.
 set(line_axis [=[                if ((dx < 0 ? -dx : dx) >= (dy < 0 ? -dy : dy)) {]=])
@@ -89,11 +86,7 @@ set(bounded_line_axis [=[                enum { MAX_LINE_WIDTH = 1023, MAX_LINE_
                     continue;
                 }
                 if (width >= height) {]=])
-string(REPLACE "${line_axis}" "${bounded_line_axis}"
-    gpu_source_with_line_limits "${gpu_source_with_lines}")
-if(gpu_source_with_lines STREQUAL gpu_source_with_line_limits)
-    message(FATAL_ERROR "Could not patch PsyZ line size limits.")
-endif()
+patch_psyz_renderer(gpu_source "${line_axis}" "${bounded_line_axis}" "line size limits")
 
 # A one-pixel line uses the first endpoint's color.
 set(line_end_color [=[                q[1].r = cr[s + 1];
@@ -105,12 +98,9 @@ set(line_end_color [=[                q[1].r = cr[s + 1];
                 q[2].b = cb[s + 1];
                 q[2].a = ca[s + 1];]=])
 string(REPLACE "[s + 1]" "[end_color]" point_line_color "${line_end_color}")
-string(REPLACE "${line_end_color}"
+patch_psyz_renderer(gpu_source "${line_end_color}"
     "                const int end_color = (dx != 0 || dy != 0) ? s + 1 : s;\n${point_line_color}"
-    gpu_source_with_point_lines "${gpu_source_with_line_limits}")
-if(gpu_source_with_line_limits STREQUAL gpu_source_with_point_lines)
-    message(FATAL_ERROR "Could not patch PsyZ one-pixel line colors.")
-endif()
+    "one-pixel line colors")
 
 # Polygon TPage updates the page, blend mode and depth without changing dither.
 set(polygon_tpage [=[                tpage = cur_tpage | TPAGE_NOTEXTURE;
@@ -123,23 +113,22 @@ set(polygon_tpage_latch [=[                tpage = cur_tpage | TPAGE_NOTEXTURE;
                 cur_tpage = tpage;
             }
             tpage |= TPAGE_POLYGON;]=])
-string(REPLACE "${polygon_tpage}" "${polygon_tpage_latch}"
-    gpu_source_with_tpage "${gpu_source_with_point_lines}")
-if(gpu_source_with_point_lines STREQUAL gpu_source_with_tpage)
-    message(FATAL_ERROR "Could not patch PsyZ polygon texture page state.")
-endif()
+patch_psyz_renderer(gpu_source "${polygon_tpage}" "${polygon_tpage_latch}"
+    "polygon texture page state")
 
 # A VRAM fill must execute after the primitives already queued before it.
 set(clear_image [=[    r = To15BitChannel(r);
     g = To15BitChannel(g);
     b = To15BitChannel(b);]=])
-string(REPLACE "${clear_image}" "    Draw_FlushBuffer();\n${clear_image}"
-    gpu_source_with_ordered_fill "${gpu_source_with_tpage}")
-if(gpu_source_with_tpage STREQUAL gpu_source_with_ordered_fill)
-    message(FATAL_ERROR "Could not patch PsyZ VRAM fill order.")
-endif()
+patch_psyz_renderer(gpu_source "${clear_image}" "    Draw_FlushBuffer();\n${clear_image}"
+    "VRAM fill order")
 file(CONFIGURE OUTPUT "${psyz_gpu_build}/sdl3_gpu.c"
-    CONTENT "#line 1 \"psyz/src/platform/sdl3_gpu.c\"\n${gpu_source_with_ordered_fill}" @ONLY)
+    CONTENT "#line 1 \"psyz/src/platform/sdl3_gpu.c\"\n${gpu_source}" @ONLY)
+
+get_target_property(psyz_sources psyz SOURCES)
+if(NOT "src/platform/sdl3_gpu.c" IN_LIST psyz_sources)
+    message(FATAL_ERROR "Could not replace the PsyZ Windows renderer source.")
+endif()
 list(REMOVE_ITEM psyz_sources "src/platform/sdl3_gpu.c")
 set_property(TARGET psyz PROPERTY SOURCES "${psyz_sources};${psyz_gpu_build}/sdl3_gpu.c")
 set_property(SOURCE "${psyz_gpu_build}/sdl3_gpu.c"
