@@ -458,7 +458,11 @@ static void villager_reached_cell(FarmVillager *villager, FarmRouteRow *grid, Fa
         return;
     case ROUTE_CELL_SCHEDULE:
         villager->step++;
+#ifdef __psyz
+        villager_set_destination(villager);
+#else
         ((void (*)())villager_set_destination)(villager);
+#endif
         villager->place.value = villager->schedule[villager->step].place.value;
         villager->place.location = villager->schedule[villager->step].place.location;
         villager->schedule[villager->step].time = game_state.progress.clock.minuteOfDay;
@@ -685,7 +689,11 @@ static void villager_schedule_advance(FarmVillager *villager)
         villager->placeFlags &= ~VILLAGER_PLACE_KEPT_PLACE;
     }
     villager->step++;
+#ifdef __psyz
+    villager_set_destination(villager);
+#else
     ((void (*)())villager_set_destination)(villager);
+#endif
     if (old_location != villager->place.location)
     {
         moved = 1;

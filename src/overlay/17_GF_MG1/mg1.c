@@ -167,11 +167,21 @@ static Func mg1_step_handlers[5] = {
     mg1_fade_out, mg1_leave_minigame,
 };
 
+#ifdef __psyz
+static void mg1_draw_award_screen_step(void) {
+    (void)mg1_draw_award_screen();
+}
+#endif
+
 /* Run by mg1_run_screen, one per mg1_state.step. */
 static Func mg1_screen_handlers[11] = {
     mg1_setup_round, mg1_screen_names, mg1_screen_stamina_tick, mg1_screen_confirm_entries,
     mg1_screen_entries_done, mg1_screen_race_roster, mg1_start_race, mg1_race_frame,
+#ifdef __psyz
+    mg1_results_screen, mg1_draw_award_screen_step, mg1_show_total,
+#else
     mg1_results_screen, (Func)mg1_draw_award_screen, mg1_show_total,
+#endif
 };
 /* The steps of mg1_load_sequence_step, in order. */
 enum Mg1LoadStep {

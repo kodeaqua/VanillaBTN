@@ -3741,11 +3741,7 @@ static void save_reset_work_tables(void)
 #ifdef __psyz
     memset(save_out_buffer, 0, sizeof(save_out_buffer));
 #else
-#ifdef __psyz
-    memset(save_out_buffer, 0, sizeof(save_out_buffer));
-#else
     memset(save_out_buffer, 0, 0x398);
-#endif
 #endif
 }
 

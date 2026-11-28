@@ -238,6 +238,10 @@ static void staff_reset_state(void) {
     staff_line_text = 0;
     staff_line_x = 0;
     staff_line_y = 0;
+#ifdef __psyz
+    staff_fade_mode = STAFF_FADE_IDLE;
+    staff_fade_level = 0;
+#endif
 }
 
 static void staff_enter(void) {

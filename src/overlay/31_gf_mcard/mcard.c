@@ -236,7 +236,11 @@ static int mcard_list_dir(void) {
             blocks += q;
         }
     }
+#ifdef __psyz
+    sprintf(mcard_info_text, "%ld file(s) %d block(s)\n", mcard_file_count, blocks);
+#else
     sprintf(mcard_info_text, "%d file(s) %d block(s)\n", mcard_file_count, blocks);
+#endif
     return MCARD_OP_LISTING;
 }
 

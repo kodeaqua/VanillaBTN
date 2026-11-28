@@ -145,10 +145,17 @@ enum Mg4StateId {
 };
 
 /* Indexed by Mg4State.state (mg4_state_tick). */
+#ifdef __psyz
+static Func mg4_state_handlers[7] = {
+    mg4_state_start, mg4_state_intro, mg4_state_confirm, mg4_state_after_confirm,
+    mg4_state_show_results, mg4_state_result_wait, mg4_play_frame,
+};
+#else
 static Fn mg4_state_handlers[7] = {
     (Fn)mg4_state_start, (Fn)mg4_state_intro, (Fn)mg4_state_confirm, (Fn)mg4_state_after_confirm,
     (Fn)mg4_state_show_results, (Fn)mg4_state_result_wait, (Fn)mg4_play_frame,
 };
+#endif
 
 /* Start offsets of the ten messages in mg4_message_text. */
 static s32 mg4_message_offsets[10] = {0x00, 0x26, 0x4A, 0x6C, 0x8E, 0xB8, 0xE8, 0x114, 0x136, 0x162};
@@ -275,7 +282,11 @@ static void mg4_step_intro_wait(void) {
 /* Runs the menu, then the handler for mg4_state.state. */
 static void mg4_state_tick(void) {
     menu_run_state();
+#ifdef __psyz
+    mg4_state_handlers[mg4_state.state]();
+#else
     mg4_state_handlers[mg4_state.state](mg4_state_handlers);
+#endif
 }
 /* Start the blend-out of the screen and the music's fade, and move to the next step. */
 static void mg4_fade_out(void) {
