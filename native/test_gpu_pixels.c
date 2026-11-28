@@ -21,6 +21,7 @@ enum {
     DIRECT_COLOR_TEXTURE = 2,
     TEXTURE_PAGE_SIZE = 256,
     VRAM_WIDTH = 1024,
+    VRAM_HEIGHT = 512,
     LAST_TEXTURE_PAGE_X = VRAM_WIDTH - 64,
     LAST_CLUT_X = VRAM_WIDTH - 16,
     WORD_BLOCK_SIZE = 2,
@@ -391,10 +392,10 @@ static int check_masked_transfers(void) {
     return failures;
 }
 
-static int check_masked_overlap(void) {
-    enum { COPY_WIDTH = 132, SHIFT = 2, X = 64, PROTECTED = 4, FIRST_SPILLED = 130 };
-    RECT region = {X, TILE_ORIGIN, COPY_WIDTH + SHIFT, 1};
-    RECT source = {X, TILE_ORIGIN, COPY_WIDTH, 1};
+static int check_copy_overlap(int x, unsigned flags) {
+    enum { COPY_WIDTH = 132, SHIFT = 2, PROTECTED = 4, FIRST_SPILLED = 130 };
+    RECT region = {x, TILE_ORIGIN, COPY_WIDTH + SHIFT, 1};
+    RECT source = {x, TILE_ORIGIN, COPY_WIDTH, 1};
     u16 words[COPY_WIDTH + SHIFT];
     u_long transfer[(sizeof(words) + sizeof(u_long) - 1) / sizeof(u_long)] = {0};
     for (int i = 0; i < COPY_WIDTH + SHIFT; ++i) {
@@ -404,27 +405,113 @@ static int check_masked_overlap(void) {
     memcpy(transfer, words, sizeof(words));
     select_mask(0);
     LoadImage(&region, transfer);
-    select_mask(FORCE_MASK | CHECK_MASK);
-    MoveImage(&source, X + SHIFT, TILE_ORIGIN);
+    select_mask(flags);
+    MoveImage(&source, x + SHIFT, TILE_ORIGIN);
     StoreImage(&region, transfer);
     DrawSync(0);
     select_mask(0);
     memcpy(words, transfer, sizeof(words));
     for (int i = SHIFT; i < COPY_WIDTH + SHIFT; ++i) {
         unsigned color = i - 1;
-        if (i == PROTECTED) {
+        if (i == PROTECTED && (flags & CHECK_MASK)) {
             color = 5;
         } else if (i == FIRST_SPILLED || i == FIRST_SPILLED + 1) {
             color -= SHIFT;
         }
-        const unsigned expected = PIXEL_MASK_BIT | color;
+        const unsigned expected = (flags & FORCE_MASK ? PIXEL_MASK_BIT : 0) | color |
+                                  (i == PROTECTED + SHIFT ? PIXEL_MASK_BIT : 0);
         if (words[i] != expected) {
-            fprintf(stderr, "masked overlapping copy at pixel %d: got %04x, expected %04x\n", i,
+            fprintf(stderr, "overlapping copy from %d at pixel %d: got %04x, expected %04x\n", x, i,
                     words[i], expected);
             return 1;
         }
     }
     return 0;
+}
+
+enum { EDGE_SIZE = 3, EDGE_WORDS = EDGE_SIZE * EDGE_SIZE, TRANSFER_PAD = 0x55aa };
+
+static void load_edge_words(RECT *rect, const u16 words[EDGE_WORDS]) {
+    u_long data[(EDGE_WORDS * sizeof(u16) + sizeof(u_long) - 1) / sizeof(u_long)] = {0};
+    memcpy(data, words, EDGE_WORDS * sizeof(u16));
+    LoadImage(rect, data);
+}
+
+static int check_edge_words(RECT *rect, const u16 expected[EDGE_WORDS], const char *source) {
+    u16 words[EDGE_WORDS + 1];
+    u_long data[(sizeof(words) + sizeof(u_long) - 1) / sizeof(u_long)] = {0};
+    words[EDGE_WORDS] = TRANSFER_PAD;
+    memcpy((u8 *)data + EDGE_WORDS * sizeof(u16), &words[EDGE_WORDS], sizeof(u16));
+    StoreImage(rect, data);
+    DrawSync(0);
+    memcpy(words, data, sizeof(words));
+    for (int i = 0; i < EDGE_WORDS; ++i) {
+        if (words[i] != expected[i]) {
+            fprintf(stderr, "%s (%d,%d) at word %d: got %04x, expected %04x\n", source, rect->x,
+                    rect->y, i, words[i], expected[i]);
+            return 1;
+        }
+    }
+    if (words[EDGE_WORDS] != TRANSFER_PAD) {
+        fprintf(stderr, "%s overwrote the word after an odd-sized readback\n", source);
+        return 1;
+    }
+    return 0;
+}
+
+static int check_edge_placement(const RECT *rect, const u16 expected[EDGE_WORDS]) {
+    for (int i = 0; i < EDGE_WORDS; ++i) {
+        RECT pixel = {(rect->x + i % EDGE_SIZE) % VRAM_WIDTH,
+                      (rect->y + i / EDGE_SIZE) % VRAM_HEIGHT, 1, 1};
+        u_long data = 0;
+        u16 word;
+        StoreImage(&pixel, &data);
+        DrawSync(0);
+        memcpy(&word, &data, sizeof(word));
+        if (word != expected[i]) {
+            fprintf(stderr, "physical VRAM (%d,%d): got %04x, expected %04x\n", pixel.x, pixel.y,
+                    word, expected[i]);
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int check_transfer_edges(int x, int y) {
+    const u16 words[EDGE_WORDS] = {1, 2, PIXEL_MASK_BIT | 3, 4, 5, 6, 7, 8, 9};
+    const u16 zero[EDGE_WORDS] = {0};
+    RECT edge = {x, y, EDGE_SIZE, EDGE_SIZE};
+    RECT source = {128, 144, EDGE_SIZE, EDGE_SIZE};
+    RECT dest = {192, 160, EDGE_SIZE, EDGE_SIZE};
+    select_mask(0);
+    load_edge_words(&edge, words);
+    int failures = check_edge_words(&edge, words, "wrapped upload and readback");
+    MoveImage(&edge, dest.x, dest.y);
+    failures += check_edge_words(&dest, words, "wrapped copy source");
+
+    load_edge_words(&source, words);
+    load_edge_words(&edge, zero);
+    MoveImage(&source, edge.x, edge.y);
+    failures += check_edge_words(&edge, words, "wrapped copy destination");
+    u16 protected[EDGE_WORDS] = {0};
+    protected[EDGE_WORDS - 1] = PIXEL_MASK_BIT | 31;
+    load_edge_words(&edge, protected);
+    select_mask(FORCE_MASK | CHECK_MASK);
+    MoveImage(&source, edge.x, edge.y);
+    u16 masked[EDGE_WORDS];
+    for (int i = 0; i < EDGE_WORDS - 1; ++i) {
+        masked[i] = words[i] | PIXEL_MASK_BIT;
+    }
+    masked[EDGE_WORDS - 1] = protected[EDGE_WORDS - 1];
+    failures += check_edge_words(&edge, masked, "mask follows wrapped destination");
+    select_mask(0);
+    load_edge_words(&edge, protected);
+    select_mask(FORCE_MASK | CHECK_MASK);
+    load_edge_words(&edge, words);
+    failures += check_edge_words(&edge, masked, "mask follows wrapped upload");
+    failures += check_edge_placement(&edge, masked);
+    select_mask(0);
+    return failures;
 }
 
 static int check_textured_blend(void) {
@@ -516,7 +603,7 @@ static int check_scaled_canvas_blend(void) {
         return 1;
     }
     return check_blend_precision() + check_textured_blend() + check_primitive_masks() +
-           check_masked_transfers();
+           check_masked_transfers() + check_transfer_edges(VRAM_WIDTH - 2, VRAM_HEIGHT - 1);
 }
 
 static int check_clear_draw_order(void) {
@@ -736,7 +823,12 @@ int main(void) {
     failures += check_primitive_masks();
     failures += check_vram_fill_mask();
     failures += check_masked_transfers();
-    failures += check_masked_overlap();
+    failures += check_copy_overlap(64, FORCE_MASK | CHECK_MASK);
+    failures += check_copy_overlap(VRAM_WIDTH - 64, FORCE_MASK | CHECK_MASK);
+    failures += check_copy_overlap(VRAM_WIDTH - 64, 0);
+    failures += check_transfer_edges(VRAM_WIDTH - 2, 60);
+    failures += check_transfer_edges(64, VRAM_HEIGHT - 1);
+    failures += check_transfer_edges(VRAM_WIDTH - 2, VRAM_HEIGHT - 1);
     failures += check_clear_draw_order();
     failures += check_copy_visibility();
     failures += check_clut_visibility();

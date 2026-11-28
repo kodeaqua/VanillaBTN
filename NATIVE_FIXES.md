@@ -68,8 +68,9 @@ sampled in the same frame. [GPU pixel test](native/test_gpu_pixels.c)
 - Mask probes check full VRAM words after primitives, uploads, copies, and raw
   fills. A separate Beetle PSX test confirmed all four transfer flag combinations,
   the overlapping 128-word copy boundary, and fill behavior.
-- Transfers crossing the physical VRAM edges still follow the backend's clipping
-  rules. Review those edges with the existing transfer acceptance checks.
+- `LoadImage`, `MoveImage`, and `StoreImage` wrap at the right and bottom VRAM
+  edges. D3D12 and Beetle PSX probes cover odd widths, corner wraps, mask flags,
+  and overlapping copies in 128-word blocks.
 - D3D12 readback verifies sprite U/V wrap at 255 and right-to-left VRAM wrap
   for 16-bit textures and 8-bit textures/CLUTs. Same-frame cases also verify
   that a draw on the left edge is visible to the wrapped texture read.

@@ -212,37 +212,81 @@ patch_psyz_renderer(gpu_source [=[    if (canvas_res == 1) {
         UploadImage(canvas_tex[fb_index], dst.x, dst.y, rect->w, dst.x - img.x,]=]
     "masked canvas uploads")
 patch_psyz_renderer(gpu_source [=[    UploadImage(vram_render, part.x, part.y, rect->w, part.x - rect->x,
-                part.y - rect->y, part.w, part.h);]=] [=[    if (vram_mask_flags) {
-        if (!UploadMaskedImage(vram_render, (PsyzSize){VRAM_W, VRAM_H}, part, 1, rect->w,
-                               part.x - rect->x, part.y - rect->y)) {
-            return;
-        }
-    } else {
-        UploadImage(vram_render, part.x, part.y, rect->w, part.x - rect->x,
-                    part.y - rect->y, part.w, part.h);
+                part.y - rect->y, part.w, part.h);]=] [=[    const SDL_Point offset = {part.x - rect->x, part.y - rect->y};
+    if (!UploadVramRegion(part, rect->w, offset)) {
+        return;
     }]=] "masked VRAM uploads")
 patch_psyz_renderer(gpu_source [=[    SDL_Rect clamped;
-    if (!layout.native) {]=] [=[    SDL_Rect clamped;
-    if (layout.native && (vram_mask_flags & VRAM_MASK_CHECK)) {
+    if (!layout.native) {
+        LeaveNative();
+        if (!SDL_GetRectIntersection(&area, &vram, &clamped) ||
+            !SDL_RectsEqual(&area, &clamped)) {]=] [=[    SDL_Rect clamped;
+    const bool wrapped = ValidVramTransfer(area) &&
+                         (area.x + area.w > VRAM_W || area.y + area.h > VRAM_H);
+    if (!wrapped && layout.native && (vram_mask_flags & VRAM_MASK_CHECK)) {
         SyncDirtyCanvases(&area);
     }
-    if (!layout.native) {]=] "mask checks see pending canvas draws")
-patch_psyz_renderer(gpu_source "    if (rect->x == x && rect->y == y) {"
-    "    if (rect->x == x && rect->y == y && !(vram_mask_flags & VRAM_MASK_SET)) {"
-    "masked self-copy")
-patch_psyz_renderer(gpu_source [=[    if (layout.native) {
-        SyncDirtyCanvases(&(SDL_Rect){src_x, src_y, copy_w, copy_h});]=] [=[    const SDL_Rect dst = {dst_x, dst_y, copy_w, copy_h};
-    if (layout.native) {
-        SyncDirtyCanvases(&(SDL_Rect){src_x, src_y, copy_w, copy_h});
-        if (vram_mask_flags & VRAM_MASK_CHECK) {
-            SyncDirtyCanvases(&dst);
-        }]=] "masked copy sees pending destination writes")
+    if (!layout.native) {
+        LeaveNative();
+        if (!wrapped && (!SDL_GetRectIntersection(&area, &vram, &clamped) ||
+                         !SDL_RectsEqual(&area, &clamped))) {]=] "detect wrapped uploads")
+patch_psyz_renderer(gpu_source "    // an image touching the framebuffer being drawn only writes VRAM inside"
+    [=[    if (wrapped) {
+        UploadWrappedVram(&layout, area);
+        return;
+    }
+
+    // an image touching the framebuffer being drawn only writes VRAM inside]=]
+    "wrapped physical uploads")
+
+patch_psyz_renderer(gpu_source [=[    if (rect->x < 0 || rect->y < 0 || rect->w < 0 || rect->h < 0 ||
+        rect->x + rect->w > VRAM_W || rect->y + rect->h > VRAM_H) {]=]
+    [=[    const SDL_Rect area = {rect->x, rect->y, rect->w, rect->h};
+    if (!ValidVramTransfer(area)) {]=] "validate wrapped downloads")
+patch_psyz_renderer(gpu_source [=[    SyncDirtyCanvases(&(SDL_Rect){rect->x, rect->y, rect->w, rect->h});
+    SDL_GPUCommandBuffer* cmd = AcquireCmd();]=] [=[    VramPart parts[MAX_VRAM_PARTS];
+    const int count = SplitVramRect(area, parts);
+    for (int i = 0; i < count; ++i) {
+        SyncDirtyCanvases(&parts[i].area);
+    }
+    SDL_GPUCommandBuffer* cmd = AcquireCmd();]=] "flush each wrapped download area")
+patch_psyz_renderer(gpu_source [=[    const SDL_GPUTextureRegion region = {
+        .texture = vram_render,
+        .x = (Uint32)rect->x,
+        .y = (Uint32)rect->y,
+        .w = (Uint32)rect->w,]=] [=[    SDL_GPUTexture* texture = vram_render;
+    SDL_Rect read = parts[0].area;
+    if (count > 1) {
+        read = StageVramParts(copy, parts, count, area);
+        texture = vram_sample;
+    }
+    const SDL_GPUTextureRegion region = {
+        .texture = texture,
+        .x = (Uint32)read.x,
+        .y = (Uint32)read.y,
+        .w = (Uint32)rect->w,]=] "pack wrapped downloads in row order")
+
 patch_psyz_renderer_section(gpu_source
-    [=[    SDL_GPUCopyPass* copy = SDL_BeginGPUCopyPass(cmd);
-    if (!RectsOverlap(src_x, src_y, dst_x, dst_y, copy_w, copy_h)) {]=]
-    "    MarkVramDirty(dst);"
-    "    CopyVram(cmd, dst, (SDL_Rect){src_x, src_y, copy_w, copy_h});\n"
-    "ordered GPU copies")
+    "void Draw_MoveImage(PS1_RECT* rect, unsigned int x, unsigned int y) {"
+    "void Draw_ResetBuffer(void) {"
+    [=[void Draw_MoveImage(PS1_RECT* rect, unsigned int x, unsigned int y) {
+    SDL_Rect source = {rect->x, rect->y, rect->w, rect->h};
+    const int dst_x = CLAMP((int)x, 0, VRAM_W - 1);
+    const int dst_y = CLAMP((int)y, 0, VRAM_H - 1);
+    if (!ValidVramTransfer(source) || x >= VRAM_W || y >= VRAM_H) {
+        source.x = CLAMP(source.x, 0, VRAM_W - 1);
+        source.y = CLAMP(source.y, 0, VRAM_H - 1);
+        source.w = CLAMP(source.w, 0, SDL_min(VRAM_W - source.x, VRAM_W - dst_x));
+        source.h = CLAMP(source.h, 0, SDL_min(VRAM_H - source.y, VRAM_H - dst_y));
+        if (source.w <= 0 || source.h <= 0) {
+            return;
+        }
+        WARNF("clamping invalid VRAM copy at (%d,%d %dx%d)", rect->x, rect->y, rect->w, rect->h);
+    }
+    MoveVramRegion((SDL_Rect){dst_x, dst_y, source.w, source.h}, source);
+}
+
+]=] "wrapped and overlapping VRAM copies")
 
 patch_psyz_renderer_section(gpu_source
     "    u8* map = SDL_MapGPUTransferBuffer(device, vtx_transfer, true);"

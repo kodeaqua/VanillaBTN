@@ -55,12 +55,18 @@ static SDL_Rect BlendTriangleBounds(int first, const SDL_Rect *clip, float scale
     return (SDL_Rect){left, top, right - left, bottom - top};
 }
 
+static void CopyTextureRegion(SDL_GPUCopyPass *pass, SDL_GPUTexture *source,
+                              SDL_GPUTexture *destination, SDL_Rect area, SDL_Point origin) {
+    const SDL_GPUTextureLocation src = {
+        .texture = source, .x = (Uint32)area.x, .y = (Uint32)area.y};
+    const SDL_GPUTextureLocation dst = {
+        .texture = destination, .x = (Uint32)origin.x, .y = (Uint32)origin.y};
+    SDL_CopyGPUTextureToTexture(pass, &src, &dst, (Uint32)area.w, (Uint32)area.h, 1, false);
+}
+
 static void CopyTargetRegion(SDL_GPUCopyPass *pass, SDL_GPUTexture *source,
                              SDL_GPUTexture *destination, SDL_Rect area) {
-    const Uint32 x = (Uint32)area.x, y = (Uint32)area.y;
-    const SDL_GPUTextureLocation src = {.texture = source, .x = x, .y = y};
-    const SDL_GPUTextureLocation dst = {.texture = destination, .x = x, .y = y};
-    SDL_CopyGPUTextureToTexture(pass, &src, &dst, (Uint32)area.w, (Uint32)area.h, 1, false);
+    CopyTextureRegion(pass, source, destination, area, (SDL_Point){area.x, area.y});
 }
 
 static bool UploadTriangleData(SDL_GPUCommandBuffer *cmd, const Vertex *vertices, Uint32 n_vertices,
@@ -212,55 +218,167 @@ static bool UploadMaskedImage(SDL_GPUTexture *texture, PsyzSize size, SDL_Rect d
     return RenderMaskedTransfer(cmd, texture, scaled, ScaleRect(destination, scale), staging);
 }
 
-static bool DrawMaskedCopy(SDL_GPUCommandBuffer *cmd, SDL_Rect destination, SDL_Rect source) {
-    SDL_GPUCopyPass *copy = SDL_BeginGPUCopyPass(cmd);
-    CopyTargetRegion(copy, vram_render, vram_sample, source);
-    SDL_EndGPUCopyPass(copy);
-    return RenderMaskedTransfer(cmd, vram_render, (PsyzSize){VRAM_W, VRAM_H}, destination, source);
+enum { MAX_VRAM_PARTS = 4 };
+
+typedef struct {
+    SDL_Rect area;
+    SDL_Point offset;
+} VramPart;
+
+static bool ValidVramTransfer(SDL_Rect area) {
+    return area.x >= 0 && area.x < VRAM_W && area.y >= 0 && area.y < VRAM_H && area.w > 0 &&
+           area.w <= VRAM_W && area.h > 0 && area.h <= VRAM_H;
 }
 
-static void CopyMaskedVram(SDL_GPUCommandBuffer *cmd, SDL_Rect destination, SDL_Rect source) {
-    if (!SDL_HasRectIntersection(&destination, &source) || SDL_RectsEqual(&destination, &source)) {
-        DrawMaskedCopy(cmd, destination, source);
-        return;
+static int SplitVramRect(SDL_Rect area, VramPart parts[MAX_VRAM_PARTS]) {
+    int count = 0;
+    for (int y = 0; y < area.h;) {
+        int top = (area.y + y) % VRAM_H;
+        int height = SDL_min(area.h - y, VRAM_H - top);
+        for (int x = 0; x < area.w;) {
+            int left = (area.x + x) % VRAM_W;
+            int width = SDL_min(area.w - x, VRAM_W - left);
+            assert(count < MAX_VRAM_PARTS);
+            parts[count++] = (VramPart){{left, top, width, height}, {x, y}};
+            x += width;
+        }
+        y += height;
     }
-    /* Copy overlapping regions in the PS1's row order and 128-word blocks. */
+    return count;
+}
+
+static SDL_Rect StageVramParts(SDL_GPUCopyPass *copy, const VramPart *parts, int count,
+                               SDL_Rect source) {
+    if (count == 1) {
+        CopyTargetRegion(copy, vram_render, vram_sample, parts[0].area);
+        return parts[0].area;
+    }
+    for (int i = 0; i < count; ++i) {
+        CopyTextureRegion(copy, vram_render, vram_sample, parts[i].area, parts[i].offset);
+    }
+    const SDL_Rect packed = {0, 0, source.w, source.h};
+    MarkVramDirty(packed);
+    return packed;
+}
+
+static void PublishVramWrite(const VideoLayout *layout, SDL_Rect area) {
+    MarkVramDirty(area);
+    SyncNativeVramToScaled(area.x, area.y, area.w, area.h);
+    for (int i = 0; layout->native && i < fb_origin_count; ++i) {
+        const SDL_Rect fb = GetFbRect(i);
+        if (SDL_HasRectIntersection(&area, &fb) && PrepareCanvas(layout, i)) {
+            CopyVramToCanvas(i, area);
+        }
+    }
+}
+
+static bool UploadVramRegion(SDL_Rect area, int pitch, SDL_Point offset) {
+    if (vram_mask_flags) {
+        return UploadMaskedImage(vram_render, (PsyzSize){VRAM_W, VRAM_H}, area, 1, pitch, offset.x,
+                                 offset.y);
+    }
+    UploadImage(vram_render, area.x, area.y, pitch, offset.x, offset.y, area.w, area.h);
+    return true;
+}
+
+static void UploadWrappedVram(const VideoLayout *layout, SDL_Rect area) {
+    VramPart parts[MAX_VRAM_PARTS];
+    const int count = SplitVramRect(area, parts);
+    for (int i = 0; i < count; ++i) {
+        if (layout->native && (vram_mask_flags & VRAM_MASK_CHECK)) {
+            SyncDirtyCanvases(&parts[i].area);
+        }
+        if (UploadVramRegion(parts[i].area, area.w, parts[i].offset)) {
+            PublishVramWrite(layout, parts[i].area);
+        }
+    }
+}
+
+static bool CopyVramBlock(SDL_GPUCommandBuffer *cmd, SDL_Rect destination, SDL_Rect source) {
+    VramPart src[MAX_VRAM_PARTS], dst[MAX_VRAM_PARTS];
+    const int src_count = SplitVramRect(source, src);
+    const int dst_count = SplitVramRect(destination, dst);
+    SDL_GPUCopyPass *copy = SDL_BeginGPUCopyPass(cmd);
+    const SDL_Rect staged = StageVramParts(copy, src, src_count, source);
+    const bool masked = vram_mask_flags != 0;
+    if (masked) {
+        SDL_EndGPUCopyPass(copy);
+    }
+    for (int i = 0; i < dst_count; ++i) {
+        const SDL_Rect read = {staged.x + dst[i].offset.x, staged.y + dst[i].offset.y,
+                               dst[i].area.w, dst[i].area.h};
+        if (!masked) {
+            const SDL_Point origin = {dst[i].area.x, dst[i].area.y};
+            CopyTextureRegion(copy, vram_sample, vram_render, read, origin);
+        } else if (!RenderMaskedTransfer(cmd, vram_render, (PsyzSize){VRAM_W, VRAM_H}, dst[i].area,
+                                         read)) {
+            return false;
+        }
+    }
+    if (!masked) {
+        SDL_EndGPUCopyPass(copy);
+    }
+    return true;
+}
+
+static bool VramPartsOverlap(const VramPart *src, int src_count, const VramPart *dst,
+                             int dst_count) {
+    for (int i = 0; i < src_count; ++i) {
+        for (int j = 0; j < dst_count; ++j) {
+            const SDL_Rect a = src[i].area, b = dst[j].area;
+            if (SDL_HasRectIntersection(&a, &b)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+static void CopyVramInOrder(SDL_GPUCommandBuffer *cmd, SDL_Rect destination, SDL_Rect source) {
     enum { COPY_BLOCK_WIDTH = 128 };
+    /* Stage both sides of a wrapped source block before writing any of its destination. */
     for (int y = 0; y < source.h; ++y) {
         for (int x = 0; x < source.w; x += COPY_BLOCK_WIDTH) {
-            int width = SDL_min(COPY_BLOCK_WIDTH, source.w - x);
-            SDL_Rect src = {source.x + x, source.y + y, width, 1};
-            SDL_Rect dst = {destination.x + x, destination.y + y, width, 1};
-            if (!DrawMaskedCopy(cmd, dst, src)) {
+            const int width = SDL_min(COPY_BLOCK_WIDTH, source.w - x);
+            const SDL_Rect src = {source.x + x, source.y + y, width, 1};
+            const SDL_Rect dst = {destination.x + x, destination.y + y, width, 1};
+            if (!CopyVramBlock(cmd, dst, src)) {
                 return;
             }
         }
     }
 }
 
-static void CopyVram(SDL_GPUCommandBuffer *cmd, SDL_Rect destination, SDL_Rect source) {
-    if (vram_mask_flags) {
-        CopyMaskedVram(cmd, destination, source);
+static void MoveVramRegion(SDL_Rect destination, SDL_Rect source) {
+    if (SDL_RectsEqual(&source, &destination) && !(vram_mask_flags & VRAM_MASK_SET)) {
         return;
     }
-    SDL_GPUCopyPass *copy = SDL_BeginGPUCopyPass(cmd);
-    if (!RectsOverlap(source.x, source.y, destination.x, destination.y, source.w, source.h)) {
-        CopyTargetRegion(copy, vram_render, vram_sample, source);
-        const SDL_GPUTextureLocation src = {
-            .texture = vram_sample, .x = (Uint32)source.x, .y = (Uint32)source.y};
-        const SDL_GPUTextureLocation dst = {
-            .texture = vram_render, .x = (Uint32)destination.x, .y = (Uint32)destination.y};
-        SDL_CopyGPUTextureToTexture(copy, &src, &dst, (Uint32)source.w, (Uint32)source.h, 1, false);
-    } else {
-        /* Keep the existing row order for unmasked overlap. */
-        for (int row = 0; row < source.h; ++row) {
-            const SDL_GPUTextureLocation src = {
-                .texture = vram_render, .x = (Uint32)source.x, .y = (Uint32)(source.y + row)};
-            const SDL_GPUTextureLocation dst = {.texture = vram_render,
-                                                .x = (Uint32)destination.x,
-                                                .y = (Uint32)(destination.y + row)};
-            SDL_CopyGPUTextureToTexture(copy, &src, &dst, (Uint32)source.w, 1, 1, false);
+    Draw_FlushBuffer();
+    const VideoLayout layout = ResolveVideoLayout();
+    VramPart src[MAX_VRAM_PARTS], dst[MAX_VRAM_PARTS];
+    const int src_count = SplitVramRect(source, src);
+    const int dst_count = SplitVramRect(destination, dst);
+    if (layout.native) {
+        for (int i = 0; i < src_count; ++i) {
+            SyncDirtyCanvases(&src[i].area);
         }
+        for (int i = 0; i < dst_count && (vram_mask_flags & VRAM_MASK_CHECK); ++i) {
+            SyncDirtyCanvases(&dst[i].area);
+        }
+    } else {
+        LeaveNative();
     }
-    SDL_EndGPUCopyPass(copy);
+    SDL_GPUCommandBuffer *cmd = AcquireCmd();
+    if (!cmd) {
+        return;
+    }
+    if (!SDL_RectsEqual(&source, &destination) &&
+        VramPartsOverlap(src, src_count, dst, dst_count)) {
+        CopyVramInOrder(cmd, destination, source);
+    } else {
+        CopyVramBlock(cmd, destination, source);
+    }
+    for (int i = 0; i < dst_count; ++i) {
+        PublishVramWrite(&layout, dst[i].area);
+    }
 }
