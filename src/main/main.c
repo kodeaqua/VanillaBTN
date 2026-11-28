@@ -72,6 +72,12 @@ static void main_init_frame_records(void);
 static void main_init_frame_records_wide(void);
 static void main_copy_prim_buffer(s32 enabled, s32 frame_count);
 
+#ifdef __psyz
+static void main_run_pda_sample(void) {
+    pda_sample_run();
+}
+#endif
+
 s32 prim_copy_frame_count;
 void (*scene_frame_handler)(void);
 void (*vsync_pending_callback)(void);
@@ -230,8 +236,19 @@ int main(void) {
             main_set_debug_mode(0);
             LOAD_OVERLAY(AFILE_PDA_SAMPLE, OVERLAY_LOW);
             scene_overlay_loaded = 0;
+#ifdef __psyz
+            scene_frame_handler = main_run_pda_sample;
+#else
             scene_frame_handler = (void (*)(void))pda_sample_run;
+#endif
             break;
+#ifdef __psyz
+        case SCENE_PDA:
+            /* The native card backend reports PocketStation absent. Resume the invoking menu. */
+            main_request_scene(main_previous_scene == SCENE_DEBUG ? SCENE_DEBUG
+                                                                  : SCENE_FARM_MENU_RETURN);
+            continue;
+#endif
         case SCENE_FARM:
             if (scene_overlay_loaded == 0) {
                 loading_screen_init();
