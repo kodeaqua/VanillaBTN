@@ -83,7 +83,11 @@ void farm_load_section(s32 index, s32 cached)
     afile_read_sectors(0, row[1], row[2] - row[1], 0, STAGING_BUFFER);
     texture_pack_load(STAGING_BUFFER);
     afile_read_sectors(0, row[2], row[4] - row[2], 0, STAGING_BUFFER);
+#ifdef __psyz
+    farm_events_load(STAGING_BUFFER, row[3] - row[2]);
+#else
     farm_events_load((struct FarmTable *)STAGING_BUFFER);
+#endif
     event_map_upload(STAGING_BUFFER + (row[3] - row[2]));
 }
 
