@@ -4,6 +4,12 @@ VanillaBTN is a native source port of *Harvest Moon: Back to Nature* (PS1,
 USA, `SLUS_011.15`) based on `hmbtn-decomp`. The repository has a matching PS1 build
 and a Windows x64 game build. **Windows x64 bring-up is complete.**
 
+## Active work
+
+Use the [Windows native correction checklist](NATIVE_FIXES.md) for the next phase.
+Start with repeatable captures, then correct geometry, texture mapping, color, and
+measured host bottlenecks. Keep the original framing and gameplay timing.
+
 ## Project decisions
 
 | Topic | Decision |

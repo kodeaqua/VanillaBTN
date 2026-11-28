@@ -8,6 +8,8 @@ your own copy of the disc, the whole disc image.
 and runs with a user-provided USA disc. Public distribution is deferred.
 [Build and run the game locally](#build-and-run-the-game-locally) · [Bring-up results](ROADMAP.md#local-bring-up-results)
 
+The [native correction checklist](NATIVE_FIXES.md) tracks graphics fixes and use of host resources.
+
 ## Building
 
 ```sh
