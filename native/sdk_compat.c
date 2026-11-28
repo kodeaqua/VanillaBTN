@@ -12,6 +12,7 @@
 #include <libgs.h>
 #include <libapi.h>
 #include "card_file.h"
+#include "kanji_font.h"
 #include "sdk_mcrd.h"
 #include <libmcx.h>
 
@@ -46,37 +47,166 @@ int MoveImage2(RECT *rect, int x, int y) {
     return MoveImage(rect, x, y);
 }
 
-/* shortcut: debug-only Shift-JIS overlays (08_DEBUG, 30_GF_swind), add glyph render if needed */
+enum {
+    KANJI_BUF_SIZE = 2048,
+    KANJI_STRIP_WIDTH = 128,
+    KANJI_MAX_STRIPS = 3,
+};
+
+static struct {
+    int open;
+    int x;
+    int y;
+    int w;
+    int h;
+    int dx;
+    int dy;
+    int cx;
+    int cy;
+    int isbg;
+    int len;
+    int cached_valid;
+    u_short clut;
+    char buf[KANJI_BUF_SIZE];
+    char cached[KANJI_BUF_SIZE];
+    u_short vram[KANJI_VRAM_HALFWORDS];
+    DR_MODE dr[2];
+    SPRT sprt[KANJI_MAX_STRIPS];
+} kanji_state;
+
 int KanjiFntOpen(int x, int y, int w, int h, int dx, int dy, int cx, int cy, int isbg, int n) {
-    (void)x;
-    (void)y;
-    (void)w;
-    (void)h;
-    (void)dx;
-    (void)dy;
-    (void)cx;
-    (void)cy;
-    (void)isbg;
     (void)n;
+    if (w > KANJI_MAX_WIDTH) {
+        w = KANJI_MAX_WIDTH;
+    }
+    if (h > KANJI_MAX_HEIGHT) {
+        h = KANJI_MAX_HEIGHT;
+    }
+    w &= ~3;
+    if (w <= 0 || h <= 0) {
+        return -1;
+    }
+
+    kanji_state.open = 1;
+    kanji_state.x = x;
+    kanji_state.y = y;
+    kanji_state.w = w;
+    kanji_state.h = h;
+    kanji_state.dx = dx;
+    kanji_state.dy = dy;
+    kanji_state.cx = cx;
+    kanji_state.cy = cy;
+    kanji_state.isbg = isbg;
+    kanji_state.len = 0;
+    kanji_state.cached_valid = 0;
+    kanji_state.buf[0] = '\0';
+    kanji_state.cached[0] = '\0';
     return 0;
 }
 
 void KanjiFntClose(int id) {
     (void)id;
+    kanji_state.open = 0;
+    kanji_state.len = 0;
+    kanji_state.cached_valid = 0;
+    kanji_state.buf[0] = '\0';
 }
 
 int KanjiFntPrint(int id, const char *fmt, ...) {
     va_list args;
+    int written;
+
     (void)id;
-    (void)fmt;
+    if (!kanji_state.open || fmt == NULL) {
+        return 0;
+    }
+    int remaining = KANJI_BUF_SIZE - 1 - kanji_state.len;
+    if (remaining <= 0) {
+        return 0;
+    }
     va_start(args, fmt);
+    written = vsnprintf(kanji_state.buf + kanji_state.len, (size_t)remaining + 1, fmt, args);
     va_end(args);
-    return 0;
+    if (written <= 0) {
+        return 0;
+    }
+    if (written > remaining) {
+        written = remaining;
+    }
+    kanji_state.len += written;
+    kanji_state.buf[kanji_state.len] = '\0';
+    return written;
 }
 
 u_long *KanjiFntFlush(int id) {
     (void)id;
-    return NULL;
+    if (!kanji_state.open) {
+        return NULL;
+    }
+    if (kanji_state.len == 0) {
+        return NULL;
+    }
+
+    if (!kanji_state.cached_valid || strcmp(kanji_state.buf, kanji_state.cached) != 0) {
+        u_short clut_data[16];
+        clut_data[0] = kanji_state.isbg ? 0x8000 : 0x0000;
+        for (int i = 1; i < 16; i++) {
+            u_short level = (u_short)(i * 2 + 1);
+            clut_data[i] = (u_short)(0x8000 | level | (level << 5) | (level << 10));
+        }
+        kanji_state.clut = LoadClut2((u_long *)clut_data, kanji_state.cx, kanji_state.cy);
+        if (!vanillabtn_kanji_rasterize(kanji_state.buf, kanji_state.w, kanji_state.h,
+                                        kanji_state.vram)) {
+            kanji_state.len = 0;
+            kanji_state.buf[0] = '\0';
+            return NULL;
+        }
+        RECT dst = {
+            (short)kanji_state.dx,
+            (short)kanji_state.dy,
+            (short)(kanji_state.w / 4),
+            (short)kanji_state.h,
+        };
+        LoadImage(&dst, (u_long *)kanji_state.vram);
+        DrawSync(0);
+        memcpy(kanji_state.cached, kanji_state.buf, (size_t)kanji_state.len + 1);
+        kanji_state.cached_valid = 1;
+    }
+
+    RECT tw = {0, 0, 0, 0};
+    u_short tpage0 = GetTPage(0, 0, kanji_state.dx, kanji_state.dy);
+    u_short tpage1 = GetTPage(0, 0, kanji_state.dx + 64, kanji_state.dy);
+    SetDrawMode(&kanji_state.dr[0], 0, 0, tpage0, &tw);
+    SetDrawMode(&kanji_state.dr[1], 0, 0, tpage1, &tw);
+
+    void *prev = &kanji_state.dr[0];
+    int strip = 0;
+    for (int offset = 0; offset < kanji_state.w && strip < KANJI_MAX_STRIPS;
+         offset += KANJI_STRIP_WIDTH, strip++) {
+        if (offset == 256) {
+            CatPrim(prev, &kanji_state.dr[1]);
+            prev = &kanji_state.dr[1];
+        }
+        int strip_w = kanji_state.w - offset;
+        if (strip_w > KANJI_STRIP_WIDTH) {
+            strip_w = KANJI_STRIP_WIDTH;
+        }
+        SPRT *sp = &kanji_state.sprt[strip];
+        SetSprt(sp);
+        setRGB0(sp, 0x80, 0x80, 0x80);
+        setXY0(sp, kanji_state.x + offset, kanji_state.y);
+        setWH(sp, strip_w, kanji_state.h);
+        setUV0(sp, offset & 0xFF, 0);
+        sp->clut = kanji_state.clut;
+        CatPrim(prev, sp);
+        prev = sp;
+    }
+    TermPrim(prev);
+    DrawOTag((OT_TYPE *)&kanji_state.dr[0]);
+
+    kanji_state.len = 0;
+    kanji_state.buf[0] = '\0';
+    return (u_long *)&kanji_state.dr[0];
 }
 
 /* ---- libgs ---- */

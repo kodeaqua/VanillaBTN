@@ -152,7 +152,7 @@ compatibility layer covers the remaining PsyZ `00fb42e` gaps so all 113 units li
 |---|---|---|
 | Kernel (`libapi`) | `SetMem` (guarded in `main.c`), `psyz_card_rename` (`31_gf_mcard`) | Translates `bu00:` paths and returns PS1 `1`/`0` status. |
 | GTE (`libgte`) | `RotMatrixZXY` (`11_GF_FARM`) | Q4.12 Z-X-Y Euler matrix using PsyZ `rsin`/`rcos`. |
-| GPU (`libgpu`) | `MoveImage2` (`11_GF_FARM`); `KanjiFnt*` (`08_DEBUG`, `30_GF_swind`) | `MoveImage2` forwards to `MoveImage`; `KanjiFnt*` are debug-only stubs. |
+| GPU (`libgpu`) | `MoveImage2` (`11_GF_FARM`); `KanjiFnt*` (`08_DEBUG`, `30_GF_swind`) | `MoveImage2` forwards to `MoveImage`; `KanjiFnt*` rasterizes Shift-JIS via `native/kanji_font.c` into 4-bit VRAM. |
 | Graphics (`libgs`) | `GsGetWorkBase` (mirrored in `main.c`); `GsSetOffset`, `GsInit3D`, `GsSetProjection`, `GsSetFlatLight`, `GsSetAmbient`, `GsSetLightMode` | Updates PsyZ `POSITION`, `GsSetDrawBuffOffset`, and GTE screen/light/color matrices. |
 | Memory card (`libmcrd`) | `MemCardInit`, `MemCardStart`, `MemCardStop`, `MemCardEnd`, `MemCardCallback`, `MemCardAccept`, `MemCardExist`, `MemCardSync`, `MemCardGetDirentry`, `MemCardCreateFile`, `MemCardDeleteFile`, `MemCardOpen`, `MemCardClose`, `MemCardReadData`, `MemCardWriteData`, `MemCardReadFile`, `MemCardWriteFile`, `MemCardFormat`, `MemCardUnformat` | Layered over PsyZ `libcard`/`libapi` (`InitCARD`, `StartCARD`, `firstfile`/`nextfile`, `psyz_open/read/write/lseek/close`, `erase`) with path and alignment validation. |
 | PocketStation (`libmcx`) | `McxStartCom`, `McxStopCom`, `McxCardType`, `McxSync`, plus 15 sample-only calls in `10_PdaSamp` | Reports PocketStation absent (`McxErrInvalid` on valid card ports) so regular memory-card probing succeeds. |

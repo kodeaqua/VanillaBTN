@@ -32,8 +32,8 @@ list(TRANSFORM VANILLABTN_INCLUDE_DIRS PREPEND "${PROJECT_SOURCE_DIR}/")
 target_include_directories(vanillabtn PRIVATE ${VANILLABTN_INCLUDE_DIRS} "${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_definitions(vanillabtn PRIVATE VANILLABTN_HAS_GAME)
 target_compile_options(vanillabtn PRIVATE -funsigned-char)
-target_sources(vanillabtn PRIVATE card_file.c gpu_primitives.c sdk_compat.c seq_player.c)
-target_link_libraries(vanillabtn PRIVATE psyz)
+target_sources(vanillabtn PRIVATE card_file.c gpu_primitives.c kanji_font.c sdk_compat.c seq_player.c)
+target_link_libraries(vanillabtn PRIVATE psyz gdi32)
 set_source_files_properties("${PROJECT_SOURCE_DIR}/src/main/main.c"
     PROPERTIES COMPILE_DEFINITIONS "main=vanillabtn_game_main")
 
@@ -43,3 +43,7 @@ add_test(NAME vanillabtn_gpu_primitives COMMAND vanillabtn_gpu_test)
 
 add_executable(vanillabtn_card_test test_card_file.c card_file.c)
 add_test(NAME vanillabtn_card_file COMMAND vanillabtn_card_test)
+
+add_executable(vanillabtn_kanji_test test_kanji_font.c kanji_font.c)
+target_link_libraries(vanillabtn_kanji_test PRIVATE gdi32)
+add_test(NAME vanillabtn_kanji_font COMMAND vanillabtn_kanji_test)
