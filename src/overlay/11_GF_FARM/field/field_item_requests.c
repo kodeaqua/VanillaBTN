@@ -132,7 +132,7 @@ static void item_request_tick(FarmItemRequest *entry) {
             input.vy = entry->pos[1] - 100;
             input.vz = entry->pos[2] - 150;
             if (estate_point_project(&input, &result) != 0) {
-                anim_draw_sprt_cursor(&current_frame->ot[result.depth >> 2], entry->record,
+                anim_draw_sprt_cursor(FRAME_OT_AT(result.depth >> 2), entry->record,
                               entry->kind, frame & 0xFF, result.x, result.y);
             }
         } else {

@@ -4149,7 +4149,7 @@ static void player_draw_carried_item(FarmPlayer *player, s32 depth, FarmScreenXY
         dir = 0;
     }
     offset = (s16 *)mark_screen_offsets + (dir * 2 + group);
-    picture_cell_build_prim(key, 0, &current_frame->ot[depth >> 2],
+    picture_cell_build_prim(key, 0, FRAME_OT_AT(depth >> 2),
                             pos->x + offset[0], pos->y + offset[1], 2);
 }
 
@@ -4162,7 +4162,7 @@ static void player_draw_body(FarmPlayer *player, s32 offset, FarmScreenXY *pos)
     AnimState *sprite;
     OT_TYPE *otEntry;
 
-    otEntry = &current_frame->ot[offset >> 2];
+    otEntry = FRAME_OT_AT(offset >> 2);
 
     if (player->stateFlags & PLAYER_FLAG_EVENT_SPRITE)
     {
@@ -4233,7 +4233,7 @@ void player_draw(VECTOR *position, s32 unused)
                               (game_state.frameCount >> 2) & 1,
                               hand_screen.x, (hand_screen.y - 50));
     }
-    cue_draw_frame(&player->cue, &current_frame->ot[depth >> 2],
+    cue_draw_frame(&player->cue, FRAME_OT_AT(depth >> 2),
                    hand_screen.x, (hand_screen.y - 40));
     if (player->facing38 == FACING_DOWN || player->facing38 == FACING_RIGHT || (player->stateFlags & PLAYER_FLAG_CARRY_ITEM) ||
         player->mode == PLAYER_MODE_SHOW_TOOL || player->mode == PLAYER_MODE_POSE_4 || player->mode == PLAYER_MODE_USE_FEATHER ||
@@ -4269,7 +4269,7 @@ void player_draw(VECTOR *position, s32 unused)
     }
     if (!(player->stateFlags & PLAYER_FLAG_RIDING))
     {
-        farm_draw_cursor(&current_frame->ot[depth >> 2], hand_screen.x, hand_screen.y, 0);
+        farm_draw_cursor(FRAME_OT_AT(depth >> 2), hand_screen.x, hand_screen.y, 0);
     }
     if (player->stateFlags & PLAYER_FLAG_RIDING)
     {
@@ -5414,7 +5414,7 @@ static void thrown_item_update(FarmThrownItem *effect)
     {
         return;
     }
-    ot = &current_frame->ot[depth >> 2];
+    ot = FRAME_OT_AT(depth >> 2);
     if (effect->phase == THROWN_ITEM_LANDED || effect->phase == THROWN_ITEM_EGG_LANDED)
     {
         anim_draw_sprt_advance(ot, &thrown_item_anim, thrown_item_screen.x, thrown_item_screen.y);
@@ -5448,7 +5448,7 @@ static void thrown_item_update(FarmThrownItem *effect)
     {
         return;
     }
-    farm_draw_cursor(&current_frame->ot[depth >> 2], thrown_item_screen.x, thrown_item_screen.y, 0);
+    farm_draw_cursor(FRAME_OT_AT(depth >> 2), thrown_item_screen.x, thrown_item_screen.y, 0);
 }
 
 /* Land a thrown item on the ground: its landing animation starts, and fish, fish food, the
@@ -6556,7 +6556,7 @@ static void player_draw_toy(VECTOR *point, FarmPlayer *player, s32 mode, s32 slo
     input.vz = point->vz - 150;
     if (estate_point_project(&input, &screen) != 0)
     {
-        sprite_draw_traced(&current_frame->ot[screen.depth >> 2], current_frame->primCursor.ft4, item,
+        sprite_draw_traced(FRAME_OT_AT(screen.depth >> 2), current_frame->primCursor.ft4, item,
                            animation & 0xFF, frame & 0xFF, screen.x, screen.y, item->scale, 0, 0x40);
     }
     if (mode == 0 && (game_state.globalFlags & GLOBAL_FLAG_PAUSED) == 0)

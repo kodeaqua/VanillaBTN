@@ -1131,7 +1131,7 @@ void farm_draw_actor(FarmActor *object) {
         farm_draw_point.vy = object->position.vy - 100;
         farm_draw_point.vz = object->position.vz - 150;
         if (estate_point_project(&farm_draw_point, &result) != 0) {
-            primitive = &current_frame->ot[result.depth >> 2];
+            primitive = FRAME_OT_AT(result.depth >> 2);
             cue_draw_frame(&object->cue, primitive, result.x,
                           result.y + farm_kind_draw_offset((s16)object->kind));
             sprite_draw_traced(primitive, current_frame->primCursor.ft4, &object->sprite, object->sprite.animation,
@@ -1141,7 +1141,7 @@ void farm_draw_actor(FarmActor *object) {
                 farm_draw_point.vy = -100;
                 farm_draw_point.vz = object->position.vz - 150;
                 primitive =
-                    &current_frame->ot[gte_project_vertex(&farm_draw_screen_xy, &farm_draw_point) >> 2];
+                    FRAME_OT_AT(gte_project_vertex(&farm_draw_screen_xy, &farm_draw_point) >> 2);
             } else {
                 farm_draw_screen_xy.x = *&result.x;
                 farm_draw_screen_xy.y = *&result.y;
@@ -1169,7 +1169,7 @@ void farm_draw_object(FarmHelper *helper) {
     input.vy = helper->actor.position.vy - 100;
     input.vz = helper->actor.position.vz - 150;
     if (estate_point_project(&input, &result) != 0) {
-        primitive = &current_frame->ot[result.depth >> 2];
+        primitive = FRAME_OT_AT(result.depth >> 2);
         cue_draw_frame(&helper->actor.cue, primitive, result.x, result.y - 20);
         if (helper->item != ITEM_NOTHING) {
             anim_draw_sprt_cursor(primitive, &helper->itemSprite, 0, 0, result.x, result.y - 16);
@@ -1195,7 +1195,7 @@ void farm_request_project(FarmActor *request, VramPlace *places, s32 base)
         farm_request_draw_point.vy = request->position.vy - 100;
         farm_request_draw_point.vz = request->position.vz - 150;
         if (estate_point_project(&farm_request_draw_point, &result) != 0) {
-            object = &current_frame->ot[result.depth >> 2];
+            object = FRAME_OT_AT(result.depth >> 2);
             text_queue_sprite(object, &request->sprite, (s16)result.x, (s16)result.y, 0x1000, 0, 0,
                           frame_ot_base + base, places);
             cue_draw_frame(&request->cue, object, result.x,
@@ -1204,7 +1204,7 @@ void farm_request_project(FarmActor *request, VramPlace *places, s32 base)
                 farm_request_draw_point.vx = request->position.vx + 150;
                 farm_request_draw_point.vy = -100;
                 farm_request_draw_point.vz = request->position.vz - 150;
-                object = &current_frame->ot[gte_project_vertex(&farm_request_screen_xy, &farm_request_draw_point) >> 2];
+                object = FRAME_OT_AT(gte_project_vertex(&farm_request_screen_xy, &farm_request_draw_point) >> 2);
             } else {
                 farm_request_screen_xy.x = result.x;
                 farm_request_screen_xy.y = result.y;

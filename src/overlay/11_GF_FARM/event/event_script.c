@@ -1450,7 +1450,7 @@ static void event_image_draw(void)
         input.vz = game_state.camera.vz - 150;
         if (estate_point_project(&input, &result) != 0)
         {
-            farm_image_queue(&current_frame->ot[result.depth >> 2], result.x, result.y);
+            farm_image_queue(FRAME_OT_AT(result.depth >> 2), result.x, result.y);
         }
     }
 }
@@ -1483,11 +1483,20 @@ static void event_villager_tick(FarmVillager *villager)
     input.vz = villager->ePosition.vz - 150;
     if (estate_point_project(&input, &screen) != 0)
     {
+#ifdef __psyz
+        s32 slot = screen.depth >> 2;
+        if (event_flag_get(EVENT_FLAG_SPOUSE_AT_HOME) != 0 && villager->id == game_state.family.wifeVillager)
+        {
+            slot -= VILLAGER_SPOUSE_DEPTH_STEP;
+        }
+        position = FRAME_OT_AT(slot);
+#else
         position = &current_frame->ot[screen.depth >> 2];
         if (event_flag_get(EVENT_FLAG_SPOUSE_AT_HOME) != 0 && villager->id == game_state.family.wifeVillager)
         {
             position -= VILLAGER_SPOUSE_DEPTH_STEP;
         }
+#endif
         anim_set_tick_flag(0);
         sprite_draw_traced(position, current_frame->primCursor.ft4, &villager->sprite, villager->sprite.animation, villager->sprite.frame,
                            screen.x, screen.y, villager->sprite.scale, 0, ANIM_DRAW_CURSOR);
@@ -1516,7 +1525,7 @@ static void event_object_draw(FarmPositionObject *object, AnimState *item)
     input.vz = object->z - 150;
     if (estate_point_project(&input, &result) != 0)
     {
-        sprite_draw_traced(&current_frame->ot[result.depth >> 2], current_frame->primCursor.ft4, item,
+        sprite_draw_traced(FRAME_OT_AT(result.depth >> 2), current_frame->primCursor.ft4, item,
                            item->animation, item->frame, result.x, result.y, item->scale, 0, ANIM_DRAW_CURSOR);
     }
     if ((game_state.globalFlags & GLOBAL_FLAG_PAUSED) == 0)

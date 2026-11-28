@@ -418,7 +418,11 @@ static inline s32 farm_tile_free(s32 x, s32 y, s32 mode) {
     FarmTmdQuad *tile;
 
     tile = farm_area.mode.quads[y][x];
+#ifdef __psyz
+    if (farm_area.mode.place.location != mode || tile == 0 || (tile->header & 8)) {
+#else
     if (farm_area.mode.place.location != mode || (tile->header & 8)) {
+#endif
         return 0;
     }
     return 1;
@@ -1019,7 +1023,7 @@ void field_draw_grid(void) {
                            &attr, &sprite, &lift) == 0) {
                 continue;
             }
-            anim_draw_sprt_cursor(&current_frame->ot[result.depth >> 2],
+            anim_draw_sprt_cursor(FRAME_OT_AT(result.depth >> 2),
                           &game_state.work.sprites[sprite], attr, 0, result.x, result.y + lift);
         }
     }
@@ -1452,7 +1456,7 @@ void greenhouse_draw(void) {
             default:
                 continue;
             }
-            anim_draw_sprt_cursor(&current_frame->ot[result.depth >> 2],
+            anim_draw_sprt_cursor(FRAME_OT_AT(result.depth >> 2),
                           &game_state.work.sprites[sprite], attr, 0, result.x, result.y);
         }
     }

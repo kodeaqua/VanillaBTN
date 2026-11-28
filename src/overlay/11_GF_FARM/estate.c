@@ -1933,7 +1933,7 @@ static void estate_search_records(s32 count, FarmEstateRecord *record, s32 (*cal
                 input.vz = record->position.vz + ESTATE_SPRITE_OFFSET_Z;
                 if (estate_point_project(&input, &position) != 0 &&
                     callback_fn(record->itemId, &callback_value, &callback_result) != 0) {
-                    anim_draw_sprt_cursor(&current_frame->ot[position.depth >> ESTATE_OT_DEPTH_SHIFT],
+                    anim_draw_sprt_cursor(FRAME_OT_AT(position.depth >> ESTATE_OT_DEPTH_SHIFT),
                                   &game_state.work.sprites[callback_result], callback_value, 0,
                                   position.x, position.y);
                 }

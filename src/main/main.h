@@ -123,4 +123,23 @@ extern InputRecord input_records[2];
 /* Deferred one-shot callback, called once at vsync and then cleared. */
 extern void (*vsync_pending_callback)(void);
 
+#ifdef __psyz
+/* Clamp direct OT slot indexing so far or behind-camera depths stay in bounds. */
+static inline s32 frame_ot_slot(s32 index) {
+    s32 limit = current_frame->otDepth;
+    if (index < 0 || limit <= 0) {
+        return 0;
+    }
+    if (index >= limit) {
+        return limit - 1;
+    }
+    return index;
+}
+#define FRAME_OT_SLOT(index) frame_ot_slot(index)
+#define FRAME_OT_AT(index) (&current_frame->ot[frame_ot_slot(index)])
+#else
+#define FRAME_OT_SLOT(index) (index)
+#define FRAME_OT_AT(index) (&current_frame->ot[index])
+#endif
+
 #endif /* MAIN_H */

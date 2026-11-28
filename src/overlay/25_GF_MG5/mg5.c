@@ -1355,7 +1355,7 @@ static void mg5_anim_draw_at(AnimState *object, SVECTOR *position) {
     converted->vy = position->vy - 100;
     converted->vz = position->vz - 150;
     converted->pad = position->pad;
-    drawing_area = &current_frame->ot[gte_project_vertex(&mg5_project_xy, converted) >> 2];
+    drawing_area = FRAME_OT_AT(gte_project_vertex(&mg5_project_xy, converted) >> 2);
     anim_draw_ft4_advance(drawing_area, object, mg5_project_xy.x, mg5_project_xy.y);
 
     if (mg5_state.dispatch == 0) {
@@ -1386,7 +1386,7 @@ static void mg5_sprite_draw_at(AnimState *sprite, SVECTOR *vec) {
     mg5_project_vec.pad = vec->pad;
     depth = gte_project_vertex(&mg5_project_xy2, &mg5_project_vec);
     depth += MG5_HEAD_DEPTH_BIAS;
-    anim_draw_ft4_advance(&current_frame->ot[depth >> 2], sprite, mg5_project_xy2.x,
+    anim_draw_ft4_advance(FRAME_OT_AT(depth >> 2), sprite, mg5_project_xy2.x,
                   mg5_project_xy2.y);
 }
 

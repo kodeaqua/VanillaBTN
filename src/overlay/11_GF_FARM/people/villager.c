@@ -1146,6 +1146,17 @@ static void villager_draw(FarmVillager *villager)
     input.vz = villager->position.vz - 150;
     if (estate_point_project(&input, &result) != 0)
     {
+#ifdef __psyz
+        s32 slot = result.depth >> 2;
+        if (villager->id == game_state.family.wifeVillager)
+        {
+            if (event_flag_get(EVENT_FLAG_SPOUSE_AT_HOME) != 0)
+            {
+                slot -= 5;
+            }
+        }
+        ot_slot = FRAME_OT_AT(slot);
+#else
         ot_slot = &current_frame->ot[result.depth >> 2];
         if (villager->id == game_state.family.wifeVillager)
         {
@@ -1154,6 +1165,7 @@ static void villager_draw(FarmVillager *villager)
                 ot_slot -= 5;
             }
         }
+#endif
         cue_draw_frame(&villager->cue, ot_slot, result.x, result.y - 40);
         sprite_draw_traced(ot_slot, current_frame->primCursor.ft4, &villager->sprite80, villager->sprite80.animation, villager->sprite80.frame,
                            result.x, result.y, villager->sprite80.scale, 0, 64);

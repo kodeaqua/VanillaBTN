@@ -1569,7 +1569,7 @@ static void mg3_draw_sprite_at(AnimState *object, s16 *coordinates) {
     mg3_offset_vec.vx = coordinates[0] + 150;
     mg3_offset_vec.vy = coordinates[1] - 100;
     mg3_offset_vec.vz = coordinates[2] - 150;
-    drawing_area = &current_frame->ot[gte_project_vertex(&mg3_offset_xy, &mg3_offset_vec) >> 2];
+    drawing_area = FRAME_OT_AT(gte_project_vertex(&mg3_offset_xy, &mg3_offset_vec) >> 2);
     anim_draw_ft4_advance(drawing_area, object, mg3_offset_xy.x, mg3_offset_xy.y);
     if (object == mg3_state.records[0].sprite || object == mg3_state.records[1].sprite ||
         object == mg3_state.records[2].sprite || object == mg3_state.records[5].sprite) {
