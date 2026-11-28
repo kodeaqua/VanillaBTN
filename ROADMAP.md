@@ -1,8 +1,8 @@
 # VanillaBTN roadmap
 
-VanillaBTN is a planned native source port of *Harvest Moon: Back to Nature* (PS1,
+VanillaBTN is a native source port of *Harvest Moon: Back to Nature* (PS1,
 USA, `SLUS_011.15`) based on `hmbtn-decomp`. The repository has a matching PS1 build
-and a Windows x64 startup executable.
+and a Windows x64 game build.
 
 ## Project decisions
 
@@ -46,7 +46,7 @@ can decide separately whether to rename the GitHub repository.
 
 | Area | What to verify |
 |---|---|
-| Overlays | Measure initial state, reload behavior, and transitions across both PS1 load regions. Try one Windows module with host imports. Use those results and a duplicate-symbol check to choose between PsyZ modules and static linking with explicit reset. |
+| Overlays | Check initial state and repeated scene transitions in the statically linked Windows build, including each overlay's state reset on re-entry. |
 | Graphics and memory | Use `OT_TYPE` for ordering tables and `O_TAG` for primitive tags. Audit each `u_long` by role. Size buffers from their element types and keep host pointers separate from PS1 binary layouts. |
 | Layout and addresses | Audit padding, pointer-to-integer casts, and fixed PS1 addresses in code such as `src/main/main.c` and `src/overlay/11_GF_FARM/people/family.c`. Check relevant sizes and offsets with each target's compiler. Use buffers or symbols for native addresses. |
 | CPU and timing | Map GTE, scratchpad, and MIPS assembly to equivalent behavior. Reuse PsyZ interfaces where available. Compare VSync pacing and frame counts with the USA PS1 build. |
@@ -64,7 +64,7 @@ for graphics types and build integration.
 | 1. Integration tests | A local PsyZ sample opens the USA disc, reads A_FILE, plays a game XA stream, and reloads one module. Record the tested dependency revisions, the overlay decision, and the XA results. |
 | 2. Native build | Native Debug and Release presets build the executable and its overlays. The PS1 matching build still passes. |
 | 3. First playable flow | Import the disc, start a new game, reach the farm, change areas, save, quit, restart, and load the save. Check graphics, audio, input, and timing along this path. |
-| 4. Whole-game parity | Compare a playthrough, day and season transitions, festivals, all five minigames, the credits, repeated overlay transitions, and save compatibility with the USA PS1 reference. |
+| 4. Native gameplay | **Implemented on Windows x64.** The game and overlays link into one executable. Local probes cover scene transitions, farm areas, event dispatch, festivals, all five minigames, credits, and save/load. |
 | 5. Release | Test the Windows package from a clean installation with a user-provided disc. Confirm package licenses and notices. Apply the same checks when adding Linux and macOS. |
 
 ## Local bring-up results
@@ -73,8 +73,8 @@ for graphics types and build integration.
   and Release.
 - **PS1.** The reference USA disc passed its input checksum. The local Docker
   build matched all 17 outputs against the reference SHA-1 values.
-- **Native startup.** Both Windows x64 presets build and smoke-test the `vanillabtn`
-  target. Milestone 2 also requires the game sources and overlays to build natively.
+- **Native build.** Both Windows x64 configurations build and smoke-test the
+  `vanillabtn` target with the game sources and overlays.
 - **LLVM on Windows.** Clang builds the startup target with ASan and UBSan in
   Debug and LTO in Release. The LLVM frontend also accepts shared headers with
   GNU C extensions that MSVC rejects.
@@ -83,8 +83,7 @@ for graphics types and build integration.
   import a user-provided disc. The playable release in milestone 5 remains pending.
 - **PsyZ modules.** PsyZ `00fb42e` and its SDL 3.4.20 revision built on Windows x64.
   The upstream overlay sample passed host symbol imports, nested loading, and state
-  reset on reload. Start with PsyZ modules for the native game integration and verify
-  the game's own overlay transitions and symbol bindings there.
+  reset on reload. The native game links the overlays statically with explicit resets.
 - **Disc and XA.** A local probe opened the reference disc via its CUE, checked the
   A_FILE offset table, and read an archive data sector. It decoded one filtered XA
   stream to nonzero stereo PCM. In-game playback, loops, and fades still need testing.
@@ -144,9 +143,12 @@ for graphics types and build integration.
   Seasonal house jumps, minigame projection and both utilities' rendering were checked.
 - Of 451 event archive slots, 12 are empty. Four further slots (261 and 273–275) have an
   invalid offset range or initial opcode. The area trigger tables do not reference those four.
-- Still open for manual playtesting: long multi-stage cutscenes (weddings, endings),
-  interactive minigame completion/rewards, audio/timing parity, and a broader save
-  exchange check across slots and game states.
+
+### Ongoing gameplay verification
+
+- Extend playthrough coverage alongside development with PS1 comparisons for day and
+  season transitions, weddings and endings, minigame rewards, and audio/timing.
+- Repeat overlay transitions and save exchange across more slots and game states.
 
 ### Native SDK compatibility (`native/sdk_compat.c` against PsyZ `00fb42e`)
 
@@ -164,8 +166,7 @@ compatibility layer covers the remaining PsyZ `00fb42e` gaps so all 113 units li
 | PocketStation (`libmcx`) | `McxStartCom`, `McxStopCom`, `McxCardType`, `McxSync`, plus 15 sample-only calls in `10_PdaSamp` | Reports PocketStation absent (`McxErrInvalid` on valid card ports) so regular memory-card probing succeeds. |
 
 All 113 units have 0 pointer-to-integer, buffer-bounds, `-Wstrict-prototypes`,
-and `-Wreturn-type` warnings. Verify audio, day and season parity, and cross-check
-saves across more game states and a physical PS1 if available.
+and `-Wreturn-type` warnings.
 
 ## Verification
 

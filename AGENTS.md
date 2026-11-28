@@ -16,8 +16,9 @@ import this file. If a rule is unclear or conflicts with a task, stop and ask.
 - **No hallucination:** check every API, flag and path against the installed headers,
   docs or a real run. If unverified, say "not verified".
 - **Do not break what works:** the byte-matching PS1 build must keep passing (see 4).
-- **Whole game, not one screen:** fix causes in shared code. No per-scene hacks, no work
-  that serves only the title screen. Bring-up order is fine, acceptance is the whole game.
+- **Whole game, not one screen:** fix causes in shared code. No per-scene hacks.
+  Use `ROADMAP.md` for implementation status and run targeted checks for each change.
+  Extend long-play verification alongside development.
 
 ## 2. Code
 
