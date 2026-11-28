@@ -144,11 +144,22 @@ static VECTOR view_direction;
 /* Source TMD words retain their disc offsets. Only the GPU packet header grows. */
 #define PRIM_HEADER_DELTA (offsetof(POLY_F3, r0) - sizeof(u32))
 #define LINK_MODEL_PRIM(ot, p, type, words) (setlen(p, words), addPrim(ot, p))
+static inline OT_TYPE *model_ot_slot(OT_TYPE *ot, s32 depth) {
+    s32 index = depth / 4;
+    if (index < 0) {
+        index = 0;
+    } else if (index >= FRAME_OT_DEPTH) {
+        index = FRAME_OT_DEPTH - 1;
+    }
+    return &ot[index];
+}
+#define MODEL_OT_SLOT(ot, depth) model_ot_slot((ot), (depth))
 _Static_assert(sizeof(PolyFT4) == sizeof(POLY_FT4), "packed textured quad size");
 _Static_assert(offsetof(PolyFT4, xy0) == offsetof(POLY_FT4, x0), "packed textured quad XY layout");
 #else
 #define PRIM_HEADER_DELTA 0
 #define LINK_MODEL_PRIM(ot, p, type, words) LINK_PRIM(ot, p, type)
+#define MODEL_OT_SLOT(ot, depth) (&(ot)[(depth) / 4])
 #endif
 #define PRIM_WORD(p, off) PACKET_WORD(p, (off) + PRIM_HEADER_DELTA)
 #define PRIM_CODE(p) ((p)[7 + PRIM_HEADER_DELTA])
@@ -625,7 +636,7 @@ loopF3:
         if (header & 0x4000) {
             depth += 1;
         }
-        slot = &ot[depth / 4];
+        slot = MODEL_OT_SLOT(ot, depth);
         LINK_MODEL_PRIM(slot, out, POLY_F3, 4);
         drawn_parts++;
     }
@@ -674,7 +685,7 @@ loopG3:
         if (header & 0x4000) {
             depth += 1;
         }
-        slot = &ot[depth / 4];
+        slot = MODEL_OT_SLOT(ot, depth);
         LINK_MODEL_PRIM(slot, out, POLY_G3, 6);
         drawn_parts++;
     }
@@ -723,7 +734,7 @@ loopFT3:
         if (header & 0x4000) {
             depth += 1;
         }
-        slot = &ot[depth / 4];
+        slot = MODEL_OT_SLOT(ot, depth);
         LINK_MODEL_PRIM(slot, out, POLY_FT3, 7);
         drawn_parts++;
         prim += sizeof(POLY_FT3);
@@ -775,7 +786,7 @@ loopGT3:
         }
         PRIM_WORD(out, 0x24) = PACKET_WORD(source, 0xC);
         PRIM_CODE(out) = 0x34 | ((header >> 24) & 2);
-        slot = &ot[depth / 4];
+        slot = MODEL_OT_SLOT(ot, depth);
         LINK_MODEL_PRIM(slot, out, POLY_GT3, 9);
         drawn_parts++;
         prim += sizeof(POLY_GT3);
@@ -831,7 +842,7 @@ loopF4:
         if (header & 0x4000) {
             depth += 1;
         }
-        slot = &ot[depth / 4];
+        slot = MODEL_OT_SLOT(ot, depth);
         LINK_MODEL_PRIM(slot, out, POLY_F4, 5);
         drawn_parts++;
     }
@@ -889,7 +900,7 @@ loopG4:
         if (header & 0x4000) {
             depth += 1;
         }
-        slot = &ot[depth / 4];
+        slot = MODEL_OT_SLOT(ot, depth);
         LINK_MODEL_PRIM(slot, out, POLY_G4, 8);
         drawn_parts++;
     }
@@ -947,7 +958,7 @@ loopFT4:
         if (header & 0x4000) {
             depth += 1;
         }
-        slot = &ot[depth / 4];
+        slot = MODEL_OT_SLOT(ot, depth);
         LINK_MODEL_PRIM(slot, out, POLY_FT4, 9);
         drawn_parts++;
         prim += sizeof(POLY_FT4);
@@ -1009,7 +1020,7 @@ loopGT4:
         if (header & 0x4000) {
             depth += 1;
         }
-        slot = &ot[depth / 4];
+        slot = MODEL_OT_SLOT(ot, depth);
         LINK_MODEL_PRIM(slot, out, POLY_GT4, 12);
         drawn_parts++;
         prim += sizeof(POLY_GT4);

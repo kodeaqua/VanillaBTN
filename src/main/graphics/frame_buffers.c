@@ -65,6 +65,11 @@ void *ot_insert_prim(s32 index, s32 advance) {
     state = current_frame;
     debug_hook_run(0x80);
     limit = state->otDepth;
+#ifdef __psyz
+    if (index < 0) {
+        index = 0;
+    }
+#endif
     if (index >= limit) {
         index = limit - 1;
     }
