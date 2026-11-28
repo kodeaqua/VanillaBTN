@@ -143,6 +143,8 @@ static void test_invalid_headers(void) {
     assert(vanillabtn_seq_open_sized(zero_res, sizeof(zero_res), 2) == -1);
     assert(vanillabtn_seq_open_sized(bad_magic, 10, 2) == -1);
     assert(vanillabtn_seq_open_sized(header, 0, 2) == -1);
+    assert(vanillabtn_seq_open_sized(header, sizeof(header) - 1, 2) == -1);
+    assert(vanillabtn_seq_open_sized(header, sizeof(header), 2) == -1);
 }
 
 static void test_playback_multitone_nrpn_loop_and_pitch_bend(void) {

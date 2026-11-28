@@ -63,6 +63,7 @@ typedef struct {
     size_t size;
     size_t cursor;
     size_t start_pos;
+    uint32_t initial_delta;
     size_t loop_pos;
     int has_nrpn_loop;
     uint8_t nrpn_loop_remaining;
@@ -619,11 +620,8 @@ static void seq_restart_from_start(SeqSlot *slot) {
     slot->running_status = 0;
     slot->tempo_us = slot->initial_tempo_us;
     slot->pulse_num = 0;
-    slot->delta_remaining = 0;
+    slot->delta_remaining = slot->initial_delta;
     seq_reset_channels(slot);
-    if (!seq_read_vlq(slot->data, slot->size, &slot->cursor, &slot->delta_remaining)) {
-        slot->playing = 0;
-    }
 }
 
 static void seq_step_slot(short handle, char status[SEQ_TOTAL_VOICES]) {
@@ -849,6 +847,8 @@ short vanillabtn_seq_open_sized(const uint8_t *data, size_t size, short vab_id) 
     int i;
     uint16_t resolution;
     uint32_t tempo_us;
+    uint32_t initial_delta;
+    size_t first_event = SEQ_HEADER_SIZE;
     SeqSlot *slot;
 
     if (!data || vab_id < 0 || vab_id >= SEQ_MAX_VABS) {
@@ -862,7 +862,8 @@ short vanillabtn_seq_open_sized(const uint8_t *data, size_t size, short vab_id) 
     }
     resolution = (uint16_t)(((uint16_t)data[8] << 8) | (uint16_t)data[9]);
     tempo_us = ((uint32_t)data[10] << 16) | ((uint32_t)data[11] << 8) | (uint32_t)data[12];
-    if (resolution == 0 || tempo_us == 0) {
+    if (resolution == 0 || tempo_us == 0 ||
+        !seq_read_vlq(data, size, &first_event, &initial_delta) || first_event == size) {
         return -1;
     }
 
@@ -883,7 +884,8 @@ short vanillabtn_seq_open_sized(const uint8_t *data, size_t size, short vab_id) 
     slot->vab_id = vab_id;
     slot->data = data;
     slot->size = size;
-    slot->start_pos = SEQ_HEADER_SIZE;
+    slot->start_pos = first_event;
+    slot->initial_delta = initial_delta;
     slot->resolution = resolution;
     slot->initial_tempo_us = tempo_us;
     slot->tempo_us = tempo_us;
