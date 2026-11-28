@@ -72,7 +72,7 @@ typedef struct {
     uint16_t resolution;
     uint32_t initial_tempo_us;
     uint32_t tempo_us;
-    uint64_t pulse_num;
+    uint64_t pulse_remainder;
     uint32_t delta_remaining;
     short loop_count;
     short loops_done;
@@ -619,15 +619,14 @@ static void seq_restart_from_start(SeqSlot *slot) {
     slot->loop_running_status = 0;
     slot->running_status = 0;
     slot->tempo_us = slot->initial_tempo_us;
-    slot->pulse_num = 0;
+    slot->pulse_remainder = 0;
     slot->delta_remaining = slot->initial_delta;
     seq_reset_channels(slot);
 }
 
 static void seq_step_slot(short handle, char status[SEQ_TOTAL_VOICES]) {
     SeqSlot *slot = &seq_slots[handle];
-    uint64_t denom;
-    uint64_t pulses;
+    uint64_t time_left;
     int events_run = 0;
 
     if (!slot->open || !slot->playing || slot->paused || slot->resolution == 0 ||
@@ -635,21 +634,22 @@ static void seq_step_slot(short handle, char status[SEQ_TOTAL_VOICES]) {
         return;
     }
 
-    denom = (uint64_t)slot->tempo_us * SEQ_TICK_HZ;
-    slot->pulse_num += (uint64_t)slot->resolution * SEQ_US_PER_SEC;
-    pulses = slot->pulse_num / denom;
-    slot->pulse_num %= denom;
+    /* Keep elapsed time in integer units shared by all tempos within this tick. */
+    time_left = slot->pulse_remainder + (uint64_t)slot->resolution * SEQ_US_PER_SEC;
 
     while (slot->playing && events_run < SEQ_MAX_EVENTS_PER_TICK) {
         uint8_t status_byte;
         uint8_t hi;
         uint8_t channel;
 
-        if (slot->delta_remaining > pulses) {
-            slot->delta_remaining -= (uint32_t)pulses;
+        uint64_t pulse_duration = (uint64_t)slot->tempo_us * SEQ_TICK_HZ;
+        uint64_t event_delay = slot->delta_remaining * pulse_duration;
+        if (event_delay > time_left) {
+            slot->delta_remaining -= (uint32_t)(time_left / pulse_duration);
+            slot->pulse_remainder = time_left % pulse_duration;
             return;
         }
-        pulses -= slot->delta_remaining;
+        time_left -= event_delay;
         slot->delta_remaining = 0;
 
         if (slot->cursor >= slot->size) {
@@ -747,7 +747,6 @@ static void seq_step_slot(short handle, char status[SEQ_TOTAL_VOICES]) {
                 slot->cursor += 3;
                 if (new_tempo > 0) {
                     slot->tempo_us = new_tempo;
-                    slot->pulse_num = 0;
                 }
             } else {
                 uint32_t skip_len = 0;
@@ -765,6 +764,7 @@ static void seq_step_slot(short handle, char status[SEQ_TOTAL_VOICES]) {
             goto end_track;
         }
     }
+    slot->pulse_remainder = time_left % ((uint64_t)slot->tempo_us * SEQ_TICK_HZ);
     return;
 
 end_track:

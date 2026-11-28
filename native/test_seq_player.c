@@ -307,8 +307,44 @@ static void test_controller_reset_restores_held_note_pitch(void) {
     vanillabtn_seq_close(h);
 }
 
+static void test_loop_keeps_fractional_timing(void) {
+    /* 80 pulses per second gives four one-pulse loops in three ticks. */
+    static const uint8_t song[] = {
+        'p', 'Q', 'E', 'S', 0, 0, 0, 1, 0, 80, 0x0f, 0x42, 0x40, 4, 2,
+        1, 0x90, 60, 100, 0, 0x80, 60, 0, 0, 0xff, 0x2f,
+    };
+    mock_reset();
+    vanillabtn_seq_reset();
+    short h = vanillabtn_seq_open_sized(song, sizeof(song), 2);
+    assert(h == 0);
+    vanillabtn_seq_play(h, 1, 0);
+    for (int i = 0; i < 3; ++i) {
+        vanillabtn_seq_tick();
+    }
+    assert(mock_total_key_ons == 4);
+    vanillabtn_seq_close(h);
+}
+
+static void test_tempo_change_applies_within_tick(void) {
+    /* One pulse at 120 PPQ uses half a tick. Doubling tempo leaves two pulses. */
+    static const uint8_t song[] = {
+        'p', 'Q', 'E', 'S', 0, 0, 0, 1, 0, 120, 0x0f, 0x42, 0x40, 4, 2,
+        1, 0xff, 0x51, 0x07, 0xa1, 0x20, 2, 0x90, 60, 100, 1, 0xff, 0x2f,
+    };
+    mock_reset();
+    vanillabtn_seq_reset();
+    short h = vanillabtn_seq_open_sized(song, sizeof(song), 2);
+    assert(h == 0);
+    vanillabtn_seq_play(h, 1, 1);
+    vanillabtn_seq_tick();
+    assert(mock_total_key_ons == 1);
+    vanillabtn_seq_close(h);
+}
+
 int main(void) {
     vanillabtn_seq_set_backend(&mock_backend);
+    test_tempo_change_applies_within_tick();
+    test_loop_keeps_fractional_timing();
     test_controller_reset_restores_held_note_pitch();
     test_invalid_headers();
     test_playback_multitone_nrpn_loop_and_pitch_bend();
