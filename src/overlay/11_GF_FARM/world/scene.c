@@ -870,6 +870,13 @@ s32 scene_slot_handoff_step(FarmSceneModel *owner, FarmSceneModel *other, s32 ne
 {
     FarmMorph *counter;
 
+#ifdef __psyz
+    /* Guard partial slot setups where PS1 would tolerate NULL dereferences. */
+    if (owner == 0 || other == 0 || owner->morph == 0 || other->morph == 0)
+    {
+        return 0;
+    }
+#endif
     owner->morph->step++;
     counter = owner->morph;
     if (counter->step < counter->steps)
@@ -1004,10 +1011,18 @@ static void scene_link_handback(void)
     FarmSceneModel *other;
     FarmMorph *link;
 
+#ifdef __psyz
+    if (scene_link_entries[0] == 0 || scene_link_entries[1] == 0 ||
+        scene_link_entries[0]->morph == 0 || scene_link_entries[1]->morph == 0)
+    {
+        return;
+    }
+#else
     if (scene_link_entries[0] == 0)
     {
         return;
     }
+#endif
     switch (scene_handback_state)
     {
     case SCENE_HANDBACK_WAIT:
