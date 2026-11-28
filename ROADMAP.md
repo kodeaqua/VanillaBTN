@@ -121,6 +121,8 @@ for graphics types and build integration.
   each route for at least 12 ticks. The PDA route resumed the farm or debug menu with no device.
 - The native loader read all 255 farm sections. Their 10,397 trigger entries reference
   313 distinct IDs. All 50 cached event scripts decoded to the corresponding disc script prefix.
+- An instrumented Debug run completed the new-game intro with simulated controller input.
+  Dialogue rendering also passed checks for an absent livestock name and an empty string.
 - Of 451 event archive slots, 12 are empty. Four further slots (261 and 273–275) have an
   invalid offset range or initial opcode. The area trigger tables do not reference those four.
 - Verify event outcomes during play, including festival eligibility, dialogue choices,
