@@ -121,9 +121,37 @@ static void vsync_frame_callback(void) {
 
 #if defined(__psyz) && defined(VANILLABTN_DEBUG)
 static s32 vanillabtn_start_scene = SCENE_TITLE;
+static s32 debug_scene_after_farm = SCENE_FARM;
+static int debug_farm_pending;
 
 void vanillabtn_start_debug_menu(void) {
     vanillabtn_start_scene = SCENE_DEBUG;
+}
+
+void vanillabtn_debug_jump(s32 scene) {
+    switch (scene) {
+    case SCENE_FARM:
+    case SCENE_MG1:
+    case SCENE_MG2:
+    case SCENE_MG3:
+    case SCENE_MG4:
+    case SCENE_MG5:
+    case SCENE_SAVE:
+    case SCENE_LOAD:
+    case SCENE_LIVESTOCK_TRADE:
+    case SCENE_MG_DEBUG:
+    case SCENE_FARM_MINIGAME_EXIT:
+    case SCENE_FARM_MENU_RETURN:
+    case SCENE_FARM_STAFF_EXIT:
+        /* These scenes depend on resources or state normally provided by the farm. */
+        debug_farm_pending = 1;
+        debug_scene_after_farm = scene;
+        main_request_scene(SCENE_FARM);
+        break;
+    default:
+        main_request_scene(scene);
+        break;
+    }
 }
 #endif
 
@@ -268,6 +296,13 @@ int main(void) {
             continue;
 #endif
         case SCENE_FARM:
+#if defined(__psyz) && defined(VANILLABTN_DEBUG)
+            if (debug_farm_pending) {
+                debug_farm_pending = 0;
+                title_prepare_debug_farm();
+                scene_overlay_loaded = 0;
+            }
+#endif
             if (scene_overlay_loaded == 0) {
                 loading_screen_init();
                 main_set_debug_mode(0);
@@ -479,6 +514,15 @@ static void main_run_frame(void) {
             vsync_pending_callback = main_draw_ots;
             VSync(2);
         }
+#if defined(__psyz) && defined(VANILLABTN_DEBUG)
+        if (main_scene == SCENE_FARM && debug_scene_after_farm != SCENE_FARM &&
+            game_state.progress.entryStep == 2 && !loading_screen_is_active()) {
+            s32 scene = debug_scene_after_farm;
+            debug_scene_after_farm = SCENE_FARM;
+            game_state.progress.entrySubStep = 0;
+            main_request_scene(scene);
+        }
+#endif
     } while (main_loop_running == 1);
 }
 

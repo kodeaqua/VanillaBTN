@@ -335,7 +335,11 @@ static void pda_menu_draw(void)
             strcpy(pda_status_line, "card not connected");
             break;
         case PDA_RESULT_FAILED:
+#ifdef __psyz
+            strcpy(pda_status_line, "PocketStation unavailable");
+#else
             strcpy(pda_status_line, "command failed");
+#endif
             break;
         case PDA_RESULT_CARD_CHANGED:
             if (cmd == McxFuncExecFlag) {

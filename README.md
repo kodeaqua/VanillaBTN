@@ -84,6 +84,10 @@ In Debug builds only, pass `--debug-menu` with `--disc` to start in `08_DEBUG`
 & .\build\native\game-debug\native\vanillabtn.exe --disc 'path\to\disc.cue' --debug-menu
 ```
 
+Use the D-pad to move and Circle or Start to open an entry. House, minigame,
+save/load, trade and farm-return entries start from a fresh farm session.
+PocketStation tests report that the device is unavailable on Windows.
+
 ### Import a reference disc locally
 
 With Python 3.10 or newer on `PATH`, run the native executable with your BIN or CUE:

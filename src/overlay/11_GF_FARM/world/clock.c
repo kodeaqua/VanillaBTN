@@ -164,6 +164,17 @@ void clock_reset(void) {
     farm->progress.clock.date.weekday = WEEKDAY_MONDAY;
     farm->progress.clock.date.year = 0;
     farm->progress.clock.date.season = SEASON_SPRING;
+#if defined(__psyz) && defined(VANILLABTN_DEBUG)
+    if (farm->debugFlags & DEBUG_FLAG_WINTER_HOUSE) {
+        farm->progress.clock.date.season = SEASON_WINTER;
+    } else if (farm->debugFlags & DEBUG_FLAG_AUTUMN_HOUSE) {
+        farm->progress.clock.date.season = SEASON_FALL;
+    } else if (farm->debugFlags & DEBUG_FLAG_SUMMER_HOUSE) {
+        farm->progress.clock.date.season = SEASON_SUMMER;
+    }
+    farm->debugFlags &= ~(DEBUG_FLAG_SPRING_HOUSE | DEBUG_FLAG_SUMMER_HOUSE |
+                          DEBUG_FLAG_AUTUMN_HOUSE | DEBUG_FLAG_WINTER_HOUSE);
+#endif
     farm->progress.clock.time.hm.minute = 0;
     farm->progress.clock.unused10 = 0;
     farm->progress.clock.minuteOfDay = CLOCK_DAY_START_MINUTE;

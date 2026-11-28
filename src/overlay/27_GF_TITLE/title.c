@@ -4,6 +4,9 @@
 #include <libgte.h>
 #ifdef __psyz
 #include <string.h>
+#ifdef VANILLABTN_DEBUG
+#include <libetc.h>
+#endif
 /* PsyZ implements rsin/rcos (same 4096-unit Q4.12 trig) without csin/ccos aliases. */
 #define csin rsin
 #define ccos rcos
@@ -2614,6 +2617,12 @@ _Static_assert(sizeof(title_image_0) <= sizeof(loading_data) &&
                    sizeof(title_image_1) <= sizeof(loading_data) &&
                    sizeof(title_image_2) <= sizeof(loading_data),
                "title pictures must fit in the loading buffer");
+
+static void title_prepare_loading_picture(void) {
+    s32 index = rand_range(sizeof(title_images) / sizeof(title_images[0]));
+    memset(&loading_data, 0, sizeof(loading_data));
+    memcpy(&loading_data, title_images[index].data, title_images[index].size);
+}
 #else
 static TitleImage *title_image_ptrs[3] = {
     (TitleImage *)title_image_0, (TitleImage *)title_image_1, (TitleImage *)title_image_2,
@@ -2718,9 +2727,7 @@ static void title_state_show_image(void) {
 
     if (title_load_sprite_file() != 0) {
 #ifdef __psyz
-        s32 index = rand_range(sizeof(title_images) / sizeof(title_images[0]));
-        memset(&loading_data, 0, sizeof(loading_data));
-        memcpy(&loading_data, title_images[index].data, title_images[index].size);
+        title_prepare_loading_picture();
 #else
         image = (TitleImage *)&loading_data;
         images = title_image_ptrs;
@@ -3612,6 +3619,31 @@ static int title_load_small_finish(void) {
     }
     return 0;
 }
+
+#if defined(__psyz) && defined(VANILLABTN_DEBUG)
+void title_prepare_debug_farm(void) {
+    u32 flags = game_state.debugFlags;
+    farm_state_init();
+    game_state.debugFlags = flags;
+    title_fill_field_layout(rand_range(3));
+    title_player_reset_for_new_game();
+    title_reset_world_options();
+    title_copy_new_game_toolbox();
+    title_prepare_loading_picture();
+    title_load_block_start();
+    while (!title_load_block_finish()) {
+        VSync(0);
+    }
+    title_load_small_start();
+    while (!title_load_small_finish()) {
+        VSync(0);
+    }
+    title_load_image_start();
+    while (!title_load_image_poll()) {
+        VSync(0);
+    }
+}
+#endif
 
 /* Empty hook, kept as a load step. */
 static void title_load_func_hook(void) {

@@ -50,9 +50,13 @@ static void (*const debug_handlers[3])(void) = {
 /* debug_tick's handler index (into debug_handlers) and the menu cursor. */
 static s32 debug_step = 0;
 static s32 debug_cursor = 0;
+#if defined(__psyz) && defined(VANILLABTN_DEBUG)
+static int debug_pda_unavailable;
+#endif
 
 /* The rows of debug_menu that choose a season house (see debug_menu_draw). */
 enum DebugMenuRow {
+    DEBUG_ROW_OWN_HOUSE = 2,
     DEBUG_ROW_SPRING_HOUSE = 13,
     DEBUG_ROW_SUMMER_HOUSE = 14,
     DEBUG_ROW_AUTUMN_HOUSE = 15,
@@ -154,6 +158,11 @@ static void debug_menu_draw(void) {
     /* \n   ＳＴＡＲＴ ＝プログラム実行 — footer, "START = run program" */
     KanjiFntPrint("\n   \202r\202s\202`\202q\202s \201\201\203v\203\215\203O\203\211\203\200\216\300\215s");
 
+#if defined(__psyz) && defined(VANILLABTN_DEBUG)
+    if (debug_pda_unavailable && debug_menu[debug_cursor].id == SCENE_PDA) {
+        KanjiFntPrint("\n   PocketStation unavailable");
+    }
+#endif
     if (fade_is_settled() != 0) {
         if (input_pad1->triggered & PAD_UP) {
             debug_cursor--;
@@ -175,12 +184,30 @@ static void debug_menu_draw(void) {
             if (debug_cursor < 0 || debug_cursor >= DEBUG_MENU_ROWS) {
                 debug_cursor = DEBUG_MENU_ROWS - 1;
             }
+#if defined(__psyz) && defined(VANILLABTN_DEBUG)
+        } else if (input_pad1->pressed & (PAD_CIRCLE | PAD_START)) {
+#else
         } else if (input_pad1->pressed & PAD_CIRCLE) {
+#endif
             if (debug_menu[debug_cursor].id != DEBUG_ROW_EMPTY) {
+#if defined(__psyz) && defined(VANILLABTN_DEBUG)
+                s32 scene = debug_menu[debug_cursor].id;
+                debug_pda_unavailable = scene == SCENE_PDA;
+                if (debug_pda_unavailable) {
+                    KanjiFntFlush(-1);
+                    return;
+                }
+                if (debug_cursor == DEBUG_ROW_OWN_HOUSE ||
+                    (debug_cursor >= DEBUG_ROW_SPRING_HOUSE &&
+                     debug_cursor <= DEBUG_ROW_WINTER_HOUSE)) {
+                    scene = SCENE_FARM;
+                }
+#else
 #ifdef __psyz
                 debug_step = 0;
 #endif
                 main_request_scene(debug_menu[debug_cursor].id);
+#endif
                 switch (debug_cursor) {
                 case DEBUG_ROW_SPRING_HOUSE:
                     game_state.debugFlags |= DEBUG_FLAG_SPRING_HOUSE;
@@ -195,6 +222,10 @@ static void debug_menu_draw(void) {
                     game_state.debugFlags |= DEBUG_FLAG_WINTER_HOUSE;
                     break;
                 }
+#if defined(__psyz) && defined(VANILLABTN_DEBUG)
+                debug_step = 0;
+                vanillabtn_debug_jump(scene);
+#endif
             }
         }
         KanjiFntFlush(-1);

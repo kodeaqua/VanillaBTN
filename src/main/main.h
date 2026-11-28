@@ -81,6 +81,9 @@ enum MainScene {
 };
 
 void main_request_scene(s32 scene);
+#if defined(__psyz) && defined(VANILLABTN_DEBUG)
+void vanillabtn_debug_jump(s32 scene);
+#endif
 s32 main_get_previous_scene(void);
 /* The speed mode: a fade runs at half step in HALF, and the cd fade steps and the pad's
  * repeat delays scale by 2 or 3 in FAST_2 and FAST_3. */
