@@ -4,7 +4,9 @@ A matching decompilation of *Harvest Moon: Back to Nature* (PlayStation, USA,
 `SLUS_011.15`). The C source builds the EXE and its 13 overlays byte for byte and, given
 your own copy of the disc, the whole disc image.
 
-See the [VanillaBTN roadmap](ROADMAP.md) for the native port milestones.
+**Windows x64 bring-up is complete.** VanillaBTN builds locally in Debug and Release
+and runs with a user-provided USA disc. Public distribution is deferred.
+[Build and run the game locally](#build-and-run-the-game-locally) · [Bring-up results](ROADMAP.md#local-bring-up-results)
 
 ## Building
 

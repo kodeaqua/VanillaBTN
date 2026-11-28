@@ -2,7 +2,7 @@
 
 VanillaBTN aims to run *Harvest Moon: Back to Nature* (PS1, USA) natively, using the
 `hmbtn-decomp` matching decompilation as its base. The repository has a matching PS1
-build and a Windows x64 startup executable.
+build and a playable Windows x64 native build.
 
 These rules bind every contributor and every AI agent. `CLAUDE.md` and `GEMINI.md`
 import this file. If a rule is unclear or conflicts with a task, stop and ask.

@@ -2,18 +2,18 @@
 
 VanillaBTN is a native source port of *Harvest Moon: Back to Nature* (PS1,
 USA, `SLUS_011.15`) based on `hmbtn-decomp`. The repository has a matching PS1 build
-and a Windows x64 game build.
+and a Windows x64 game build. **Windows x64 bring-up is complete.**
 
 ## Project decisions
 
 | Topic | Decision |
 |---|---|
-| Source and platforms | Share the decompiled C source. Start with Windows x64, then port to Linux and macOS. |
+| Source and platforms | The PS1 and Windows x64 builds share the decompiled C source. |
 | Matching build | Preserve PSY-Q 4.7, GCC 2.95.2, compiler flags, linker layout, and artifact names. |
-| Native build | Add a CMake target named `vanillabtn` and Debug and Release presets. PsyZ provides the PSY-Q API and uses an SDL3 backend. |
-| Dependencies | Plan to use a submodule at `external/psyz`. Pin a tested PsyZ commit and use its SDL revision. |
+| Native build | The `vanillabtn` CMake target builds in Debug and Release. PsyZ provides the PSY-Q API and uses an SDL3 backend. |
+| Dependencies | Set `VANILLABTN_PSYZ_SOURCE_DIR` to a local PsyZ checkout at `00fb42e` with its SDL submodule initialized. |
 | Game data | Verify the user's raw USA image before launch or local extraction. Keep game data and the PSY-Q SDK out of the repository and release packages. |
-| Parity | Preserve gameplay, timing, graphics, audio, input, and save compatibility. Enhancements and quality-of-life features are out of scope. |
+| Bring-up reference | Use the USA PS1 build to verify gameplay, timing, graphics, audio, input, and save compatibility. |
 
 Use the VanillaBTN name for the native product and its documentation. The maintainer
 can decide separately whether to rename the GitHub repository.
@@ -39,7 +39,7 @@ can decide separately whether to rename the GitHub repository.
   PsyZ headers labeled *Unlicensed* upstream. Clarify the terms for those headers
   before publishing a game build. [NOTICE](NOTICE)
 
-## Porting risks
+## Regression checks for native changes
 
 | Area | What to verify |
 |---|---|
@@ -53,16 +53,19 @@ can decide separately whether to rename the GitHub repository.
 See the [PsyZ porting guide](https://github.com/Xeeynamo/psyz/blob/00fb42e6f49c146ad760a1f605b15d2a4ec598f0/PORTING_GUIDE.md)
 for graphics types and build integration.
 
-## Milestones and completion checks
+## Windows x64 bring-up milestones
 
-| Milestone | Completion check |
+| Milestone | Result |
 |---|---|
-| 0. Baseline | A small C program builds and runs in the Windows x64 developer shell. Local Docker verifies all 17 matching outputs with the original disc, including the 14 code binaries. |
-| 1. Integration tests | A local PsyZ sample opens the USA disc, reads A_FILE, plays a game XA stream, and reloads one module. Record the tested dependency revisions, the overlay decision, and the XA results. |
-| 2. Native build | Native Debug and Release presets build the executable and its overlays. The PS1 matching build still passes. |
-| 3. First playable flow | Import the disc, start a new game, reach the farm, change areas, save, quit, restart, and load the save. Check graphics, audio, input, and timing along this path. |
+| 0. Baseline | The local Docker build matched all 17 reference outputs with the USA disc. |
+| 1. Integration tests | Local probes read A_FILE from disc, decoded XA audio, and verified PsyZ module reload and state reset. |
+| 2. Native build | Windows x64 Clang builds the executable and all 13 overlays in Debug and Release. The game passed all six CTest tests in each configuration. |
+| 3. First playable flow | The new-game intro reached the farm. Saving a diary, restarting, loading it, and returning to the farmyard restored the saved state. |
 | 4. Native gameplay | **Implemented on Windows x64.** The game and overlays link into one executable. Local probes cover scene transitions, farm areas, event dispatch, festivals, all five minigames, credits, and save/load. |
-| 5. Release | Test the Windows package from a clean installation with a user-provided disc. Confirm package licenses and notices. Apply the same checks when adding Linux and macOS. |
+
+**Public distribution is deferred.** The Release package has been tested locally.
+Clean-install testing and clarification of the PsyZ header redistribution terms apply
+when preparing a public build. [NOTICE](NOTICE)
 
 ## Local bring-up results
 
@@ -172,7 +175,7 @@ and `-Wreturn-type` warnings.
   with the original disc. GitHub Actions stays manual.
 - Use separate PS1 and native build directories. Limit `__psyz` conditionals to
   platform-specific behavior. Change shared types and layouts in small steps.
-- Smoke-test native changes before and after once the executable is available.
+- Smoke-test native changes before and after on the Windows host.
   Follow the Debug and Release requirements in `AGENTS.md`, including path redaction
   in logs. Validate asset and save input in both configurations.
 - Test first-run import with a valid disc, a wrong-region or damaged image, and
