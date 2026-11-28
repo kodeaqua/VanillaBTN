@@ -6,5 +6,8 @@
 
 
 void mcard_screen_tick(void);
+#ifdef __psyz
+void mcard_screen_enter(void);
+#endif
 
 #endif /* MCARD_H */

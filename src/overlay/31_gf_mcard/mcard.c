@@ -79,6 +79,13 @@ static struct DIRENTRY mcard_dirents[MCARD_MAX_ENTRIES];
 /* The directory summary line mcard_list_dir writes. */
 static char mcard_info_text[784];
 
+#ifdef __psyz
+void mcard_screen_enter(void) {
+    mcard_status = 0;
+    FntLoad(960, 0);
+    SetDumpFnt(FntOpen(8, 0, MAIN_DISPLAY_WIDTH, MAIN_DISPLAY_HEIGHT, 0, 512));
+}
+#endif
 
 /* One frame of the test screen: the menu, then the status line while one is showing
  * (a pressed button clears it), else the command for the pressed button. */

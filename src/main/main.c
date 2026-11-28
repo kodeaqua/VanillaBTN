@@ -391,6 +391,9 @@ int main(void) {
             main_set_debug_mode(0);
             LOAD_OVERLAY(AFILE_MCARD, OVERLAY_LOW);
             farm_entry_args_clear();
+#ifdef __psyz
+            mcard_screen_enter();
+#endif
             scene_frame_handler = mcard_screen_tick;
             scene_overlay_loaded = 0;
             break;
@@ -505,6 +508,11 @@ static void main_draw_ots(void) {
         DrawOTag(current_frame->otTags[0] + current_frame->otTagCounts[0] - 1);
     }
     DrawOTag(active_ot + 1);
+#ifdef __psyz
+    if (scene_frame_handler == mcard_screen_tick || scene_frame_handler == swind_window_tick) {
+        FntFlush(-1);
+    }
+#endif
 }
 
 /* Does nothing: the scene argument is ignored. */

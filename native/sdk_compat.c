@@ -13,6 +13,7 @@
 #include <libapi.h>
 #include "card_file.h"
 #include "kanji_font.h"
+#include "main.h"
 #include "sdk_mcrd.h"
 #include <libmcx.h>
 
@@ -201,8 +202,7 @@ u_long *KanjiFntFlush(int id) {
         CatPrim(prev, sp);
         prev = sp;
     }
-    TermPrim(prev);
-    DrawOTag((OT_TYPE *)&kanji_state.dr[0]);
+    AddPrims(&current_frame->otTags[0][0], &kanji_state.dr[0], prev);
 
     kanji_state.len = 0;
     kanji_state.buf[0] = '\0';
