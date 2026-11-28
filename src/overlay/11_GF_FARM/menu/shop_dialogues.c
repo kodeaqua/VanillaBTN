@@ -2760,7 +2760,11 @@ s32 shop_phase_run(void) {
             }
         }
         if (shop_dialogue_tick_handlers[shop_dialogue_tick_index] != 0) {
+#ifdef __psyz
+            ((s32 (*)(void))shop_dialogue_tick_handlers[shop_dialogue_tick_index])();
+#else
             shop_dialogue_tick_handlers[shop_dialogue_tick_index](shop_dialogue_tick_handlers);
+#endif
         }
     }
     return completed;
@@ -2792,9 +2796,18 @@ s32 shop_request_dispatch(s32 arg) {
         }
         result = 0;
         shop_screen_id = arg;
+#ifdef __psyz
+        /* PS1 lays shop_phase_complete_handlers directly after the 1-entry start table. */
+        if (arg >= 1 && arg <= (s32)(sizeof(shop_phase_complete_handlers) /
+                                     sizeof(shop_phase_complete_handlers[0])) &&
+            shop_phase_complete_handlers[arg - 1] != 0) {
+            ((s32 (*)(void))shop_phase_complete_handlers[arg - 1])();
+        }
+#else
         if (shop_screen_start_handlers[arg] != 0) {
             shop_screen_start_handlers[arg]();
         }
+#endif
     }
     return result;
 }
