@@ -143,6 +143,14 @@ s32 item_run_use(FarmStoredItem *item) {
         argument = dispatch->firstArg;
     }
     if (dispatch != 0 && dispatch->callback != 0) {
+#ifdef __psyz
+        if (dispatch->callback == (DispatchRecordCallback)item_use_coin) {
+            return item_use_coin(argument, dispatch->secondArg, dispatch->thirdArg, 0);
+        }
+        if (dispatch->callback == (DispatchRecordCallback)farm_adjust_stamina_fatigue) {
+            return farm_adjust_stamina_fatigue(argument, dispatch->secondArg);
+        }
+#endif
         return dispatch->callback(argument, dispatch->secondArg, dispatch->thirdArg, 0);
     }
     return -1;

@@ -17,7 +17,11 @@
 #include "scene.h"
 #include "screen_fade.h"
 
+#ifdef __psyz
+typedef s32 (*HorseActionTick)(FarmActor *);
+#else
 typedef void (*HorseActionTick)(FarmActor *);
+#endif
 
 typedef struct {
     u16 x;
@@ -149,12 +153,20 @@ static s32 horse_promote_flag(FarmActor *flags) {
     return farm_record_promote_flag(flags);
 }
 
+#ifdef __psyz
+s32 (*const horse_action_start_handlers[20])(FarmActor *) = {
+#else
 void *const horse_action_start_handlers[20] = {
+#endif
     0, 0, 0, horse_cue_affection_drop, horse_start_scold_cue, horse_cue_sound, horse_set_bit2_cue, 0, 0, 0, 0, 0, 0,
     horse_mover_update, 0, 0, 0, 0, 0, horse_roll_visit,
 };
 
+#ifdef __psyz
+s32 (*const horse_action_tick_handlers[20])(FarmActor *) = {
+#else
 void *const horse_action_tick_handlers[20] = {
+#endif
     horse_idle_cue, horse_cue_1, horse_cue_2, 0, horse_idle_cue, horse_idle_cue,
     horse_idle_cue, 0, 0, 0, 0, 0, 0, horse_action_check, 0, 0, 0, horse_action_start, horse_action_refresh,
     0,

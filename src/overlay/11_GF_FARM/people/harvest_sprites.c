@@ -352,6 +352,25 @@ static s32 harvest_sprite_tick(FarmHelper *helper)
     return 0;
 }
 
+#ifdef __psyz
+static s32 harvest_helper_idle_cue_h(FarmHelper *h) { return harvest_helper_idle_cue(&h->actor); }
+static s32 harvest_helper_cue_1_h(FarmHelper *h) { return harvest_helper_cue_1(&h->actor); }
+static s32 harvest_helper_cue_2_h(FarmHelper *h) { return harvest_helper_cue_2(&h->actor); }
+static s32 harvest_helper_cue_3_h(FarmHelper *h) { return harvest_helper_cue_3(&h->actor); }
+static s32 harvest_helper_cue_4_h(FarmHelper *h) { return harvest_helper_cue_4(&h->actor); }
+static s32 harvest_helper_scold_cue_h(FarmHelper *h) { return harvest_helper_scold_cue(&h->actor); }
+
+s32 (*const harvest_helper_start_handlers[14])(FarmHelper *) = {
+    0, 0, 0, 0, 0, harvest_helper_lower_affection, harvest_helper_talk, 0, 0, 0, 0, 0, 0, harvest_helper_greet,
+};
+
+s32 (*const harvest_helper_tick_handlers[14])(FarmHelper *) = {
+    harvest_helper_idle_cue_h, harvest_helper_cue_1_h, harvest_helper_cue_2_h, harvest_helper_cue_3_h,
+    harvest_helper_cue_4_h, harvest_helper_scold_cue_h, harvest_helper_script_tick,
+    harvest_helper_set_work_state, harvest_obj_move_input_tick, harvest_obj_move_action_tick,
+    harvest_obj_carry_tick, harvest_obj_place_tick, harvest_obj_walk_tick, 0,
+};
+#else
 s32 (*const harvest_helper_start_handlers[14])() = {
     0, 0, 0, 0, 0, harvest_helper_lower_affection, harvest_helper_talk, 0, 0, 0, 0, 0, 0, harvest_helper_greet,
 };
@@ -361,13 +380,19 @@ s32 (*const harvest_helper_tick_handlers[14])() = {
     harvest_helper_scold_cue, harvest_helper_script_tick, harvest_helper_set_work_state, harvest_obj_move_input_tick, harvest_obj_move_action_tick,
     harvest_obj_carry_tick, harvest_obj_place_tick, harvest_obj_walk_tick, 0,
 };
+#endif
 
 /* Run a helper's current action. When its interrupt timer is due, apply a seasonal task
  * and reset the timer. Outside work hours a helper that holds nothing walks home.
  * Then count the timer up. */
 static s32 harvest_helper_timer_tick(FarmHelper *helper) {
+#ifdef __psyz
+    s32 (*const *actions)(FarmHelper *);
+    s32 (*action)(FarmHelper *);
+#else
     s32 (*const *actions)();
     s32 (*action)();
+#endif
     u16 action_id;
     u16 clock;
 

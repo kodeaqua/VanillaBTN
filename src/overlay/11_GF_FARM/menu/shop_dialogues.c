@@ -2719,11 +2719,19 @@ s32 shop_menu_choose(s32 *step, s32 base, s32 next, FarmMenuRequest request, Sho
 }
 
 /* The callback tables the farm phase dispatches through: by screen id, and by request. */
+#ifdef __psyz
+s32 (*const shop_dialogue_tick_handlers[8])(void) = {
+#else
 s32 (*const shop_dialogue_tick_handlers[8])() = {
+#endif
     0, shop_menu_count_draw, shop_gold_panel_step, shop_gold_panel_redraw_step,
     shop_gold_choice_step, shop_panel_submit, shop_panel_submit_both, shop_medals_choice_step,
 };
+#ifdef __psyz
+s32 (*const shop_screen_run_handlers[29])(void) = {
+#else
 s32 (*const shop_screen_run_handlers[29])() = {
+#endif
     0, 0, shop_buy_stock_step, shop_buy_item_step,
     shop_grant_rice_ball, shop_grant_bread, shop_grant_oil, shop_grant_flour,
     shop_grant_curry_powder, shop_grant_rucksack_upgrade, shop_basket_step, shop_result_request,
@@ -2734,7 +2742,11 @@ s32 (*const shop_screen_run_handlers[29])() = {
     shop_plot_sale_step,
 };
 void (*const shop_screen_start_handlers[1])(void) = {0};
+#ifdef __psyz
+s32 (*const shop_phase_complete_handlers[28])(void) = {
+#else
 s32 (*const shop_phase_complete_handlers[28])() = {
+#endif
     shop_dialogue_finish, shop_fish_food_menu_setup, shop_dialogue_03_start, shop_start_default,
     shop_start_default, shop_start_default, shop_start_default, shop_start_default,
     shop_start_default, shop_start_default, shop_seed_menu_setup_a, shop_seed_menu_setup_b,
@@ -2761,7 +2773,7 @@ s32 shop_phase_run(void) {
         }
         if (shop_dialogue_tick_handlers[shop_dialogue_tick_index] != 0) {
 #ifdef __psyz
-            ((s32 (*)(void))shop_dialogue_tick_handlers[shop_dialogue_tick_index])();
+            shop_dialogue_tick_handlers[shop_dialogue_tick_index]();
 #else
             shop_dialogue_tick_handlers[shop_dialogue_tick_index](shop_dialogue_tick_handlers);
 #endif
@@ -2801,7 +2813,7 @@ s32 shop_request_dispatch(s32 arg) {
         if (arg >= 1 && arg <= (s32)(sizeof(shop_phase_complete_handlers) /
                                      sizeof(shop_phase_complete_handlers[0])) &&
             shop_phase_complete_handlers[arg - 1] != 0) {
-            ((s32 (*)(void))shop_phase_complete_handlers[arg - 1])();
+            shop_phase_complete_handlers[arg - 1]();
         }
 #else
         if (shop_screen_start_handlers[arg] != 0) {

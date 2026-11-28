@@ -92,6 +92,15 @@ typedef struct ResultCameraTable {
     ResultCameraPair pairs[3];
 } ResultCameraTable;
 
+#ifdef __psyz
+typedef s32 (*WorldToCellHandler)(VECTOR *, s16 *, s16 *);
+typedef WorldToCellHandler CellFromWorldMoveCandidates;
+typedef WorldToCellHandler CellFromWorldMoveRun;
+typedef WorldToCellHandler CellFromWorldMoveUpdate;
+typedef WorldToCellHandler CellFromWorldMoveResolve;
+typedef WorldToCellHandler CellFromWorldToolClearAlt;
+typedef WorldToCellHandler CellFromWorldToolClear;
+#else
 typedef s32 (*CellFromWorldMoveCandidates)(s32 *, u16 *, u16 *);
 
 typedef s32 (*CellFromWorldMoveRun)(s32 *, s16 *, s16 *);
@@ -105,6 +114,7 @@ typedef s32 (*CellFromWorldToolClearAlt)(s32 *, u16 *, u16 *);
 typedef s32 (*CellFromWorldToolClear)(s32 *, u16 *, u16 *);
 
 typedef s32 (*WorldToCellHandler)(VECTOR *, s16 *, s16 *);
+#endif
 
 /* Hop steps indexed [row][facing]: row 0 while the jump crouches, row 1 otherwise. */
 #ifdef __psyz
@@ -816,7 +826,11 @@ u16 player_anim_banks[28] = {
     0,
 };
 
+#ifdef __psyz
+static CellFromWorldMoveCandidates world_to_cell_handlers[2] = {field_world_to_cell, greenhouse_world_to_cell};
+#else
 static void *world_to_cell_handlers[2] = {field_world_to_cell, greenhouse_world_to_cell};
+#endif
 
 /* Build and validate farm movement candidates for each of nine slots. */
 static void player_build_move_candidates(FarmPlayer *player)
@@ -824,23 +838,40 @@ static void player_build_move_candidates(FarmPlayer *player)
     s32 status;
     s32 slot;
     s16 mode;
+#ifdef __psyz
+    VECTOR values;
+    s16 resultX;
+    s16 resultY;
+#else
     s32 values[3];
     u16 resultX;
     u16 resultY;
+#endif
     s16 deltaX;
     s16 deltaY;
     CellFromWorldMoveCandidates callback;
 
     status = player_location_kind();
+#ifdef __psyz
+    values.vx = player->position.vx;
+    values.vy = player->position.vy;
+    values.vz = player->position.vz;
+    values.pad = 0;
+#else
     values[0] = player->position.vx;
     values[1] = player->position.vy;
     values[2] = player->position.vz;
+#endif
     if (status == 2)
     {
         return;
     }
     callback = world_to_cell_handlers[status];
+#ifdef __psyz
+    callback(&values, &resultX, &resultY);
+#else
     callback(values, &resultX, &resultY);
+#endif
     slot = 0;
     do
     {
@@ -876,14 +907,23 @@ static s32 player_move_record_run(FarmPlayer *player)
         player_add_tool_exp(player, TOOL_EXP_BASE);
         return 0;
     }
+#ifdef __psyz
+    VECTOR pos = {player->position.vx, player->position.vy, player->position.vz, 0};
+#else
     values[0] = player->position.vx;
     values[1] = player->position.vy;
     values[2] = player->position.vz;
+#endif
     mode = (player->toolCharge / TOOL_CHARGE_STEP);
     result = tool_charge_steps_a[mode];
     mode = mode - player->held[HELD_TOOL].modifier;
     callback = world_to_cell_handlers[status];
+#ifdef __psyz
+    (void)values;
+    callback(&pos, &callbackX, &callbackY);
+#else
     callback(values, &callbackX, &callbackY);
+#endif
     player_result_params_init(RESULT_KIND_DIG, status, callbackX, callbackY, mode, result);
     player_set_mode(player, PLAYER_MODE_RESULT_STEP, 0, -2);
     return 1;
@@ -907,9 +947,13 @@ static s32 player_move_record_update(FarmPlayer *player)
         player_add_tool_exp(player, TOOL_EXP_BASE);
         return 0;
     }
+#ifdef __psyz
+    VECTOR pos = {player->position.vx, player->position.vy, player->position.vz, 0};
+#else
     values[0] = player->position.vx;
     values[1] = player->position.vy;
     values[2] = player->position.vz;
+#endif
     mode = (player->toolCharge / TOOL_CHARGE_STEP);
     result = tool_charge_steps_b[mode];
     count = player->held[HELD_TOOL].count;
@@ -921,7 +965,12 @@ static s32 player_move_record_update(FarmPlayer *player)
     if ((difference << 16) < 0)
         player->held[HELD_TOOL].count = 0;
     callback = world_to_cell_handlers[status];
+#ifdef __psyz
+    (void)values;
+    callback(&pos, &callbackX, &callbackY);
+#else
     callback(values, &callbackX, &callbackY);
+#endif
     player_result_params_init(RESULT_KIND_GATE, status, callbackX, callbackY, mode, result);
     player_set_mode(player, PLAYER_MODE_RESULT_STEP, 0, -2);
     return 1;
@@ -956,14 +1005,23 @@ static s32 player_move_record_resolve(FarmPlayer *player)
         }
         return 0;
     }
+#ifdef __psyz
+    VECTOR pos = {player->position.vx, player->position.vy, player->position.vz, 0};
+#else
     values[0] = player->position.vx;
     values[1] = player->position.vy;
     values[2] = player->position.vz;
+#endif
     mode = (player->toolCharge / TOOL_CHARGE_STEP);
     result = tool_charge_steps_c[mode];
     mode = mode - player->held[HELD_TOOL].modifier;
     callback = world_to_cell_handlers[status];
+#ifdef __psyz
+    (void)values;
+    callback(&pos, &callbackX, &callbackY);
+#else
     callback(values, &callbackX, &callbackY);
+#endif
     player_result_params_init(RESULT_KIND_HARVEST, status, callbackX, callbackY, mode, result);
     player_set_mode(player, PLAYER_MODE_RESULT_STEP, 0, -2);
     return 1;
@@ -1085,23 +1143,39 @@ static void player_tool_clear_alt(FarmPlayer *player)
 {
     s32 status;
     s32 found;
+#ifdef __psyz
+    VECTOR values;
+    s16 origin_x;
+    s16 origin_y;
+#else
     s32 values[3];
-    s16 quotient;
-    s16 total;
     u16 origin_x;
     u16 origin_y;
+#endif
+    s16 quotient;
+    s16 total;
     s16 delta_x;
     s16 delta_y;
     s32 delay;
     delay = TOOL_EXP_BASE;
     status = player_location_kind();
     quotient = player->toolCharge / TOOL_CHARGE_STEP;
+#ifdef __psyz
+    values.vx = player->position.vx;
+    values.vy = player->position.vy;
+    values.vz = player->position.vz;
+    values.pad = 0;
+    if (status != 2)
+    {
+        world_to_cell_handlers[status](&values, &origin_x, &origin_y);
+#else
     values[0] = player->position.vx;
     values[1] = player->position.vy;
     values[2] = player->position.vz;
     if (status != 2)
     {
         ((CellFromWorldToolClearAlt)world_to_cell_handlers[status])(values, &origin_x, &origin_y);
+#endif
         found = picture_grid_find_cell(&player->held[HELD_TOOL].id, 0, player->facing38, &delta_x, &delta_y, 0);
         if (found == 1)
         {
@@ -1134,23 +1208,39 @@ static void player_tool_clear(FarmPlayer *player)
 {
     s32 status;
     s32 found;
+#ifdef __psyz
+    VECTOR values;
+    s16 origin_x;
+    s16 origin_y;
+#else
     s32 values[3];
-    s16 quotient;
-    s16 total;
     u16 origin_x;
     u16 origin_y;
+#endif
+    s16 quotient;
+    s16 total;
     s16 delta_x;
     s16 delta_y;
     s32 delay;
     delay = TOOL_EXP_BASE;
     status = player_location_kind();
     quotient = player->toolCharge / TOOL_CHARGE_STEP;
+#ifdef __psyz
+    values.vx = player->position.vx;
+    values.vy = player->position.vy;
+    values.vz = player->position.vz;
+    values.pad = 0;
+    if (status != 2)
+    {
+        world_to_cell_handlers[status](&values, &origin_x, &origin_y);
+#else
     values[0] = player->position.vx;
     values[1] = player->position.vy;
     values[2] = player->position.vz;
     if (status != 2)
     {
         ((CellFromWorldToolClear)world_to_cell_handlers[status])(values, &origin_x, &origin_y);
+#endif
         found = picture_grid_find_cell(&player->held[HELD_TOOL].id, 0, player->facing38, &delta_x, &delta_y, 0);
         if (found == 1)
         {

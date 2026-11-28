@@ -102,7 +102,12 @@ static FarmEstateRecord *estate_record_find(s16 itemId, FarmEstateRecord *items,
 static void estate_gate_results_place(void);
 static s32 estate_season_bit(void);
 static void estate_search_run(void);
+#ifdef __psyz
+typedef s32 (*EstateSearchHandler)(s32, s32 *, s32 *);
+static void estate_search_records(s32 count, FarmEstateRecord *record, EstateSearchHandler callback);
+#else
 static void estate_search_records(s32 count, FarmEstateRecord *record, s32 (*callback)());
+#endif
 static s32 estate_action_status(s32 action, s32 *result, s32 *status);
 static s32 estate_code_status(s32 code, s32 *result, s32 *status);
 static s32 estate_code_lookup(s32 code, s32 *result, s32 *value);
@@ -1823,7 +1828,11 @@ enum EstateSearchKind {
 /* Runs the screen's search handler over the records of the current map, then over the
  * shared records of runs 18 and 16. */
 static void estate_search_run(void) {
+#ifdef __psyz
+    EstateSearchHandler handler;
+#else
     s32 (*handler)();
+#endif
     s32 run;
     FarmEstateRecord record;
 
@@ -1889,6 +1898,17 @@ static void estate_search_run(void) {
 
 /* Draw a sprite at each record of this season and place that is on screen; the handler
  * picks the sprite and its cell. */
+#ifdef __psyz
+static void estate_search_records(s32 count, FarmEstateRecord *record, EstateSearchHandler callback) {
+    SVECTOR input;
+    FarmScreenPoint position;
+    /* All search callbacks write 4 bytes through their second argument (s32 *). */
+    s32 callback_value;
+    s32 callback_result;
+    s32 mode_bits;
+    s32 remaining;
+    EstateSearchHandler callback_fn;
+#else
 static void estate_search_records(s32 count, FarmEstateRecord *record, s32 (*callback)()) {
     SVECTOR input;
     FarmScreenPoint position;
@@ -1897,6 +1917,7 @@ static void estate_search_records(s32 count, FarmEstateRecord *record, s32 (*cal
     s32 mode_bits;
     s32 remaining;
     s32 (*callback_fn)();
+#endif
     FarmModeGlobal *mode_data;
 
     mode_bits = (estate_season_bit() | 1) & 0xFFFF;

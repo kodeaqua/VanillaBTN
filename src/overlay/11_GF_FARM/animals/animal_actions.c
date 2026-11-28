@@ -109,10 +109,26 @@ FarmAction *farm_action_claim(s32 kind) {
 u16 farm_action_countdown_step;
 u16 farm_action_start_value;
 
+#ifdef __psyz
+static s32 farm_action_count_down_actor(FarmActor *actor) {
+    return farm_action_count_down((FarmAction *)actor);
+}
+
+static s32 farm_action_none_actor(FarmActor *unused) {
+    (void)unused;
+    return farm_action_none();
+}
+
+static s32 (*const farm_action_start_handlers[21])(FarmActor *) = {
+    0, 0, 0, 0, 0, farm_message_for_kind, farm_action_count_down_actor, farm_action_none_actor,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+};
+#else
 static void *const farm_action_start_handlers[21] = {
     0, 0, 0, 0, 0, farm_message_for_kind, farm_action_count_down, farm_action_none, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0,
 };
+#endif
 
 /* The per-frame handler for each task state, run by farm_action_update. */
 static s32 (*const farm_action_tick_handlers[21])(FarmActor *) = {
@@ -1261,7 +1277,11 @@ static s32 dog_herd_cue(FarmActor *self) {
     s16 step = self->taskId;
     VECTOR box;
     FarmActor *target;
+#ifdef __psyz
+    s32 (*action)(FarmLivestock *, s32);
+#else
     s32 (*action)();
+#endif
     s32 index;
 
     switch (step) {
@@ -1285,7 +1305,11 @@ static s32 dog_herd_cue(FarmActor *self) {
             farm_set_destination(target, box);
             target->facing = self->facing;
             if (action != 0) {
+#ifdef __psyz
+                action((FarmLivestock *)target, 3);
+#else
                 action(target, 3);
+#endif
             } else {
                 farm_actor_dispatch_state(target, 3);
             }
