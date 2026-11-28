@@ -11,6 +11,8 @@ Windows game build dependencies:
 - PsyZ runtime (psyz/src/platform and psyz/src/psyz): MPL 2.0.
   Obtain the runtime source used by the documented build from:
   https://github.com/Xeeynamo/psyz/tree/00fb42e6f49c146ad760a1f605b15d2a4ec598f0/psyz/src
+  The Windows pixel shader in native/shaders also uses MPL 2.0.
+  Its source is the pinned PsyZ psx.frag.glsl with native/shaders/quarter_blend.patch.
 - PsyZ SDK decompilation (decomp): MIT, see the upstream decomp/LICENSE.
   https://github.com/Xeeynamo/psyz/tree/00fb42e6f49c146ad760a1f605b15d2a4ec598f0/decomp
 - PsyZ SDK headers (psyz/include): listed as Unlicensed upstream.

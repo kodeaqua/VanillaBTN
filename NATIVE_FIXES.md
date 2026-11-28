@@ -56,6 +56,16 @@ interlace where a game route or reachable command stream shows a dependency.
 | Blend and VRAM visibility | Draw all four blend modes over known RGB555 backgrounds with odd channel values. Upload a new CLUT entry and copy the destination to another VRAM region, then sample both updated regions in the same frame. | Readback matches the reference words at the affected coordinates. Both dependent draws use the updated data, including on the first frame. [PS1 blend and transfer rules](https://psx-spx.consoledev.net/graphicsprocessingunitgpu/) |
 | Projection and UVs | Move two adjacent world triangles by fractions of a logical pixel and use an oblique checkerboard with different vertex depths. Submit a nearby HUD sprite and reuse packet storage on the next frame. | Projected XY follows the calculated fractional positions, the shared edge stays joined, and the texture landmarks follow their expected perspective positions. HUD pixels and the next frame's unrelated draw match their own inputs. |
 
+On Windows D3D12, `vanillabtn_gpu_pixels` checks the Gouraud dither phase, one
+RGB555 vector across all four blend modes, and VRAM copies and CLUT updates
+sampled in the same frame. [GPU pixel test](native/test_gpu_pixels.c)
+
+- The pinned shader produced `0x7ac7` instead of `0x7aa6` for the mode 3
+  vector. Truncating the quarter foreground in RGB555 fixes that vector.
+  [Shader patch and regeneration](native/shaders/README.md)
+- Keep other dither-eligible primitive types and repeated blending open
+  until their probes run.
+
 ## 3. Prioritize visible defects
 
 | Priority and task | Where to investigate | Acceptance check |

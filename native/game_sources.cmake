@@ -9,6 +9,9 @@ add_subdirectory("${VANILLABTN_PSYZ_SOURCE_DIR}/psyz" psyz EXCLUDE_FROM_ALL)
 set_property(SOURCE "${VANILLABTN_PSYZ_SOURCE_DIR}/psyz/src/psyz/libgpu.c"
     TARGET_DIRECTORY psyz APPEND PROPERTY COMPILE_DEFINITIONS
     Draw_PushPrim=vanillabtn_gpu_push_prim)
+if(PSYZ_RENDERER STREQUAL "sdl3_gpu")
+    include(psyz_gpu.cmake)
+endif()
 
 # Reuse the PS1 manifests for source selection while linking the game as one host executable.
 function(psx_exe name)
@@ -40,6 +43,13 @@ set_source_files_properties("${PROJECT_SOURCE_DIR}/src/main/main.c"
 add_executable(vanillabtn_gpu_test test_gpu_primitives.c gpu_primitives.c)
 target_link_libraries(vanillabtn_gpu_test PRIVATE psyz)
 add_test(NAME vanillabtn_gpu_primitives COMMAND vanillabtn_gpu_test)
+
+if(PSYZ_RENDERER STREQUAL "sdl3_gpu")
+    add_executable(vanillabtn_gpu_pixel_test test_gpu_pixels.c gpu_primitives.c)
+    target_link_libraries(vanillabtn_gpu_pixel_test PRIVATE psyz)
+    add_test(NAME vanillabtn_gpu_pixels COMMAND vanillabtn_gpu_pixel_test)
+    set_tests_properties(vanillabtn_gpu_pixels PROPERTIES TIMEOUT 15)
+endif()
 
 add_executable(vanillabtn_card_test test_card_file.c card_file.c)
 add_test(NAME vanillabtn_card_file COMMAND vanillabtn_card_test)
