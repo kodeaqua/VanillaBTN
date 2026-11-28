@@ -95,6 +95,9 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif()
 add_test(NAME vanillabtn_seq_player COMMAND vanillabtn_seq_test)
 
+add_executable(vanillabtn_event_test test_event_decode.c)
+add_test(NAME vanillabtn_event_decode COMMAND vanillabtn_event_test)
+
 add_test(NAME vanillabtn_native_smoke
     COMMAND ${CMAKE_COMMAND} "-DEXECUTABLE=$<TARGET_FILE:vanillabtn>" "-DBUILD_CONFIG=$<CONFIG>"
     "-DHAS_GAME=$<BOOL:${VANILLABTN_PSYZ_SOURCE_DIR}>"

@@ -115,6 +115,17 @@ for graphics types and build integration.
   `MG1`, `MG5`, `STAFF`, `FARM_MINIGAME_EXIT`, and `FARM_STAFF_EXIT` after fixing
   static re-entry resets, missing returns, and unprototyped calls under `__psyz`.
 
+### Scene and event coverage
+
+- A local Windows Debug probe requested all 21 scene IDs with the USA disc and exercised
+  each route for at least 12 ticks. The PDA route resumed the farm or debug menu with no device.
+- The native loader read all 255 farm sections. Their 10,397 trigger entries reference
+  313 distinct IDs. All 50 cached event scripts decoded to the corresponding disc script prefix.
+- Of 451 event archive slots, 12 are empty. Four further slots (261 and 273–275) have an
+  invalid offset range or initial opcode. The area trigger tables do not reference those four.
+- Verify event outcomes during play, including festival eligibility, dialogue choices,
+  season rollover and save/reload across transitions.
+
 ### Native SDK compatibility (`native/sdk_compat.c` against PsyZ `00fb42e`)
 
 Seven overlays (`17_GF_MG1`..`25_GF_MG5`, `27_GF_TITLE`, `28_GF_STAFF`) need no
