@@ -155,7 +155,7 @@ static short seq_clamp_vol(short vol) {
 }
 
 static uint8_t seq_get_vab_mvol(short vab_id) {
-    if (vab_id >= 0 && vab_id < SEQ_MAX_VABS && seq_vab_mvol[vab_id] > 0) {
+    if (vab_id >= 0 && vab_id < SEQ_MAX_VABS) {
         return seq_vab_mvol[vab_id];
     }
     return SEQ_DEFAULT_VAB_MVOL;
@@ -795,7 +795,9 @@ void vanillabtn_seq_reset(void) {
 
 void vanillabtn_seq_register_vab_mvol(short vab_id, uint8_t mvol) {
     if (vab_id >= 0 && vab_id < SEQ_MAX_VABS) {
+        seq_lock();
         seq_vab_mvol[vab_id] = mvol > SEQ_VOL_MAX ? SEQ_VOL_MAX : mvol;
+        seq_unlock();
     }
 }
 
