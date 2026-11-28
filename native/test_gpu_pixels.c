@@ -119,6 +119,32 @@ static int check_flat_line(int vertical, int reverse) {
     return 0;
 }
 
+static int check_point_line(void) {
+    enum { POINT_OFFSET = 1, POINT = TILE_ORIGIN + POINT_OFFSET };
+    LINE_G2 line = {0};
+    SetLineG2(&line);
+    setXY2(&line, POINT, POINT, POINT, POINT);
+    setRGB0(&line, RGB888_MAX, 0, 0);
+    setRGB1(&line, 0, 0, RGB888_MAX);
+    termPrim(&line);
+
+    select_draw_mode(0, 0);
+    draw_tile(TILE_ORIGIN, TILE_ORIGIN, 0, 0, 0, 0);
+    DrawOTag((OT_TYPE *)&line);
+    u16 pixels[TILE_PIXELS];
+    read_tile(TILE_ORIGIN, TILE_ORIGIN, pixels);
+    for (int i = 0; i < TILE_PIXELS; ++i) {
+        unsigned expected = i == POINT_OFFSET * (TILE_SIZE + 1) ? COLOR_MAX : 0;
+        unsigned actual = pixels[i] & COLOR_MASK;
+        if (actual != expected) {
+            fprintf(stderr, "single-point Gouraud line at pixel %d: got %04x, expected %04x\n", i,
+                    actual, expected);
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static int check_blend(int blend, unsigned expected) {
     u16 pixels[TILE_PIXELS];
     select_draw_mode(getTPage(0, blend, 0, 0), 0);
@@ -366,6 +392,7 @@ int main(void) {
     failures += check_flat_line(0, 1);
     failures += check_flat_line(1, 0);
     failures += check_flat_line(1, 1);
+    failures += check_point_line();
     failures += check_blend(0, rgb555(6, 15, 18));
     failures += check_blend(1, rgb555(12, 30, COLOR_MAX));
     failures += check_blend(2, rgb555(0, 8, 19));

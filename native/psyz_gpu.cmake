@@ -80,6 +80,23 @@ if(gpu_source_with_common STREQUAL gpu_source_with_lines)
     message(FATAL_ERROR "Could not patch PsyZ axis-aligned line endpoints.")
 endif()
 
+# A one-pixel line uses the first endpoint's color.
+set(line_end_color [=[                q[1].r = cr[s + 1];
+                q[1].g = cg[s + 1];
+                q[1].b = cb[s + 1];
+                q[1].a = ca[s + 1];
+                q[2].r = cr[s + 1];
+                q[2].g = cg[s + 1];
+                q[2].b = cb[s + 1];
+                q[2].a = ca[s + 1];]=])
+string(REPLACE "[s + 1]" "[end_color]" point_line_color "${line_end_color}")
+string(REPLACE "${line_end_color}"
+    "                const int end_color = (dx != 0 || dy != 0) ? s + 1 : s;\n${point_line_color}"
+    gpu_source_with_point_lines "${gpu_source_with_lines}")
+if(gpu_source_with_lines STREQUAL gpu_source_with_point_lines)
+    message(FATAL_ERROR "Could not patch PsyZ one-pixel line colors.")
+endif()
+
 # Polygon TPage updates the page, blend mode and depth without changing dither.
 set(polygon_tpage [=[                tpage = cur_tpage | TPAGE_NOTEXTURE;
             }
@@ -92,8 +109,8 @@ set(polygon_tpage_latch [=[                tpage = cur_tpage | TPAGE_NOTEXTURE;
             }
             tpage |= TPAGE_POLYGON;]=])
 string(REPLACE "${polygon_tpage}" "${polygon_tpage_latch}"
-    gpu_source_with_tpage "${gpu_source_with_lines}")
-if(gpu_source_with_lines STREQUAL gpu_source_with_tpage)
+    gpu_source_with_tpage "${gpu_source_with_point_lines}")
+if(gpu_source_with_point_lines STREQUAL gpu_source_with_tpage)
     message(FATAL_ERROR "Could not patch PsyZ polygon texture page state.")
 endif()
 
