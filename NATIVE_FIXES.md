@@ -66,6 +66,40 @@ sampled in the same frame. [GPU pixel test](native/test_gpu_pixels.c)
 - Keep other dither-eligible primitive types and repeated blending open
   until their probes run.
 
+### First title-demo baseline
+
+- Beetle PSX `0.9.44.1 b76bfc5` produced identical software-rendered captures
+  across two runs at 10 demo ticks. A native diagnostic confirmed the same
+  recorded inputs and sampled its logical framebuffer at those 10 ticks.
+- From demo tick 120 through 1680, native advanced 1,560 game updates and the
+  reference advanced 3,120 VBlanks. The full demo reached tick 1848 on both.
+  Match the logical crop and presentation phase before using image diffs as a gate.
+- Fresh Windows game Debug and Release builds passed all seven CTest tests
+  after the blend fix. Both booted the verified USA image on D3D12. The
+  changed shader has a separate readback test for its exact RGB555 result.
+
+Three Release runs of `b92fb8b` used the Radeon RX Vega, D3D12, and a 75 Hz
+display. PresentMon 2.6.0 sampled the common 15–60 second title window.
+Times below are ranges of the individual run statistics.
+
+| Metric | Median range | 95th percentile range |
+|---|---:|---:|
+| Frame time | 26.90–33.25 ms | 47.51–52.03 ms |
+| PresentMon CPU busy | 22.39–27.91 ms | 33.04–33.26 ms |
+| GPU busy | 0.147–0.160 ms | 0.260–0.303 ms |
+| Displayed time | 26.70–26.73 ms | 53.35–53.39 ms |
+
+Process private bytes peaked at 814.1–814.2 MiB in the once-per-second
+samples over the full runs. Use this title interval for regression comparisons
+on this host and collect separate samples for farm and minigame workloads.
+
+- A separate instrumented Release run reached the first replay tick 2.018 s
+  after the title requested the farm. The farm overlay A_FILE read took 53.6 ms.
+  Profile section reads, decoding, and upload separately to attribute the rest.
+- At 70.23 s after the first present, that run had submitted 1,978,108 texture
+  upload bytes and 12,853,272 GPU buffer upload bytes. The texture readback and
+  fence-wait counters were zero on this route through that checkpoint.
+
 ## 3. Prioritize visible defects
 
 | Priority and task | Where to investigate | Acceptance check |

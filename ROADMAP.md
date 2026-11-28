@@ -11,6 +11,10 @@ Start with the [baseline routes and GPU probes](NATIVE_FIXES.md#2-capture-a-base
 Use the [evidence for each stage](NATIVE_FIXES.md#delivery-order-and-acceptance)
 to prioritize PS1 parity fixes, PGXP-style corrections, and host optimization at 4:3.
 
+- The first native renderer fix corrects RGB555 quarter blending on Windows D3D12.
+  The same GPU readback test covers dithering and same-frame VRAM/CLUT visibility.
+  [Regression and baseline results](NATIVE_FIXES.md#first-title-demo-baseline)
+
 ## Project decisions
 
 | Topic | Decision |
