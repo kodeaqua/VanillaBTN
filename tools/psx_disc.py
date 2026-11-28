@@ -498,6 +498,7 @@ def prepare_user_data(directory: Path) -> None:
 
 
 def extract(disc: Path, out: Path, verify_reference: bool = False) -> None:
+    input_image = disc.resolve()
     image = disc.read_bytes()
     label = "Disc" if verify_reference else str(disc)
     if len(image) % SECTOR:
@@ -506,7 +507,7 @@ def extract(disc: Path, out: Path, verify_reference: bool = False) -> None:
     if pvd[:6] != b"\x01CD001":
         raise SystemExit(f"{label}: no ISO 9660 volume descriptor at sector {PVD_LBA}")
     if not verify_reference:
-        _extract_image(image, pvd, out)
+        _extract_image(image, pvd, out, input_image)
         return
 
     check_reference_sha1(hashlib.sha1(image, usedforsecurity=False).hexdigest())
@@ -515,7 +516,7 @@ def extract(disc: Path, out: Path, verify_reference: bool = False) -> None:
     staging_parent.mkdir(parents=True, exist_ok=True)
     with TemporaryDirectory(prefix=".vanillabtn-import-", dir=staging_parent) as temp:
         staged = Path(temp) / "disc"
-        _extract_image(image, pvd, staged)
+        _extract_image(image, pvd, staged, input_image)
         if staging_parent != out:
             try:
                 staged.rename(out)
@@ -523,22 +524,32 @@ def extract(disc: Path, out: Path, verify_reference: bool = False) -> None:
             except OSError:
                 if not out.is_dir():
                     raise
-        # Replace entries individually so a repeat import keeps unrelated files.
+        # Check destination conflicts before replacing any files.
+        destination = out.resolve()
+        replacements = []
         for source in staged.rglob("*"):
             if source.is_file():
                 target = out / source.relative_to(staged)
-                if not target.parent.resolve().is_relative_to(out.resolve()):
+                if not target.parent.resolve().is_relative_to(destination):
                     raise SystemExit("Import directory entry leaves the destination.")
+                if target.resolve() == input_image:
+                    raise SystemExit("Refusing to overwrite the input disc image.")
+                if target.is_dir():
+                    raise SystemExit("An import file would replace an existing directory.")
                 target.parent.mkdir(parents=True, exist_ok=True)
-                source.replace(target)
+                replacements.append((source, target))
+        for source, target in replacements:
+            source.replace(target)
 
 
-def _extract_image(image: bytes, pvd: bytes, out: Path) -> None:
+def _extract_image(image: bytes, pvd: bytes, out: Path, input_image: Path) -> None:
     out.mkdir(parents=True, exist_ok=True)
     root_path = out.resolve()
     visited = set()
 
     def write_file(path: Path, data: bytes) -> None:
+        if path == input_image:
+            raise SystemExit("Refusing to overwrite the input disc image.")
         if path.resolve() != path or (path.exists() and path.stat().st_nlink > 1):
             raise SystemExit("Refusing to overwrite a linked extraction target.")
         path.write_bytes(data)

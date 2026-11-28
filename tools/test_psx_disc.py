@@ -9,6 +9,25 @@ from unittest.mock import patch
 from tools import psx_disc
 
 
+def image_with_one_file() -> psx_disc.Image:
+    root = psx_disc.PVD_LBA + 1
+    pvd = bytearray(psx_disc.USER)
+    pvd[:6] = b"\x01CD001"
+    struct.pack_into("<I", pvd, 158, root)
+    struct.pack_into("<I", pvd, 166, psx_disc.USER)
+    record = bytearray(34)
+    record[0] = len(record)
+    record[32:] = b"\x01A"
+    struct.pack_into("<I", record, 2, root + 1)
+    struct.pack_into("<I", record, 10, 1)
+    image = psx_disc.Image()
+    for _ in range(psx_disc.PVD_LBA):
+        image.empty_form2_sector(psx_disc.SM_FORM2)
+    image.form1_sector(pvd, psx_disc.DATA_LAST)
+    image.form1_sector(record, psx_disc.DATA_LAST)
+    return image
+
+
 class DiscImportTest(unittest.TestCase):
     def test_legacy_cards_migrate_without_overwriting_or_restoring_deleted_saves(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -35,21 +54,7 @@ class DiscImportTest(unittest.TestCase):
             self.assertFalse((documents / "disc").exists())
 
     def test_extract_checks_file_extent_before_writing(self):
-        root = psx_disc.PVD_LBA + 1
-        pvd = bytearray(psx_disc.USER)
-        pvd[:6] = b"\x01CD001"
-        struct.pack_into("<I", pvd, 158, root)
-        struct.pack_into("<I", pvd, 166, psx_disc.USER)
-        record = bytearray(34)
-        record[0] = len(record)
-        record[32:] = b"\x01A"
-        struct.pack_into("<I", record, 2, root + 1)
-        struct.pack_into("<I", record, 10, 1)
-        image = psx_disc.Image()
-        for _ in range(psx_disc.PVD_LBA):
-            image.empty_form2_sector(psx_disc.SM_FORM2)
-        image.form1_sector(pvd, psx_disc.DATA_LAST)
-        image.form1_sector(record, psx_disc.DATA_LAST)
+        image = image_with_one_file()
         with tempfile.TemporaryDirectory() as temp:
             disc = Path(temp) / "input.bin"
             out = Path(temp) / "extracted"
@@ -61,6 +66,39 @@ class DiscImportTest(unittest.TestCase):
             disc.write_bytes(image.data)
             psx_disc.extract(disc, out)
             self.assertEqual((out / "A").read_bytes(), b"x")
+
+    def test_import_preserves_existing_files_when_an_output_name_is_a_directory(self):
+        image = image_with_one_file()
+        image.form1_sector(b"x", psx_disc.DATA_LAST)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            disc = root / "input.bin"
+            disc.write_bytes(image.data)
+            for kept, blocked in (("A", "license_data.dat"), ("license_data.dat", "A")):
+                with self.subTest(blocked=blocked):
+                    out = root / blocked
+                    (out / blocked).mkdir(parents=True)
+                    (out / kept).write_bytes(b"previous data")
+                    with patch.object(psx_disc, "check_reference_sha1"):
+                        with self.assertRaises(SystemExit):
+                            psx_disc.main(["import", str(disc), "--out", str(out)])
+                    self.assertEqual((out / kept).read_bytes(), b"previous data")
+
+    def test_extraction_preserves_the_input_image_at_an_output_name(self):
+        image = image_with_one_file()
+        image.form1_sector(b"x", psx_disc.DATA_LAST)
+        with tempfile.TemporaryDirectory() as temp:
+            out = Path(temp)
+            disc = out / "license_data.dat"
+            for verify_reference in (False, True):
+                with self.subTest(verify_reference=verify_reference):
+                    disc.write_bytes(image.data)
+                    with patch.object(psx_disc, "check_reference_sha1"):
+                        try:
+                            psx_disc.extract(disc, out, verify_reference)
+                        except SystemExit:
+                            pass
+                    self.assertTrue(disc.read_bytes() == image.data, "extraction changed the input")
 
     def test_directory_record_must_fit_declared_directory_size(self):
         image = psx_disc.Image()

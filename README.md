@@ -165,7 +165,8 @@ or newer on `PATH`, run:
   `MODE2/2352` track starting at `00:00:00`. An `.iso` extension works for the
   same raw 2352-byte-sector dump. Standard 2048-byte-sector ISOs lack the raw layout.
 
-Repeat extraction stages files first and preserves unrelated files in the destination.
+Repeat extraction stages files and checks for conflicting paths before publishing.
+The importer preserves the source image and unrelated files in the destination.
 
 ### Stage a Windows game package
 
