@@ -16,7 +16,6 @@ enum {
     SEQ_TOTAL_VOICES = 24,
     SEQ_MAX_TONES_PER_PROG = 16,
     SEQ_HEADER_SIZE = 15,
-    SEQ_DEFAULT_MAX_SIZE = 0x10000,
     SEQ_MAX_EVENTS_PER_TICK = 256,
     SEQ_TICK_HZ = 60,
     SEQ_US_PER_SEC = 1000000,
@@ -854,9 +853,6 @@ short vanillabtn_seq_open_sized(const uint8_t *data, size_t size, short vab_id) 
     if (!data || vab_id < 0 || vab_id >= SEQ_MAX_VABS) {
         return -1;
     }
-    if (size == 0) {
-        size = SEQ_DEFAULT_MAX_SIZE;
-    }
     if (size < SEQ_HEADER_SIZE) {
         return -1;
     }
@@ -895,10 +891,6 @@ short vanillabtn_seq_open_sized(const uint8_t *data, size_t size, short vab_id) 
     seq_restart_from_start(slot);
     seq_unlock();
     return (short)i;
-}
-
-short vanillabtn_seq_open(const uint8_t *data, short vab_id) {
-    return vanillabtn_seq_open_sized(data, SEQ_DEFAULT_MAX_SIZE, vab_id);
 }
 
 void vanillabtn_seq_close(short handle) {

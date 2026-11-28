@@ -54,7 +54,6 @@ void vanillabtn_seq_disown_voice(int voice);
 void vanillabtn_seq_clear_voices(void);
 
 short vanillabtn_seq_open_sized(const uint8_t *data, size_t size, short vab_id);
-short vanillabtn_seq_open(const uint8_t *data, short vab_id);
 void vanillabtn_seq_close(short handle);
 void vanillabtn_seq_play(short handle, char play_mode, short loop_count);
 void vanillabtn_seq_stop(short handle);
