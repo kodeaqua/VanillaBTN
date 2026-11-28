@@ -80,6 +80,21 @@ if(gpu_source_with_common STREQUAL gpu_source_with_lines)
     message(FATAL_ERROR "Could not patch PsyZ axis-aligned line endpoints.")
 endif()
 
+# Reject lines beyond the PS1 span before expanding them into geometry.
+set(line_axis [=[                if ((dx < 0 ? -dx : dx) >= (dy < 0 ? -dy : dy)) {]=])
+set(bounded_line_axis [=[                enum { MAX_LINE_WIDTH = 1023, MAX_LINE_HEIGHT = 511 };
+                const int width = abs(dx);
+                const int height = abs(dy);
+                if (width > MAX_LINE_WIDTH || height > MAX_LINE_HEIGHT) {
+                    continue;
+                }
+                if (width >= height) {]=])
+string(REPLACE "${line_axis}" "${bounded_line_axis}"
+    gpu_source_with_line_limits "${gpu_source_with_lines}")
+if(gpu_source_with_lines STREQUAL gpu_source_with_line_limits)
+    message(FATAL_ERROR "Could not patch PsyZ line size limits.")
+endif()
+
 # A one-pixel line uses the first endpoint's color.
 set(line_end_color [=[                q[1].r = cr[s + 1];
                 q[1].g = cg[s + 1];
@@ -92,8 +107,8 @@ set(line_end_color [=[                q[1].r = cr[s + 1];
 string(REPLACE "[s + 1]" "[end_color]" point_line_color "${line_end_color}")
 string(REPLACE "${line_end_color}"
     "                const int end_color = (dx != 0 || dy != 0) ? s + 1 : s;\n${point_line_color}"
-    gpu_source_with_point_lines "${gpu_source_with_lines}")
-if(gpu_source_with_lines STREQUAL gpu_source_with_point_lines)
+    gpu_source_with_point_lines "${gpu_source_with_line_limits}")
+if(gpu_source_with_line_limits STREQUAL gpu_source_with_point_lines)
     message(FATAL_ERROR "Could not patch PsyZ one-pixel line colors.")
 endif()
 

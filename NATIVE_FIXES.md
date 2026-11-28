@@ -71,6 +71,8 @@ sampled in the same frame. [GPU pixel test](native/test_gpu_pixels.c)
 - Horizontal and vertical monochrome lines include both endpoints in both
   directions. The D3D12 probe checks their dithering and surrounding pixels.
 - Coincident Gouraud line vertices draw one pixel in the first vertex's color.
+- Lines spanning more than 1023 pixels horizontally or 511 vertically are
+  rejected. The D3D12 probe also verifies the last accepted span on each axis.
 - Textured polygons update the page and blend mode for subsequent draws,
   including when clipping rejects the polygon. The D3D12 probe checks a
   following sprite and blend without an intervening draw-mode command.

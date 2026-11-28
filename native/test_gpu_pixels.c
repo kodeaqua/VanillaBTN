@@ -145,6 +145,36 @@ static int check_point_line(void) {
     return 0;
 }
 
+static int check_large_line(int vertical, int oversized) {
+    enum { WIDTH_LIMIT = 1023, HEIGHT_LIMIT = 511 };
+    const int length = (vertical ? HEIGHT_LIMIT : WIDTH_LIMIT) + oversized;
+    const int start = -(length + 1) / 2;
+    const int end = start + length;
+    LINE_F2 line = {0};
+    SetLineF2(&line);
+    setXY2(&line, vertical ? TILE_ORIGIN : start, vertical ? start : TILE_ORIGIN,
+           vertical ? TILE_ORIGIN : end, vertical ? end : TILE_ORIGIN);
+    setRGB0(&line, RGB888_MAX, 0, 0);
+    termPrim(&line);
+
+    select_draw_mode(0, 0);
+    draw_tile(TILE_ORIGIN, TILE_ORIGIN, 0, 0, 0, 0);
+    DrawOTag((OT_TYPE *)&line);
+    u16 pixels[TILE_PIXELS];
+    read_tile(TILE_ORIGIN, TILE_ORIGIN, pixels);
+    for (int i = 0; i < TILE_PIXELS; ++i) {
+        int across = vertical ? i % TILE_SIZE : i / TILE_SIZE;
+        unsigned expected = !oversized && across == 0 ? COLOR_MAX : 0;
+        unsigned actual = pixels[i] & COLOR_MASK;
+        if (actual != expected) {
+            fprintf(stderr, "line length %d vertical=%d at pixel %d: got %04x, expected %04x\n",
+                    length, vertical, i, actual, expected);
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static int check_blend(int blend, unsigned expected) {
     u16 pixels[TILE_PIXELS];
     select_draw_mode(getTPage(0, blend, 0, 0), 0);
@@ -393,6 +423,10 @@ int main(void) {
     failures += check_flat_line(1, 0);
     failures += check_flat_line(1, 1);
     failures += check_point_line();
+    failures += check_large_line(0, 0);
+    failures += check_large_line(0, 1);
+    failures += check_large_line(1, 0);
+    failures += check_large_line(1, 1);
     failures += check_blend(0, rgb555(6, 15, 18));
     failures += check_blend(1, rgb555(12, 30, COLOR_MAX));
     failures += check_blend(2, rgb555(0, 8, 19));
