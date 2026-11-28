@@ -35,12 +35,9 @@ can decide separately whether to rename the GitHub repository.
   for extraction alone. The running game reads the original image through PsyZ.
 - **Windows save location.** Virtual cards and save backups use Documents.
   The launcher's first-run copy preserves legacy files in LocalAppData.
-- **PsyZ licensing needs clarification before public integration.** VanillaBTN
-  uses MIT, and `NOTICE` identifies the upstream base as CC0. PsyZ marks
-  `psyz/include` and `psyz/src/psyq` as *Unlicensed*. A submodule pins a revision
-  and leaves its licensing unchanged. Confirm the terms for files used by the build
-  before public integration or binary distribution, and record them in `NOTICE`.
-  [PsyZ license](https://github.com/Xeeynamo/psyz/blob/00fb42e6f49c146ad760a1f605b15d2a4ec598f0/LICENSE)
+- **PsyZ redistribution terms need clarification.** The Windows game build uses
+  PsyZ headers labeled *Unlicensed* upstream. Clarify the terms for those headers
+  before publishing a game build. [NOTICE](NOTICE)
 
 ## Porting risks
 
@@ -78,9 +75,9 @@ for graphics types and build integration.
 - **LLVM on Windows.** Clang builds the startup target with ASan and UBSan in
   Debug and LTO in Release. The LLVM frontend also accepts shared headers with
   GNU C extensions that MSVC rejects.
-- **Windows packaging.** The Release install rules stage the startup executable,
-  importer, checksum manifest, and notices. The installed startup package can
-  import a user-provided disc. The playable release in milestone 5 remains pending.
+- **Windows packaging.** The Release install rules stage the executable, importer,
+  checksum manifest, and notices. The game build also stages the PsyZ and SDL
+  license texts.
 - **PsyZ modules.** PsyZ `00fb42e` and its SDL 3.4.20 revision built on Windows x64.
   The upstream overlay sample passed host symbol imports, nested loading, and state
   reset on reload. The native game links the overlays statically with explicit resets.

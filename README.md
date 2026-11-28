@@ -167,17 +167,19 @@ or newer on `PATH`, run:
 
 Repeat extraction stages files first and preserves unrelated files in the destination.
 
-### Stage a Windows startup package
+### Stage a Windows game package
 
-After building Release, install into an empty directory under `build/`:
+After building the local game in Release, install into an empty directory under `build/`:
 
 ```powershell
-cmake --install build/native/windows-x64-release --prefix build/package/VanillaBTN
+cmake --install build/native/game-release --prefix build/package/VanillaBTN
 ```
 
-Distribute the installed directory as a unit. It contains the startup executable,
-importer, checksum manifest, and notices. The executable requires the Visual C++
-x64 runtime. Disc import also requires Python 3.10 or newer on `PATH`.
+The directory contains the executable, disc importer, checksum manifest, and
+license notices. Use it as a unit. The executable requires the Visual C++ x64
+runtime and Python 3.10 or newer on `PATH` to verify and import the disc.
+
+Confirm the redistribution terms in [NOTICE](NOTICE) before publishing a game build.
 
 ## Exceptions
 

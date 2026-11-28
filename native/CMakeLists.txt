@@ -75,6 +75,20 @@ else()
     install(FILES "${CMAKE_CURRENT_BINARY_DIR}/tools/psx_disc.py" DESTINATION tools)
     install(FILES "${CMAKE_CURRENT_BINARY_DIR}/disc/disc.sha1" DESTINATION disc)
     install(FILES "${PROJECT_SOURCE_DIR}/LICENSE" "${PROJECT_SOURCE_DIR}/NOTICE" DESTINATION .)
+    if(VANILLABTN_PSYZ_SOURCE_DIR)
+        set(sdl_source "${VANILLABTN_PSYZ_SOURCE_DIR}/external/SDL")
+        install(FILES "${VANILLABTN_PSYZ_SOURCE_DIR}/LICENSE"
+            DESTINATION licenses RENAME PsyZ-NOTICE.txt)
+        install(FILES "${VANILLABTN_PSYZ_SOURCE_DIR}/psyz/src/psyz/LICENSE"
+            DESTINATION licenses RENAME PsyZ-MPL-2.0.txt)
+        install(FILES "${VANILLABTN_PSYZ_SOURCE_DIR}/decomp/LICENSE"
+            DESTINATION licenses RENAME PsyZ-decomp-MIT.txt)
+        install(FILES "${sdl_source}/LICENSE.txt" DESTINATION licenses RENAME SDL-zlib.txt)
+        install(FILES "${sdl_source}/src/hidapi/LICENSE-bsd.txt"
+            DESTINATION licenses RENAME SDL-HIDAPI-BSD.txt)
+        install(FILES "${sdl_source}/src/video/yuv2rgb/LICENSE"
+            DESTINATION licenses RENAME SDL-yuv2rgb-BSD.txt)
+    endif()
 endif()
 
 add_executable(vanillabtn_seq_test test_seq_player.c seq_player.c)
