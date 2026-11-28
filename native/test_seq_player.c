@@ -288,8 +288,26 @@ static void test_muted_vab_stays_silent_on_volume_change(void) {
     vanillabtn_seq_close(h);
 }
 
+static void test_controller_reset_restores_held_note_pitch(void) {
+    static const uint8_t song[] = {
+        'p', 'Q', 'E', 'S', 0, 0, 0, 1, 0, 60, 0x0f, 0x42, 0x40, 4, 2,
+        0, 0x90, 60, 100, 1, 0xe0, 0, 80, 1, 0xb0, 121, 0, 1, 0xff, 0x2f,
+    };
+    mock_reset();
+    vanillabtn_seq_reset();
+    short h = vanillabtn_seq_open_sized(song, sizeof(song), 2);
+    assert(h == 0);
+    vanillabtn_seq_play(h, 1, 1);
+    vanillabtn_seq_tick();
+    assert(mock_voices[21].pitch > 0x1000);
+    vanillabtn_seq_tick();
+    assert(mock_voices[21].on && mock_voices[21].pitch == 0x1000);
+    vanillabtn_seq_close(h);
+}
+
 int main(void) {
     vanillabtn_seq_set_backend(&mock_backend);
+    test_controller_reset_restores_held_note_pitch();
     test_invalid_headers();
     test_playback_multitone_nrpn_loop_and_pitch_bend();
     test_sfx_coexistence_and_eot_loop();

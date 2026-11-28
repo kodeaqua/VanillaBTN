@@ -500,9 +500,8 @@ static void seq_handle_note_on(short handle, uint8_t channel, uint8_t note, uint
     }
 }
 
-static void seq_handle_pitch_bend(short handle, uint8_t channel, uint8_t lsb, uint8_t msb) {
+static void seq_handle_pitch_bend(short handle, uint8_t channel, uint16_t bend14) {
     SeqSlot *slot = &seq_slots[handle];
-    uint16_t bend14 = (uint16_t)(((uint16_t)(msb & 0x7Fu) << 7) | (uint16_t)(lsb & 0x7Fu));
     int v;
 
     slot->ch[channel].pitch_bend = bend14;
@@ -599,7 +598,7 @@ static void seq_handle_control_change(short handle, uint8_t channel, uint8_t cc,
         ch->vol = SEQ_VOL_MAX;
         ch->expression = SEQ_VOL_MAX;
         ch->pan = SEQ_PAN_CENTER;
-        ch->pitch_bend = SEQ_BEND_CENTER;
+        seq_handle_pitch_bend(handle, channel, SEQ_BEND_CENTER);
         if (ch->damper) {
             ch->damper = 0;
             seq_handle_damper_off(handle, channel);
@@ -723,7 +722,7 @@ static void seq_step_slot(short handle, char status[SEQ_TOTAL_VOICES]) {
             lsb = slot->data[slot->cursor];
             msb = slot->data[slot->cursor + 1];
             slot->cursor += 2;
-            seq_handle_pitch_bend(handle, channel, lsb, msb);
+            seq_handle_pitch_bend(handle, channel, ((msb & 0x7fu) << 7) | (lsb & 0x7fu));
         } else if (status_byte == 0xFFu) {
             uint8_t meta;
             if (slot->cursor >= slot->size) {
