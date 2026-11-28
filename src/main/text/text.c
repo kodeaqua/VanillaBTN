@@ -930,6 +930,7 @@ static u8 *text_draw_string(void *ot, u8 *prim, u16 *text, s16 x, s16 y, s32 sca
     s16 glyphY;
 
 #ifdef __psyz
+    const u16 *start = text;
     if (text == 0)
     {
         return prim;
@@ -1072,7 +1073,11 @@ static u8 *text_draw_string(void *ot, u8 *prim, u16 *text, s16 x, s16 y, s32 sca
         }
         text++;
     }
+#ifdef __psyz
+    text_last_code = text == start ? TEXT_END : text[-1];
+#else
     text_last_code = text[-1];
+#endif
     return prim;
 }
 
@@ -1083,7 +1088,11 @@ static s16 text_end_y(void)
     s16 y = text_pen_y;
     u16 index = text_index;
     u16 *p = text_current;
+#ifdef __psyz
+    if (index != 0 && p != NULL && p[index - 1] == TEXT_LINE_BREAK)
+#else
     if (p[index - 1] == TEXT_LINE_BREAK)
+#endif
     {
         s32 next = y - TEXT_LINE_HEIGHT;
         next -= text_spacing_y;
